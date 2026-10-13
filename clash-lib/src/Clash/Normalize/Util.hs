@@ -100,8 +100,8 @@ import           Clash.Core.Term
 import           Clash.Core.TermInfo  (isClosed)
 import           Clash.Core.Type
   (PiTele (..), TypeView (..), isClockOrReset, mkFunTy, piTeleNameBinders, tyView)
-import           Clash.Rewrite.Scoped.Apply  (runRewrite)
-import           Clash.Rewrite.Scoped.Globals (freshGlobalId)
+import           Clash.Rewrite.Apply  (runRewrite)
+import           Clash.Rewrite.Globals (freshGlobalId)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.

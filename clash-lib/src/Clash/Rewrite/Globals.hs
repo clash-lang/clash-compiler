@@ -18,7 +18,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE DataKinds #-}
 
-module Clash.Rewrite.Scoped.Globals
+module Clash.Rewrite.Globals
   ( lookupBinding
   , freshGlobalId
   , addGlobalBind
@@ -48,7 +48,7 @@ import           Clash.Core.FreeVars  (termGlobalIds)
 import           Clash.Core.HasType   (inferCoreTypeOf)
 import           Clash.Core.NameMap
 import           Clash.Core.Syntax
-import qualified Clash.Rewrite.Scoped.WorkFree as WorkFree
+import qualified Clash.Rewrite.WorkFree as WorkFree
 
 -- | The binding of a global, as a closed term
 lookupBinding :: GlobalId -> RewriteMonad extra (Maybe (Binding (Term 'VoidS)))
@@ -118,7 +118,7 @@ findAlphaEqBinding body = do
 isTopEntity :: GlobalId -> RewriteMonad extra Bool
 isTopEntity g = memberGlobalSet g <$> Lens.view topEntities
 
--- | Whether a term is work free, see 'Clash.Rewrite.Scoped.WorkFree.isWorkFree'.
+-- | Whether a term is work free, see 'Clash.Rewrite.WorkFree.isWorkFree'.
 -- Caches the work-freeness of global binders in the rewrite state.
 isWorkFreeTerm :: HasCallStack => Term n -> RewriteMonad extra Bool
 isWorkFreeTerm e = do

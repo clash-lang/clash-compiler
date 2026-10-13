@@ -216,7 +216,7 @@ instance Hashable DebugOpts where
 -- Other flags, such as writing to a history file or offsetting which applied
 -- transformation to show information from do not affect the result, as it is
 -- possible to enable these but still not perform any debugging checks in
--- functions like 'Clash.Rewrite.Scoped.Apply.applyDebug'. If this is no
+-- functions like 'Clash.Rewrite.Apply.applyDebug'. If this is no
 -- longer the case, this function will need to be changed.
 isDebugging :: DebugOpts -> Bool
 isDebugging opts = or

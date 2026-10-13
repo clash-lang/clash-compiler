@@ -335,13 +335,13 @@ Library
                       Clash.Primitives.Verification
                       Clash.Primitives.Xilinx.ClockGen
 
-                      Clash.Rewrite.Scoped
-                      Clash.Rewrite.Scoped.Apply
-                      Clash.Rewrite.Scoped.Combinators
-                      Clash.Rewrite.Scoped.Globals
-                      Clash.Rewrite.Scoped.History
-                      Clash.Rewrite.Scoped.Whnf
-                      Clash.Rewrite.Scoped.WorkFree
+                      Clash.Rewrite
+                      Clash.Rewrite.Apply
+                      Clash.Rewrite.Combinators
+                      Clash.Rewrite.Globals
+                      Clash.Rewrite.History
+                      Clash.Rewrite.Whnf
+                      Clash.Rewrite.WorkFree
                       Clash.Rewrite.StrategyDSL
                       Clash.Rewrite.StrategyDSL.TH
                       Clash.Rewrite.Types

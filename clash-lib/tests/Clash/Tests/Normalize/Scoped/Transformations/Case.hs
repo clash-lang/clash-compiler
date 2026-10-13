@@ -33,7 +33,7 @@ import Clash.Core.Syntax
   (Alt (..), Distinct, Pat (DefaultPat), PrimUnfolding (NoUnfolding), PrimInfo, Term (..), sink)
 import qualified Clash.Normalize.Scoped.Transformations.Case as S
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (Rewrite, Transform (..))
+import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 

@@ -104,10 +104,10 @@ import Clash.Core.Type
 import Clash.Core.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Util
   (LetGroup (..), inverseTopSortOrder, mkLets, mkVec, regroupLetBindings)
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   ( FrameKind (..), TransformContext, changed, ctxFrames, isLambdaBodyKind
   , isTickKind, setChanged, tfScope )
-import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
+import Clash.Rewrite.Globals (isWorkFreeTerm)
 import Clash.Rewrite.Util
   ( LetBinding (..), isFromInt, isUntranslatable, keepBindings, mkTmBinderFor
   , openLetBindings, removeUnusedBinders, substVars )

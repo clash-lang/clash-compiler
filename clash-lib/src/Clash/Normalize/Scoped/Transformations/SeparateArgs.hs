@@ -46,7 +46,7 @@ import Clash.Core.Term (collectArgsTicks, mkApps, mkLams, mkTicks)
 import Clash.Core.Type
   (SplitFunForall (..), TypeView (..), mkFunTy, piTeleTmArity, piTeleTyArity, splitFunForallTy, tyView)
 import Clash.Core.Util (SplitInfo (..), shouldSplit)
-import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
+import Clash.Rewrite (TransformContext, changed, mkDerivedName, tfScope)
 
 -- | Split apart (global) function arguments that contain types that we want
 -- to separate off, e.g. Clocks. Works on both the definition side (i.e. the

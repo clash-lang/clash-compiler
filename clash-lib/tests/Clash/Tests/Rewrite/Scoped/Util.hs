@@ -39,9 +39,9 @@ import Clash.Core.NameMap (globalEnvElems, lookupGlobalEnv)
 import Clash.Core.Subst (unsinkTerm)
 import Clash.Core.Syntax
 import Clash.Core.Term (AbsBinder (..), collectArgs)
-import Clash.Rewrite.Scoped (rootContext, whnfRW)
-import Clash.Rewrite.Scoped.Apply (applyDebug)
-import qualified Clash.Rewrite.Scoped as Scoped
+import Clash.Rewrite (rootContext, whnfRW)
+import Clash.Rewrite.Apply (applyDebug)
+import qualified Clash.Rewrite as Scoped
 import Clash.Rewrite.Util
 
 import Test.Clash.Rewrite

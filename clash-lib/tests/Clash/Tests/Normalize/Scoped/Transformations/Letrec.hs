@@ -23,10 +23,10 @@ import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Core.Syntax (Distinct, GlobalId, Term)
-import qualified Clash.Rewrite.Scoped.Combinators as SC (bottomupR)
+import qualified Clash.Rewrite.Combinators as SC (bottomupR)
 import Clash.Driver.Types (DebugOpts (..), debugSilent)
-import Clash.Rewrite.Scoped (Rewrite, Transform (..))
-import Clash.Rewrite.Scoped.Apply (applyDebug)
+import Clash.Rewrite (Rewrite, Transform (..))
+import Clash.Rewrite.Apply (applyDebug)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 

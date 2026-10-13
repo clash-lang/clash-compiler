@@ -27,7 +27,7 @@ import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (Wo
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Inline as S
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (Rewrite)
+import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 

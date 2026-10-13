@@ -18,7 +18,7 @@ import qualified Data.ByteString.Lazy as BL
 
 import Clash.Core.Syntax  (S (VoidS))
 import qualified Clash.Core.Syntax as S
-import Clash.Rewrite.Scoped.History (decodeRewriteHistory)
+import Clash.Rewrite.History (decodeRewriteHistory)
 import Clash.Rewrite.Types (RewriteStep (..))
 import Clash.Core.Pretty   ( ClashDoc, ClashAnnotation (..), SyntaxElement (..)
                            , PrettyOptions (..), SubtermPos )
@@ -28,7 +28,7 @@ import RewriteInspector (Diff (..), History, HStep (..), Syntax)
 import qualified RewriteInspector as RW
 
 -- | The terms of the rewrite history: closed terms of scoped Clash Core, see
--- "Clash.Rewrite.Scoped.History"
+-- "Clash.Rewrite.History"
 type Term = S.Term 'VoidS
 
 main :: IO ()

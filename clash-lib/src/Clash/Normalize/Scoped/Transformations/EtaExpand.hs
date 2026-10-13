@@ -48,10 +48,10 @@ import Clash.Core.Syntax
 import Clash.Core.Term (collectArgs, mkLams)
 import Clash.Core.Type (splitFunTy)
 import Clash.Core.Util (internalName)
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   ( FrameKind (KAppFun), TransformContext, Under (LamBody), changed, ctxFrames
   , isTickKind, pushUnder, tfScope, underLam, underLet )
-import Clash.Rewrite.Scoped.Globals (isTopEntity)
+import Clash.Rewrite.Globals (isTopEntity)
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
 -- functions to appear as arguments to higher-order primitives.

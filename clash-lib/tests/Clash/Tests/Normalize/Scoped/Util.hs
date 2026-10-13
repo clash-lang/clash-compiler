@@ -28,7 +28,7 @@ import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkConstant))
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeState (..), TermClassification (..))
-import qualified Clash.Rewrite.Scoped as Scoped (changed)
+import qualified Clash.Rewrite as Scoped (changed)
 import Clash.Rewrite.Types
   (RewriteState (..), Frame (..), Rewrite, Transform (..), pushFrame, rootContext)
 
@@ -38,7 +38,7 @@ import Clash.Core.Syntax
 import Clash.Core.TermInfo (isClosed)
 import Clash.Core.Util (mkLets)
 import qualified Clash.Normalize.Util as Scoped
-import qualified Clash.Rewrite.Scoped.Combinators as Scoped (bottomupR)
+import qualified Clash.Rewrite.Combinators as Scoped (bottomupR)
 
 import Test.Clash.Rewrite
   ( TestDefs (..), mkGlobalBinding, parseTestTermWith, rewriteEnvWithTyCons, runRewriteTest )

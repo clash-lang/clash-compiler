@@ -80,7 +80,7 @@ import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)
 
-import           Clash.Rewrite.Scoped.History (recordRewriteStep)
+import           Clash.Rewrite.History (recordRewriteStep)
 
 import           Clash.Core.FreeVars       (termGlobalIds, teleNameBinders)
 import           Clash.Core.NameMap

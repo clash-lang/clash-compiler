@@ -29,7 +29,7 @@ import Clash.Core.TyCon (mkAlgTyCon)
 import Clash.Core.Evaluator.Types (Env)
 import Clash.Core.TypeEnv (mkTypeEnv)
 import Clash.Core.TysPrim (liftedTypeKind)
-import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
+import Clash.Rewrite.Whnf (evaluatorEnv)
 
 import Test.Clash.Rewrite (mkTyConName, testTyConMap)
 import Test.Clash.Scoped (assertTermAlphaEq, assertTermIs, builtTerm)

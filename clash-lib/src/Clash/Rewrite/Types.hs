@@ -9,7 +9,7 @@
   Type and instance definitions for Rewrite modules
 
   The rewrite context and the transformation type of scoped Clash Core
-  ("Clash.Core.Syntax"). See "Clash.Rewrite.Scoped" for how to write a
+  ("Clash.Core.Syntax"). See "Clash.Rewrite" for how to write a
   transformation.
 
   = The context
@@ -30,7 +30,7 @@
 
   = Let-bindings
 
-  'Clash.Rewrite.Scoped.Whnf.whnfRW' evaluates a subterm with the let-bindings
+  'Clash.Rewrite.Whnf.whnfRW' evaluates a subterm with the let-bindings
   of its context on the heap of the evaluator: the context carries them. The
   context keeps that heap, 'tfHeap', as it is extended: 'pushUnder' adds the
   bindings of a 'LetBody', and sinks it under every other binder. Its keys are
@@ -184,7 +184,7 @@ import Clash.Util.Supply         (Supply, freshId)
 import Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 
 -- | A step of the rewrite history of @-fclash-debug-history@, see
--- "Clash.Rewrite.Scoped.History"
+-- "Clash.Rewrite.History"
 data RewriteStep
   = RewriteStep
   { t_name   :: String
@@ -326,7 +326,7 @@ values bound outside of it, full laziness floats the building out of the
 function, so that it is shared between runs of the function. But an action
 almost always runs once: the floating only allocates the action, and the
 closures it captures, earlier and unconditionally. In the traversals of
-"Clash.Rewrite.Scoped.Combinators" and "Clash.Rewrite.StrategyDSL.TH", that
+"Clash.Rewrite.Combinators" and "Clash.Rewrite.StrategyDSL.TH", that
 happened for every node: GHC built the actions for all constructors before the
 node was matched.
 

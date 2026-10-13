@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Rewrite.Scoped.WorkFree".
+  Tests for "Clash.Rewrite.WorkFree".
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -22,7 +22,7 @@ import Clash.Core.Builder (TmB, appB, deDupTickB, primB, tickB)
 import Clash.Core.NameMap (emptyGlobalEnv, lookupGlobalEnv)
 import Clash.Core.Syntax
 import qualified Clash.Core.TysPrim as P
-import Clash.Rewrite.Scoped.WorkFree
+import Clash.Rewrite.WorkFree
 
 import Test.Clash.Scoped
 

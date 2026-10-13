@@ -2365,7 +2365,7 @@ withTicks ctx ticks0 k = go [] (reverse (List.nubBy eqTick ticks0))
               globals <- Lens.use bindings
               let
                 m0 = initMachine emptyScope emptyNameMap globals (IntMap.empty, 0) attrsC
-                -- See 'Clash.Rewrite.Scoped.Whnf.evaluatorEnv'
+                -- See 'Clash.Rewrite.Whnf.evaluatorEnv'
                 env0 = Env te (PrimReductions primReductionMap Nothing)
                 attrsE = nfData env0 m0 (termToDataError . mTerm)
               case attrsE of

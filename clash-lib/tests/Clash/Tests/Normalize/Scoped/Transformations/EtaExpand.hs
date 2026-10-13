@@ -21,7 +21,7 @@ import Test.Tasty.HUnit
 import Clash.Core.Syntax (GlobalId)
 import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (Rewrite, Transform (..))
+import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState)
 

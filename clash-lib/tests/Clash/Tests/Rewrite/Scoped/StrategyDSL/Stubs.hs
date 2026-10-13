@@ -26,7 +26,7 @@ import Clash.Core.Builder
 import Clash.Core.FreeVars (teleNameBinders)
 import Clash.Core.Subst (unsinkTerm)
 import Clash.Core.Syntax hiding (Name)
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   (Rewrite, Transform (..), TransformContext, changed, ctxFrames)
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH

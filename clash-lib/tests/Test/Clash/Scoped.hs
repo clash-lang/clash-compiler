@@ -224,10 +224,10 @@ import Clash.Core.Term (mkLams, mkTyLams)
 import Clash.Core.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types (CompCtx, LocalId (..), compCtxFromList)
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   ( Rewrite, Transform (..), Frame (LetBinding), pushFrame, rootContext
   , underAlt, underLam, underLet, underLetRec, underTyLam)
-import qualified Clash.Rewrite.Scoped as Scoped
+import qualified Clash.Rewrite as Scoped
 import Clash.Rewrite.Types (RewriteEnv, RewriteMonad, RewriteState (..))
 import qualified Clash.Rewrite.Util as Util (changed)
 import qualified Clash.Rewrite.Types as C

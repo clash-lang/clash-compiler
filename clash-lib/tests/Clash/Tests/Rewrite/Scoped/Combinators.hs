@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Rewrite.Scoped.Combinators" and the context of
+  Tests for "Clash.Rewrite.Combinators" and the context of
   "Clash.Rewrite.Types"
 -}
 
@@ -25,7 +25,7 @@ import qualified Clash.Core.Name as C
 
 import Clash.Core.Alpha (aeqTm)
 import Clash.Core.Syntax
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
 
 import Test.Clash.Scoped
   ( TestScope (..), assertTermAlphaEq, assertTermIs, closedTerm, emptyTestScope

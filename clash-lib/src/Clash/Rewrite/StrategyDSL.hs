@@ -21,7 +21,7 @@
 
   = Scoped Core
 
-  The transformations are those of scoped Clash Core ("Clash.Rewrite.Scoped"):
+  The transformations are those of scoped Clash Core ("Clash.Rewrite"):
   declare one with 'toTransformation', and a whole-term pass with
   'pass'. 'Clash.Rewrite.StrategyDSL.TH.compileStrategy' compiles
   a strategy. Workers take a 'Clash.Rewrite.Types.TransformContext'
@@ -192,19 +192,19 @@ data Step
 -- | A complete rewriting strategy.
 data Strat
   = TopDown Step
-  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.topdownR': repeat the step at each
+  -- ^ Fused 'Clash.Rewrite.Combinators.topdownR': repeat the step at each
   -- node until it no longer fires, then descend.
   | BottomUp Step
-  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.bottomupR': descend first, run the
+  -- ^ Fused 'Clash.Rewrite.Combinators.bottomupR': descend first, run the
   -- step once on the rebuilt node.
   | TopDownFix Step
-  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.topdownFixR'. Mind its soundness
-  -- precondition (Note [topdownFixR] in "Clash.Rewrite.Scoped.Combinators").
+  -- ^ Fused 'Clash.Rewrite.Combinators.topdownFixR'. Mind its soundness
+  -- precondition (Note [topdownFixR] in "Clash.Rewrite.Combinators").
   | TopDownSuc Step
-  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.topdownSucR': stop at the first
+  -- ^ Fused 'Clash.Rewrite.Combinators.topdownSucR': stop at the first
   -- success, neither repeating nor descending below it.
   | InnerMost Step
-  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.innerMost': bottom-up; when the step
+  -- ^ Fused 'Clash.Rewrite.Combinators.innerMost': bottom-up; when the step
   -- fires, re-traverse the result until the innermost fixpoint is reached.
   | Pass String Name
   -- ^ A whole-term pass: @apply \<name\> \<rewrite\>@, for transformations
@@ -251,7 +251,7 @@ innerMost  = InnerMost . toStep
 
 -- | A whole-term pass of a rewrite of scoped Core, i.e. a function of type
 -- @forall n. Distinct n => TransformContext n -> Term n -> RewriteMonad extra
--- (Term n)@, see "Clash.Rewrite.Scoped".
+-- (Term n)@, see "Clash.Rewrite".
 pass :: String -> Name -> Strat
 pass = Pass
 
@@ -268,7 +268,7 @@ infixr 5 !->
 infixr 5 >-!
 
 -- | The combinators shared by both DSL layers. Fixities match
--- "Clash.Rewrite.Scoped.Combinators"; a strategy spec module should import only
+-- "Clash.Rewrite.Combinators"; a strategy spec module should import only
 -- this module, so the names are unambiguous there.
 class Strategic a where
   -- | Apply two strategies in succession.

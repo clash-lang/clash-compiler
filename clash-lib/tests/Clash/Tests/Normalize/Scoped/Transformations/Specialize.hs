@@ -32,7 +32,7 @@ import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import qualified Clash.Normalize.Scoped.Transformations.Inline as InlineS
 import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
 import Clash.Normalize.Types (NormalizeState, specialisationCache)
-import Clash.Rewrite.Scoped (Rewrite, Transform (..))
+import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..), extra)
 import Clash.Util.Supply (newSupply)

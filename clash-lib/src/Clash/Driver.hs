@@ -111,7 +111,7 @@ import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), SomeBlackBoxFunction (..), Component (..), HWTypeTranslator, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Netlist.Util               (checkTopEntityPorts)
-import           Clash.Rewrite.Scoped.History     (startRewriteHistory)
+import           Clash.Rewrite.History     (startRewriteHistory)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Core.NameMap
@@ -264,7 +264,7 @@ replaceChar a b = map go
     | otherwise = c
 
 -- | Start the rewrite history of @-fclash-debug-history@, if it is on: a
--- file with just the header, see "Clash.Rewrite.Scoped.History"
+-- file with just the header, see "Clash.Rewrite.History"
 startHistoryFile :: Maybe FilePath -> IO ()
 startHistoryFile = mapM_ startRewriteHistory
 

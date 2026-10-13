@@ -77,7 +77,7 @@ import Clash.Core.Type
 import Clash.Core.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Util (mkVec, shouldSplit)
 import Clash.Normalize.Util (shouldReduce)
-import Clash.Rewrite.Scoped
+import Clash.Rewrite
   ( FrameKind (..), TransformContext, Under (LamBody)
   , changed, ctxFrames, pushUnder, setChanged, tfScope, whnfRW )
 import Clash.Rewrite.Util

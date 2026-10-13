@@ -17,7 +17,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Clash.Rewrite.Scoped.Combinators
+module Clash.Rewrite.Combinators
   ( allR
   , descendLet
   , (!->)

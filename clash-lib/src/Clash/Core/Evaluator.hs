@@ -151,7 +151,7 @@ whnf env isSubj m0 k
     Nothing -> k (unwindStack m)
 
 {- [Note: forcing special primitives]
-The normalizer evaluates terms to WHNF ('Clash.Rewrite.Scoped.Whnf.whnfRW')
+The normalizer evaluates terms to WHNF ('Clash.Rewrite.Whnf.whnfRW')
 in two kinds of places:
 
   1. The case-of-known-constructor transformation
