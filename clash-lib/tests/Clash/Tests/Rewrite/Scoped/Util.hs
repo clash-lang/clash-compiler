@@ -44,7 +44,7 @@ import Clash.Rewrite.Scoped (rootContext, whnfRW)
 import qualified Clash.Rewrite.Scoped as Scoped
 import Clash.Rewrite.Scoped.Util
 
-import Test.Clash.Rewrite (addTyConName, firstUniques, runRewriteTest, showPprU, withCurFun)
+import Test.Clash.Rewrite (addTyConName, firstUniques, runRewriteTest, showPprU)
 import Test.Clash.Scoped
 
 -- | Render a term as text, with types

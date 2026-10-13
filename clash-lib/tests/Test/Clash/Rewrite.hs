@@ -58,10 +58,12 @@ import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (apply, changed, runRewrite)
 import Clash.Core.Scoped.Builder
-  ( Key, TmB, TyB, appB, appTyB, caseB, constTyB, dataAltB, dataB, defaultAltB
-  , forAllTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB, runClosedType
-  , tyAppB, tyLamB, uniqueKey, varB, varTyB )
-import qualified Clash.Core.Scoped.Convert as S (mkGlobalId)
+  ( runDataConSig, Key, TickB, TmB, TyB, appB, appTyB, caseB, castB, constTyB, dataAltB, dataB, deDupTickB
+  , defaultAltB, forAllTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB
+  , nameModTickB, noDeDupTickB, primB, runClosedType, srcSpanTickB, tickB, tyAppB
+  , tyLamB, uniqueKey, varB, varTyB )
+import qualified Clash.Core.Scoped.Convert as S (mkAlgTyCon, mkDataCon, mkGlobalId, mkPrimInfo)
+import Clash.Core.Scoped.Syntax (PrimInfo (..), PrimUnfolding (NoUnfolding))
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
 import Clash.Core.Scoped.Sig (DataConSig (..))
 import Clash.Core.Scoped.Syntax (GlobalId (..), teleLength)
@@ -759,6 +761,32 @@ parseToTermQQ = TH.QuasiQuoter{
 --     first binders, annotated with their kinds, like the type binders of a
 --     lambda: @MkE (b :: Type) (y :: b)@.
 --
+--   * Primitives, as qualified variables annotated with their (closed) type:
+--     @(GHC.Num.Integer.integerMul :: Integer -> Integer -> Integer)@. They
+--     do variable work, have a single result and no unfolding. Without an
+--     annotation, a primitive has type 'freeVarType'. The module @Prim@
+--     qualifies primitives whose names are not qualified (@Prim.f@), and
+--     @Core.prim \@"name"@ is the primitive of any name. A test can define
+--     its own primitives, by name, with 'parseTestTermWith'.
+--
+--   * Literals annotated with their type, for the literals that aren't
+--     @Int#@ literals: @(3 :: Integer)@, @(3 :: Natural)@, @(3 :: Word)@, and
+--     negative literals @(-1)@.
+--
+--   * Binders of type variables of other kinds than the ones above, such as
+--     a type variable, annotated as @Core.Kind k@:
+--     @\\(k :: Type) (a :: Core.Kind k) -> ..@.
+--
+--   * Empty case-expressions: @(case x of {}) :: Int@.
+--
+--   * Equality constraints @a ~ b@, see 'liftedEqTyConName'.
+--
+--   * Casts and ticks, as applications of the pseudo-functions of the module
+--     @Core@: @Core.cast \@T1 \@T2 e@ casts @e@ from @T1@ to @T2@,
+--     @Core.deDup e@, @Core.noDeDup e@ and @Core.srcSpan e@ are ticks, and
+--     @Core.prefixName \@"n" e@ (and @suffixName@, @suffixNameP@, @setName@)
+--     are name modifiers.
+--
 --   * Non-recursive let-bindings, written with a bang:
 --     @let { !(x :: Int) = 1 } in x@. Like in Haskell, where a bang binding
 --     can't be recursive, its right-hand side is outside of its scope. A let
@@ -869,9 +897,42 @@ testGlobalId s ty = S.mkGlobalId (parseName (Ident () s)) (runClosedType (testTy
 
 -- | Parse a term of scoped Core, see the section header
 parseTestTerm :: HasCallStack => String -> TestTerm
-parseTestTerm s = TestTerm b (freeDecls fr)
+parseTestTerm = parseTestTermWith mempty
+
+-- | Data constructors and primitives that a test defines, which the terms it
+-- parses with 'parseTestTermWith' mention by name
+data TestDefs = TestDefs
+  { testDefDataCons :: [C.DataCon]
+  -- ^ Data constructors, e.g. those of a type constructor that a test
+  -- defines. They take precedence over those of 'testDataCons'.
+  , testDefPrims :: [PrimInfo]
+  -- ^ Primitives, by their names. A type annotation on a primitive the term
+  -- mentions overrides the type of its definition. A primitive that is not
+  -- one of these does variable work, see the section header.
+  , testDefGlobals :: [GlobalId]
+  -- ^ Global variables, with their types, see 'testGlobalId'. A global
+  -- variable the term mentions with a type annotation, or that is not one of
+  -- these, has the type of its annotation.
+  }
+
+instance Semigroup TestDefs where
+  TestDefs dcs1 ps1 gs1 <> TestDefs dcs2 ps2 gs2 =
+    TestDefs (dcs1 <> dcs2) (ps1 <> ps2) (gs1 <> gs2)
+
+instance Monoid TestDefs where
+  mempty = TestDefs [] [] []
+
+-- | Parse a term of scoped Core that may also mention the data constructors
+-- and primitives that a test defines, see 'TestDefs'
+parseTestTermWith :: HasCallStack => TestDefs -> String -> TestTerm
+parseTestTermWith defs s = TestTerm b (freeDecls fr)
  where
-  (b, fr) = runWriter (spTm emptyPEnv (fromParseResult (parseExpWithMode scopedParseMode s)))
+  (b, fr) = runWriter (spTm emptyPEnv {_peDefs = defs} (fromParseResult (parseExpWithMode scopedParseMode s)))
+
+-- | A quasiquoter for strings that span several lines, e.g. for
+-- 'parseTestTermWith'
+strQQ :: TH.QuasiQuoter
+strQQ = stringQQ 'id
 
 -- | Parse a type of scoped Core, see the section header
 parseTestType :: HasCallStack => String -> TestType
@@ -910,7 +971,7 @@ stringQQ f = TH.QuasiQuoter
 scopedParseMode :: ParseMode
 scopedParseMode = termParseMode
   { extensions =
-      map EnableExtension [BangPatterns, DataKinds, KindSignatures, MagicHash]
+      map EnableExtension [BangPatterns, DataKinds, EmptyCase, GADTs, KindSignatures, MagicHash]
         <> extensions termParseMode
   }
 
@@ -920,16 +981,19 @@ data PEnv = PEnv
   { _peTyVars :: !IntSet.IntSet
   , _peVars :: !IntSet.IntSet
   , _peSigs :: !(IntMap.IntMap TyB)
+  , _peDefs :: TestDefs
+  -- ^ The data constructors and primitives of the test, see
+  -- 'parseTestTermWith'
   }
 
 emptyPEnv :: PEnv
-emptyPEnv = PEnv IntSet.empty IntSet.empty IntMap.empty
+emptyPEnv = PEnv IntSet.empty IntSet.empty IntMap.empty mempty
 
 bindTyKey :: Key -> PEnv -> PEnv
-bindTyKey k (PEnv tys tms sigs) = PEnv (IntSet.insert k tys) tms sigs
+bindTyKey k (PEnv tys tms sigs dcs) = PEnv (IntSet.insert k tys) tms sigs dcs
 
 bindTmKey :: Key -> PEnv -> PEnv
-bindTmKey k (PEnv tys tms sigs) = PEnv tys (IntSet.insert k tms) sigs
+bindTmKey k (PEnv tys tms sigs dcs) = PEnv tys (IntSet.insert k tms) sigs dcs
 
 -- | The free variables of a parsed term: the type variables by key, and the
 -- term variables by key, with the type of the first occurrence that has one
@@ -1048,7 +1112,12 @@ resolveTyConName s = case lookupByOcc (C.nameOcc . C.tyConName) testTyCons s of
 
 -- | A data constructor of 'testDataCons', see 'lookupByOcc'
 resolveDataCon :: HasCallStack => String -> C.DataCon
-resolveDataCon s = case lookupByOcc (C.nameOcc . C.dcName) testDataCons s of
+resolveDataCon = resolveDataConIn []
+
+-- | A data constructor of the given ones, or else of 'testDataCons', see
+-- 'lookupByOcc'
+resolveDataConIn :: HasCallStack => [C.DataCon] -> String -> C.DataCon
+resolveDataConIn dcs s = case lookupByOcc (C.nameOcc . C.dcName) dcs s <|> lookupByOcc (C.nameOcc . C.dcName) testDataCons s of
   Just dc -> dc
   Nothing -> error ("resolveDataCon: unknown or ambiguous data constructor: " <> s)
 
@@ -1061,7 +1130,7 @@ tyConB = \case
   s -> constTyB (C.TyCon (resolveTyConName s))
 
 spTy :: (HasCallStack, Show l) => PEnv -> Type l -> P TyB
-spTy env@(PEnv tvs _ _) = \case
+spTy env@(PEnv tvs _ _ _) = \case
   TyParen _ t -> spTy env t
   TyCon _ qn -> pure (tyConB (qNameString qn))
   TyVar _ nm0 -> do
@@ -1075,6 +1144,10 @@ spTy env@(PEnv tvs _ _) = \case
       pure (foldr (\(k, nm, ki) -> forAllTyB k nm ki) body bs)
   TyApp _ t1 t2 -> appTyB <$> spTy env t1 <*> spTy env t2
   TyFun _ t1 t2 -> funTyB <$> spTy env t1 <*> spTy env t2
+  TyEquals _ t1 t2 -> do
+    a <- spTy env t1
+    b <- spTy env t2
+    pure (appTyB (appTyB (appTyB (constTyB (C.TyCon liftedEqTyConName)) liftedTypeKindB) a) b)
   TyPromoted _ (PromotedInteger _ i _) -> pure (litTyB (C.NumTy i))
   TyPromoted _ (PromotedString _ s _) -> pure (litTyB (C.SymTy s))
   t -> error ("parseTestType: " <> show t)
@@ -1096,21 +1169,42 @@ spTm env = \case
   Paren _ e -> spTm env e
   ExpTypeSig _ e t -> case stripParens e of
     Var _ (UnQual _ nm) -> varRef env nm (Just t)
+    Var _ qn@Qual {} -> pure (primRef env qn (Just t))
+    App _ (Var _ (Qual _ (ModuleName _ "Core") (Ident _ "prim"))) (TypeApp _ (TyPromoted _ (PromotedString _ nm _))) ->
+      pure (primNamed env nm (Just t))
     Case _ scrut alts -> spCase env scrut alts t
+    Lit _ l -> pure (literalB (typedLiteral l t))
+    NegApp _ (Lit _ l@Int {}) -> pure (literalB (negateLiteral (typedLiteral l t)))
     _ -> error ("parseTestTerm: unsupported type annotation: " <> show e)
+  App _ (App _ (App _ (Var _ (Qual _ (ModuleName _ "Core") (Ident _ "cast"))) (TypeApp _ t1)) (TypeApp _ t2)) e ->
+    castB <$> spTm env e <*> spTy env t1 <*> spTy env t2
+  App _ (App _ (Var _ (Qual _ (ModuleName _ "Core") (Ident _ op))) (TypeApp _ t)) e
+    | Just nmMod <- lookup op nameMods -> do
+        ty <- spTy env t
+        tickB (nameModTickB nmMod ty) <$> spTm env e
+  App _ (Var _ (Qual _ (ModuleName _ "Core") (Ident _ op))) e
+    | Just tk <- lookup op ticks -> tickB tk <$> spTm env e
+  Var _ (Qual _ (ModuleName _ "Core") nm) ->
+    error ("parseTestTerm: unknown or partially applied pseudo-function Core." <> nameString nm)
+  App _ (Var _ (Qual _ (ModuleName _ "Core") (Ident _ "prim"))) (TypeApp _ (TyPromoted _ (PromotedString _ nm _))) ->
+    pure (primNamed env nm (Nothing :: Maybe (Type ())))
+  Var _ qn@Qual {} -> pure (primRef env qn Nothing)
+  NegApp _ (Lit _ (Int _ i _)) -> pure (literalB (C.IntLiteral (negate i)))
+  Lit _ (String _ str _) -> pure (literalB (C.StringLiteral str))
+  Lit _ (Char _ c _) -> pure (literalB (C.CharLiteral c))
   App _ e1 (TypeApp _ t) -> tyAppB <$> spTm env e1 <*> spTy env t
   App _ e1 e2 -> appB <$> spTm env e1 <*> spTm env e2
   InfixApp _ e1 op e2 -> do
     f <- case op of
       QVarOp _ (UnQual _ nm) -> varRef env nm Nothing
-      QConOp _ qn -> pure (dataB (resolveDataCon (qNameString qn)))
+      QConOp _ qn -> pure (dataB (resolveDataConIn (testDefDataCons (_peDefs env)) (qNameString qn)))
       o -> error ("parseTestTerm: unsupported operator: " <> show o)
     a1 <- spTm env e1
     a2 <- spTm env e2
     pure (appB (appB f a1) a2)
   Lambda _ pats body -> spLams env pats body
   Var _ (UnQual _ nm) -> varRef env nm Nothing
-  Con _ qn -> pure (dataB (resolveDataCon (qNameString qn)))
+  Con _ qn -> pure (dataB (resolveDataConIn (testDefDataCons (_peDefs env)) (qNameString qn)))
   Lit _ (Int _ i _) -> pure (literalB (C.IntLiteral i))
   Let _ (BDecls _ decls) body -> spLet env decls body
   e@Case {} ->
@@ -1121,10 +1215,71 @@ spTm env = \case
     Paren _ e -> stripParens e
     e -> e
 
+-- | The ticks that are pseudo-functions of the module @Core@
+ticks :: [(String, TickB)]
+ticks = [("deDup", deDupTickB), ("noDeDup", noDeDupTickB), ("srcSpan", srcSpanTickB C.noSrcSpan)]
+
+-- | The name modifiers that are pseudo-functions of the module @Core@
+nameMods :: [(String, C.NameMod)]
+nameMods =
+  [ ("prefixName", C.PrefixName), ("suffixName", C.SuffixName)
+  , ("suffixNameP", C.SuffixNameP), ("setName", C.SetName) ]
+
+-- | A primitive, by its qualified name, with an optional (closed) type
+-- annotation. The module @Prim@ qualifies the names of primitives that are
+-- not qualified: @Prim.f@ is the primitive @f@.
+primRef :: (HasCallStack, Show l) => PEnv -> QName l -> Maybe (Type l) -> TmB
+primRef env qn = primNamed env $ case qn of
+  Qual _ (ModuleName _ "Prim") nm -> nameString nm
+  _ -> qNameString qn
+
+-- | A primitive by its name: one the test defines (see 'TestDefs'), at the
+-- given (closed) type if there is one; or else one of the given type, which
+-- does variable work
+primNamed :: (HasCallStack, Show l) => PEnv -> String -> Maybe (Type l) -> TmB
+primNamed env nm annot =
+  case (List.find ((`elem` [Text.pack nm, ghcName (Text.pack nm)]) . primName) (testDefPrims (_peDefs env)), annot) of
+    (Just p, Nothing) -> primB p
+    (Just p, Just _) ->
+      primB (S.mkPrimInfo (primName p) (runClosedType ty) (primWorkInfo p) (primMultiResult p) (primUnfolding p))
+    (Nothing, _) ->
+      primB (S.mkPrimInfo (ghcName (Text.pack nm)) (runClosedType ty) C.WorkVariable C.SingleResult NoUnfolding)
+ where
+  ty = maybe freeVarTyB (fst . runWriter . spTy emptyPEnv) annot
+
+-- | A literal annotated with its type, see the section header
+typedLiteral :: (HasCallStack, Show l) => Literal l -> Type l -> C.Literal
+typedLiteral l t = case (l, stripTyParens t) of
+  (Int _ i _, TyCon _ (UnQual _ (Ident _ tc))) -> case tc of
+    "Int" -> C.IntLiteral i
+    "Integer" -> C.IntegerLiteral i
+    "Natural" -> C.NaturalLiteral i
+    "Word" -> C.WordLiteral i
+    _ -> err
+  (String _ str _, _) -> C.StringLiteral str
+  (Char _ c _, _) -> C.CharLiteral c
+  _ -> err
+ where
+  err = error ("parseTestTerm: unsupported literal: " <> show l <> " :: " <> show t)
+  stripTyParens = \case
+    TyParen _ ty -> stripTyParens ty
+    ty -> ty
+
+-- | The negation of a numeric literal
+negateLiteral :: HasCallStack => C.Literal -> C.Literal
+negateLiteral = \case
+  C.IntLiteral i -> C.IntLiteral (negate i)
+  C.IntegerLiteral i -> C.IntegerLiteral (negate i)
+  l -> error ("parseTestTerm: can't negate the literal " <> show l)
+
 -- | A reference to a variable, with an optional type annotation
 varRef :: (HasCallStack, Show l) => PEnv -> Name l -> Maybe (Type l) -> P TmB
-varRef env@(PEnv _ tms _) nm0 annot = case parseNameScope nm0 of
-  (nm, C.GlobalId) ->
+varRef env@(PEnv _ tms _ defs) nm0 annot = case parseNameScope nm0 of
+  (nm, C.GlobalId)
+    | Nothing <- annot
+    , Just g <- List.find ((== C.nameUniq nm) . C.nameUniq . globalIdName) (testDefGlobals defs)
+    -> pure (globalB g)
+    | otherwise ->
     -- The type of a global is closed, so its type variables are not free
     -- variables of the term
     let ty = maybe freeVarTyB (fst . runWriter . spTy env) annot
@@ -1142,7 +1297,7 @@ varRef env@(PEnv _ tms _) nm0 annot = case parseNameScope nm0 of
 -- annotation, or that of a type signature of an enclosing let-expression, see
 -- 'parsePats'.
 spIdBinder :: (HasCallStack, Show l) => PEnv -> Pat l -> P (Key, C.Name C.Term, TyB)
-spIdBinder env@(PEnv _ _ sigs) = \case
+spIdBinder env@(PEnv _ _ sigs _) = \case
   PParen _ p -> spIdBinder env p
   PatTypeSig _ (PVar _ nm0) t -> do
     let nm = parseName nm0
@@ -1173,10 +1328,12 @@ spLams env (p : ps) body = case kindBinderPat p of
     lamB k nm ty <$> spLams (bindTmKey k env) ps body
 
 -- | A binder annotated with a kind, which binds a type variable: its name and
--- kind. The kinds are @Type@, @Nat@, @Symbol@, and functions between them.
+-- kind. The kinds are @Type@, @Nat@, @Symbol@, and functions between them, or
+-- any kind @k@ annotated as @Core.Kind k@, see 'coreKind'.
 kindBinderPat :: Pat l -> Maybe (Name l, Type l)
 kindBinderPat = \case
   PParen _ q -> kindBinderPat q
+  PatTypeSig _ (PVar _ nm) ki | Just ki' <- coreKind ki -> Just (nm, ki')
   PatTypeSig _ (PVar _ nm) ki | isKind ki -> Just (nm, ki)
   _ -> Nothing
  where
@@ -1186,14 +1343,23 @@ kindBinderPat = \case
     TyFun _ t1 t2 -> isKind t1 && isKind t2
     _ -> False
 
+-- | The kind @k@ of an annotation @Core.Kind k@, which marks the binder of a
+-- type variable whose kind is not one that 'kindBinderPat' recognizes, such
+-- as a type variable: @\\(k :: Type) (a :: Core.Kind k) -> ..@
+coreKind :: Type l -> Maybe (Type l)
+coreKind = \case
+  TyParen _ t -> coreKind t
+  TyApp _ (TyCon _ (Qual _ (ModuleName _ "Core") (Ident _ "Kind"))) ki -> Just ki
+  _ -> Nothing
+
 -- | A let-expression: recursive, or non-recursive if all its bindings have a
 -- bang
 spLet :: (HasCallStack, Show l) => PEnv -> [Decl l] -> Exp l -> P TmB
-spLet env0@(PEnv tys tms sigs0) decls body = do
+spLet env0@(PEnv tys tms sigs0 dcs) decls body = do
   sigs <- IntMap.fromList . concat <$> sequence
     [ (\ty -> [ (nameKey (parseName nm), ty) | nm <- nms ]) <$> spTy env0 t
     | TypeSig _ nms t <- decls ]
-  let env = PEnv tys tms (IntMap.union sigs sigs0)
+  let env = PEnv tys tms (IntMap.union sigs sigs0) dcs
       binds = [ (p, e) | PatBind _ p (UnGuardedRhs _ e) Nothing <- decls ]
       others = [ d | d <- decls, not (isTypeSig d), not (isPatBind d) ]
   Monad.unless (null others) (error ("parseTestTerm: unsupported declarations: " <> show others))
@@ -1244,7 +1410,7 @@ spCase env scrut alts ty = caseB <$> spTm env scrut <*> spTy env ty <*> mapM pAl
     PLit _ sign (Int _ i _) ->
       litAltB (C.IntLiteral (case sign of Negative _ -> negate i; Signless _ -> i)) <$> spTm env rhs
     PApp _ qn ps -> do
-      let dc = resolveDataCon (qNameString qn)
+      let dc = resolveDataConIn (testDefDataCons (_peDefs env)) (qNameString qn)
           nExt = case C.dcSig dc of DataConSig _ ext _ -> teleLength ext
           (exPs, idPs) = List.splitAt nExt ps
       Monad.unless (length exPs == nExt && all (Maybe.isJust . kindBinderPat) exPs) $
@@ -1270,6 +1436,35 @@ spCase env scrut alts ty = caseB <$> spTm env scrut <*> spTy env ty <*> mapM pAl
       ki <- spTy env1 ki0
       exTvs (bindTyKey key env1) qs $ \env2 tvs -> k env2 ((key, nm, ki) : tvs)
     Nothing -> error "parseTestTerm: impossible"
+
+-- | A data constructor of scoped Core: its name (see 'parseTestTerm' and
+-- 'testDefDataCons'), unique, tag (1 for the first constructor of its type),
+-- universally and existentially quantified type variables ('tyVarD' or
+-- 'kindedTyVarD'), and the types of its fields and its result, which mention
+-- them by their identifiers. Its fields are lazy.
+testDataCon
+  :: HasCallStack
+  => String -> Unique -> Int -> [ScopeDecl] -> [ScopeDecl] -> [TestType] -> TestType
+  -> C.DataCon
+testDataCon nm u tag univ ext args res =
+  S.mkDataCon (C.mkUnsafeName C.User (ghcName (Text.pack nm)) u) tag ty sig (map (const C.Lazy) args) []
+ where
+  tvs = map tvOf (univ <> ext)
+  tvOf = \case
+    ScopeDecl _ (DeclTyVar k n ki) -> (k, n, testTypeB ki)
+    _ -> error ("testDataCon: not a type variable in the signature of " <> nm)
+  ty = runClosedType
+    (foldr (\(k, n, ki) -> forAllTyB k n ki) (foldr (funTyB . testTypeB) (testTypeB res) args) tvs)
+  sig = runDataConSig (map tvOf univ) (map tvOf ext) (map testTypeB args)
+
+-- | A data type of scoped Core, with the given name (see 'resolveTyConName'),
+-- type variables of kind @Type@, by their identifiers, and data constructors
+testAlgTyCon :: HasCallStack => String -> [String] -> [C.DataCon] -> C.TyCon
+testAlgTyCon nm tvs dcs =
+  S.mkAlgTyCon tcNm (runClosedType (foldr (\_ -> funTyB liftedTypeKindB) liftedTypeKindB tvs))
+    (length tvs) (C.DataTyCon dcs) False
+ where
+  tcNm = resolveTyConName nm
 
 -- | The name 'parseType' produces for a type constructor whose name it
 -- derives a unique from, e.g. @Int@
@@ -1541,9 +1736,12 @@ eqTy k a b = foldl C.AppTy C.eqPrimTy [k, k, a, b]
 -- equality constraints that 'Clash.Normalize.Util.substWithTyEq' and
 -- 'Clash.Normalize.Util.tvSubstWithTyEq' substitute
 liftedEqTy :: C.Type -> C.Type -> C.Type
-liftedEqTy a b = C.mkTyConApp eqTyConNm [C.liftedTypeKind, a, b]
- where
-  eqTyConNm = C.mkUnsafeName C.User (Text.pack "~") (fromGhcUnique eqTyConKey)
+liftedEqTy a b = C.mkTyConApp liftedEqTyConName [C.liftedTypeKind, a, b]
+
+-- | The name of the type constructor of 'liftedEqTy'. The parser of scoped
+-- Core parses @a ~ b@ as its application to @Type@, @a@ and @b@.
+liftedEqTyConName :: C.TyConName
+liftedEqTyConName = C.mkUnsafeName C.User (Text.pack "~") (fromGhcUnique eqTyConKey)
 
 -- | @data V n where VNil :: (n ~ 0) => V n; VCons :: forall m. (n ~ m + 1) =>
 -- Int -> V m -> V n@, a data type with equality constraints and an

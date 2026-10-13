@@ -153,6 +153,18 @@ module Test.Clash.Scoped
     -- * Running scoped transformations in a test scope
   , runScopedIn
   , runScopedAt
+  , assertRewritesTo
+  , assertRewritesAt
+  , assertNoRewrite
+  , assertNoRewriteAt
+  , withBinderClashes
+  , withCapture
+  , assertCaptureRewritesTo
+  , withCurFun
+  , withTopEntities
+  , assertSpecializesTo
+  , mapGlobals
+  , newBindings
   , mkGlobalBindings
   , globalsByOcc
   , testCompCtx
@@ -229,12 +241,14 @@ import qualified Data.IntSet as IntSet
 import qualified Data.Hashable as Hashable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
+import qualified Data.Maybe as Maybe
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import Data.Text (Text)
+import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
 import Test.Tasty (TestTree, adjustOption, testGroup)
-import Test.Tasty.HUnit (Assertion, assertBool, assertFailure, testCase, (@?=))
+import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, assertFailure, testCase, (@?=))
 import Test.Tasty.QuickCheck
   (Gen, Property, QuickCheckTests (..), Testable, choose, forAllShow, frequency)
 
@@ -244,7 +258,7 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (unionInScope)
+import Clash.Core.VarEnv (mkVarSet, unionInScope)
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
@@ -284,12 +298,13 @@ import Test.Clash.Rewrite
   ( DeclVar (..), ScopeDecl (..), TestTerm (..), TestType (..), assertAlphaEq
   , assertErrorContains, atRaw, builtTerm, builtType, freeVarType, globalsByName, inScopeOf, intId, kindedTyVarD
   , justDataCon, mkBinding, mkGlobalBinding, nothingDataCon, parseTestTerm, parseToTerm, parseTestType, runRewriteTest, showPprU
-  , termQQ, testGlobalId, testTyConMap, tyVarD, typeQQ, varD, vecTcNm, consDc)
+  , termQQ, testGlobalId, testTyConMap, tyVarD, typeQQ, varD, vecTcNm, consDc, withCurFun)
 import Test.Clash.Rewrite (ghcName)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
 import Test.Clash.Scoped.Evaluator (whnfIn)
 import Test.Clash.Scoped.Evaluator.Differential (scopedWhnf)
 import Test.Clash.Scoped.Gen.Clash (FreeVars (..), showTerm)
+import Test.Clash.Scoped.Print (globalIdent, showTestTerm)
 
 -- * Test scopes
 
@@ -487,7 +502,8 @@ assertTermAlphaEq :: HasCallStack => Term n -> Term n -> Assertion
 assertTermAlphaEq expected actual =
   assertBool
     ("Expected (up to alpha equivalence):\n" <> showTermT expected
-      <> "\nbut got:\n" <> showTermT actual)
+      <> "\nbut got:\n" <> showTermT actual
+      <> "\nwhich is, in the language of the tests:\n" <> showTestTerm actual)
     (aeqTm expected actual)
 
 -- | Pretty print a term like 'showPprU', with its ticks, which
@@ -569,10 +585,243 @@ runScopedAt env st ts path0 t e0 =
       pure (Case subj ty (replaceAt i alt' alts))
     (AppFunStep, App f a) -> (`App` a) <$> go path (pushFrame Scoped.AppFun ctx) f
     (AppArgStep, App f a) -> App f <$> go path (pushFrame (Scoped.appArgFrame f) ctx) a
+    (TickStep, Tick tk a) -> Tick tk <$> go path (pushFrame (Scoped.TickC tk) ctx) a
+    (CastStep, Cast a t1 t2) -> (\a' -> Cast a' t1 t2) <$> go path (pushFrame Scoped.CastBody ctx) a
+    (SubjStep, Case a ty alts) -> (\a' -> Case a' ty alts) <$> go path (pushFrame Scoped.CaseScrut ctx) a
     _ -> error ("runScopedAt: " <> show step <> " doesn't fit the term:\n" <> showPprU e)
 
   replaceAt :: Int -> a -> [a] -> [a]
   replaceAt i x xs = take i xs <> [x] <> drop (i + 1) xs
+
+-- | Assert that a scoped transformation, run at the root of a term in a
+-- scope with the given variables, gives the expected term (built in the same
+-- scope), with a lint-clean result, and that it signals a change. Runs it twice:
+-- in that scope, and in the scope extended such that the binders of the term
+-- clash with its variables ('withBinderClashes'), so that a transformation that
+-- moves a term under one of them has to rename it.
+assertRewritesTo
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> ScopedRewrite extra
+  -> [ScopeDecl]
+  -> TestTerm
+  -- ^ The term
+  -> TestTerm
+  -- ^ The expected result
+  -> Assertion
+assertRewritesTo env st = assertRewritesAt env st []
+
+-- | 'assertRewritesTo', for a transformation run at the subterm at a path
+-- (see 'runScopedAt')
+assertRewritesAt
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> [Step]
+  -> ScopedRewrite extra
+  -> [ScopeDecl]
+  -> TestTerm
+  -> TestTerm
+  -> Assertion
+assertRewritesAt env st path rw decls input expected =
+  withTestScope decls $ \ts0 -> do
+    let e0 = termIn ts0 input
+    check ts0 e0
+    withBinderClashes ts0 e0 check
+ where
+  check :: Distinct n => TestScope n -> Term n -> Assertion
+  check ts e = do
+    (e', _, ch) <- runScopedAt env st ts path rw e
+    assertLintClean ts e'
+    assertTermIs ts expected e'
+    assertBool "no change signaled" ch
+
+-- | Assert that a scoped transformation, run at the root of a term in a
+-- scope with the given variables, leaves it as it is and signals no change.
+-- Like 'assertRewritesTo', also in a scope that the binders of the term clash
+-- with.
+assertNoRewrite
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> ScopedRewrite extra
+  -> [ScopeDecl]
+  -> TestTerm
+  -> Assertion
+assertNoRewrite env st = assertNoRewriteAt env st []
+
+-- | 'assertNoRewrite', for a transformation run at the subterm at a path (see
+-- 'runScopedAt')
+assertNoRewriteAt
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> [Step]
+  -> ScopedRewrite extra
+  -> [ScopeDecl]
+  -> TestTerm
+  -> Assertion
+assertNoRewriteAt env st path rw decls input =
+  withTestScope decls $ \ts0 -> do
+    let e0 = termIn ts0 input
+    check ts0 e0
+    withBinderClashes ts0 e0 check
+ where
+  check :: Distinct n => TestScope n -> Term n -> Assertion
+  check ts e = do
+    (e', _, ch) <- runScopedAt env st ts path rw e
+    assertTermAlphaEq e e'
+    assertBool "a change signaled" (not ch)
+
+-- | Run an assertion on a term sunk into its scope extended with a variable
+-- for each of its binders, of type @Int@ (see 'withClashing'), after
+-- asserting that its binders clash with them. Does nothing if the term has no
+-- binders.
+withBinderClashes
+  :: (HasCallStack, Distinct n)
+  => TestScope n
+  -> Term n
+  -> (forall l. Distinct l => TestScope l -> Term l -> Assertion)
+  -> Assertion
+withBinderClashes ts e k
+  | null (binderRaws e) = pure ()
+  | otherwise =
+      withClashing ts [varD ("clash_" <> show i) "Int" | i <- [900001 .. 900000 + length (binderRaws e)]] e $ \ts' e' -> do
+        assertClashes ts' e'
+        k ts' e'
+
+-- | An environment in which the given globals are the top entities
+-- ('Clash.Rewrite.Types.topEntities')
+withTopEntities :: [GlobalId] -> RewriteEnv -> RewriteEnv
+withTopEntities gs env = env {C._topEntities = mkVarSet (map globalIdLegacy gs)}
+
+-- | The scenario of a capture bug of Clash Core: a term with a binder that has
+-- the name of a variable that the term mentions outside of the scope of the
+-- binder. Builds a part of the term in a scope with the given variables, then
+-- extends the scope with more variables, which get the names of the first
+-- binders of that part (see 'withClashing'), and builds the term from the
+-- part, sunk into the extended scope, where it can mention the new variables.
+-- Asserts that the term is such a scenario, and runs an assertion on it.
+--
+-- E.g. a binder of the inner case-expression of @case (case a of {MkT x ->
+-- f}) of {_ -> x}@ that has the name of the free @x@:
+--
+-- > withCapture [varD "a" "T", varD "f" "Int -> Int"]
+-- >   "(case a of { MkT (x :: Int) -> f }) :: Int -> Int"
+-- >   [varD "x_3" "Int"]
+-- >   (\ts inner -> Case inner (typeIn ts "Int") [Alt DefaultPat (termIn ts "x_3")])
+-- >   $ \ts e -> ..
+withCapture
+  :: HasCallStack
+  => [ScopeDecl]
+  -- ^ The variables of the scope of the part
+  -> TestTerm
+  -- ^ The part
+  -> [ScopeDecl]
+  -- ^ The variables that the scope is extended with
+  -> (forall l. Distinct l => TestScope l -> Term l -> Term l)
+  -- ^ Build the term from the part, in the extended scope
+  -> (forall l. Distinct l => TestScope l -> Term l -> Assertion)
+  -> Assertion
+withCapture decls part new mk k =
+  withTestScope decls $ \ts0 ->
+    withClashing ts0 new (termIn ts0 part) $ \ts partL -> do
+      let e = mk ts partL
+          free = IntSet.fromList (nameSetRaws (freeTmVars e) <> nameSetRaws (freeTyVars e))
+      assertBool ("no binder has the name of a variable that the term mentions:\n" <> showPprU e)
+        (any (`IntSet.member` free) (binderRaws e))
+      k ts e
+
+-- | Assert that a scoped transformation, run at the root of the term of a
+-- capture scenario (see 'withCapture'), gives the expected term, built in the
+-- extended scope, with a lint-clean result
+assertCaptureRewritesTo
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> ScopedRewrite extra
+  -> [ScopeDecl]
+  -> TestTerm
+  -> [ScopeDecl]
+  -> (forall l. Distinct l => TestScope l -> Term l -> Term l)
+  -> TestTerm
+  -- ^ The expected result
+  -> Assertion
+assertCaptureRewritesTo env st rw decls part new mk expected =
+  withCapture decls part new mk $ \ts e -> do
+    (e', _, _) <- runScopedIn env st ts rw e
+    assertLintClean ts e'
+    assertTermIs ts expected e'
+
+-- | The global bindings ('Clash.Rewrite.Types.scopedBindings') of the second
+-- state that the first doesn't have
+newBindings :: RewriteState extra -> RewriteState extra -> [Binding (Term 'VoidS)]
+newBindings st0 st1 =
+  [ b | b <- globalEnvElems (_scopedBindings st1)
+      , Maybe.isNothing (lookupGlobalEnv (bindingId b) (_scopedBindings st0)) ]
+
+-- | Assert that a scoped transformation, run at the root of a term in a
+-- scope with the given variables, creates new global bindings, and gives the
+-- expected term. The expected term refers to the new global functions by
+-- placeholders, given with the expected bodies of their bindings, in the
+-- order of creation (by unique). A placeholder has the name of the new
+-- function, see 'Test.Clash.Scoped.Print.globalIdent', and any unique. Like
+-- 'assertRewritesTo', it also runs in a scope that the binders of the term
+-- clash with.
+assertSpecializesTo
+  :: HasCallStack
+  => RewriteEnv
+  -> RewriteState extra
+  -> ScopedRewrite extra
+  -> [ScopeDecl]
+  -> TestTerm
+  -- ^ The term
+  -> TestTerm
+  -- ^ The expected result
+  -> [(GlobalId, TestTerm)]
+  -- ^ The placeholders of the new global functions, and their expected bodies
+  -> Assertion
+assertSpecializesTo env st rw decls input expected newFuns =
+  withTestScope decls $ \ts0 -> do
+    let e0 = termIn ts0 input
+    check ts0 e0
+    withBinderClashes ts0 e0 check
+ where
+  check :: Distinct n => TestScope n -> Term n -> Assertion
+  check ts e = do
+    (e', st1, ch) <- runScopedIn env st ts rw e
+    let new = List.sortOn (globalIdUniq . bindingId) (newBindings st st1)
+        rename g = maybe g snd (List.find ((== globalIdUniq g) . globalIdUniq . fst)
+                     (zip (map bindingId new) (map fst newFuns)))
+    assertEqual "the names of the new functions"
+      [ C.nameOcc (globalIdName g) | (g, _) <- newFuns ]
+      [ Text.pack (globalIdent (bindingId b)) | b <- new ]
+    assertLintClean ts e'
+    assertTermIs ts expected (mapGlobals rename e')
+    sequence_
+      [ assertTermIs emptyTestScope body (mapGlobals rename (bindingTerm b))
+      | (b, (_, body)) <- zip new newFuns ]
+    assertBool "no change signaled" ch
+
+-- | Apply a function to every global variable of a term
+mapGlobals :: (GlobalId -> GlobalId) -> Term n -> Term n
+mapGlobals f = go
+ where
+  go :: Term x -> Term x
+  go = \case
+    GlobalVar g -> GlobalVar (f g)
+    Lam b e -> Lam b (go e)
+    TyLam b e -> TyLam b (go e)
+    App e1 e2 -> App (go e1) (go e2)
+    TyApp e ty -> TyApp (go e) ty
+    Let (NonRec b x) e -> Let (NonRec b (go x)) (go e)
+    Let (Rec bs xs) e -> Let (Rec bs (map go xs)) (go e)
+    Case e ty alts -> Case (go e) ty [Alt p (go rhs) | Alt p rhs <- alts]
+    Cast e t1 t2 -> Cast (go e) t1 t2
+    Tick (Attributes ty x) e -> Tick (Attributes ty (go x)) (go e)
+    Tick t e -> Tick t (go e)
+    e -> e
 
 -- | Give every global variable a unique derived from its occurrence name, so
 -- that terms that refer to new globals made by different runs, which get
@@ -1514,6 +1763,12 @@ data Step
   -- ^ The function of an application
   | AppArgStep
   -- ^ The argument of an application
+  | TickStep
+  -- ^ The body of a tick
+  | CastStep
+  -- ^ The body of a cast
+  | SubjStep
+  -- ^ The subject of a case-expression
   deriving (Show)
 
 -- | Go down a term along a path, opening the binders on the way, and continue
