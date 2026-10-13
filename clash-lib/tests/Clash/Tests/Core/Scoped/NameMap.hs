@@ -8,27 +8,24 @@
 
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Tests.Core.Scoped.NameMap (tests) where
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-
-import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 
-import Test.Clash.Rewrite (assertErrorContains, globalId, intId, intTy)
+import Test.Clash.Scoped (closedTerm, testGlobalId)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.NameMap"
   [ testCase "GlobalEnv" $ do
-      let f = mkGlobalIdFromClash (globalId C.User "f" 3 intTy)
-          g = mkGlobalIdFromClash (globalId C.User "g" 2 intTy)
+      let f = testGlobalId "f_G3" "Int"
+          g = testGlobalId "g_G2" "Int"
           env = insertGlobalEnv f 'f' (singletonGlobalEnv g 'g')
       lookupGlobalEnv f env @?= Just 'f'
       lookupGlobalEnv g (deleteGlobalEnv g env) @?= Nothing
@@ -38,12 +35,9 @@ tests = testGroup "Clash.Tests.Core.Scoped.NameMap"
       globalSetToList (globalEnvKeysSet env) @?= [g, f]
       globalEnvKeys (withoutGlobalEnv env (singletonGlobalSet g)) @?= [f]
 
-  , testCase "mkGlobalIdFromClash errors on local variables" $
-      assertErrorContains "not a global variable"
-        (C.Var (globalIdLegacy (mkGlobalIdFromClash (intId C.User "x" 1))))
 
   , testCase "NameSet and NameMap" $
-      case fromClashTermClosed (C.Lam (intId C.User "x" 1) (C.Var (intId C.User "x" 1))) of
+      case closedTerm "\\(x :: Int) -> x" of
         Lam b e -> openIdBinder emptyScope b e $ \_ b1 _ -> do
           let n = tmNameOf b1
               m = singletonNameMap n 'x'
@@ -54,10 +48,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.NameMap"
           sizeNameSet (unsinkNameSet (idBinderNameBinders b1) (singletonNameSet n)) @?= 0
         _ -> assertFailure "unexpected shape"
 
-  , testCase "appendNameBinders" $ do
-      let x = intId C.User "x" 1
-          y = intId C.User "y" 2
-      case fromClashTermClosed (C.Lam x (C.Lam y (C.Var x))) of
+  , testCase "appendNameBinders" $
+      case closedTerm "\\(x :: Int) (y :: Int) -> x" of
         Lam bx (Lam by e) -> do
           let nbs = appendNameBinders (idBinderNameBinders bx) (idBinderNameBinders by)
           -- Both variables are bound between the scopes

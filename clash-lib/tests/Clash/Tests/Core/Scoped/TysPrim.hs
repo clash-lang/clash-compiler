@@ -4,8 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for the builtin types of scoped Clash Core, and their type
-  constructors: they agree with those of "Clash.Core.TysPrim", as it made them
-  before the scoped ones replaced them.
+  constructors
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -13,85 +12,93 @@
 
 module Clash.Tests.Core.Scoped.TysPrim (tests) where
 
+import Data.Text (Text)
 import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Clash.Core.Name as C
 import Clash.Core.DataCon (DataCon (..), DcStrictness (..))
 import Clash.Core.TyCon (TyCon (..), TyConName, tyConDataCons)
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
-import qualified Clash.Core.Util as C
-import qualified Clash.Core.Var as C
+import qualified Clash.Core.Type as C (ConstTy (TyCon))
 import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Unique (Unique, fromGhcUnique)
+import qualified GHC.Builtin.Names as GHC
 
+import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Type (mkFunTy)
 import Clash.Core.Scoped.TysPrim
 
-import Test.Clash.Scoped (assertScopedTyAlphaEq)
+import Test.Clash.Scoped (assertTypeIs, emptyTestScope)
+import Test.Clash.Rewrite (ghcName)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.TysPrim"
-  [ testCase "builtin types agree with Clash.Core.TysPrim" $
-      mapM_ (uncurry assertScopedTyAlphaEq) builtins
-  , testCase "undefinedTy" $ assertScopedTyAlphaEq C.undefinedTy undefinedTy
-  , testCase "unsafeCoerceTy" $ assertScopedTyAlphaEq C.unsafeCoerceTy unsafeCoerceTy
+  [ testCase "builtin types are the type constructors of GHC" $
+      mapM_ builtinIs builtins
+  , testCase "undefinedTy" $ assertTypeIs emptyTestScope "forall (a :: Type). a" undefinedTy
+  , testCase "unsafeCoerceTy" $
+      assertTypeIs emptyTestScope "forall (a :: Type) (b :: Type). a -> b" unsafeCoerceTy
   , testCase "kinds of the type constructors" $
-      mapM_ (\tc -> assertScopedTyAlphaEq (expectedKind tc) (tyConKind tc))
-        (UniqMap.elems tysPrimMap)
+      mapM_ kindIs (UniqMap.elems tysPrimMap)
   , testCase "data constructors of Integer" $
-      dataConsAgree integerPrimTyConName integerIsDc C.integerPrimTy
-        [C.intPrimTy, C.byteArrayPrimTy, C.byteArrayPrimTy]
+      dataConsAre integerPrimTyConName integerIsDc integerPrimTy
+        [intPrimTy, byteArrayPrimTy, byteArrayPrimTy]
   , testCase "data constructors of Natural" $
-      dataConsAgree naturalPrimTyConName naturalNsDc C.naturalPrimTy
-        [C.wordPrimTy, C.byteArrayPrimTy]
+      dataConsAre naturalPrimTyConName naturalNsDc naturalPrimTy
+        [wordPrimTy, byteArrayPrimTy]
   ]
 
 -- | The data constructors of a type constructor: the first one is the given
 -- one, they are tagged in order, and each has one strict field of the given
 -- type
-dataConsAgree :: TyConName -> DataCon -> C.Type -> [C.Type] -> Assertion
-dataConsAgree tc dc0 resTy argTys = do
+dataConsAre :: TyConName -> DataCon -> Type VoidS -> [Type VoidS] -> Assertion
+dataConsAre tc dc0 resTy argTys = do
   let dcs = maybe [] tyConDataCons (UniqMap.lookup tc tysPrimMap)
   map dcName (take 1 dcs) @?= [dcName dc0]
   map dcTag dcs @?= [1 .. length argTys]
   mapM_ (\(dc, argTy) -> do
-           assertScopedTyAlphaEq (C.mkPolyFunTy resTy [Right argTy]) (dcType dc)
+           assertBool ("type of " <> show (dcName dc))
+             (aeqTy (mkFunTy argTy resTy) (dcType dc))
            assertBool "strict field" (dcArgStrict dc == [Strict]))
     (zip dcs argTys)
 
--- | The kinds that "Clash.Core.TysPrim" gave the type constructors
-expectedKind :: TyCon -> C.Kind
-expectedKind tc
+-- | The kind of a builtin type constructor: that of the equality constructor
+-- takes two types of any kind, the others are of kind @Type@
+kindIs :: TyCon -> Assertion
+kindIs tc
   | tyConName tc == eqPrimTyConName =
-      C.mkPolyFunTy C.liftedTypeKind
-        [Left aTv, Left bTv, Right (C.VarTy aTv), Right (C.VarTy bTv)]
-  | otherwise = C.liftedTypeKind
- where
-  aTv = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "a" 0)
-  bTv = C.mkTyVar C.liftedTypeKind (C.mkUnsafeSystemName "b" 1)
+      assertTypeIs emptyTestScope "forall (a :: Type) (b :: Type). a -> b -> Type" (tyConKind tc)
+  | otherwise = assertTypeIs emptyTestScope "Type" (tyConKind tc)
 
-builtins :: [(C.Type, Type 'VoidS)]
+-- | Assert that a builtin type is the type constructor with the given name
+-- (see 'ghcName') and unique: that of GHCs type constructor
+builtinIs :: (Type VoidS, Text, Unique) -> Assertion
+builtinIs (ty, occ, u) = case ty of
+  ConstTy (C.TyCon nm) -> (C.nameOcc nm, C.nameUniq nm, C.nameSort nm) @?= (ghcName occ, u, C.System)
+  _ -> assertFailure ("not a type constructor: " <> show ty)
+
+builtins :: [(Type VoidS, Text, Unique)]
 builtins =
-  [ (C.liftedTypeKind, liftedTypeKind)
-  , (C.typeNatKind, typeNatKind)
-  , (C.typeSymbolKind, typeSymbolKind)
-  , (C.intPrimTy, intPrimTy)
-  , (C.integerPrimTy, integerPrimTy)
-  , (C.charPrimTy, charPrimTy)
-  , (C.stringPrimTy, stringPrimTy)
-  , (C.wordPrimTy, wordPrimTy)
-  , (C.int64PrimTy, int64PrimTy)
-  , (C.word64PrimTy, word64PrimTy)
-  , (C.int8PrimTy, int8PrimTy)
-  , (C.int16PrimTy, int16PrimTy)
-  , (C.int32PrimTy, int32PrimTy)
-  , (C.word8PrimTy, word8PrimTy)
-  , (C.word16PrimTy, word16PrimTy)
-  , (C.word32PrimTy, word32PrimTy)
-  , (C.floatPrimTy, floatPrimTy)
-  , (C.doublePrimTy, doublePrimTy)
-  , (C.naturalPrimTy, naturalPrimTy)
-  , (C.byteArrayPrimTy, byteArrayPrimTy)
-  , (C.eqPrimTy, eqPrimTy)
+  [ (liftedTypeKind, "Type", fromGhcUnique GHC.liftedTypeKindTyConKey)
+  , (typeNatKind, "GHC.Num.Natural.Natural", fromGhcUnique GHC.naturalTyConKey)
+  , (typeSymbolKind, "Symbol", fromGhcUnique GHC.typeSymbolKindConNameKey)
+  , (intPrimTy, "GHC.Prim.Int#", fromGhcUnique GHC.intPrimTyConKey)
+  , (integerPrimTy, "GHC.Num.Integer.Integer", fromGhcUnique GHC.integerTyConKey)
+  , (charPrimTy, "GHC.Prim.Char#", fromGhcUnique GHC.charPrimTyConKey)
+  , (stringPrimTy, "GHC.Prim.Addr#", fromGhcUnique GHC.addrPrimTyConKey)
+  , (wordPrimTy, "GHC.Prim.Word#", fromGhcUnique GHC.wordPrimTyConKey)
+  , (int64PrimTy, "GHC.Prim.Int64#", fromGhcUnique GHC.int64PrimTyConKey)
+  , (word64PrimTy, "GHC.Prim.Word64#", fromGhcUnique GHC.word64PrimTyConKey)
+  , (int8PrimTy, "GHC.Prim.Int8#", fromGhcUnique GHC.int8PrimTyConKey)
+  , (int16PrimTy, "GHC.Prim.Int16#", fromGhcUnique GHC.int16PrimTyConKey)
+  , (int32PrimTy, "GHC.Prim.Int32#", fromGhcUnique GHC.int32PrimTyConKey)
+  , (word8PrimTy, "GHC.Prim.Word8#", fromGhcUnique GHC.word8PrimTyConKey)
+  , (word16PrimTy, "GHC.Prim.Word16#", fromGhcUnique GHC.word16PrimTyConKey)
+  , (word32PrimTy, "GHC.Prim.Word32#", fromGhcUnique GHC.word32PrimTyConKey)
+  , (floatPrimTy, "GHC.Prim.Float#", fromGhcUnique GHC.floatPrimTyConKey)
+  , (doublePrimTy, "GHC.Prim.Double#", fromGhcUnique GHC.doublePrimTyConKey)
+  , (naturalPrimTy, "GHC.Num.Natural.Natural", fromGhcUnique GHC.naturalTyConKey)
+  , (byteArrayPrimTy, "GHC.Prim.ByteArray#", fromGhcUnique GHC.byteArrayPrimTyConKey)
+  , (eqPrimTy, "GHC.Prim.~#", fromGhcUnique GHC.eqPrimTyConKey)
   ]
