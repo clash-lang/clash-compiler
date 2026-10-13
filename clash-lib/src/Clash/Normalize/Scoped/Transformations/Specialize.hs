@@ -43,7 +43,6 @@ module Clash.Normalize.Scoped.Transformations.Specialize
   , constantSpec
   , constantSpecWorker
   , specialize
-  , specialize'
   , specializeIn
   , nonRepSpec
   , nonRepSpecWorker
@@ -318,21 +317,9 @@ specializeIn sc e = case e of
   App e1 e2 -> specializeArgIn sc e (collectArgsTicks e1) (Left e2)
   _ -> return e
 
--- | Specialize an application on its argument
-specialize'
-  :: (HasCallStack, Distinct n)
-  => TransformContext n
-  -- ^ Transformation context
-  -> Term n
-  -- ^ Original term
-  -> (Term n, [Either (Term n) (Type n)], [TickInfo n])
-  -- ^ Function part of the term, split into root and applied arguments
-  -> Either (Term n) (Type n)
-  -- ^ Argument to specialize on
-  -> NormalizeSession (Term n)
-specialize' ctx = specializeArgIn (tfScope ctx)
-
--- | 'specialize'' in a scope, see 'specializeIn'
+-- | Specialize an application on its argument, given the function part of
+-- the application split into its root, applied arguments and ticks, in a
+-- scope, see 'specializeIn'
 specializeArgIn
   :: (HasCallStack, Distinct n)
   => Scope n
@@ -363,7 +350,7 @@ specializeArgIn sc e (fHd, args, ticks) specArgIn = case fHd of
         changed (mkApps (mkTicks fHd ticks) (args ++ [newArg]))
     | otherwise -> return e
 
--- | 'specialize'' for an application of a global function
+-- | 'specializeArgIn' for an application of a global function
 specializeGlobal
   :: (HasCallStack, Distinct n)
   => Scope n

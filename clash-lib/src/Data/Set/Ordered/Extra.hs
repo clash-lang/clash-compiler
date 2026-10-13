@@ -9,14 +9,8 @@
 
 module Data.Set.Ordered.Extra
   ( OLSet
-  , toListL
   ) where
 
-import           Data.Coerce                 (coerce)
-import           Data.Foldable               (toList)
 import qualified Data.Set.Ordered as OSet
 
 type OLSet a = OSet.Bias OSet.L (OSet.OSet a)
-
-toListL :: forall a. OLSet a -> [a]
-toListL = toList . coerce @(OLSet a) @(OSet.OSet a)

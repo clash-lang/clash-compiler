@@ -42,8 +42,6 @@ module Clash.Netlist.Scoped.Util
   , unsafeCoreTypeToHWTypeM'
   , coreTypeToHWTypeM
   , coreTypeToHWTypeM'
-  , termHWType
-  , termHWTypeM
     -- * Ticks
   , withTicks
   ) where
@@ -589,20 +587,6 @@ coreTypeToHWTypeM sc ty = do
 -- | Same as 'coreTypeToHWTypeM', but discards void filter information
 coreTypeToHWTypeM' :: Distinct n => Scope n -> Type n -> NetlistMonad (Maybe HWType)
 coreTypeToHWTypeM' sc ty = fmap stripFiltered <$> coreTypeToHWTypeM sc ty
-
--- | The HWType of a term, in the given scope. Errors if its type is not
--- translatable to a HWType.
-termHWType :: (HasCallStack, Distinct n) => String -> Scope n -> Term n -> NetlistMonad HWType
-termHWType loc sc e = do
-  te <- Lens.view typeEnv
-  unsafeCoreTypeToHWTypeM' loc sc (inferCoreTypeOf te sc e)
-
--- | The HWType of a term, in the given scope. 'Nothing' if its type is not
--- translatable to a HWType.
-termHWTypeM :: (HasCallStack, Distinct n) => Scope n -> Term n -> NetlistMonad (Maybe FilteredHWType)
-termHWTypeM sc e = do
-  te <- Lens.view typeEnv
-  coreTypeToHWTypeM sc (inferCoreTypeOf te sc e)
 
 -- * Ticks
 

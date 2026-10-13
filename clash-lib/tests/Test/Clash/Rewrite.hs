@@ -84,7 +84,7 @@ import Language.Haskell.Exts.Parser
   , parseTypeWithMode )
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase, (@?=))
+import Test.Tasty.HUnit (Assertion, assertFailure, testCase, (@?=))
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 import GHC.Builtin.Names
@@ -92,7 +92,6 @@ import GHC.Builtin.Names
   , ordLTDataConKey, trueDataConKey, typeNatAddTyFamNameKey
   , typeNatCmpTyFamNameKey, typeUnconsSymbolTyFamNameKey )
 
-import qualified Text.Show.Pretty as Pretty
 
 import qualified Language.Haskell.TH.Syntax as TH
 import qualified Language.Haskell.TH.Quote as TH
@@ -1651,17 +1650,6 @@ showPprU = showPpr' PrettyOptions
   , displayQualifiers = False
   , displayTicks = False
   }
-
--- | Assert that two terms are structurally equal, by comparing their 'Show'
--- output.
---
--- Note that we deliberately use neither '==' nor 'Clash.Core.Subst.eqTerm':
--- 'Eq' on 'C.Term' is alpha equivalence, and both compare names by their unique
--- alone, so they'd ignore a name's sort ('C.User', 'C.System', 'C.Internal')
--- and human readable name. 'Show' is derived everywhere, so it shows all of it.
-assertStructurallyEqual :: (HasCallStack, Show a) => a -> a -> Assertion
-assertStructurallyEqual expected actual =
-  assertEqual "" (Pretty.ppShow expected) (Pretty.ppShow actual)
 
 -- | Assert that forcing a value throws an 'ErrorCall' mentioning the given
 -- substring

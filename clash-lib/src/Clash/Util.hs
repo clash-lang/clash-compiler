@@ -102,25 +102,6 @@ assertPanic
 assertPanic file ln = Exception.throw
   (ClashException noSrcSpan ("ASSERT failed! file " ++ file ++ ", line " ++ show ln) Nothing)
 
-assertPprPanic
-  :: HasCallStack => String -> Int -> Doc ann -> a
-assertPprPanic _file _line msg = pprPanic "ASSERT failed!" doc
- where
-  doc = sep [ msg, callStackDoc ]
-
-pprPanic
-  :: String -> Doc ann -> a
-pprPanic heading prettyMsg = Exception.throw
-  (ClashException noSrcSpan (renderString (layoutPretty defaultLayoutOptions doc)) Nothing)
- where
-  doc = sep [pretty heading, nest 2 prettyMsg]
-
-callStackDoc
-  :: HasCallStack => Doc ann
-callStackDoc =
-  "Call stack:" <+> hang 4
-    (vcat (map pretty (lines (prettyCallStack callStack))))
-
 warnPprTrace
   :: HasCallStack
   => Bool
@@ -141,16 +122,6 @@ warnPprTrace True  file ln msg x =
  where
   heading0 = hsep ["WARNING: file", pretty file <> comma, "line", pretty ln]
   heading1 = "WARNING CALLSTACK:" <> line <> pretty (prettyCallStack callStack)
-
-pprTrace
-  :: String -> Doc ann -> a -> a
-pprTrace str = pprDebugAndThen trace (pretty str)
-
-pprTraceDebug
-  :: String -> Doc ann -> a -> a
-pprTraceDebug str doc x
-  | debugIsOn = pprTrace str doc x
-  | otherwise = x
 
 pprDebugAndThen
   :: (String -> a) -> Doc ann -> Doc ann -> a
@@ -348,7 +319,3 @@ unwantedLanguageExtensions =
   , LangExt.Strict
   , LangExt.StrictData
   ]
-
-thenCompare :: Ordering -> Ordering -> Ordering
-thenCompare EQ rel = rel
-thenCompare rel _  = rel

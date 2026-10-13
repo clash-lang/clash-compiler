@@ -23,9 +23,6 @@
   'underLetRec', which all go through 'pushUnder'. The constructor of the
   context is not exported.
 
-  The root of a context may be that of a subterm of a term outside of scoped
-  Core ('embeddedRootContext'), with the kinds of the frames of its context.
-
   = Let-bindings
 
   'Clash.Rewrite.Scoped.Whnf.whnfRW' evaluates a subterm with the
@@ -42,8 +39,7 @@
   = Inspecting the context
 
   Transformations inspect the context through 'ctxFrames', which lists the
-  kinds of its frames from the subterm outwards, including those of the root
-  ('embeddedRootContext'). E.g. whether a subterm is the function of an
+  kinds of its frames from the subterm outwards. E.g. whether a subterm is the function of an
   application:
 
   @
@@ -71,7 +67,6 @@ module Clash.Rewrite.Scoped.Types
   , Frame (..)
   , Under (..)
   , rootContext
-  , embeddedRootContext
   , pushFrame
   , pushUnder
   , appArgFrame
@@ -151,10 +146,6 @@ tfHeap (TransformContext _ _ h) = h
 data Path (n :: S) where
   -- | The root of a term
   PRoot :: Path n
-  -- | The root of a subterm of a term outside of scoped Core, with the kinds
-  -- of the frames of its context there, from the subterm outwards. See
-  -- 'embeddedRootContext'.
-  PEmbedded :: [FrameKind] -> Path n
   -- | A frame that doesn't bind variables
   PFrame :: !(Frame n) -> !(Path n) -> Path n
   -- | A frame that goes under binders, extending scope @i@ to @n@
@@ -202,14 +193,6 @@ type role Under nominal nominal
 -- | The context of the root of a term in scope @n@
 rootContext :: Scope n -> TransformContext n
 rootContext sc = TransformContext sc PRoot emptyNameMap
-
--- | The context of the root of a subterm of a term outside of scoped Core,
--- given the kinds of the frames of its context there, from the subterm
--- outwards, and the let-bindings of those frames that are valid at the
--- subterm. During the port, the tests run scoped transformations at subterms
--- of Clash Core this way.
-embeddedRootContext :: Scope n -> [FrameKind] -> NameMap TmName n (Term n) -> TransformContext n
-embeddedRootContext sc ks h = TransformContext sc (PEmbedded ks) h
 
 -- | Push a frame that doesn't bind variables
 pushFrame :: Frame n -> TransformContext n -> TransformContext n
@@ -358,7 +341,6 @@ ctxFrames = go . tfPath
   go :: Path x -> [FrameKind]
   go = \case
     PRoot -> []
-    PEmbedded ks -> ks
     PFrame f p -> frameKind f : go p
     PUnder u p -> underKind u : go p
 
