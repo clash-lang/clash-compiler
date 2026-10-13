@@ -3,22 +3,16 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Cast": the tests of the
-  transformations of Clash Core, run on the ports through
-  'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of the ports with the
-  transformations of Clash Core.
-
-  The transformations on casts never fired while capturing the corpus of the
-  differential harness, so these tests construct their inputs. They include
-  the inputs of the regression tests of 'Clash.Normalize.Transformations.Cast.caseCast'
-  (in "Clash.Tests.Normalize.Transformations.Case") and of
-  'Clash.Normalize.Transformations.Cast.splitCastWork' (in
-  "Clash.Tests.Normalize.Transformations"), whose bugs can't be written in
-  scoped Core: the binders of the alternatives and the let-binders can't
-  capture the variables they are moved past.
+  Tests for "Clash.Normalize.Scoped.Transformations.Cast". The expected
+  results of the tests that compared a port with its Clash Core counterpart
+  are the results of the latter. 'assertRewritesTo' runs every test in the
+  scope of the free variables of its input, and in a scope that the binders of
+  the input clash with: e.g. the tests in which a binder shadowed a free
+  variable in Clash Core.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -30,209 +24,186 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.DataCon (DataCon)
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term (Bind (..), Pat (..), Term (..), TickInfo (..))
-import qualified Clash.Core.Term as C
-import Clash.Core.Type (Type (VarTy), mkFunTy)
-import Clash.Core.Var (Id, TyVar)
-import Clash.Core.VarEnv (extendInScopeSet)
+import qualified Clash.Core.DataCon as C
+import Clash.Core.Scoped.Syntax (GlobalId, Term (Cast))
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Rewrite.Scoped (ScopedRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
-import Clash.Util (ClashException, noSrcSpan)
-import Clash.Util.Supply (freshId, newSupply)
+import Clash.Rewrite.Types (RewriteState)
+import Clash.Util (ClashException)
 
-import Clash.Tests.Normalize.Transformations.Cast
-  (CastRewrites (..), castTests, currentRewrites)
 import Test.Clash.Rewrite
-  ( assertFires, globalId, inScopeOf, intFunTy, intId, intLit, intTy, localId, mkTestDataCon
-  , pairDataCon, pairTy, parseTyConTy, runRewriteTest, tyVar )
-import Test.Clash.Scoped (assertRewritesAgree)
-import Test.Clash.Scoped.ViaFoil (viaFoil)
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+  ( TestDefs (..), TestTerm, kindedTyVarD, parseTestTermWith, strQQ, testDataCon
+  , testGlobalId )
+import Test.Clash.Scoped
+  ( ScopeDecl, assertCaptureRewritesTo, assertNoRewrite, assertRewritesTo, runScopedIn, termIn
+  , typeIn, varD, withCurFun, withTestScope )
 
--- | The ports, on terms of Clash Core: through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil'
-scopedRewrites :: CastRewrites
-scopedRewrites = CastRewrites
-  { crCaseCast = (viaFoil "caseCast" $(asScopedRewriteQ Scoped.caseCast))
-  , crElimCastCast = (viaFoil "elimCastCast" $(asScopedRewriteQ Scoped.elimCastCast))
-  , crLetCast = (viaFoil "letCast" $(asScopedRewriteQ Scoped.letCast))
-  , crSplitCastWork = (viaFoil "splitCastWork" $(asScopedRewriteQ Scoped.splitCastWork))
-  }
-
--- | Assert that a transformation and its port agree on a term, with the given
--- variables in scope, and whether they fire
-agree :: Bool -> (CastRewrites -> NormRewrite) -> [Id] -> [TyVar] -> Term -> Assertion
-agree fires rw ids tvs tm = do
-  supply <- newSupply
-  let st = def{_uniqSupply = supply} :: RewriteState NormalizeState
-      ctx = TransformContext (foldl extendInScopeSet (inScopeOf ids) tvs) []
-  assertFires fires def st ctx (rw currentRewrites) tm
-  assertRewritesAgree def st ctx (rw currentRewrites) (rw scopedRewrites) tm
-
--- * Variables
-
-s, x, y, z :: Id
-s = localId User "s" 30 pairTy
-x = intId User "x" 31
-y = intId User "y" 32
-z = intId User "z" 33
-
--- | Global functions @f :: Int -> Int@ and @g :: Int -> Int@
-f, g :: Term
-f = Var (globalId User "f" 40 (intFunTy 1))
-g = Var (globalId User "g" 41 (intFunTy 1))
-
--- | @a@, a free type variable
-a :: TyVar
-a = tyVar User "a" 50
-
-aTy :: Type
-aTy = VarTy a
-
--- | @E@, a data type with a single constructor 'mkE'
-eTy :: Type
-eTy = parseTyConTy "E"
+-- * Definitions
 
 -- | @MkE :: forall b. b -> E@, a data constructor with an existential type
 -- variable
-mkE :: DataCon
-mkE = mkTestDataCon "MkE" 1001 [] [b] [VarTy b] eTy
- where
-  b = tyVar User "b" 1002
+mkE :: C.DataCon
+mkE = testDataCon "MkE" 1001 1 [] [kindedTyVarD "b" "Type"] ["b"] "E"
 
--- | A cast from and to @Int@
-castInt :: Term -> Term
-castInt e = Cast e intTy intTy
+-- | Global functions @f, g :: Int -> Int@
+globals :: [GlobalId]
+globals =
+  [ testGlobalId "g_G2" "Int -> Int"
+  , testGlobalId "f_G40" "Int -> Int"
+  , testGlobalId "g_G41" "Int -> Int" ]
 
-srcTick :: TickInfo
-srcTick = NameMod C.PrefixName (parseTyConTy "Pfx")
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [mkE] [] globals)
 
--- * caseCast
+st :: RewriteState NormalizeState
+st = def
 
-caseCastTests :: TestTree
-caseCastTests = testGroup "caseCast"
-  [ testCase "pushes a cast into the alternatives" $
-      agree True crCaseCast [s] [] $
-        Cast
-          (Case (Var s) intTy
-            [ (DataPat pairDataCon [] [x, y], App f (Var x))
-            , (DefaultPat, intLit 3) ])
-          intTy (mkFunTy intTy intTy)
-  , testCase "looks through ticks" $
-      agree True crCaseCast [s] [] $
-        castInt (Tick srcTick (Case (Var s) intTy [(DataPat pairDataCon [] [x, y], Var y)]))
+caseCastS, elimCastCastS, letCastS, splitCastWorkS :: ScopedRewrite NormalizeState
+caseCastS = $(asScopedRewriteQ Scoped.caseCast)
+elimCastCastS = $(asScopedRewriteQ Scoped.elimCastCast)
+letCastS = $(asScopedRewriteQ Scoped.letCast)
+splitCastWorkS = $(asScopedRewriteQ Scoped.splitCastWork)
 
-    -- The input of the regression test "caseCast deshadows existentials and
-    -- sets the type": the existential @a'@ shadows the free @a@ of the cast
-  , testCase "existential type variables that shadow the cast's" $ do
-      let a' = tyVar User "a'" 50
-          sE = localId User "s" 30 eTy
-          yA = localId User "y" 32 aTy
-          xA' = localId User "x" 31 (VarTy a')
-      agree True crCaseCast [sE, yA] [a] $
-        Cast (Case (Var sE) aTy [(DataPat mkE [a'] [xA'], Var yA)]) aTy intTy
-  , testCase "doesn't fire on another term" $
-      agree False crCaseCast [x] [] (castInt (App f (Var x)))
-  ]
+-- | Assert that a transformation rewrites a term to the expected one, see
+-- 'assertRewritesTo'
+rewrites :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+rewrites = assertRewritesTo def st
 
--- * letCast
-
-letCastTests :: TestTree
-letCastTests = testGroup "letCast"
-  [ testCase "pushes a cast into the body of a let" $
-      agree True crLetCast [x] [] $
-        castInt (Let (NonRec y (App f (Var x))) (App g (Var y)))
-  , testCase "pushes a cast into the body of a letrec" $
-      agree True crLetCast [x] [] $
-        castInt (Letrec [(y, App f (Var z)), (z, App g (Var y))] (Var y))
-  , testCase "the cast may mention variables the let shadows" $
-      -- The cast's type variable is @a@; the let's binder @x@ shadows the
-      -- free @x@
-      agree True crLetCast [x] [a] $
-        Cast (Let (NonRec x (App f (Var x))) (Var x)) intTy aTy
-  , testCase "doesn't fire on another term" $
-      agree False crLetCast [x] [] (castInt (Var x))
-  ]
-
--- * elimCastCast
-
-elimCastCastTests :: TestTree
-elimCastCastTests = testGroup "elimCastCast"
-  [ testCase "eliminates back to back casts" $
-      agree True crElimCastCast [x] [a] $
-        Cast (Cast (Var x) intTy aTy) aTy intTy
-  , testCase "looks through ticks" $
-      agree True crElimCastCast [x] [a] $
-        Cast (Tick srcTick (Cast (Var x) intTy aTy)) aTy intTy
-  , testCase "doesn't fire on another term" $
-      agree False crElimCastCast [x] [] (castInt (Var x))
-  , testCase "both fail on casts whose types don't line up" $ do
-      let tm = Cast (Cast (Var x) intTy aTy) intTy intTy
-          run rw = do
-            supply <- newSupply
-            let st = def{_uniqSupply = supply, _curFun = (mkGlobalIdFromClash (globalId User "top" 60 intTy), noSrcSpan)}
-                       :: RewriteState NormalizeState
-                ctx = TransformContext (extendInScopeSet (inScopeOf [x]) a) []
-            r <- try (runRewriteTest def st (crElimCastCast rw ctx tm))
-            case r of
-              Left (_ :: ClashException) -> pure ()
-              Right _ -> assertFailure "no exception"
-      run currentRewrites
-      run scopedRewrites
-  ]
-
--- * splitCastWork
-
-splitCastWorkTests :: TestTree
-splitCastWorkTests = testGroup "splitCastWork"
-  [ testCase "splits a NonRec binding" $
-      agree True crSplitCastWork [x] [] $
-        Let (NonRec y (castInt (App f (Var x)))) (Var y)
-  , testCase "a NonRec binding that shadows a free variable of its cast" $
-      agree True crSplitCastWork [x] [] $
-        Let (NonRec x (castInt (App f (Var x)))) (Var x)
-  , testCase "looks through ticks" $
-      agree True crSplitCastWork [x] [] $
-        Let (NonRec y (Tick srcTick (castInt (App f (Var x))))) (Var y)
-  , testCase "splits the bindings of a letrec in place" $
-      agree True crSplitCastWork [x] [] $
-        Letrec
-          [ (y, castInt (App f (Var z)))
-          , (z, App g (Var x))
-          , (s, Cast (App g (Var y)) intTy pairTy) ]
-          (Var s)
-
-    -- The input of the regression test "splitCastWork binders are fresh
-    -- w.r.t. the let's binders": @y@ has the unique the supply hands out
-    -- first
-  , testCase "new binders are fresh with respect to the let's binders" $ do
-      supply <- newSupply
-      let (uy, supply1) = freshId supply
-          (ux, _) = freshId supply1
-          yF = intId User "y" uy
-          xF = intId User "x" ux
-          tm = Letrec [(yF, intLit 3), (xF, castInt (App g (Var yF)))] (Var xF)
-      let st = def{_uniqSupply = supply} :: RewriteState NormalizeState
-          ctx = TransformContext (inScopeOf []) []
-      assertFires True def st ctx (crSplitCastWork currentRewrites) tm
-      assertRewritesAgree def st ctx (crSplitCastWork currentRewrites) (crSplitCastWork scopedRewrites) tm
-  , testCase "doesn't split a cast of a variable" $
-      agree False crSplitCastWork [x] [] $
-        Letrec [(y, castInt (Var x)), (z, castInt f)] (Var y)
-  , testCase "doesn't split a cast of a cast" $
-      agree False crSplitCastWork [x] [] $
-        Let (NonRec y (castInt (castInt (App f (Var x))))) (Var y)
-  ]
+-- | Assert that a transformation leaves a term as it is
+keeps :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
+keeps = assertNoRewrite def st
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Cast"
-  [ testGroup "Regression tests" (castTests scopedRewrites)
-  , caseCastTests
-  , letCastTests
-  , elimCastCastTests
-  , splitCastWorkTests
+  [ testGroup "regression tests"
+      [ -- @let x = cast (g x) in x@, with the outer @x@ on the right-hand
+        -- side: 'splitCastWork' must keep the binding non-recursive. It used to
+        -- rebuild it as @letrec x' = g x; x = cast x' in x@, where @g x@ refers
+        -- to the cast itself.
+        testCase "splitCastWork keeps a NonRec let non-recursive" $
+          rewrites splitCastWorkS [varD "x_0" "Int"]
+            (tm "let { !(x :: Int) = Core.cast @Int @Int (g_G2 x_0) } in x")
+            (tm "let { !(cx_I :: Int) = g_G2 x_0; !(x :: Int) = Core.cast @Int @Int cx_I } in x")
+      ]
+  , testGroup "caseCast"
+      [ testCase "pushes a cast into the alternatives" $
+          rewrites caseCastS [varD "s_30" "Pair"]
+            (tm [strQQ|
+              Core.cast @Int @(Int -> Int) ((case s_30 of { MkPair (x :: Int) (y :: Int) -> f_G40 x; _ -> 3 }) :: Int)
+            |])
+            (tm [strQQ|
+              (case s_30 of
+                { MkPair (x :: Int) (y :: Int) -> Core.cast @Int @(Int -> Int) (f_G40 x)
+                ; _ -> Core.cast @Int @(Int -> Int) 3
+                }) :: Int -> Int
+            |])
+      , testCase "looks through ticks" $
+          rewrites caseCastS [varD "s_30" "Pair"]
+            (tm [strQQ|
+              Core.cast @Int @Int (Core.prefixName @Pfx ((case s_30 of { MkPair (x :: Int) (y :: Int) -> y }) :: Int))
+            |])
+            (tm "(case s_30 of { MkPair (x :: Int) (y :: Int) -> Core.cast @Int @Int y }) :: Int")
+      , testCase "existential type variables that shadow the cast's" $ do
+          rewrites caseCastS [kindedTyVarD "a_50" "Type", varD "s_30" "E", varD "y_32" "a_50"]
+            (tm [strQQ|
+              Core.cast @a_50 @Int ((case s_30 of { MkE (a'_51 :: Type) (x :: a'_51) -> y_32 }) :: a_50)
+            |])
+            (tm "(case s_30 of { MkE (a'_51 :: Type) (x :: a'_51) -> Core.cast @a_50 @Int y_32 }) :: Int")
+          -- The existential type variable @a'@ has the name of the type
+          -- variable @a@ of the cast
+          assertCaptureRewritesTo def st caseCastS [varD "s_30" "E", varD "y_32" "Int"]
+            (tm "(case s_30 of { MkE (a' :: Type) (x :: a') -> y_32 }) :: Int")
+            [kindedTyVarD "a_50" "Type"]
+            (\ts e -> Cast e (typeIn ts "Int") (typeIn ts "a_50"))
+            (tm "(case s_30 of { MkE (a' :: Type) (x :: a') -> Core.cast @Int @a_50 y_32 }) :: a_50")
+      , testCase "doesn't fire on another term" $
+          keeps caseCastS [varD "x_31" "Int"]
+            (tm "Core.cast @Int @Int (f_G40 x_31)")
+      ]
+  , testGroup "letCast"
+      [ testCase "pushes a cast into the body of a let" $
+          rewrites letCastS [varD "x_31" "Int"]
+            (tm "Core.cast @Int @Int (let { !(y :: Int) = f_G40 x_31 } in g_G41 y)")
+            (tm "let { !(y :: Int) = f_G40 x_31 } in Core.cast @Int @Int (g_G41 y)")
+      , testCase "pushes a cast into the body of a letrec" $
+          rewrites letCastS []
+            (tm "Core.cast @Int @Int (let { (y :: Int) = f_G40 z; (z :: Int) = g_G41 y } in y)")
+            (tm "let { (y :: Int) = f_G40 z; (z :: Int) = g_G41 y } in Core.cast @Int @Int y")
+      , testCase "the cast may mention variables the let shadows" $
+          rewrites letCastS [kindedTyVarD "a_50" "Type", varD "x_31" "Int"]
+            (tm "Core.cast @Int @a_50 (let { !(x :: Int) = f_G40 x_31 } in x)")
+            (tm "let { !(x :: Int) = f_G40 x_31 } in Core.cast @Int @a_50 x")
+      , testCase "doesn't fire on another term" $
+          keeps letCastS [varD "x_31" "Int"]
+            (tm "Core.cast @Int @Int x_31")
+      ]
+  , testGroup "elimCastCast"
+      [ testCase "eliminates back to back casts" $
+          rewrites elimCastCastS [kindedTyVarD "a_50" "Type", varD "x_31" "Int"]
+            (tm "Core.cast @a_50 @Int (Core.cast @Int @a_50 x_31)")
+            (tm "x_31")
+      , testCase "looks through ticks" $
+          rewrites elimCastCastS [kindedTyVarD "a_50" "Type", varD "x_31" "Int"]
+            (tm "Core.cast @a_50 @Int (Core.prefixName @Pfx (Core.cast @Int @a_50 x_31))")
+            (tm "x_31")
+      , testCase "doesn't fire on another term" $
+          keeps elimCastCastS [varD "x_31" "Int"]
+            (tm "Core.cast @Int @Int x_31")
+      , testCase "fails on casts whose types don't line up" $
+          withTestScope [kindedTyVarD "a_50" "Type", varD "x_31" "Int"] $ \ts -> do
+            let e = termIn ts (tm "Core.cast @Int @Int (Core.cast @Int @a_50 x_31)")
+                st1 = withCurFun (testGlobalId "top_G60" "Int") st
+            r <- try (runScopedIn def st1 ts elimCastCastS e)
+            case r of
+              Left (_ :: ClashException) -> pure ()
+              Right _ -> assertFailure "no exception"
+      ]
+  , testGroup "splitCastWork"
+      [ testCase "splits a NonRec binding" $
+          rewrites splitCastWorkS [varD "x_31" "Int"]
+            (tm "let { !(y :: Int) = Core.cast @Int @Int (f_G40 x_31) } in y")
+            (tm "let { !(cy_I :: Int) = f_G40 x_31; !(y :: Int) = Core.cast @Int @Int cy_I } in y")
+      , testCase "a NonRec binding that shadows a free variable of its cast" $
+          rewrites splitCastWorkS [varD "x_31" "Int"]
+            (tm "let { !(x :: Int) = Core.cast @Int @Int (f_G40 x_31) } in x")
+            (tm "let { !(cx_I :: Int) = f_G40 x_31; !(x :: Int) = Core.cast @Int @Int cx_I } in x")
+      , testCase "looks through ticks" $
+          rewrites splitCastWorkS [varD "x_31" "Int"]
+            (tm "let { !(y :: Int) = Core.prefixName @Pfx (Core.cast @Int @Int (f_G40 x_31)) } in y")
+            (tm "let { !(cy_I :: Int) = f_G40 x_31; !(y :: Int) = Core.cast @Int @Int cy_I } in y")
+      , testCase "splits the bindings of a letrec in place" $
+          rewrites splitCastWorkS [varD "x_31" "Int"]
+            (tm [strQQ|
+              let
+                { (y :: Int) = Core.cast @Int @Int (f_G40 z)
+                ; (z :: Int) = g_G41 x_31
+                ; (s :: Pair) = Core.cast @Int @Pair (g_G41 y)
+                } in s
+            |])
+            (tm [strQQ|
+              let
+                { (cy_I :: Int) = f_G40 z
+                ; (y :: Int) = Core.cast @Int @Int cy_I
+                ; (z :: Int) = g_G41 x_31
+                ; (cs_I :: Int) = g_G41 y
+                ; (s :: Pair) = Core.cast @Int @Pair cs_I
+                } in s
+            |])
+      , testCase "new binders are fresh with respect to the let's binders" $
+          rewrites splitCastWorkS []
+            (tm "let { (y :: Int) = 3; (x :: Int) = Core.cast @Int @Int (g_G41 y) } in x")
+            (tm [strQQ|
+              let { (y :: Int) = 3; (cx_I :: Int) = g_G41 y; (x :: Int) = Core.cast @Int @Int cx_I } in x
+            |])
+      , testCase "doesn't split a cast of a variable" $
+          keeps splitCastWorkS [varD "x_31" "Int"]
+            (tm [strQQ|
+              let { (y :: Int) = Core.cast @Int @Int x_31; (z :: Int) = Core.cast @Int @Int f_G40 } in y
+            |])
+      , testCase "doesn't split a cast of a cast" $
+          keeps splitCastWorkS [varD "x_31" "Int"]
+            (tm "let { !(y :: Int) = Core.cast @Int @Int (Core.cast @Int @Int (f_G40 x_31)) } in y")
+      ]
   ]
