@@ -274,7 +274,7 @@ mkBindings convBind convClsOp bindings clsOps = do
   return ( UniqMap.fromList [ (globalIdName (bindingId b), b) | b <- concatMap fst bindingsList ]
          , map fst clsOpList )
 
--- | Convert a single (possibly recursive) binder group to bindings of scoped
+-- | Convert a single (possibly recursive) binder group to bindings of Clash
 -- Core. See 'mkBindings' for how these conversions are run in parallel.
 --
 -- The bindings hold the builders of their bodies, see
@@ -376,7 +376,7 @@ will be rewritten (and inserted into the map of global bindings) as
                     g[LocalId] = f[LocalId] ...
                  in g[LocalId]
 
-In scoped Core, the local binders of the group are a 'Rec' telescope of
+In Clash Core, the local binders of the group are a 'Rec' telescope of
 fresh local variables, which 'Clash.GHC.GHC2Core.coreToTermB' refers
 to instead of the global binders of the group.
 

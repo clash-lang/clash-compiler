@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Predicates on and measures of scoped Clash Core terms.
+  Predicates on and measures of Clash Core terms.
 
   Note that 'isVar' holds for local and global variables alike, while
   'isLocalVar' and 'isGlobalVar' tell them apart.

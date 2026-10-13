@@ -7,7 +7,7 @@
   and tests of the cases of DEC.
 
   The regression tests are about binders in the alternatives that shadow, or
-  are captured by, variables outside of them. In scoped Clash Core, binders
+  are captured by, variables outside of them. In Clash Core, binders
   don't shadow, and DEC can only move the parts of an application out of the
   alternatives that don't refer to their binders, so these bugs can't be
   written there. 'assertRewritesTo' runs every test in the scope of the free

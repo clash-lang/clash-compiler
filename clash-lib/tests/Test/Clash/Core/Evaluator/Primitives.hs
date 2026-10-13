@@ -3,14 +3,14 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Helpers for the unit tests of the scoped evaluator and its reductions of
+  Helpers for the unit tests of the evaluator and its reductions of
   primitives ("Clash.Core.Evaluator.Primitives"): evaluating terms
   with the reductions, in the environment Clash uses
   ('Clash.Rewrite.Whnf.evaluatorEnv'), and building primitives,
-  literals, types and values of the sized types, as builders of scoped Core
+  literals, types and values of the sized types, as builders of Clash Core
   ("Clash.Core.Builder").
 
-  The parser of scoped Core ('Test.Clash.Rewrite.parseTestTerm') doesn't parse
+  The parser of Clash Core ('Test.Clash.Rewrite.parseTestTerm') doesn't parse
   primitives and most literals, so the tests build their terms with these
   builders, e.g. @2 +# 3@:
 

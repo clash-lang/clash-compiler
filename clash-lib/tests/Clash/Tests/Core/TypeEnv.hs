@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the environment of the types of scoped Clash Core: its lookups
+  Tests for the environment of the types of Clash Core: its lookups
   give the signatures that the type and data constructors store, and give
   them as the same objects every time.
 -}

@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on case-expressions of scoped Clash Core.
+  Transformations on case-expressions of Clash Core.
 
   Moving the alternatives of a case-expression under the binders of a pattern
   or a let-expression ('caseCase', 'caseLet') needs the scope those extend,
@@ -16,7 +16,7 @@
   alternative without its pattern needs that the variables the pattern binds
   don't occur in it ('Clash.Core.Subst.unsinkAlt').
 
-  * 'caseCon' evaluates the subject with the evaluator of scoped Clash Core
+  * 'caseCon' evaluates the subject with the evaluator of Clash Core
     ('Clash.Rewrite.Whnf.whnfRW'), which uses the let-bindings of the
     context. Its primitive reductions build coercions as @_CO_ \@ty@
     ('Clash.Core.Util.primCo').

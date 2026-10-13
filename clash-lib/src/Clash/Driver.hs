@@ -675,7 +675,7 @@ interpretFunctions idirs interpreterArgs topDir reqs = do
     -> Hint.InterpreterT IO (Either Hint.InterpreterError InterpretFunctionResult)
   tryInterp = try
 
-  -- A blackbox function on scoped Clash Core
+  -- A blackbox function on Clash Core
   interpret req = case ifrType req of
     InterpretBlackBoxFunction ->
       InterpretBBF <$>

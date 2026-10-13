@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Free variables of scoped Clash Core.
+  Free variables of Clash Core.
 
   Type variables and term variables are collected separately: a type never
   mentions a term variable, so the free term variables of a term are found

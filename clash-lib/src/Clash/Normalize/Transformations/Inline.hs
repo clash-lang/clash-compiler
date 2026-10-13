@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations for inlining on scoped Clash Core.
+  Transformations for inlining on Clash Core.
 
   = Globals
 

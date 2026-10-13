@@ -133,7 +133,7 @@ tests = testGroup "Clash.Tests.Normalize.Transformations.XOptimize"
         -- unique 'xOptimize' picks for the let-binder of the subject. It used
         -- to pick that unique avoiding only the variables in scope of the
         -- case-expression, not the pattern binders, which it let-binds
-        -- alongside it. In scoped Core, the new binder is fresh by
+        -- alongside it. In Clash Core, the new binder is fresh by
         -- construction.
       , testCase "xOptimize: subject binder is not a pattern binder" $
           xOptTo [varD "s_30" "Pair"]

@@ -4,7 +4,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformation process for normalization, on scoped Clash Core. The
+  Transformation process for normalization, on Clash Core. The
   strategies themselves are described in "Clash.Normalize.Strategy.Spec".
 -}
 

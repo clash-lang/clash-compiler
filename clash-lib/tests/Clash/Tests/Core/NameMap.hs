@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the sets and maps of names of scoped Clash Core
+  Tests for the sets and maps of names of Clash Core
 -}
 
 {-# LANGUAGE GADTs #-}

@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on primitives with multiple results, of scoped Clash Core.
+  Transformations on primitives with multiple results, of Clash Core.
   See Note [MultiResult type].
 -}
 

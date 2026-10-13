@@ -3,8 +3,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Builders of closed terms and types of scoped Clash Core
-  ("Clash.Core.Syntax"). They build scoped Core from a representation
+  Builders of closed terms and types of Clash Core
+  ("Clash.Core.Syntax"). They build Clash Core from a representation
   that refers to variables by name, such as GHC Core
   ("Clash.GHC.GHC2Core"), and add nothing to the trusted core.
 

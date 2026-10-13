@@ -8,7 +8,7 @@
 
   Turn CoreHW terms into normalized CoreHW Terms
 
-  The normalizer runs on scoped Clash Core ("Clash.Core.Syntax"): the
+  The normalizer runs on Clash Core ("Clash.Core.Syntax"): the
   global bindings are closed terms, which GHC2Core produces and Netlist
   generation consumes.
 -}

@@ -4,7 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Normalize". The regression tests of 'cleanupGraph' build
-  their binders in scoped Core, and assert that the result only mentions the
+  their binders in Clash Core, and assert that the result only mentions the
   variables it binds, and is the expected term.
 
   Note that there is no test for #448 ("Use proper InScopeSet in

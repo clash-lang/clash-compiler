@@ -7,8 +7,8 @@
   in, type constructors to test them with ('testTyConMap'), and parsers of
   terms from strings.
 
-  'parseTestTerm' parses a term of scoped Clash Core, see the section
-  "Parsing scoped Core" and "Test.Clash.Core" for the test scopes that
+  'parseTestTerm' parses a term of Clash Core, see the section
+  "Parsing Clash Core" and "Test.Clash.Core" for the test scopes that
   build its terms.
 -}
 
@@ -140,7 +140,7 @@ testTypeTranslator = HWTypeTranslator $ \_reprs _tenv _sc ty -> pure $ Just $
     _ -> Right (FilteredHWType (Signed 64) [])
 
 -- | Run a 'NetlistMonad' action for VHDL, with the given global bindings of
--- scoped Core, in the environment of the default 'RewriteEnv' (e.g. its type
+-- Clash Core, in the environment of the default 'RewriteEnv' (e.g. its type
 -- translator) with the type constructors of 'testTyConMap'
 runNetlistTest :: GlobalEnv (Binding (ST.Term 'ST.VoidS)) -> NetlistMonad a -> IO a
 runNetlistTest bs act =
@@ -302,7 +302,7 @@ parseName = fst . parseNameScope
 -- compares free variables by unique alone.
 --
 -- Note that this only applies to /references/: binders always need their type
--- declared, see the section "Parsing scoped Core".
+-- declared, see the section "Parsing Clash Core".
 freeVarType :: C.TyConName
 freeVarType = C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan
 
@@ -311,7 +311,7 @@ freeVarType = C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan
 --
 --   * @ScopedTypeVariables@, so lambda binders can spell out their type:
 --     @\\(x_0 :: Int) -> x_0@, and so a type binder can spell out its kind:
---     @\\(a :: Type) -> ..@, see the section "Parsing scoped Core".
+--     @\\(a :: Type) -> ..@, see the section "Parsing Clash Core".
 --   * @RankNTypes@, for @forall@ in a type: @(x :: forall a. a)@.
 --   * @TypeApplications@, for type application: @f \@Int@.
 termParseMode :: ParseMode
@@ -321,9 +321,9 @@ termParseMode = defaultParseMode
         <> extensions defaultParseMode
   }
 
--- * Parsing scoped Core
+-- * Parsing Clash Core
 --
--- The parser of scoped Clash Core. It parses very simple Haskell expressions,
+-- The parser of Clash Core. It parses very simple Haskell expressions,
 -- with the identifiers of 'parseNameScope', into builders
 -- ("Clash.Core.Builder") rather than terms, so that a test can build
 -- the term in a scope of its choice. See "Test.Clash.Core" for how tests
@@ -398,7 +398,7 @@ termParseMode = defaultParseMode
 -- 'Test.Clash.Core.termIn'), or the test declares them from the term (see
 -- 'Test.Clash.Core.withTerm', and 'testTermFree').
 
--- | A term of scoped Clash Core to build in the scope of a test, see
+-- | A term of Clash Core to build in the scope of a test, see
 -- 'Test.Clash.Core.termIn'. Parse it from a string with 'parseTestTerm',
 -- the quasiquoter 'termQQ', or a string literal (with @OverloadedStrings@).
 data TestTerm = TestTerm
@@ -414,7 +414,7 @@ data TestTerm = TestTerm
 instance IsString TestTerm where
   fromString = parseTestTerm
 
--- | A type of scoped Clash Core to build in the scope of a test, see
+-- | A type of Clash Core to build in the scope of a test, see
 -- 'TestTerm' and 'Test.Clash.Core.typeIn'
 data TestType = TestType
   { testTypeB :: TyB
@@ -488,7 +488,7 @@ nameKey = uniqueKey . C.nameUniq
 testGlobalId :: HasCallStack => String -> TestType -> GlobalId
 testGlobalId s ty = S.mkGlobalId (parseName (Ident () s)) (runClosedType (testTypeB ty))
 
--- | Parse a term of scoped Core, see the section header
+-- | Parse a term of Clash Core, see the section header
 parseTestTerm :: HasCallStack => String -> TestTerm
 parseTestTerm = parseTestTermWith mempty
 
@@ -515,7 +515,7 @@ instance Semigroup TestDefs where
 instance Monoid TestDefs where
   mempty = TestDefs [] [] []
 
--- | Parse a term of scoped Core that may also mention the data constructors
+-- | Parse a term of Clash Core that may also mention the data constructors
 -- and primitives that a test defines, see 'TestDefs'
 parseTestTermWith :: HasCallStack => TestDefs -> String -> TestTerm
 parseTestTermWith defs s = TestTerm b (freeDecls fr)
@@ -527,7 +527,7 @@ parseTestTermWith defs s = TestTerm b (freeDecls fr)
 strQQ :: TH.QuasiQuoter
 strQQ = stringQQ 'id
 
--- | Parse a type of scoped Core, see the section header
+-- | Parse a type of Clash Core, see the section header
 parseTestType :: HasCallStack => String -> TestType
 parseTestType s = TestType b (freeDecls fr)
  where
@@ -569,7 +569,7 @@ parseMode = termParseMode
   }
 
 -- | The keys of the variables bound around a subterm, and the types that let
--- expressions declare for binders by key, see the section "Parsing scoped
+-- expressions declare for binders by key, see the section "Parsing Clash
 -- Core"
 data PEnv = PEnv
   { _peTyVars :: !IntSet.IntSet
@@ -875,7 +875,7 @@ varRef env@(PEnv _ tms _ defs) nm0 annot = case parseNameScope nm0 of
 
 -- | A binder of a term variable: its key, name and type. The type is its
 -- annotation, or that of a type signature of an enclosing let-expression, see
--- the section "Parsing scoped Core".
+-- the section "Parsing Clash Core".
 spIdBinder :: (HasCallStack, Show l) => PEnv -> Pat l -> P (Key, C.Name ST.Term, TyB)
 spIdBinder env@(PEnv _ _ sigs _) = \case
   PParen _ p -> spIdBinder env p
@@ -894,7 +894,7 @@ spIdBinder env@(PEnv _ _ sigs _) = \case
   p -> error ("parseTestTerm: unsupported binder: " <> show p)
 
 -- | Lambdas. A binder annotated with a kind binds a type variable, see the
--- section "Parsing scoped Core".
+-- section "Parsing Clash Core".
 spLams :: (HasCallStack, Show l) => PEnv -> [Pat l] -> Exp l -> P TmB
 spLams env [] body = spTm env body
 spLams env (p : ps) body = case kindBinderPat p of
@@ -1017,7 +1017,7 @@ spCase env scrut alts ty = caseB <$> spTm env scrut <*> spTy env ty <*> mapM pAl
       exTvs (bindTyKey key env1) qs $ \env2 tvs -> k env2 ((key, nm, ki) : tvs)
     Nothing -> error "parseTestTerm: impossible"
 
--- | A data constructor of scoped Core: its name (see 'parseTestTerm' and
+-- | A data constructor of Clash Core: its name (see 'parseTestTerm' and
 -- 'testDefDataCons'), unique, tag (1 for the first constructor of its type),
 -- universally and existentially quantified type variables ('tyVarD' or
 -- 'kindedTyVarD'), and the types of its fields and its result, which mention
@@ -1037,7 +1037,7 @@ testDataCon nm u tag univ ext args res =
     (foldr (\(k, n, ki) -> forAllTyB k n ki) (funTyB (map testTypeB args) (testTypeB res)) tvs)
   sig = runDataConSig (map tvOf univ) (map tvOf ext) (map testTypeB args)
 
--- | A data type of scoped Core, with the given name (see 'resolveTyConName'),
+-- | A data type of Clash Core, with the given name (see 'resolveTyConName'),
 -- type variables of kind @Type@, by their identifiers, and data constructors
 testAlgTyCon :: HasCallStack => String -> [String] -> [C.DataCon] -> C.TyCon
 testAlgTyCon nm tvs dcs =
@@ -1240,7 +1240,7 @@ unconsSymbolTyConName =
   mkTyConName "GHC.TypeLits.UnconsSymbol" (fromGhcUnique typeUnconsSymbolTyFamNameKey)
 
 -- | The name of the type constructor of lifted equality, @a ~ b@. The parser
--- of scoped Core parses @a ~ b@ as its application to @Type@, @a@ and @b@.
+-- of Clash Core parses @a ~ b@ as its application to @Type@, @a@ and @b@.
 liftedEqTyConName :: C.TyConName
 liftedEqTyConName = C.mkUnsafeName C.User (Text.pack "~") (fromGhcUnique eqTyConKey)
 
@@ -1633,7 +1633,7 @@ zeroWidthTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     ]
 
 -- | A global binding of the given term, of a function without an inline
--- pragma, e.g. of a term of scoped Core
+-- pragma, e.g. of a term of Clash Core
 mkGlobalBinding :: GlobalId -> a -> Binding a
 mkGlobalBinding i t = Binding
   { bindingId = i

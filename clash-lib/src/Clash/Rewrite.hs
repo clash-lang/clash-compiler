@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Writing transformations of scoped Clash Core ("Clash.Core.Syntax").
+  Writing transformations of Clash Core ("Clash.Core.Syntax").
   This module re-exports what a transformation needs from the rewrite
   machinery; read this header before writing one.
 
@@ -45,7 +45,7 @@
     'Clash.Rewrite.StrategyDSL.anyConstructor'):
     @w :: Distinct n => TransformContext n -> Term n -> m (Term n)@, getting
     the node only. @onVarNode@ fires at both local ('Var') and global
-    ('GlobalVar') variables. There is no @onVar@ for scoped Core.
+    ('GlobalVar') variables. There is no @onVar@ for Clash Core.
 
   * 'Clash.Rewrite.StrategyDSL.pass' takes a function of that same type,
     which traverses the term itself (with "Clash.Rewrite.Combinators").
@@ -92,7 +92,7 @@
     _ -> pure (sink e)  -- doesn't fire: return the original node
   @
 
-  The evaluator is that of scoped Clash Core ("Clash.Core.Evaluator").
+  The evaluator is that of Clash Core ("Clash.Core.Evaluator").
   The let-bindings of the context are those of its frames.
 
   = A worked example
@@ -120,13 +120,13 @@
   and opens a recursive let-binding ('Clash.Core.Subst.openBind')
   before it looks at its variables.
 
-  The strategies ("Clash.Normalize.Strategy.Spec") refer to the scoped
+  The strategies ("Clash.Normalize.Strategy.Spec") refer to the
   transformations, and the strategy compiler
   ("Clash.Rewrite.StrategyDSL.TH", 'Clash.Rewrite.StrategyDSL.TH.compileStrategy')
   compiles them into fused traversals that open the binders they go under.
 
   Tests: "Test.Clash.Core" has test scopes to write the inputs and the
-  expected results, and runs scoped transformations in them (@runRewriteIn@,
+  expected results, and runs transformations in them (@runRewriteIn@,
   @runRewriteClosed@).
 
   = Common type errors

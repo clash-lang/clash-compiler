@@ -69,7 +69,7 @@ type NetlistInputs =
   , DomainMap
   )
 
--- | Write inputs, or normalized bindings, to a file of scoped Clash Core: with
+-- | Write inputs, or normalized bindings, to a file of Clash Core: with
 -- the header of "Clash.Core.Binary"
 writeInputs :: Binary a => FilePath -> a -> IO ()
 writeInputs f = BL.writeFile f . encodeWithHeader

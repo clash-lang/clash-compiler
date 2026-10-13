@@ -3,8 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Evaluator": the whnf evaluator of scoped Clash
-  Core and its primitive reductions, in the environment Clash uses
+  Tests for "Clash.Core.Evaluator": the whnf evaluator of Clash Core and its primitive reductions, in the environment Clash uses
   ('Clash.Rewrite.Whnf.evaluatorEnv').
 -}
 

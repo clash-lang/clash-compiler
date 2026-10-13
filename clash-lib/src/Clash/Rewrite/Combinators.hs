@@ -4,7 +4,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Rewriting combinators and traversals for scoped Clash Core. Traversals open
+  Rewriting combinators and traversals for Clash Core. Traversals open
   the binders they go under (see "Clash.Rewrite.Types"), which renames
   a binder that clashes with the scope.
 
@@ -364,7 +364,7 @@ infixr 6 >-!->
   forceTerm e' `seq` r2 c e'
 {-# INLINE (>-!->) #-}
 
--- | Evaluate a term fully, like 'Control.DeepSeq.deepseq' would. The fields of scoped terms are strict, except
+-- | Evaluate a term fully, like 'Control.DeepSeq.deepseq' would. The fields of terms are strict, except
 -- for the lists of case alternatives and recursive right-hand sides, so a term
 -- in WHNF is evaluated except for those.
 forceTerm :: Term n -> ()

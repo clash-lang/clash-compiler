@@ -3,11 +3,11 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Smart constructors and destructors for scoped Clash Core.
+  Smart constructors and destructors for Clash Core.
 
   = Let-bindings
 
-  Let-bindings can't be passed around as lists in scoped Core: the right-hand
+  Let-bindings can't be passed around as lists in Clash Core: the right-hand
   side of a binding may only mention the binders in scope at it. The functions
   here take the bindings of a recursive let-expression
   (@'Let' ('Rec' bs xs) body@) and regroup or reorder them, giving a telescope

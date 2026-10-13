@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations for converting scoped Clash Core to A-normal form. See
+  Transformations for converting Clash Core to A-normal form. See
   Note [ANF in Clash] for the shape of the result.
 
   = How 'makeANF' moves bindings
@@ -17,7 +17,7 @@
   patterns bind: the binders on the path to a binding become let-binders of
   the same let-expression.
 
-  Scoped Core can't simply move a term out from under binders: the binders
+  Clash Core can't simply move a term out from under binders: the binders
   scope over the term, so the term lives in an extension of the scope it
   moves to. So the traversal here lets the scope /grow/ instead: it works in a
   single scope (@q@ below) that extends the scope of the root (@r@) with every

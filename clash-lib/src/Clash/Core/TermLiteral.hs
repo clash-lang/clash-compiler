@@ -6,7 +6,7 @@ Copyright   :  (C) 2019, Myrtle Software Ltd,
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-Tools to convert a scoped 'Term' into its "real" representation.
+Tools to convert a 'Term' into its "real" representation.
 
 There is no @TermLiteral Term@ instance: the
 scope of the decoded term is quantified in 'termToData#', so a decoded value

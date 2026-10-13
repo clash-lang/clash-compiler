@@ -4,7 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Solving the type equations of the fields of data constructors, for their
-  existentially quantified type variables, in scoped Clash Core.
+  existentially quantified type variables, in Clash Core.
 
   A solution gives a type variable a closed type: a type constructor or a
   number (see 'solveEq' and 'solveAdd'). Substituting a solution for an

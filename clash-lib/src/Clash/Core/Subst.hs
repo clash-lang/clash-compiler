@@ -4,7 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Capture-avoiding substitution, going under binders, creating fresh binders,
-  and moving values out of the scope of binders, for scoped Clash Core.
+  and moving values out of the scope of binders, for Clash Core.
 
   = Substitutions
 

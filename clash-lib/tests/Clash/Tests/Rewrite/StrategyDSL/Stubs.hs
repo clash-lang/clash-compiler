@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Stub transformations of scoped Clash Core, test terms, and strategy
+  Stub transformations of Clash Core, test terms, and strategy
   fragments for "Clash.Tests.Rewrite.StrategyDSL". They live in their
   own module because Template Haskell splices can only evaluate imported
   values.

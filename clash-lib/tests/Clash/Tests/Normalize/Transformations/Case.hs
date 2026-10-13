@@ -6,7 +6,7 @@
   Tests for "Clash.Normalize.Transformations.Case".
 
   The regression tests guard against bugs that the case transformations had.
-  The capture bugs among them can't be written in scoped Core: they are type
+  The capture bugs among them can't be written in Clash Core: they are type
   errors. Instead, 'assertRewritesTo' also runs each test in a scope
   whose variables clash with the binders of its input, where a transformation
   that moves a term under one of them has to rename it. The tests in a sunk

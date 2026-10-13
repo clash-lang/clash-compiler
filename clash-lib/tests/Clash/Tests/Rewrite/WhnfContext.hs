@@ -9,7 +9,7 @@
   of a term to the variable.
 
   A binder that shadows a let-binder, or a free variable of its right-hand
-  side, in the source of a test has another name in scoped Core, so the
+  side, in the source of a test has another name in Clash Core, so the
   binding is used where it is valid: the variable evaluates to the free
   variable of the right-hand side, not to the binder in between that has its
   name in the source.

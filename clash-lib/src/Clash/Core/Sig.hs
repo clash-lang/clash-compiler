@@ -3,8 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The signatures of type constructors and data constructors in scoped Clash
-  Core: the parts of a 'Clash.Core.TyCon.TyCon' and a
+  The signatures of type constructors and data constructors in Clash Core: the parts of a 'Clash.Core.TyCon.TyCon' and a
   'Clash.Core.DataCon.DataCon' that bind type variables.
 
   * The /signature of a newtype/ (t'NewTyConSig'): a telescope of the type

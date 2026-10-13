@@ -129,7 +129,7 @@ regressionTests =
     -- single let-expression. It used to pick uniques for the new binders that
     -- only avoided the free variables, not the bound variables of the
     -- expression, so a new binder could get the same unique as an existing
-    -- one. In scoped Core, the binders it creates are fresh by construction.
+    -- one. In Clash Core, the binders it creates are fresh by construction.
     -- https://github.com/clash-lang/clash-compiler/commit/63827c31fff4ab27005f25cb027969f8805d646d
   , testCase "ANF does not duplicate binders" $
       assertRewritesTo def st anfS [varD "x_31" "Int"]

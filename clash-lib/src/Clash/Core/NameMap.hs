@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Sets and maps of local and global names of scoped Clash Core.
+  Sets and maps of local and global names of Clash Core.
 
   Local names and global names live in separate namespaces: a 'NameMap' is
   keyed by local names ('TyName' or 'TmName') of one scope, a t'GlobalEnv' by

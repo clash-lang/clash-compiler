@@ -6,7 +6,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of the primitives of "GHC.Base" in the scoped evaluator. See
+  Reductions of the primitives of "GHC.Base" in the evaluator. See
   "Clash.Core.Evaluator.Primitives" for how to write them.
 -}
 

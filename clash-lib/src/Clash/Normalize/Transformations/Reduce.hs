@@ -7,7 +7,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Transformations for compile-time reduction of expressions / primitives, on
-  scoped Clash Core.
+  Clash Core.
 
   = Primitive reductions
 

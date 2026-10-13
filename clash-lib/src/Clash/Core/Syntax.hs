@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Scoped Clash Core: Clash's core language in the style of the foil
+  Clash Core: Clash's core language in the style of the foil
   (Maclaurin, Radul, Paszke, "The Foil: Capture-Avoiding Substitution With No
   Sharp Edges", IFL 2022, <https://doi.org/10.1145/3587216.3587224>).
 

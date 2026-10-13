@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The environment of the types of scoped Clash Core: the type constructors
+  The environment of the types of Clash Core: the type constructors
   that types refer to.
 
   The functions on types that look up type constructors ("Clash.Core.Type",
@@ -40,7 +40,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.Syntax
 import Clash.Core.TyCon
 
--- | The environment of the types of scoped Clash Core, see the module header
+-- | The environment of the types of Clash Core, see the module header
 newtype TypeEnv = TypeEnv
   { typeEnvTyConMap :: TyConMap
   -- ^ The type constructors

@@ -350,7 +350,7 @@ tests =
 -- a free variable of an argument, and 'assertRewritesTo' also runs it in a
 -- scope that the binders of the input clash with.
 
--- | Run the scoped 'Clash.Normalize.Transformations.Inline.bindConstantVar'
+-- | Run 'Clash.Normalize.Transformations.Inline.bindConstantVar'
 -- on @let a = .. in \\x -> e@, and 'appProp' on the body of the resulting
 -- lambda. Asserts that this gives the expected term, also in a scope that the
 -- binders of the input clash with.

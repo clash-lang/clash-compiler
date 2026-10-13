@@ -3,8 +3,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Evaluating a subterm of a scoped rewrite to weak-head normal form, with the
-  evaluator of scoped Clash Core ("Clash.Core.Evaluator").
+  Evaluating a subterm of a rewrite to weak-head normal form, with the
+  evaluator of Clash Core ("Clash.Core.Evaluator").
 
   The evaluator gets the let-bindings of the context ('tfHeap') as its local
   heap. Its result lives in the scope of the subterm extended with the
@@ -36,7 +36,7 @@ import Clash.Core.TypeEnv (TypeEnv)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (bindPureHeap)
 
--- | The environment of the scoped evaluator: the primitive reductions of
+-- | The environment of the evaluator: the primitive reductions of
 -- "Clash.Core.Evaluator.Primitives". A primitive without one doesn't
 -- reduce.
 evaluatorEnv :: TypeEnv -> Env

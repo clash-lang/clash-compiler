@@ -7,7 +7,7 @@
 
   PrettyPrec printing class and instances for CoreHW
 
-  Pretty printing of scoped Clash Core: the 'PrettyPrec' instances of its
+  Pretty printing of Clash Core: the 'PrettyPrec' instances of its
   types, terms, binders, global variables and type constructors. Notably:
 
   * The unique of a local variable is its raw name.
@@ -126,14 +126,14 @@ instance Default PrettyOptions where
 -- | Annotations carried on pretty-printed code.
 data ClashAnnotation
   = AnnSubterm SubtermPos
-  -- ^ marking navigation to a subterm, in the printed terms of scoped Core
+  -- ^ marking navigation to a subterm, in the printed terms of Clash Core
   -- (see the module header)
   | AnnSyntax  SyntaxElement
   -- ^ marking a specific sort of syntax
   deriving Eq
 
 -- | The position of a subterm in its parent term. It marks navigation to the
--- subterm in the printed terms of scoped Core (see the module header).
+-- subterm in the printed terms of Clash Core (see the module header).
 -- It holds no binders, which are scoped: the subterm is identified by its
 -- position alone.
 data SubtermPos

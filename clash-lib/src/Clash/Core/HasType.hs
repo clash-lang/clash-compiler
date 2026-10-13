@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The types of scoped Clash Core terms, and the kinds of their types.
+  The types of Clash Core terms, and the kinds of their types.
 
   Local variables carry their type ('Var', and 'idBinderType'), and so do
   case-expressions and casts, and global variables ('globalIdType'). Data

@@ -8,7 +8,7 @@
 
   Type and instance definitions for Rewrite modules
 
-  The rewrite context and the transformation type of scoped Clash Core
+  The rewrite context and the transformation type of Clash Core
   ("Clash.Core.Syntax"). See "Clash.Rewrite" for how to write a
   transformation.
 
@@ -220,7 +220,7 @@ data RewriteState extra
   , _globalHeap       :: PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
   , _bindings   :: GlobalEnv (Binding (S.Term 'S.VoidS))
-  -- ^ Global binders, as closed terms of scoped Clash Core
+  -- ^ Global binders, as closed terms of Clash Core
   , _workFreeBinders :: GlobalEnv Bool
   -- ^ Map telling whether the definition of a global binder in
   -- '_bindings' is work-free
@@ -246,7 +246,7 @@ data RewriteEnv
   -- ^ Functions that are considered TopEntities
   , _typeEnv  :: TypeEnv
   -- ^ The type constructors of 'tcCache', and the globals of the bindings at
-  -- the start of the session, for scoped Clash Core. It caches their
+  -- the start of the session, for Clash Core. It caches their
   -- signatures as scoped types, see "Clash.Core.TypeEnv": make it once
   -- per session.
   }

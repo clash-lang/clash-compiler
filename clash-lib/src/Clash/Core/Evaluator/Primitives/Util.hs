@@ -6,10 +6,10 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Shared helpers of the reductions of primitives of the scoped evaluator
+  Shared helpers of the reductions of primitives of the evaluator
   ("Clash.Core.Evaluator"). See
   "Clash.Core.Evaluator.Primitives" for how reductions are registered,
-  and how to write one. The helpers work on scoped Clash Core:
+  and how to write one. The helpers work on Clash Core:
 
   * __Types are scoped.__ The type arguments of a primitive ('tys') and its
     type ('ty') live in the scope of the machine ('sc'). Helpers that look at

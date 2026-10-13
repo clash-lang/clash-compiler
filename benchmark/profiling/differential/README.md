@@ -1,11 +1,11 @@
 # clash-differential
 
-Compares serialized designs of scoped Clash Core (`Clash.Core`):
+Compares serialized designs of Clash Core (`Clash.Core`):
 
 * `normalized`: the normalized bindings of two runs of the normalizer, e.g.
   at two commits, up to alpha-equivalence;
 * `binary`: the bindings of a design with the result of the round trip
-  through the `Binary` instances of scoped Clash Core
+  through the `Binary` instances of Clash Core
   (`Clash.Core.Binary`).
 
 ## Running

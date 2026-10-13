@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for solving type equations in scoped Clash Core.
+  Tests for solving type equations in Clash Core.
 -}
 
 {-# LANGUAGE PolyKinds #-}

@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Alpha-equivalence of scoped Clash Core, and a total order up to
+  Alpha-equivalence of Clash Core, and a total order up to
   alpha-equivalence.
 
   Both sides are in the same scope, so free variables are compared by their

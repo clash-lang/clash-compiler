@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The separating arguments transformation of scoped Clash Core.
+  The separating arguments transformation of Clash Core.
 
   It doesn't split arguments of a product type of which the type of a field
   mentions an existentially quantified type variable, see

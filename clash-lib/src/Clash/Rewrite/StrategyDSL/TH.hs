@@ -10,7 +10,7 @@
 
   = Target
 
-  A strategy compiles to a transformation of scoped Clash Core (see
+  A strategy compiles to a transformation of Clash Core (see
   "Clash.Rewrite"). The 'Target' says how: the term constructors, how a
   transformation is called, the instrumentation and combinators, and how a
   traversal descends into a node. A traversal opens the binders it goes
@@ -85,7 +85,7 @@ data Target = Target
 callE :: Target -> Q Exp -> Q Exp -> Q Exp -> Q Exp
 callE target f ctxE tmE = [| $(target.call f ctxE) $tmE |]
 
--- | The target of scoped Clash Core
+-- | The target of Clash Core
 coreTarget :: Target
 coreTarget = Target
   { patterns = corePatterns
@@ -109,7 +109,7 @@ coreTarget = Target
       [| SApply.apply $(stringE name) (S.Transform $(varE rewriteName)) |]
   }
 
--- | The term constructors of scoped Core belonging to a 'Constructor'. A
+-- | The term constructors of Clash Core belonging to a 'Constructor'. A
 -- variable is local ('S.Var') or global ('S.GlobalVar').
 corePatterns :: Constructor -> [(Name, [String])]
 corePatterns con = case con of
@@ -177,7 +177,7 @@ validateChain members = do
 -- | A transformation's worker table must be non-empty, register at most one
 -- worker per constructor, and not mix 'AnyWorker' with per-constructor
 -- workers: a transformation either fires at any constructor or at specific
--- ones, never both. A transformation of scoped Core has no 'FieldWorker' for
+-- ones, never both. A transformation of Clash Core has no 'FieldWorker' for
 -- 'CVar', see "Clash.Rewrite.StrategyDSL".
 validateTransformation :: Transformation -> Q ()
 validateTransformation transformation
@@ -419,9 +419,9 @@ guardExp target wrapInvoke transformation =
   nodeCaseExp target $ \con ->
     wrapInvoke target <$> invokeAt target con transformation
 
--- ** Descent into a node of scoped Core
+-- ** Descent into a node of Clash Core
 
--- | The one-level descent for one constructor of scoped Core, replicating
+-- | The one-level descent for one constructor of Clash Core, replicating
 -- 'Clash.Rewrite.Combinators.allR': it opens the binders it goes under,
 -- pushes the same frames, and gives the node itself when no child changed
 -- (see Note [sharing unchanged nodes] in "Clash.Rewrite.Combinators").
@@ -535,7 +535,7 @@ genDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
                    [| $(varE rebuildName) $nodeE $b $e $(varE b') $(varE e'') |]
                ])) |]
 
--- | A recursive traversal of scoped Core: a 'S.Transform' of a lambda
+-- | A recursive traversal of Clash Core: a 'S.Transform' of a lambda
 -- with a case-expression on the node
 coreGoDec
   :: Name -> (Constructor -> Q Exp -> Q Exp -> [Q Exp] -> Descend -> Q Exp) -> Q Dec
@@ -761,9 +761,9 @@ dispatchQFor target step = do
   cs <- compileStep target step
   letE cs.decs cs.dispatch
 
--- ** Scoped Clash Core
+-- ** Clash Core
 
--- | Compile a strategy of transformations of scoped Core into its fused
+-- | Compile a strategy of transformations of Clash Core into its fused
 -- dispatch code. The result is an expression of type
 -- @'Clash.Rewrite.Types.Rewrite' extra@, with @extra@ fixed by
 -- the workers the spec references.

@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests of the 'Data.Binary.Binary' instances of scoped Clash Core
+  Tests of the 'Data.Binary.Binary' instances of Clash Core
   ("Clash.Core.Binary"), on generated terms
   ("Test.Clash.Core.Gen"), with the number of tests that 'withTests' gives.
 -}

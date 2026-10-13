@@ -5,7 +5,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The normalization strategies, as pure "Clash.Rewrite.StrategyDSL" values,
-  of the transformations of scoped Clash Core
+  of the transformations of Clash Core
   ("Clash.Normalize.Transformations").
   "Clash.Normalize.Strategy" compiles 'normalizationSpec' and
   'constantPropagationSpec' into the executable 'Clash.Normalize.Strategy.normalization'

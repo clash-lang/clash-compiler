@@ -5,7 +5,7 @@
 
   Compares the results of normalizing serialized designs in two runs
   ("Normalized"), and checks the round trip through the 'Data.Binary.Binary'
-  instances of scoped Clash Core ("RoundTrip"). See README.md.
+  instances of Clash Core ("RoundTrip"). See README.md.
 -}
 
 {-# LANGUAGE LambdaCase #-}

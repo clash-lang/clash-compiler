@@ -6,7 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations for specialization on scoped Clash Core, and application
+  Transformations for specialization on Clash Core, and application
   propagation ('appProp').
 
   'specialize' creates a closed global function, which abstracts over the

@@ -6,19 +6,19 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Conversion of GHC Core to closed terms of scoped Clash Core
+  Conversion of GHC Core to closed terms of Clash Core
   ("Clash.Core.Syntax"). It converts in two phases, see
   "Clash.Core.Builder".
 
   = Types
 
   The types in terms, and those of global variables, primitives and data
-  constructors, are types of scoped Core, which
+  constructors, are types of Clash Core, which
   'Clash.GHC.GHC2Core.coreToTypeB' builds from GHC's types directly.
 
   = Primitives
 
-  The type of a primitive is closed in scoped Core. Primitives that stand in
+  The type of a primitive is closed in Clash Core. Primitives that stand in
   for a term of some type, @_RUBBISH_@, @_TY_@ and @_CO_@, have the shape of
   'Clash.Core.Util.primAtType': if the type is open, they are a
   primitive of type @forall a. a@ applied to the type.
@@ -60,7 +60,7 @@ module Clash.GHC.GHC2Core
   , makeAllTyCons
   , emptyGHC2CoreState
   , pendingWarnings
-    -- * Types of scoped Core
+    -- * Types of Clash Core
   , varKey
   , coreToTypeB
   , coreToTyVarB
@@ -79,7 +79,7 @@ module Clash.GHC.GHC2Core
   , hasPrimCo
   , isSizedCast
   , isDataConWrapId
-    -- * Terms of scoped Core
+    -- * Terms of Clash Core
   , coreToTermB
   , coreToIdB
   )
@@ -297,10 +297,10 @@ data GHC2CoreState
   { _tyConMap :: C.UniqMap TyCon
   , _nameMap  :: HashMap Name Text
   , _convertedTypeCache :: HashMap StructuralType TyB
-  -- ^ Cache for types converted to scoped Core, keyed on the GHC type. See
+  -- ^ Cache for types converted to Clash Core, keyed on the GHC type. See
   -- 'coreToTypeB'.
   , _varTypeMap :: HashMap Name (S.Type 'S.VoidS)
-  -- ^ Cache for the types of global variables, converted to scoped Core. See
+  -- ^ Cache for the types of global variables, converted to Clash Core. See
   -- 'coreToVarTypeB'.
   , _dataConCache :: C.UniqMap C.DataCon
   -- ^ Cache for converted data constructors, by unique. See 'coreToDataCon'.
@@ -798,14 +798,14 @@ coreToAttrs (TyConApp tycon kindsOrTypes)
 coreToAttrs _ =
     return []
 
--- * Types of scoped Core
+-- * Types of Clash Core
 
--- | The key of a GHC variable in the builders of scoped Core, see
+-- | The key of a GHC variable in the builders of Clash Core, see
 -- "Clash.Core.Builder"
 varKey :: Var -> Key
 varKey = uniqueKey . fromGhcUnique . varUnique
 
--- | Converts a GHC type to a type of scoped Core, as a builder (see
+-- | Converts a GHC type to a type of Clash Core, as a builder (see
 -- "Clash.Core.Builder").
 --
 -- The order in which it looks up names matters: the names are cached by

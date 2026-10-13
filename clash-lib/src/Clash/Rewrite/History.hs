@@ -4,8 +4,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The rewrite history of @-fclash-debug-history@: a file of 'RewriteStep's,
-  which @clash-term@ shows. It starts with the header of the files of scoped
-  Clash Core ('Clash.Core.Binary.putHeader').
+  which @clash-term@ shows. It starts with the header of the files of Clash
+  Core ('Clash.Core.Binary.putHeader').
 
   A transformation rewrites a subterm, which may mention variables bound
   around it. A step stores closed terms: the term before and the term after

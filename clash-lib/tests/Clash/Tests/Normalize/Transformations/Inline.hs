@@ -102,7 +102,7 @@ keepsInTop bs = assertNoRewrite env (topState bs)
 
 -- * inlineBndrsCleanup
 
--- | Run the scoped 'S.inlineBndrsCleanup' on a let-expression, keeping its
+-- | Run 'S.inlineBndrsCleanup' on a let-expression, keeping its
 -- first binding and inlining the others, as in the regression tests of
 -- #1337. Asserts that it gives the let-expression with the expected bindings,
 -- also in a scope that its binders clash with.
