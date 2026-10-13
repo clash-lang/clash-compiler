@@ -33,7 +33,7 @@ import Clash.Core.Scoped.TypeEnv
 import Test.Clash.Rewrite
   (assertErrorContains, intTy, mkTestDataCon, nTyConName, testTyConMap)
 import Test.Clash.Scoped (assertScopedTyAlphaEq, testTypeEnv, withFreeVars, withTests)
-import qualified Test.Clash.Scoped.Gen as Gen
+import qualified Test.Clash.Scoped.Gen.Clash as Gen
 
 -- | Whether two values are the same heap object, after evaluating them
 sameObject :: a -> a -> Bool

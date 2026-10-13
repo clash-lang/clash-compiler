@@ -6,7 +6,7 @@
   Tests for the conversion between Clash Core and scoped Clash Core.
 
   The properties of scoped Clash Core run on generated terms
-  ("Test.Clash.Scoped.Gen"), with the number of tests that 'withTests' gives
+  ("Test.Clash.Scoped.Gen.Clash"), with the number of tests that 'withTests' gives
   them. To run more tests, on larger terms, e.g. after changing the trusted
   core:
 
@@ -49,7 +49,7 @@ import Test.Clash.Rewrite
 import Test.Clash.Scoped
   ( aeqTermTyped, binderRaws, extendFreeVars, forAllScrambled, lintScopeOf, lintTerm
   , lowBinders, roundTrip, sinkInto, withFreeVars, withFreeVarsOf, withTests)
-import Test.Clash.Scoped.Gen
+import Test.Clash.Scoped.Gen.Clash
   ( InScope (..), Sunk (..), ctxOf, freeVarsUniqs, genFreeVars, genInScope, genSunk
   , genType, kindOf, runG, shrinkInScope, shrinkSunk, showFreeVars, showTerm
   , showType, termFeatures, wellScopedIn)

@@ -37,7 +37,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Test.Clash.Scoped.Gen
+module Test.Clash.Scoped.Gen.Clash
   ( -- * Signatures
     dataCons
   , tyConMap

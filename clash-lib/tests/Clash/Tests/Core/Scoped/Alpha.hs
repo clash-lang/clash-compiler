@@ -34,7 +34,7 @@ import Test.Clash.Rewrite
 import Test.Clash.Scoped
   ( assertScopedAlphaEq, extendFreeVars, extendSunk, forAllScrambled, sinkInto
   , withFreeVars, withFreeVarsOf, withTests)
-import Test.Clash.Scoped.Gen
+import Test.Clash.Scoped.Gen.Clash
   ( InScope (..), Sunk (..), genInScope, genPerturbed, genSameRhsCase, genSunk
   , patBindersFreeIn, renameBinders, shrinkInScope, shrinkSunk, showTerm)
 

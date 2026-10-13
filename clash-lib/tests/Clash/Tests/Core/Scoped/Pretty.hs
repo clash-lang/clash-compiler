@@ -42,7 +42,7 @@ import Clash.Core.Scoped.Syntax
 
 import Test.Clash.Rewrite (globalId, intTy, tyVar)
 import Test.Clash.Scoped (extendFreeVars, forAllScrambled, sinkInto, withFreeVars, withTests)
-import Test.Clash.Scoped.Gen
+import Test.Clash.Scoped.Gen.Clash
   (InScope (..), Sunk (..), ctxOf, genFreeVars, genInScope, genSunk, genType, runG,
    shrinkInScope, shrinkSunk, showType, tyConMap)
 

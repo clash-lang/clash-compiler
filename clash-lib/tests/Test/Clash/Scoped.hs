@@ -288,7 +288,7 @@ import Test.Clash.Rewrite
 import Test.Clash.Rewrite (ghcName)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
 import Test.Clash.Scoped.Evaluator (scopedWhnf, whnfIn)
-import Test.Clash.Scoped.Gen (FreeVars (..), showTerm)
+import Test.Clash.Scoped.Gen.Clash (FreeVars (..), showTerm)
 
 -- * Test scopes
 
@@ -773,7 +773,7 @@ withFreeVars :: FreeVars -> (forall n. Distinct n => ConvEnv n -> r) -> r
 withFreeVars (FreeVars tvs ids) = withConvEnv tvs ids
 
 -- | Extend a conversion environment with more generated free variables, see
--- 'Test.Clash.Scoped.Gen.genMoreFreeVars'
+-- 'Test.Clash.Scoped.Gen.Clash.genMoreFreeVars'
 extendFreeVars
   :: Distinct n
   => ConvEnv n

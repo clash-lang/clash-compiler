@@ -53,7 +53,7 @@ import Test.Clash.Scoped
   , binderRaws, bindersNot, clashingBinders, closedTerm, extendFreeVars, forAllScrambled
   , lintScopeOf, lintTerm, reopenTerm, sinkInto, sunkD, termIn, testScope, varD
   , withClashing, withFreeVars, withTerm, withTestScope, withTests)
-import Test.Clash.Scoped.Gen
+import Test.Clash.Scoped.Gen.Clash
   ( FreeVars (..), InScope (..), KnownCon (..), Redex (..), Sunk (..), ctxOf, genFreeVars
   , genInScope, genKnownCon, genRedex, genSunk, genType, inScopeOf, runG, shrinkInScope
   , shrinkKnownCon, shrinkRedex, shrinkSunk, showTerm, showType)
