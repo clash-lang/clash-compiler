@@ -50,7 +50,7 @@ import qualified Control.Lens                     as Lens
 import           Control.Monad                    (zipWithM)
 import           Control.Monad.Extra              (concatMapM, mapMaybeM)
 import           Data.Bifunctor                   (first, second)
-import           Data.Either                      (partitionEithers, rights)
+import           Data.Either                      (partitionEithers)
 import           Data.Char                        (ord)
 import           Data.List                        (elemIndex, partition)
 import           Data.List.Extra                  (zipEqual)
@@ -69,13 +69,11 @@ import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
 import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr' (..), CustomReprs, DataRepr' (..), Type' (..), getConstrRepr, getDataRepr)
 import           Clash.Core.DataCon               (DataCon (..))
-import           Clash.Core.HasType               (coreTypeOf)
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
 import qualified Clash.Core.Name                  as C (nameLoc, nameOcc)
 import qualified Clash.Core.Term                  as C
 import qualified Clash.Core.Type                  as C
-import qualified Clash.Core.Util                  as C (splitShouldSplit)
 import           Clash.Driver.Types
   (Binding (..), ClashEnv (..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist                    (genNames, runNetlistMonad)
@@ -86,17 +84,19 @@ import           Clash.Netlist.Types              as HW
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, dcToLiteral, declareInstUses, expandTopEntityOrErrM,
    isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
-   procAssign)
-import qualified Clash.Netlist.Util               as Legacy
-  (unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM')
+   procAssign, stripFiltered)
 import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
 
 import           Clash.Core.Scoped.Alpha          (aeqTy)
 import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
-import           Clash.Core.Scoped.Type           (coreView)
+import           Clash.Core.Scoped.Type
+  (SplitCoreFunForall (..), TypeView (..), coreView, splitCoreFunForallTy, tyView)
 import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
+import           Clash.Core.Scoped.TypeEnv        (TypeEnv)
+import           Clash.Core.Scoped.Subst          (closeType, openTyBinder)
+import           Clash.Core.Scoped.Util           (splitShouldSplit)
 import           Clash.Core.Scoped.Pretty         ()
 import           Clash.Core.Scoped.NameMap        (GlobalEnv, lookupGlobalEnv)
 import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNameBinders)
@@ -152,6 +152,37 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
       $ genComponent topEntity
   return (topComponent, _components s, seen1)
 
+-- | The number of arguments of the type of a top entity, after splitting off
+-- clocks and stuff from product types that contain them (see
+-- 'splitShouldSplit'). Its quantified type variables are skipped, like
+-- 'Clash.Core.Type.splitFunForallTy' does.
+topArgCount :: Distinct n => TypeEnv -> Scope n -> Type n -> Int
+topArgCount te sc ty = case ty of
+  ForAllTy b res -> openTyBinder sc b res $ \sc' _ res' -> topArgCount te sc' res'
+  (tyView -> FunTy a res) -> length (splitShouldSplit te sc [a]) + topArgCount te sc res
+  _ -> 0
+
+-- | The HWTypes of the arguments of the type of a top entity, split like
+-- 'topArgCount' does, and of its result
+topHWTypes
+  :: Distinct n
+  => TypeEnv -> Scope n -> Type n -> NetlistMonad ([HWType], FilteredHWType)
+topHWTypes te sc ty = case ty of
+  ForAllTy b res -> openTyBinder sc b res $ \sc' _ res' -> topHWTypes te sc' res'
+  (tyView -> FunTy a res) -> do
+    as <- mapM (unsafeCoreTypeToHWTypeM' $(curLoc) sc) (splitShouldSplit te sc [a])
+    (rest, r) <- topHWTypes te sc res
+    pure (as ++ rest, r)
+  _ -> ([],) <$> unsafeCoreTypeToHWTypeM $(curLoc) sc ty
+
+-- | The result type of the type of a top entity, see
+-- 'Clash.Core.Type.splitCoreFunForallTy'. Errors if it mentions quantified type
+-- variables.
+topResultType :: HasCallStack => TypeEnv -> Type 'VoidS -> Type 'VoidS
+topResultType te ty = case splitCoreFunForallTy te emptyScope ty of
+  SplitCoreFunForall _ _ res ->
+    fromMaybe (error ($(curLoc) ++ "polymorphic result type: " ++ showPpr res)) (closeType res)
+
 -- | Generate a component for a given function (caching)
 genComponent
   :: HasCallStack
@@ -176,7 +207,6 @@ genComponentT
   -- ^ Corresponding term
   -> NetlistMonad (ComponentMeta, Component)
 genComponentT compName0 componentExpr = do
-  tcm <- Lens.view tcCache
   tenv <- Lens.view typeEnv
   let compVar = globalIdLegacy compName0
   compName1 <-
@@ -189,7 +219,7 @@ genComponentT compName0 componentExpr = do
 
   topEntityTM <- lookupGlobalEnv compName0 <$> Lens.use topEntityAnns
   let topAnnMM = topAnnotation <$> topEntityTM
-      topVarTypeM = snd . C.splitCoreFunForallTy tcm . coreTypeOf . globalIdLegacy . topId <$> topEntityTM
+      topVarTypeM = topResultType tenv . globalIdType . topId <$> topEntityTM
 
   seenIds <~ Lens.use seenComps
   UniqueNormalized ctx wereVoids compInps argWrappers compOutps resUnwrappers binders resultM <-
@@ -531,23 +561,16 @@ mkFunApp
   -> NetlistMonad [Declaration]
 mkFunApp ctx declType dstId (Right fun) args tickDecls = do
   topAnns <- Lens.use topEntityAnns
-  tcm     <- Lens.view tcCache
   let sc = compScope ctx
       argTyOf = inferCoreTypeOf (compTypeEnv ctx) sc
   case lookupGlobalEnv fun topAnns of
     Just topEntity
-      -- The type of a top entity is a type of Clash Core, whose quantified
-      -- type variables have been removed: so it can mention type variables
-      -- that are not in scope, and its HWTypes come from Clash Core types.
-      -- TODO(D4): use the scoped type once 'GlobalId' carries one.
-      | let ty = coreTypeOf (globalIdLegacy (topId topEntity))
-      , let (fArgTys0,fResTy) = C.splitFunForallTy ty
-      -- Take into account that clocks and stuff are split off from any product
-      -- types containing them
-      , let fArgTys1 = C.splitShouldSplit tcm $ rights fArgTys0
-      , length fArgTys1 == length args
+      -- The type of a top entity is closed. Take into account that clocks and
+      -- stuff are split off from any product types containing them.
+      | let ty = globalIdType (topId topEntity)
+      , topArgCount (compTypeEnv ctx) emptyScope ty == length args
       -> do
-        argHWTys <- mapM (Legacy.unsafeCoreTypeToHWTypeM' $(curLoc)) fArgTys1
+        (argHWTys, resTy) <- topHWTypes (compTypeEnv ctx) emptyScope ty
         (argExprs, concat -> argDecls) <- unzip <$>
           mapM (\e -> mkExpr ctx False declType (NetlistId dstId (argTyOf e)) e) args
 
@@ -555,14 +578,13 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
         let
           filteredTypeExprs = filter (not . isVoid . snd) (zip argExprs argHWTys)
 
-        dstHWty  <- Legacy.unsafeCoreTypeToHWTypeM' $(curLoc) fResTy
+        let dstHWty = stripFiltered resTy
 
         -- TODO: The port names of the component are not available, see
         -- 'Clash.Netlist.mkFunApp'. The current workaround is to not rely on
         -- named arguments, using positional ones instead when instantiating a
         -- top entity.
         argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) sc . argTyOf) args
-        resTy <- Legacy.unsafeCoreTypeToHWTypeM $(curLoc) fResTy
         let
           ettArgs = (Nothing,) <$> argTys
           ettRes = (Nothing, resTy)

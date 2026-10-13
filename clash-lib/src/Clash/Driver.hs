@@ -93,15 +93,11 @@ import           Clash.Annotations.TopEntity
   (TopEntity (..), PortName(PortName, PortProduct))
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
-import           Clash.Core.HasType
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
-import           Clash.Core.Type
-  (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
-import           Clash.Core.TyCon                 (TyConMap)
-import           Clash.Core.Util                  (shouldSplit)
+import           Clash.Core.Type                  (LitTy(SymTy))
 import           Clash.Core.Var
-  (varName, varUniq, varType)
+  (varName, varUniq)
 import           Clash.Debug                      (debugIsOn)
 import qualified Clash.Driver.BrokenGhcs          as BrokenGhcs
 import           Clash.Driver.Types
@@ -124,10 +120,14 @@ import           Clash.Normalize                  (checkNonRecursive, cleanupGra
 import           Clash.Core.Scoped.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvElems, lookupGlobalEnv, memberGlobalEnv)
 import           Clash.Core.Scoped.Syntax (globalIdLegacy, globalIdUniq, GlobalId)
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
-import           Clash.Core.Scoped.TypeEnv        (mkTypeEnv)
-import           Clash.Normalize.Scoped.Util      (callGraph)
-import           Clash.Normalize.Util             (tvSubstWithTyEq)
+import           Clash.Core.Scoped.Convert (mkGlobalId)
+import           Clash.Core.Scoped.Pretty         ()
+import qualified Clash.Core.Scoped.Subst          as S (openTyBinder)
+import qualified Clash.Core.Scoped.Syntax         as S
+import qualified Clash.Core.Scoped.Type           as S
+import           Clash.Core.Scoped.TypeEnv        (TypeEnv, mkTypeEnv)
+import qualified Clash.Core.Scoped.Util           as S (SplitInfo (..), shouldSplit)
+import           Clash.Normalize.Scoped.Util      (callGraph, tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
 import qualified Clash.Primitives.Sized.Vector    as P
@@ -149,31 +149,33 @@ import qualified Clash.Util.Supply                as Supply
 
 -- | Worker function of 'splitTopEntityT'
 splitTopAnn
-  :: TyConMap
+  :: S.Distinct n
+  => TypeEnv
+  -> S.Scope n
   -> SrcSpan
   -- ^ Source location of top entity (for error reporting)
-  -> Type
+  -> S.Type n
   -- ^ Top entity body
   -> TopEntity
   -- ^ Port annotations for top entity
   -> TopEntity
   -- ^ New top entity with split ports (or the old one if not applicable)
-splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
-  t{t_inputs=go typ t_inputs}
+splitTopAnn te sc0 sp typ0@(S.tyView -> S.FunTy {}) t@Synthesize{t_inputs} =
+  t{t_inputs=go sc0 typ0 t_inputs}
  where
-  go :: Type -> [PortName] -> [PortName]
-  go _ [] = []
-  go (tyView -> FunTy a res) (p:ps)
+  go :: S.Distinct m => S.Scope m -> S.Type m -> [PortName] -> [PortName]
+  go _ _ [] = []
+  go sc (S.tyView -> S.FunTy a res) (p:ps)
    | shouldNotHavePortName a
      -- Insert dummy PortName for args for which the user shouldn't have
      -- to provide a name.
      -- Ideally this would be any (non Hidden{Clock,Reset,Enable}) constraint.
      -- But because we can't properly detect constraints,
      -- we only skip some specific one. see "shouldNotHavePortName"
-     = PortName "" : go res (p:ps)
+     = PortName "" : go sc res (p:ps)
    | otherwise =
-    case shouldSplit tcm a of
-      Just (_,_,argTys@(_:_:_)) ->
+    case S.splitArgTys <$> S.shouldSplit te sc a of
+      Just argTys@(_:_:_) ->
         -- Port must be split up into 'n' pieces.. can it?
         case p of
           PortProduct nm portNames0 ->
@@ -181,9 +183,9 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
               n = length argTys
               newPortNames = map (PortName . show) [(0::Int)..]
               portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
-              newLam = foldr1 mkFunTy (argTys ++ [res])
+              newLam = foldr1 S.mkFunTy (argTys ++ [res])
             in
-              go newLam (take n portNames1 ++ ps)
+              go sc newLam (take n portNames1 ++ ps)
           PortName nm ->
             throw (flip (ClashException sp) Nothing $ [I.i|
               Couldn't separate clock, reset, or enable from a product type due
@@ -198,9 +200,9 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
             |])
       _ ->
         -- No need to split the port, carrying on..
-        p : go res ps
-  go (ForAllTy _tyVar ty) ps = go ty ps
-  go _ty ps = ps
+        p : go sc res ps
+  go sc (S.ForAllTy b ty) ps = S.openTyBinder sc b ty $ \sc' _ ty' -> go sc' ty' ps
+  go _ _ty ps = ps
 
   prependName :: String -> PortName -> PortName
   prependName "" pn = pn
@@ -210,30 +212,31 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
   -- Returns True for
   --   * type equality constraints (~)
   --   * HasCallStack
-  shouldNotHavePortName :: Type -> Bool
-  shouldNotHavePortName (tyView -> TyConApp (nameUniq -> tcUniq) tcArgs)
+  shouldNotHavePortName :: S.Type m -> Bool
+  shouldNotHavePortName (S.tyView -> S.TyConApp (nameUniq -> tcUniq) tcArgs)
     | tcUniq == fromGhcUnique eqTyConKey = True
     | tcUniq == fromGhcUnique ipClassKey
-    , [LitTy (SymTy "callStack"), _] <- tcArgs = True
+    , [S.LitTy (SymTy "callStack"), _] <- tcArgs = True
   shouldNotHavePortName _ = False
 
-splitTopAnn tcm sp (ForAllTy _tyVar typ) t = splitTopAnn tcm sp typ t
-splitTopAnn tcm sp (AnnType _anns typ) t = splitTopAnn tcm sp typ t
-splitTopAnn _tcm _sp _typ t = t
+splitTopAnn te sc sp (S.ForAllTy b typ) t =
+  S.openTyBinder sc b typ $ \sc' _ typ' -> splitTopAnn te sc' sp typ' t
+splitTopAnn te sc sp (S.AnnType _anns typ) t = splitTopAnn te sc sp typ t
+splitTopAnn _te _sc _sp _typ t = t
 
 -- When splitting up a single argument into multiple arguments (see docs of
 -- 'separateArguments') we should make sure to update TopEntity annotations
 -- accordingly. See: https://github.com/clash-lang/clash-compiler/issues/1033
 splitTopEntityT
   :: HasCallStack
-  => TyConMap
+  => TypeEnv
   -> GlobalBindings
   -> TopEntityT
   -> TopEntityT
-splitTopEntityT tcm bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
+splitTopEntityT te bindingsMap tt@(TopEntityT id_ (Just t@(Synthesize {})) _) =
   case lookupGlobalEnv id_ bindingsMap of
     Just (Binding _id sp _ _ _ _) ->
-      tt{topAnnotation=Just (splitTopAnn tcm sp (coreTypeOf (globalIdLegacy id_)) t)}
+      tt{topAnnotation=Just (splitTopAnn te S.emptyScope sp (S.globalIdType id_) t)}
     Nothing ->
       error "Internal error in 'splitTopEntityT'. Please report as a bug."
 splitTopEntityT _ _ t = t
@@ -241,9 +244,7 @@ splitTopEntityT _ _ t = t
 -- | Remove constraints such as 'a ~ 3'.
 removeForAll :: TopEntityT -> TopEntityT
 removeForAll (TopEntityT g annM isTb) =
-  TopEntityT (mkGlobalIdFromClash var{varType=tvSubstWithTyEq (coreTypeOf var)}) annM isTb
- where
-  var = globalIdLegacy g
+  TopEntityT (mkGlobalId (S.globalIdName g) (tvSubstWithTyEq S.emptyScope (S.globalIdType g))) annM isTb
 
 -- | Given a list of all found top entities and _maybe_ a top entity (+dependencies)
 -- passed in by '-main-is', return the list of top entities Clash needs to
@@ -329,7 +330,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
     unless (opt_cachehdl opts) $
       putStrLn "Clash: Ignoring previously made caches"
 
-    let topEntities1 = fmap (removeForAll . splitTopEntityT tcm bindingsMap)
+    let topEntities1 = fmap (removeForAll . splitTopEntityT (mkTypeEnv tcm) bindingsMap)
                          (selectTopEntities topEntities0 mainTopEntity)
         hdl = hdlFromBackend (Proxy @backend)
         (compNames, initIs) = genTopNames opts hdl topEntities1
@@ -413,7 +414,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
   -- to prevent unnecessary recompilation.
   clashModDate <- getClashModificationDate
   (userModifications, maybeManifest, topHashWithSubHashes) <-
-    readFreshManifest topEntities0 (bindingsMap, topEntity) primMap opts clashModDate manPath
+    readFreshManifest topEntities0 (bindingsMap, topEntityG) primMap opts clashModDate manPath
 
   let topEntityNames = map topId (globalEnvElems topEntityMap)
 
@@ -468,7 +469,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
       --      ports the user didn't directly write.
       evaluate
         (checkTopEntityPorts typeTrans (envCustomReprs env)
-           (mkTypeEnv (envTyConMap env)) topEntity annM)
+           (mkTypeEnv (envTyConMap env)) topEntityG annM)
 
       -- 3. Normalize topEntity
       supplyN <- Supply.newSupply

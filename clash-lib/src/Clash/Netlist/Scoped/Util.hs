@@ -72,12 +72,11 @@ import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Scoped.Pretty    ()
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Type             as C (LitTy (..), Type)
+import qualified Clash.Core.Type             as C (LitTy (..))
 import           Clash.Core.Scoped.TermInfo  (MultiPrimInfo (..), multiPrimInfo')
 import           Clash.Util                  (ClashException (..), curLoc)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
-import           Clash.Core.Scoped.Convert   (fromClashTypeClosed)
 import           Clash.Core.Scoped.Evaluator (nfData)
 import           Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
 import           Clash.Core.Scoped.Evaluator.Types
@@ -209,15 +208,13 @@ mkUniqueNormalized
   --     * Nothing: term is not a top entity
   --     * Just Nothing: term is a top entity, but has no explicit annotation
   --     * Just (Just ..): term is a top entity, and has an explicit annotation
-  -> Maybe C.Type
+  -> Maybe (Type 'VoidS)
   -- ^ The type of the result, if not that of the result variable
   -> SplitNormalized
   -> NetlistMonad UniqueNormalized
 mkUniqueNormalized tenv topMM resTyM (SplitNormalized sc args binds res0) = do
   let res = case resTyM of
-        -- TODO(D4): the type of a top entity is a Clash Core type until
-        -- 'GlobalId' carries a scoped one
-        Just ty -> res0 {localIdType = fromClashTypeClosed sc ty}
+        Just ty -> res0 {localIdType = sinkClosed ty}
         Nothing -> res0
   -- Generate port names and add them to set of seen identifiers
   argHwtys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) sc . localIdType) args
