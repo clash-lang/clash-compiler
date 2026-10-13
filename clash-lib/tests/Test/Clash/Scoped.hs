@@ -287,7 +287,8 @@ import Test.Clash.Rewrite
   , termQQ, testGlobalId, testTyConMap, tyVarD, typeQQ, varD, vecTcNm, consDc)
 import Test.Clash.Rewrite (ghcName)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
-import Test.Clash.Scoped.Evaluator (scopedWhnf, whnfIn)
+import Test.Clash.Scoped.Evaluator (whnfIn)
+import Test.Clash.Scoped.Evaluator.Differential (scopedWhnf)
 import Test.Clash.Scoped.Gen.Clash (FreeVars (..), showTerm)
 
 -- * Test scopes

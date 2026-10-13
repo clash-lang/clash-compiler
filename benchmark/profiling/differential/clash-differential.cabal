@@ -26,7 +26,7 @@ executable clash-differential
                        Registry
                        Test.Clash.Differential
                        Test.Clash.Differential.Sites
-                       Test.Clash.Scoped.Evaluator
+                       Test.Clash.Scoped.Evaluator.Differential
                        Test.Clash.Scoped.Evaluator.Adapter
                        Test.Clash.Scoped.ViaFoil
                        WhnfReplay

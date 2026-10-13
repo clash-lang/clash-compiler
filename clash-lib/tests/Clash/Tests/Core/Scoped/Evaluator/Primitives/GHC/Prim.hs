@@ -42,7 +42,7 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, ghcBoolTy, ghcTrueDataCon, heapLookupEvaluator, mkTyConName
   , t2TyConName, tcApp, testTyConMap )
 import Test.Clash.Scoped (testTypeEnv)
-import Test.Clash.Scoped.Evaluator (portedEnv, scopedWhnf)
+import Test.Clash.Scoped.Evaluator.Differential (portedEnv, scopedWhnf)
 
 -- | Evaluate with the ported reductions, as the subject of a case-expression
 eval :: C.Term -> C.Term

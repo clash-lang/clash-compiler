@@ -68,7 +68,7 @@ import Test.Clash.Rewrite
   , orderingTy, pairDataCon, pairTy, proxyDc, rtreeTy, signedTyConName, snatDc, snatTy
   , someNatDc, someNatTy, t2DataCon, t2Ty, t3DataCon, t3Ty, tcApp, testTyConMap, vecTy )
 import Test.Clash.Scoped (testTypeEnv)
-import Test.Clash.Scoped.Evaluator
+import Test.Clash.Scoped.Evaluator.Differential
 import Test.Clash.Scoped.Evaluator.Primitives
 
 import qualified Clash.Annotations.BitRepresentation.Deriving

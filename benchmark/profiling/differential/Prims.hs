@@ -6,7 +6,8 @@
   Compares the ported reductions of primitives of the scoped evaluator
   ("Clash.Core.Scoped.Evaluator.Primitives") with the reductions of Clash
   Core (@Clash.GHC.Evaluator@), through the adapter, on calls generated from
-  the types of the primitives ("Test.Clash.Scoped.Evaluator.genPrimCall").
+  the types of the primitives
+  ("Test.Clash.Scoped.Evaluator.Differential.genPrimCall").
 
   The types of the primitives come from the designs: every primitive that
   occurs in the bindings of a design, with the type constructors of that
@@ -53,7 +54,7 @@ import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimitives)
 import Clash.Core.Scoped.Evaluator.Types (PrimReduction)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 
-import Test.Clash.Scoped.Evaluator
+import Test.Clash.Scoped.Evaluator.Differential
   ( PrimOutcome (..), adapterEnv, comparePrimCall, genOpenPrimCall, genPrimCall
   , onlyPortedEnv, outcomeKey, scopedWhnf )
 
