@@ -83,7 +83,7 @@ import           Clash.Core.Scoped.Pretty      ()
 import qualified Clash.Core.Term               as C
 import           Clash.Core.TyCon              (tyConDataCons)
 import qualified Clash.Core.Type               as C (ConstTy (..))
-import qualified Clash.Core.Util               as C (undefinedTy)
+import           Clash.Core.Scoped.TysPrim (undefinedTy)
 import qualified Clash.Data.UniqMap            as UniqMap
 import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail, prepareBlackBox)
 import           Clash.Netlist.BlackBox.Types
@@ -113,7 +113,7 @@ import           Clash.Core.Scoped.Subst
   (extendTmSubst, idSubst, openBind, openIdBinder, openTyBinder, substTm,
    teleIdVars, withFreshIdBinder)
 import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
+import           Clash.Core.Scoped.Convert (mkPrimInfo)
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 import           Clash.Core.Scoped.TermInfo
@@ -1405,13 +1405,13 @@ unSimIO ctx arg =
   in  case tyView argTy of
         TyConApp _ [tcArg] ->
           mkApps (primAtType
-                    (mkPrimInfoFromClash $ C.PrimInfo
+                    (mkPrimInfo
                        "Clash.Explicit.SimIO.unSimIO#"
                        -- primAtType sets the type
-                       C.undefinedTy
+                       undefinedTy
                        C.WorkNever
                        C.SingleResult
-                       C.NoUnfolding)
+                       NoUnfolding)
                     (mkFunTy argTy tcArg))
                  [Left arg]
         _ -> error ("internal error:\n" ++ showPpr arg)

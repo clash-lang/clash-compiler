@@ -69,12 +69,11 @@ import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (nameOcc)
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
-import qualified Clash.Core.Term as C
 import Clash.Core.Term (IsMultiPrim (..), WorkInfo (..))
 import Clash.Core.TyCon (TyConName, tyConDataCons, tyConName)
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C (integerPrimTy, typeNatKind)
-import qualified Clash.Core.Var as C (mkTyVar)
+import Clash.Core.Scoped.TysPrim (integerPrimTyConName, typeNatKindTyConName)
+
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Clash.Normalize.Scoped.Primitives as NP (undefined)
 import Clash.Normalize.Types (NormalizeSession, scopedConstantPropagationStrategy)
@@ -83,7 +82,8 @@ import Clash.Sized.RTree (RTree)
 import Clash.Sized.Vector (Vec)
 import Clash.Unique (fromGhcUnique)
 
-import Clash.Core.Scoped.Convert (toClashType, mkPrimInfoFromClash)
+import Clash.Core.Scoped.Convert (mkPrimInfo)
+import Clash.Core.Scoped.Builder (forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
 import Clash.Core.Scoped.DataCon (dataConInstArgTys)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
 import Clash.Core.Scoped.Pretty ()
@@ -235,11 +235,11 @@ buildSNat snatDc i =
   mkApps (Data snatDc) [Right (numTy i), Left (Literal (NaturalLiteral i))]
 
 -- | The @True@ constructor and the type @Bool@
-boolTrue :: HasCallStack => TypeEnv -> (DataCon, C.Type)
+boolTrue :: HasCallStack => TypeEnv -> (DataCon, Type n)
 boolTrue te = fromMaybe (error "reducePrim: failed to build the True DC") $ do
   boolTc <- UniqMap.lookup (fromGhcUnique boolTyConKey) (typeEnvTyConMap te)
   [_, trueDc] <- pure (tyConDataCons boolTc)
-  pure (trueDc, C.mkTyConApp (tyConName boolTc) [])
+  pure (trueDc, mkTyConApp (tyConName boolTc) [])
 
 -- | Equality on lifted @Int@, returning a @Bool@, applied to the index given to
 -- @replace_int@ or @index_int@ and the given index. See
@@ -249,15 +249,14 @@ eqIntWith te iTy i elIndex =
   mkApps (Prim eqInt) [Left i, Left (mkApps (Data iDc) [Left (Literal (IntLiteral elIndex))])]
  where
   iDc = fromMaybe (error "reducePrim: failed to build the Int DC") (firstDataConOf te iTy)
-  -- The type of a primitive is closed. TODO(D4): a scoped type once
-  -- 'PrimInfo' carries one.
-  iTyC = maybe (error ("reducePrim: open Int type: " <> showPpr iTy)) toClashType (closeType iTy)
-  eqInt = mkPrimInfoFromClash $ C.PrimInfo
+  -- The type of a primitive is closed
+  iTyC = fromMaybe (error ("reducePrim: open Int type: " <> showPpr iTy)) (closeType iTy)
+  eqInt = mkPrimInfo
     (showt 'GHC.Classes.eqInt)
-    (C.mkFunTy iTyC (C.mkFunTy iTyC (snd (boolTrue te))))
+    (mkFunTy iTyC (mkFunTy iTyC (snd (boolTrue te))))
     WorkVariable
     SingleResult
-    C.NoUnfolding
+    NoUnfolding
 
 -- * Reductions
 
@@ -381,15 +380,13 @@ reduceImap n argElTy resElTy _kn fun arg ctx = do
             SplitFunForall (PiArg idxTy _) _ | TyConApp nm _ <- tyView idxTy -> Just nm
             _ -> Nothing
         -- fromInteger# :: KnownNat n => Integer -> Index n
-        --
-        -- Its type is closed, as the types of primitives are, so the unique of
-        -- the type variable it quantifies over doesn't matter.
-        nTv = C.mkTyVar C.typeNatKind (C.mkUnsafeSystemName "n" 0)
         idxFromIntegerTy =
-          C.ForAllTy nTv
-            (foldr C.mkFunTy (C.mkTyConApp idxTcNm [C.VarTy nTv]) [C.integerPrimTy, C.integerPrimTy])
+          forAllTyB 0 (C.mkUnsafeSystemName "n" 0) (tyConAppB typeNatKindTyConName [])
+            (funTyB [tyConAppB integerPrimTyConName [], tyConAppB integerPrimTyConName []]
+               (tyConAppB idxTcNm [varTyB 0]))
         idxFromInteger =
-          mkPrimInfoFromClash $ C.PrimInfo "Clash.Sized.Internal.Index.fromInteger#" idxFromIntegerTy WorkNever SingleResult C.NoUnfolding
+          mkPrimInfo "Clash.Sized.Internal.Index.fromInteger#" (runClosedType idxFromIntegerTy)
+            WorkNever SingleResult NoUnfolding
       changed $ extractElems te sc consCon argElTy 'I' n n arg $ \sc1 bs rhss vars _ ->
         let
           idxs = map (App (App (TyApp (Prim idxFromInteger) (numTy n)) (Literal (IntegerLiteral n)))
