@@ -924,7 +924,7 @@ isUntranslatableType stringRepresentable ty = do
   tt <- Lens.view typeTranslator
   reprs <- Lens.view customReprs
   te <- Lens.view scopedTypeEnv
-  -- TODO(D4): the normalizer uses this on the Clash Core types of 'GlobalId's
+  -- Only the transformations of Clash Core use this, see 'withLegacyType'
   not <$> runWithHWTypeCache
     (withLegacyType ty (representableTypeState tt reprs stringRepresentable te))
 
