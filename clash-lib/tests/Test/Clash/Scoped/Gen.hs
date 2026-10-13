@@ -115,7 +115,8 @@ import GHC.Types.SrcLoc (noSrcSpan)
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Builder
-  (Key, TyB, appTyB, constTyB, forAllTyB, litTyB, runClosedType, runDataConSig, varTyB)
+  ( Key, TyB, appTyB, constTyB, forAllTyB, funTyB, litTyB, runClosedType, runDataConSig
+  , varTyB )
 import Clash.Core.Scoped.Convert (mkAlgTyCon, mkDataCon, mkPrimTyCon)
 import Clash.Core.Scoped.FreeVars (bindNameBinders, patNameBinders)
 import Clash.Core.Scoped.NameMap (idBinderNameBinders, tyBinderNameBinders)
@@ -128,7 +129,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Core.Scoped.TysPrim as P
 
 import Test.Clash.Rewrite
-  ( existentialDataCon, funTyB, intTyCon, justDataCon, maybeTyConName
+  ( existentialDataCon, intTyCon, justDataCon, maybeTyConName
   , nothingDataCon, pairDataCon, parseTyConName, showPprU, testGlobalId)
 import Test.Clash.Scoped (TestScope (..), testPrim)
 
@@ -187,7 +188,7 @@ mkGenDataCon nm u univ ext args res =
   mkDataCon (C.mkUnsafeName C.User nm u) 1 (runClosedType ty) (runDataConSig univ ext args)
     (map (const Lazy) args) []
  where
-  ty = foldr (\(k, n, ki) -> forAllTyB k n ki) (foldr funTyB res args) (univ <> ext)
+  ty = foldr (\(k, n, ki) -> forAllTyB k n ki) (funTyB args res) (univ <> ext)
 
 -- | A type variable of a signature, with the given key, name and kind
 sigTv :: Key -> Text -> TyB -> (Key, C.Name C.Type, TyB)
@@ -263,7 +264,7 @@ tyConMap = UniqMap.fromList [(tyConName t, t) | t <- tcs]
   alg nm k ar dcs = mkAlgTyCon nm k ar (DataTyCon dcs) False
 
   -- forall k. k -> Type
-  pKind = runClosedType (forAllTyB 69 (C.mkUnsafeName C.User "k" 69) typeB (funTyB (varTyB 69) typeB))
+  pKind = runClosedType (forAllTyB 69 (C.mkUnsafeName C.User "k" 69) typeB (funTyB [varTyB 69] typeB))
 
 typeEnv :: TypeEnv
 typeEnv = mkTypeEnv tyConMap

@@ -115,7 +115,7 @@ import qualified Clash.Normalize.Primitives as NP
 import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Builder
-  ( Key, TmB, TyB, appB, appTyB, caseB, dataAltB, dataB, forAllTyB, lamB, letB
+  ( Key, TmB, TyB, appB, appTyB, caseB, dataAltB, dataB, forAllTyB, funTyB, lamB, letB
   , literalB, primB, runClosedTerm, runClosedType, tyAppB, tyLamB, varB, varTyB )
 import Clash.Core.Scoped.Convert (mkDataCon)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (bConPrim, bvConPrim, indexConPrim)
@@ -128,7 +128,7 @@ import Clash.Core.Scoped.Util (primCo)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
 import Test.Clash.Rewrite
-  ( consDc, funTyB, iHashDc, indexTcNm, lrDc, brDc, nameKey, nilDc, parseName
+  ( consDc, iHashDc, indexTcNm, lrDc, brDc, nameKey, nilDc, parseName
   , parseTestType, snatDc, testTypeB, tyConB )
 import qualified Test.Clash.Rewrite as R
 import Test.Clash.Scoped
@@ -283,7 +283,7 @@ tc nm = foldl appTyB (tyConB (Text.unpack (C.nameOcc nm) <> "_" <> show (C.nameU
 
 -- | The function type
 (~>) :: TyB -> TyB -> TyB
-(~>) = funTyB
+a ~> r = funTyB [a] r
 infixr 5 ~>
 
 -- | A @forall@, binding the type variable with the given identifier and kind

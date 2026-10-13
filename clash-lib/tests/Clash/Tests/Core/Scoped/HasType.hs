@@ -30,7 +30,7 @@ import qualified Clash.Core.Type as C (ConstTy (TyCon), LitTy (CharTy))
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.Builder
-  ( TmB, TyB, annTyB, appB, appTyB, castB, constTyB, deDupTickB, forAllTyB, litTyB, primB
+  ( TmB, TyB, annTyB, appB, appTyB, castB, constTyB, deDupTickB, forAllTyB, funTyB, litTyB, primB
   , runClosedType, tickB, tyAppB, tyLamB, varTyB)
 import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.HasType
@@ -39,7 +39,7 @@ import Clash.Core.Scoped.Type (mkFunTy)
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import qualified Clash.Core.Scoped.TysPrim as P
 
-import Test.Clash.Rewrite (funTyB, mkTyConName, showPprU)
+import Test.Clash.Rewrite (mkTyConName, showPprU)
 import Test.Clash.Scoped
 
 tenv :: TypeEnv
@@ -74,7 +74,7 @@ wPrim = primB (testPrim "w" "forall a. a -> W")
 -- | A multi-result primitive @mr :: forall a. a -> (a, Int)@
 mrPrim :: PrimInfo
 mrPrim =
-  mkPrimInfo "mr" (runClosedType (forallA (\a -> funTyB a (tupleB a intB)))) C.WorkNever
+  mkPrimInfo "mr" (runClosedType (forallA (\a -> funTyB [a] (tupleB a intB)))) C.WorkNever
     C.MultiResult NoUnfolding
 
 -- | A coercion primitive, as 'Clash.Core.Scoped.Util.primCo' makes them
@@ -130,10 +130,10 @@ terms =
   , ("(sig_G4203 :: forall a. Signal a (Int -> Int)) @\"System\" x", Ty "Int")
   , (wrapB (\x -> appB (appB (tyAppB wPrim intB) x) x) "x", Ty "Int")
   , ( builtTerm (primB mrPrim)
-    , Ty (builtType (forallA (\a -> funTyB a (funTyB a (funTyB intB (tupleB a intB)))))) )
+    , Ty (builtType (forallA (\a -> funTyB [a, a, intB] (tupleB a intB)))) )
   , ( wrapB (\v -> tyLamB aKey (C.mkUnsafeSystemName "a" 0) (testTypeB "Type")
                      (appB (tyAppB (primB mrPrim) (varTyB aKey)) v)) "v"
-    , Ty (builtType (forallA (\a -> funTyB a (funTyB intB (tupleB a intB))))) )
+    , Ty (builtType (forallA (\a -> funTyB [a, intB] (tupleB a intB)))) )
     -- A coercion with an open type
   , ( builtTerm (tyLamB aKey (C.mkUnsafeSystemName "a" 0) (testTypeB "Type")
                   (tyAppB coPrim (appTyB (testTypeB "N") (varTyB aKey))))
@@ -156,7 +156,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.HasType"
   , testCase "primInfoType of a multi-result primitive" $
       -- forall a. a -> a -> Int -> (a, Int)
       assertTypeIs emptyTestScope
-        (builtType (forallA (\a -> funTyB a (funTyB a (funTyB intB (tupleB a intB))))))
+        (builtType (forallA (\a -> funTyB [a, a, intB] (tupleB a intB))))
         (primInfoType mrPrim :: Type 'VoidS)
 
   , testCase "piResultTys" $
