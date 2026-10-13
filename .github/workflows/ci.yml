@@ -230,11 +230,11 @@ jobs:
           cabal v2-run clash-lib:doctests
           cabal v2-run clash-lib:unittests -- --hide-successes
 
-      - name: Negative compile tests (scoped Clash Core)
+      - name: Negative compile tests (scoping of Clash Core)
         if: github.ref != 'refs/heads/master'
         run: |
           export CABAL_DIR=$HOME/.cabal
-          clash-lib/tests/scoped-negative/check.sh
+          clash-lib/tests/scope-negative/check.sh
 
       - name: Testsuite (VHDL)
         if: github.ref != 'refs/heads/master'

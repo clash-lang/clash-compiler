@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Negative compile tests of scoped Clash Core ("Clash.Core").
+# Negative compile tests of the scoping of Clash Core ("Clash.Core.Syntax").
 #
 # Every N*.hs is a buggy use of the API, of a kind that caused scoping bugs in
 # Clash, that GHC must reject with the error that its "-- EXPECT:" line gives
@@ -10,8 +10,8 @@
 #
 # Run after building clash-lib, passing the cabal flags of that build, e.g.:
 #
-#   clash-lib/tests/scoped-negative/check.sh
-#   clash-lib/tests/scoped-negative/check.sh -w ghc-9.6.7 --builddir=dist-9.6
+#   clash-lib/tests/scope-negative/check.sh
+#   clash-lib/tests/scope-negative/check.sh -w ghc-9.6.7 --builddir=dist-9.6
 set -uo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
