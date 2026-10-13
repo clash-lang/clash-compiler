@@ -3,13 +3,13 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Letrec". Most compare a
-  port with its Clash Core counterpart in
-  "Clash.Normalize.Transformations.Letrec", running the port through
-  'Test.Clash.Scoped.ViaFoil.viaFoil', as the normalizer does.
+  Tests for "Clash.Normalize.Scoped.Transformations.Letrec". The expected
+  results of the tests that compared a port with its Clash Core counterpart in
+  "Clash.Normalize.Transformations.Letrec" are the results of the latter.
+  'assertRewritesTo' runs every test in the scope of the free variables of
+  its input, and in a scope that the binders of the input clash with.
 -}
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -20,63 +20,62 @@ import Data.Default (def)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User), nameOcc, noSrcSpan)
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
+import Clash.Core.Name (nameOcc)
 import Clash.Core.DataCon (DataCon (..))
-import Clash.Core.Var (Id)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
-import qualified Clash.Normalize.Transformations.Letrec as Current
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Core.Scoped.Syntax (Distinct, Term)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Core.Scoped.Syntax (Distinct, GlobalId, Term)
 import qualified Clash.Rewrite.Scoped.Combinators as SC (bottomupR)
+import Clash.Driver.Types (DebugOpts (..), debugSilent)
 import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
-import Test.Clash.Scoped.ViaFoil (viaFoil)
+import Clash.Rewrite.Scoped.Apply (applyDebug)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
-import Clash.Rewrite.Util (apply)
+import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
-import Clash.Tests.Normalize.Transformations.Letrec (letrecTests)
 import Test.Clash.Rewrite
-  ( assertAlphaEq, consDc, globalId, globalIntVar, inScopeOf, intFunTy, intId
-  , intLit, intTy, localId, nilDc, pairDataCon, pairTy, rewriteEnvWithTyCons
-  , runRewriteTest, showPprU, vecTy )
+  ( TestDefs (..), TestTerm, TestType, assertErrorContainsIO, consDc, parseTestTermWith
+  , rewriteEnvWithDebug, rewriteEnvWithTyCons, runRewriteTest, strQQ, testGlobalId )
 import Test.Clash.Scoped
-  ( TestScope, assertClashes, assertLintClean, assertRewritesAgree, assertTermAlphaEq
-  , assertTermIs, runScopedIn, termQQ, varD, withClashing, withTerm )
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+  ( ScopeDecl, Step (..), TestScope, assertClashes, assertLintClean, assertNoRewrite
+  , assertNoRewriteAt, assertRewritesAt, assertRewritesTo, assertTermAlphaEq, assertTermIs, runScopedIn
+  , termIn, termQQ, varD, withClashing, withCurFun, withTerm )
 
--- * Running the transformations
+-- * Definitions
 
--- | Run a rewrite on a term in a context, with the type constructors of the
--- tests. Gives the result and whether a change was signaled.
-runIn :: RewriteState NormalizeState -> TransformContext -> NormRewrite -> C.Term -> IO (C.Term, Bool)
-runIn st ctx rw e = do
-  (t, _, ch) <- runRewriteTest rewriteEnvWithTyCons st (rw ctx e)
-  pure (t, ch)
+-- | The global functions of the tests
+globals :: [GlobalId]
+globals =
+  [ testGlobalId "f_G5" "Int -> Int"
+  , testGlobalId "g_G10" "Int -> Int"
+  , testGlobalId "h_G11" "Int -> Int"
+  , testGlobalId "k_G12" "Int -> Int -> Int"
+  , testGlobalId "f_G102" "Int -> Int"
+  , testGlobalId "g_G103" "Int -> Int -> Int"
+  , testGlobalId "h_G104" "Int -> Int -> Int -> Int"
+  , testGlobalId "c_G99" "Int" ]
 
--- | The root context with the given variables in scope
-rootCtx :: [Id] -> TransformContext
-rootCtx vs = TransformContext (inScopeOf vs) []
+-- | The constructor 'Clash.Normalize.Scoped.Transformations.Letrec.removeUnusedExpr'
+-- recognizes by its name
+vecCons :: DataCon
+vecCons = consDc {dcName = (dcName consDc) {nameOcc = "Clash.Sized.Vector.Cons"}}
 
--- | Assert that a port agrees with the current transformation, in the given
--- context and state. The current transformations run at a single node, and
--- their ports through 'viaFoil'.
-agrees
-  :: RewriteState NormalizeState -> TransformContext -> NormRewrite -> NormRewrite
-  -> C.Term -> Assertion
-agrees = assertRewritesAgree rewriteEnvWithTyCons
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [vecCons] [] globals)
 
--- * Fixtures
+env :: RewriteEnv
+env = rewriteEnvWithTyCons
 
-a, b, c, x :: Id
-a = intId User "a" 1
-b = intId User "b" 2
-c = intId User "c" 3
-x = intId User "x" 4
+st :: RewriteState NormalizeState
+st = def
 
-f :: C.Term
-f = globalIntVar User "f" 5
+-- | Assert that a transformation rewrites a term to the expected one, see
+-- 'assertRewritesTo'
+rewrites :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+rewrites = assertRewritesTo env st
+
+-- | Assert that a transformation leaves a term as it is
+keeps :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
+keeps = assertNoRewrite env st
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Letrec"
@@ -97,18 +96,12 @@ deadCodeAt :: Distinct n => TestScope n -> Term n -> IO (Term n, Bool)
 deadCodeAt ts e = do
   (t, _, ch) <- runScopedIn def st ts $(asScopedRewriteQ S.deadCode) e
   pure (t, ch)
- where
-  st :: RewriteState NormalizeState
-  st = def
 
 -- | 'deadCode' in a bottom-up traversal
 deadCodeBottomup :: Distinct n => TestScope n -> Term n -> IO (Term n)
 deadCodeBottomup ts e = do
   (t, _, _) <- runScopedIn def st ts (SC.bottomupR $(asScopedRewriteQ S.deadCode)) e
   pure t
- where
-  st :: RewriteState NormalizeState
-  st = def
 
 deadCodeTests :: TestTree
 deadCodeTests = testGroup "deadCode"
@@ -160,59 +153,29 @@ deadCodeTests = testGroup "deadCode"
 
 -- * removeUnusedExpr
 
-removeUnusedExprC, removeUnusedExprS :: NormRewrite
-removeUnusedExprC = apply "removeUnusedExpr" $ \ctx -> \case
-  e@(C.Case subj ty alts) -> Current.removeUnusedExprCase ctx e subj ty alts
-  e -> Current.removeUnusedExprSpine ctx e
-removeUnusedExprS = (viaFoil "removeUnusedExpr" $(asScopedRewriteQ S.removeUnusedExpr))
+removeUnusedExprS :: ScopedRewrite NormalizeState
+removeUnusedExprS = $(asScopedRewriteQ S.removeUnusedExpr)
 
 removeUnusedExprTests :: TestTree
 removeUnusedExprTests = testGroup "removeUnusedExpr"
-      [ testCase "removes a case-expression whose pattern binds no used variables" $
-          agrees def (rootCtx [s]) removeUnusedExprC removeUnusedExprS
-            (C.Case (C.Var s) intTy [(C.DataPat pairDataCon [] [a, b], intLit 1)])
-      , testCase "keeps a case-expression whose pattern binds a used variable" $
-          agrees def (rootCtx [s]) removeUnusedExprC removeUnusedExprS
-            (C.Case (C.Var s) intTy [(C.DataPat pairDataCon [] [a, b], C.Var b)])
-      , testCase "replaces a vector of length zero in a Cons by Nil" $ do
-          -- Cons @1 @Int @0 co x v, where v :: Vec 0 Int
-          let v = localId User "v" 20 (vecTy (C.LitTy (C.NumTy 0)) intTy)
-              co = localId User "co" 21 intTy
-              e = C.mkApps (C.Data vecCons)
-                    [ Right (C.LitTy (C.NumTy 1)), Right intTy, Right (C.LitTy (C.NumTy 0))
-                    , Left (C.Var co), Left (C.Var x), Left (C.Var v) ]
-          (t, ch) <- runIn def (rootCtx [v, co, x]) removeUnusedExprS e
-          ch @?= True
-          case C.collectArgs t of
-            (C.Data dc, [_, _, _, _, Left x1, Left nil])
-              | dc == vecCons, x1 == C.Var x, (C.Data nilDc1, _) <- C.collectArgs nil
-              , nilDc1 == nilDc -> pure ()
-            _ -> assertFailure ("Unexpected result:\n" <> showPprU t)
-      ]
- where
-  s = localId User "s" 40 pairTy
-  -- The constructor 'Clash.Normalize.Transformations.Letrec.removeUnusedExpr'
-  -- recognizes by its name
-  vecCons = consDc {dcName = (dcName consDc) {nameOcc = "Clash.Sized.Vector.Cons"}}
+  [ testCase "removes a case-expression whose pattern binds no used variables" $
+      rewrites removeUnusedExprS [varD "s_40" "Pair"]
+        (tm "(case s_40 of { MkPair (a :: Int) (b :: Int) -> 1 }) :: Int")
+        (tm "1")
+  , testCase "keeps a case-expression whose pattern binds a used variable" $
+      keeps removeUnusedExprS [varD "s_40" "Pair"]
+        (tm "(case s_40 of { MkPair (a :: Int) (b :: Int) -> b }) :: Int")
+  , testCase "replaces a vector of length zero in a Cons by Nil" $
+      rewrites removeUnusedExprS
+        [varD "x_4" "Int", varD "v_20" "Clash.Sized.Vector.Vec 0 Int", varD "co_21" "Int"]
+        (tm "Clash.Sized.Vector.Cons @1 @Int @0 co_21 x_4 v_20")
+        (tm [strQQ|
+          Cons @1 @Int @0 (Prim._CO_ @((GHC.Prim.~#) Nat Nat 1 ((GHC.TypeNats.+) 0 1))) x_4
+            (Nil @0 @Int (Prim._CO_ @((GHC.Prim.~#) Nat Nat 0 0)))
+        |])
+  ]
 
 -- * flattenLet
-
-d, r, y :: Id
-d = intId User "d" 6
-r = intId User "r" 7
-y = intId User "y" 8
-
--- | An application of a global function of type @Int -> ... -> Int@
-app :: String -> Int -> [C.Term] -> C.Term
-app g u args = C.mkApps (C.Var (globalId User g (fromIntegral u) (intFunTy (length args)))) (map Left args)
-
--- | A tick
-srcTick :: C.TickInfo
-srcTick = C.SrcSpan noSrcSpan
-
-flattenLetC, flattenLetS :: NormRewrite
-flattenLetC = apply "flattenLet" Current.flattenLetWorker
-flattenLetS = (viaFoil "flattenLet" flattenLetSc)
 
 -- | The scoped 'S.flattenLet'
 flattenLetSc :: ScopedRewrite NormalizeState
@@ -220,210 +183,337 @@ flattenLetSc = $(asScopedRewriteQ S.flattenLet)
 
 flattenLetTests :: TestTree
 flattenLetTests = testGroup "flattenLet"
-      [ testCase "merges nested let-expressions" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Letrec [(a, app "g" 10 [C.Var x])]
-              (C.Let (C.NonRec b (app "h" 11 [C.Var a, C.Var x])) (app "k" 12 [C.Var a, C.Var b])))
-      , testCase "inlines a work-free binding" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Let (C.NonRec a (C.Var x)) (app "k" 12 [C.Var a, C.Var a]))
-      , testCase "inlines a binding used once" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Let (C.NonRec a (app "g" 10 [C.Var x])) (app "k" 12 [C.Var a, C.Var x]))
-      , testCase "keeps a binding used twice that performs work" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Let (C.NonRec a (app "g" 10 [C.Var x])) (app "k" 12 [C.Var a, C.Var a]))
-      , testCase "keeps a recursive binding" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Letrec [(a, app "g" 10 [C.Var a])] (C.Var a))
-      , testCase "merges let-expressions in right-hand sides, before their binding" $
-          -- letrec a = 1; b = (letrec c = g a; d = h c in tick (k c d)); r = f b
-          -- in r
-          agrees def (rootCtx []) flattenLetC flattenLetS
-            (C.Letrec
-              [ (a, intLit 1)
-              , (b, C.Tick srcTick
-                      (C.Letrec [(c, app "g" 10 [C.Var a]), (d, app "h" 11 [C.Var c])]
-                        (app "k" 12 [C.Var c, C.Var d])))
-              , (r, C.App f (C.Var b)) ]
-              (C.Var r))
-      , testCase "inlines the single binding of a let-expression in a right-hand side" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Letrec
-              [ (a, C.Tick srcTick (C.Let (C.NonRec c (app "g" 10 [C.Var x])) (app "k" 12 [C.Var c, C.Var x])))
-              , (b, app "h" 11 [C.Var a]) ]
-              (app "k" 12 [C.Var a, C.Var b]))
-      , testCase "merges a recursive single binding in a right-hand side" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Letrec
-              [ (a, C.Letrec [(c, app "h" 11 [C.Var c])] (app "k" 12 [C.Var c, C.Var x]))
-              , (b, app "h" 11 [C.Var a]) ]
-              (app "k" 12 [C.Var a, C.Var b]))
-        -- The Clash Core version deshadows the let-expression in the
-        -- right-hand side as a recursive one, which turns @x = g x@ into the
-        -- loop @x' = g x'@. In scoped Core, the right-hand side of a 'NonRec'
-        -- binding can't refer to its binder. The binder of @x@ also clashes
-        -- with a variable of the scope.
-      , testCase "doesn't make a shadowing NonRec binding in a right-hand side recursive" $
-          withTerm [termQQ|
-            let { !(y :: Int) =
-              let { !(x_1 :: Int) = (g_G10 :: Int -> Int) (x_1 :: Int) } in x_1 }
-            in y
-          |] $ \ts0 e0 -> withClashing ts0 [varD "z" "Int"] e0 $ \ts e -> do
-            assertClashes ts e
-            (t, _, ch) <- runScopedIn rewriteEnvWithTyCons def ts flattenLetSc e
-            assertLintClean ts t
-            assertTermIs ts "g_G10 x_1" t
-            ch @?= True
-      , testCase "doesn't fire on a let-expression without let-expressions" $
-          agrees def (rootCtx [x]) flattenLetC flattenLetS
-            (C.Letrec [(a, app "g" 10 [C.Var x]), (b, app "h" 11 [C.Var a])]
-              (app "k" 12 [C.Var a, C.Var b]))
-      ]
+  [ testCase "merges nested let-expressions" $
+      rewrites flattenLetSc [varD "x_4" "Int"]
+        (tm "let { (a :: Int) = g_G10 x_4 } in let { !(b :: Int) = (h_G11 :: Int -> Int -> Int) a x_4 } in k_G12 a b")
+        (tm "let { (a :: Int) = g_G10 x_4; (b :: Int) = (h_G11 :: Int -> Int -> Int) a x_4 } in k_G12 a b")
+  , testCase "inlines a work-free binding" $
+      rewrites flattenLetSc [varD "x_4" "Int"]
+        (tm "let { !(a :: Int) = x_4 } in k_G12 a a")
+        (tm "k_G12 x_4 x_4")
+  , testCase "inlines a binding used once" $
+      rewrites flattenLetSc [varD "x_4" "Int"]
+        (tm "let { !(a :: Int) = g_G10 x_4 } in k_G12 a x_4")
+        (tm "k_G12 (g_G10 x_4) x_4")
+  , testCase "keeps a binding used twice that performs work" $
+      keeps flattenLetSc [varD "x_4" "Int"]
+        (tm "let { !(a :: Int) = g_G10 x_4 } in k_G12 a a")
+  , testCase "keeps a recursive binding" $
+      keeps flattenLetSc [] (tm "let { (a :: Int) = g_G10 a } in a")
+  , testCase "merges let-expressions in right-hand sides, before their binding" $
+      rewrites flattenLetSc []
+        (tm [strQQ|
+          let
+            { (a :: Int) = 1
+            ; (b :: Int) = Core.srcSpan (let { (c :: Int) = g_G10 a; (d :: Int) = h_G11 c } in k_G12 c d)
+            ; (r :: Int) = f_G5 b
+            } in r
+        |])
+        (tm [strQQ|
+          let
+            { (a :: Int) = 1
+            ; (c :: Int) = g_G10 a
+            ; (d :: Int) = h_G11 c
+            ; (b :: Int) = Core.srcSpan (k_G12 c d)
+            ; (r :: Int) = f_G5 b
+            } in r
+        |])
+  , testCase "inlines the single binding of a let-expression in a right-hand side" $
+      rewrites flattenLetSc [varD "x_4" "Int"]
+        (tm [strQQ|
+          let
+            { (a :: Int) = Core.srcSpan (let { !(c :: Int) = g_G10 x_4 } in k_G12 c x_4)
+            ; (b :: Int) = h_G11 a
+            } in k_G12 a b
+        |])
+        (tm "let { (a :: Int) = Core.srcSpan (k_G12 (g_G10 x_4) x_4); (b :: Int) = h_G11 a } in k_G12 a b")
+  , testCase "merges a recursive single binding in a right-hand side" $
+      rewrites flattenLetSc [varD "x_4" "Int"]
+        (tm "let { (a :: Int) = let { (c :: Int) = h_G11 c } in k_G12 c x_4; (b :: Int) = h_G11 a } in k_G12 a b")
+        (tm "let { (c :: Int) = h_G11 c; (a :: Int) = k_G12 c x_4; (b :: Int) = h_G11 a } in k_G12 a b")
+    -- The Clash Core version deshadows the let-expression in the
+    -- right-hand side as a recursive one, which turns @x = g x@ into the
+    -- loop @x' = g x'@. In scoped Core, the right-hand side of a 'NonRec'
+    -- binding can't refer to its binder. The binder of @x@ also clashes
+    -- with a variable of the scope.
+  , testCase "doesn't make a shadowing NonRec binding in a right-hand side recursive" $
+      withTerm [termQQ|
+        let { !(y :: Int) =
+          let { !(x_1 :: Int) = (g_G10 :: Int -> Int) (x_1 :: Int) } in x_1 }
+        in y
+      |] $ \ts0 e0 -> withClashing ts0 [varD "z" "Int"] e0 $ \ts e -> do
+        assertClashes ts e
+        (t, _, ch) <- runScopedIn rewriteEnvWithTyCons def ts flattenLetSc e
+        assertLintClean ts t
+        assertTermIs ts "g_G10 x_1" t
+        ch @?= True
+  , testCase "doesn't fire on a let-expression without let-expressions" $
+      keeps flattenLetSc [varD "x_4" "Int"]
+        (tm "let { (a :: Int) = g_G10 x_4; (b :: Int) = h_G11 a } in k_G12 a b")
+  ]
 
 -- * topLet
 
--- | The context of the body of lambdas binding the given variables
-lamBodyCtx :: [Id] -> TransformContext
-lamBodyCtx vs = TransformContext (inScopeOf vs) (map C.LamBody (reverse vs))
+topLetS :: ScopedRewrite NormalizeState
+topLetS = $(asScopedRewriteQ S.topLet)
 
-topLetC, topLetS :: NormRewrite
-topLetC = apply "topLet" Current.topLetWorker
-topLetS = (viaFoil "topLet" $(asScopedRewriteQ S.topLet))
+-- | Assert that 'S.topLet', in the body of the outer lambda of a term, gives
+-- the expected term
+topLetTo :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+topLetTo = assertRewritesAt env st [LamStep] topLetS
+
+-- | Assert that 'S.topLet', at the given path, leaves a term as it is
+topLetKeeps :: [Step] -> [ScopeDecl] -> TestTerm -> Assertion
+topLetKeeps path = assertNoRewriteAt env st path topLetS
 
 topLetTests :: TestTree
 topLetTests = testGroup "topLet"
-      [ testCase "binds the body of a function" $
-          agrees def (lamBodyCtx [x]) topLetC topLetS (app "g" 10 [C.Var x])
-      , testCase "adds a binding for the body of a let-expression" $
-          agrees def (lamBodyCtx [x]) topLetC topLetS
-            (C.Letrec [(a, app "g" 10 [C.Var x])] (app "k" 12 [C.Var a, C.Var x]))
-      , testCase "adds a binding for the body of a non-recursive let-expression" $
-          agrees def (lamBodyCtx [x]) topLetC topLetS
-            (C.Let (C.NonRec a (app "g" 10 [C.Var x])) (app "k" 12 [C.Var a, C.Var x]))
-      , testCase "doesn't fire on a let-expression whose body is a variable" $
-          agrees def (lamBodyCtx [x]) topLetC topLetS
-            (C.Letrec [(a, app "g" 10 [C.Var x])] (C.Var a))
-      , testCase "doesn't fire on a tick" $
-          agrees def (lamBodyCtx [x]) topLetC topLetS (C.Tick srcTick (app "g" 10 [C.Var x]))
-      , testCase "doesn't fire on an untranslatable term" $
-          agrees def (lamBodyCtx [x]) topLetC topLetS (C.Var (globalId User "g" 10 (intFunTy 1)))
-      , testCase "doesn't fire outside the body of a function" $
-          agrees def (TransformContext (inScopeOf [x]) [C.AppArg Nothing, C.LamBody x])
-            topLetC topLetS (app "g" 10 [C.Var x])
-      ]
+  [ testCase "binds the body of a function" $
+      topLetTo []
+        (tm "\\(x :: Int) -> g_G10 x")
+        (tm "\\(x :: Int) -> let { !(r :: Int) = g_G10 x } in r")
+  , testCase "adds a binding for the body of a let-expression" $
+      topLetTo []
+        (tm "\\(x :: Int) -> let { (a :: Int) = g_G10 x } in k_G12 a x")
+        (tm "\\(x :: Int) -> let { (a :: Int) = g_G10 x; (r :: Int) = k_G12 a x } in r")
+  , testCase "adds a binding for the body of a non-recursive let-expression" $
+      topLetTo []
+        (tm "\\(x :: Int) -> let { !(a :: Int) = g_G10 x } in k_G12 a x")
+        (tm "\\(x :: Int) -> let { (a :: Int) = g_G10 x; (r :: Int) = k_G12 a x } in r")
+  , testCase "doesn't fire on a let-expression whose body is a variable" $
+      topLetKeeps [LamStep] [] (tm "\\(x :: Int) -> let { (a :: Int) = g_G10 x } in a")
+  , testCase "doesn't fire on a tick" $
+      topLetKeeps [LamStep] [] (tm "\\(x :: Int) -> Core.srcSpan (g_G10 x)")
+  , testCase "doesn't fire on an untranslatable term" $
+      topLetKeeps [LamStep] [] (tm "\\(x :: Int) -> g_G10")
+  , testCase "doesn't fire outside the body of a function" $
+      topLetKeeps [LamStep, AppArgStep] [] (tm "\\(x :: Int) -> f_G5 (g_G10 x)")
+  ]
 
--- | The regression tests of the Clash Core versions
+-- | The regression tests of "Clash.Normalize.Transformations.Letrec"
 regressionTests :: TestTree
-regressionTests = testGroup "regression tests" (letrecTests flattenLetS topLetS)
+regressionTests = testGroup "regression tests"
+  [ -- 'topLet' turns @letrec x = 1 in 2@ into @letrec x = 1; result = 2 in
+    -- result@. Its new binder must not clash with the binders of the let
+    -- expression. Before #490, 'topLet' made a new binder using an in-scope
+    -- set that did not contain them.
+    -- https://github.com/clash-lang/clash-compiler/pull/490
+    testCase "topLet does not reuse the unique of a let-binder (#490)" $
+      rewrites topLetS []
+        (tm "let { (x :: Int) = 1 } in 2")
+        (tm "let { (x :: Int) = 1; (r :: GHC.Prim.Int#) = 2 } in r")
+
+    -- #1766 / #1837: 'flattenLet' did not flatten a let-expression whose body
+    -- is another let-expression. Doing so requires deshadowing the inner
+    -- bindings, as they may reuse uniques of the outer ones: here the inner
+    -- @x@ shadows the outer one. Unflattened, and with shadowing binders,
+    -- Clash generated duplicate signal names.
+    -- https://github.com/clash-lang/clash-compiler/pull/1837
+  , testCase "flattenLet deshadows when flattening nested letrec (#1837)" $
+      rewrites flattenLetSc []
+        (tm [strQQ|
+          let { (x :: Int) = f_G102 y; (y :: Int) = f_G102 x } in
+            let { (x :: Int) = g_G103 y z; (z :: Int) = g_G103 x x } in
+              h_G104 x z y
+        |])
+        (tm [strQQ|
+          let
+            { (x :: Int) = f_G102 y
+            ; (y :: Int) = f_G102 x
+            ; (x2 :: Int) = g_G103 y z
+            ; (z :: Int) = g_G103 x2 x2
+            } in h_G104 x2 z y
+        |])
+
+    -- #1837 also made flattening a nested letrec signal a change (it merely
+    -- merges two let-expressions, so no other code path in 'flattenLet' does).
+    -- Without it, the strategy might not run to a fixed point.
+  , testCase "flattenLet signals change when flattening nested letrec (#1837)" $
+      rewrites flattenLetSc []
+        (tm "let { (a :: Int) = f_G102 b; (b :: Int) = f_G102 a } in let { (c :: Int) = g_G103 a b } in h_G104 c c")
+        (tm "let { (a :: Int) = f_G102 b; (b :: Int) = f_G102 a; (c :: Int) = g_G103 a b } in h_G104 c c")
+
+    -- #1837 also made 'Clash.Rewrite.Util.apply' report a transformation that
+    -- changes a term without signalling it, when checking invariants
+  , testCase "apply reports an unsignalled change (#1837)" $
+      withTerm (tm "let { (a :: Int) = f_G102 b; (b :: Int) = f_G102 a } in a") $ \ts e ->
+        assertErrorContainsIO "Expression changed without notice" $ do
+          -- 'applyDebug' skips its checks until the first transformation
+          -- that signals a change, so pretend one already did
+          (e', _, _) <- runRewriteTest (rewriteEnvWithDebug debugSilent{dbg_invariants = True})
+            st{_transformCounter = 1} $
+            applyDebug "flattenLet" e False (termIn ts (tm "3"))
+          pure e'
+
+    -- 'flattenLet' deshadowed a non-recursive let-expression in a right-hand
+    -- side as if it were recursive. Its binder @x@ shadowed the variable
+    -- @x_9@ its right-hand side refers to, so renaming both turned
+    --
+    --   let y = (let x_9 = g_5 x_9 in x_9) in y
+    --
+    -- into the loop @letrec x' = g_5 x'; y = x' in y@.
+  , testCase "flattenLet keeps a shadowing NonRec let in a right-hand side non-recursive" $
+      rewrites flattenLetSc [varD "g_5" "Int -> Int", varD "x_9" "Int"]
+        (tm "let { !(y :: Int) = let { !(x :: Int) = g_5 x_9 } in x } in y")
+        (tm "g_5 x_9")
+
+    -- #1103 made 'flattenLet' deshadow a let-expression in the right-hand
+    -- side of a let-binding (before merging it into the outer let-expression)
+    -- only when one of its binders is already in scope. That set of in-scope
+    -- variables must include the context of the let-expression, the outer
+    -- binders, /and/ the binders merged in from earlier right-hand sides.
+    -- Here, in Clash Core:
+    --
+    --   * the binder @x@ in @a@ is also a free variable (bound in the
+    --     context), referred to by @b@: not renaming it captures that
+    --     reference;
+    --   * the binder @u@ in @b@ was already merged in from @a@;
+    --   * the binder @a@ in @b@ is also an outer binder.
+    --
+    -- https://github.com/clash-lang/clash-compiler/pull/1103
+  , testCase "flattenLet deshadows nested let-bindings when needed (#1103)" $
+      rewrites flattenLetSc [varD "x_9" "Int"]
+        (tm [strQQ|
+          let
+            { (a :: Int) = let { (x :: Int) = f_G102 c_G99; (u :: Int) = g_G103 x x } in u
+            ; (b :: Int) = let { (u :: Int) = f_G102 x_9; (a :: Int) = g_G103 u u } in a
+            } in h_G104 a b x_9
+        |])
+        (tm [strQQ|
+          let
+            { (x :: Int) = f_G102 c_G99
+            ; (u :: Int) = g_G103 x x
+            ; (a :: Int) = u
+            ; (u2 :: Int) = f_G102 x_9
+            ; (a2 :: Int) = g_G103 u2 u2
+            ; (b :: Int) = a2
+            } in h_G104 a b x_9
+        |])
+
+    -- 'flattenLet' merges a let-expression into the non-recursive
+    -- let-expression whose body it is: @let x = g x in let y = h x in y@,
+    -- where the right-hand side @g x@ refers to the outer @x@, must not
+    -- become @letrec x = g x; y = h x in y@.
+  , testCase "flattenLet merges a let into a shadowing NonRec let" $
+      rewrites flattenLetSc [varD "x_0" "Int"]
+        (tm "let { !(x :: Int) = g_G10 x_0; !(y :: Int) = h_G11 x } in y")
+        (tm "let { (x :: Int) = g_G10 x_0; (y :: Int) = h_G11 x } in y")
+
+    -- 'flattenLet' merges a let-expression in the right-hand side of a
+    -- non-recursive let-binding into it: @let x = (letrec y = h x; z = k y in
+    -- z) in f x x@ must become @letrec y = h x; z = k y; x' = z in f x' x'@,
+    -- where @h x@ still refers to the outer @x@.
+  , testCase "flattenLet merges a let into a shadowing NonRec binding" $
+      rewrites flattenLetSc [varD "x_0" "Int"]
+        (tm "let { !(x :: Int) = let { (y :: Int) = h_G11 x_0; (z :: Int) = (k_G12 :: Int -> Int) y } in z } in (f_G10 :: Int -> Int -> Int) x x")
+        (tm "let { (y :: Int) = h_G11 x_0; (z :: Int) = k_G12 y; (x :: Int) = z } in f_G10 x x")
+
+    -- 'topLet' adds a binder for the body of a non-recursive let-expression
+    -- to its bindings: @let x = g x in f x@ must become
+    -- @letrec x' = g x; result = f x' in result@.
+  , testCase "topLet adds its binder to a shadowing NonRec let" $
+      rewrites topLetS [varD "x_0" "Int"]
+        (tm "let { !(x :: Int) = g_G10 x_0 } in (f_G11 :: Int -> Int) x")
+        (tm "let { (x :: Int) = g_G10 x_0; (r :: Int) = f_G11 x } in r")
+  ]
 
 -- * simpleCSE
 
-cseC, cseS :: NormRewrite
-cseC = apply "CSE" $ \ctx -> \case
-  e@(C.Let bind body) -> Current.simpleCSEWorker ctx e bind body
-  e -> pure e
-cseS = (viaFoil "simpleCSE" $(asScopedRewriteQ S.simpleCSE))
+cseS :: ScopedRewrite NormalizeState
+cseS = $(asScopedRewriteQ S.simpleCSE)
 
 simpleCSETests :: TestTree
 simpleCSETests = testGroup "simpleCSE"
-      [ testCase "replaces a binding by an equal one" $ do
-          let e = C.Letrec [ (a, app "g" 10 [C.Var x]), (b, app "g" 10 [C.Var x])
-                           , (c, app "k" 12 [C.Var a, C.Var b]) ]
-                    (C.Var c)
-          agrees def (rootCtx [x]) cseC cseS e
-          (t, _) <- runIn def (rootCtx [x]) cseS e
-          assertAlphaEq
-            (C.Letrec [(c, app "k" 12 [C.Var a, C.Var a]), (a, app "g" 10 [C.Var x])] (C.Var c))
-            t
-      , testCase "replaces bindings in a recursive group" $
-          agrees def (rootCtx [x]) cseC cseS
-            (C.Letrec [ (a, app "k" 12 [C.Var x, C.Var b]), (b, app "k" 12 [C.Var x, C.Var a])
-                      , (c, app "k" 12 [C.Var x, C.Var a]), (d, app "k" 12 [C.Var c, C.Var b]) ]
-              (C.Var d))
-      , testCase "doesn't replace a binding with a NoDeDup tick" $
-          agrees def (rootCtx [x]) cseC cseS
-            (C.Letrec [ (a, C.Tick C.NoDeDup (app "g" 10 [C.Var x]))
-                      , (b, C.Tick C.NoDeDup (app "g" 10 [C.Var x]))
-                      , (c, app "k" 12 [C.Var a, C.Var b]) ]
-              (C.Var c))
-      , testCase "doesn't fire on a non-recursive let-expression" $
-          agrees def (rootCtx [x]) cseC cseS
-            (C.Let (C.NonRec a (app "g" 10 [C.Var x])) (C.Var a))
-      ]
+  [ testCase "replaces a binding by an equal one" $
+      rewrites cseS [varD "x_4" "Int"]
+        (tm "let { (a :: Int) = g_G10 x_4; (b :: Int) = g_G10 x_4; (c :: Int) = k_G12 a b } in c")
+        (tm "let { (c :: Int) = k_G12 a a; (a :: Int) = g_G10 x_4 } in c")
+  , testCase "replaces bindings in a recursive group" $
+      rewrites cseS [varD "x_4" "Int"]
+        (tm [strQQ|
+          let
+            { (a :: Int) = k_G12 x_4 b
+            ; (b :: Int) = k_G12 x_4 a
+            ; (c :: Int) = k_G12 x_4 a
+            ; (d :: Int) = k_G12 c b
+            } in d
+        |])
+        (tm "let { (d :: Int) = k_G12 b b; (a :: Int) = k_G12 x_4 b; (b :: Int) = k_G12 x_4 a } in d")
+  , testCase "doesn't replace a binding with a NoDeDup tick" $
+      keeps cseS [varD "x_4" "Int"]
+        (tm [strQQ|
+          let
+            { (a :: Int) = Core.noDeDup (g_G10 x_4)
+            ; (b :: Int) = Core.noDeDup (g_G10 x_4)
+            ; (c :: Int) = k_G12 a b
+            } in c
+        |])
+  , testCase "doesn't fire on a non-recursive let-expression" $
+      keeps cseS [varD "x_4" "Int"] (tm "let { !(a :: Int) = g_G10 x_4 } in a")
+  ]
 
 -- * recToLetRec
 
--- | The function being normalized in the 'recToLetRec' tests,
--- @rec :: Int -> Int -> Int@, applied
-recApp :: [C.Term] -> C.Term
-recApp = app "rec" 300
+recToLetRecS :: ScopedRewrite NormalizeState
+recToLetRecS = ScopedTransform S.recToLetRec
 
--- | A state in which the function being normalized is @rec@, see 'recApp'
-recState :: C.Type -> RewriteState NormalizeState
-recState ty = def { _curFun = (mkGlobalIdFromClash (globalId User "rec" 300 ty), noSrcSpan) }
+-- | A state in which the function being normalized is @rec@, of the given
+-- type
+recState :: TestType -> RewriteState NormalizeState
+recState ty = withCurFun (testGlobalId "rec_G300" ty) st
 
-recToLetRecC, recToLetRecS :: NormRewrite
-recToLetRecC = apply "recToLetRec" Current.recToLetRec
-recToLetRecS = apply "recToLetRec" (viaFoil "recToLetRec" (ScopedTransform S.recToLetRec))
+-- | Assert that 'S.recToLetRec' rewrites a term to the expected one, in a
+-- state in which the function being normalized is @rec :: Int -> Int ->
+-- Int@
+recTo :: TestTerm -> TestTerm -> Assertion
+recTo = assertRewritesTo env (recState "Int -> Int -> Int") recToLetRecS []
+
+-- | Assert that 'S.recToLetRec' leaves a term as it is, see 'recTo'
+recKeeps :: [ScopeDecl] -> TestTerm -> Assertion
+recKeeps = assertNoRewrite env (recState "Int -> Int -> Int") recToLetRecS
+
+-- | @rec :: Int -> Int -> Int@, applied
+recTm :: String -> TestTerm
+recTm = parseTestTermWith (TestDefs [] [] (testGlobalId "rec_G300" "Int -> Int -> Int" : globals))
 
 recToLetRecTests :: TestTree
 recToLetRecTests = testGroup "recToLetRec"
-      [ testCase "replaces recursive calls with the original arguments by the result" $ do
-          -- \x y -> letrec a = rec x y; b = g a; r = k b a in r
-          let e = C.Lam x (C.Lam y
-                    (C.Letrec [ (a, recApp [C.Var x, C.Var y]), (b, app "g" 10 [C.Var a])
-                              , (r, app "k" 12 [C.Var b, C.Var a]) ]
-                      (C.Var r)))
-          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS e
-          (t, _) <- runIn (recState (intFunTy 2)) (rootCtx []) recToLetRecS e
-          assertAlphaEq
-            (C.Lam x (C.Lam y
-              (C.Letrec [(b, app "g" 10 [C.Var r]), (r, app "k" 12 [C.Var b, C.Var r])] (C.Var r))))
-            t
-      , testCase "keeps recursive calls with other arguments" $
-          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
-            (C.Lam x (C.Lam y
-              (C.Letrec [ (a, recApp [C.Var y, C.Var x]), (r, app "k" 12 [C.Var a, C.Var a]) ]
-                (C.Var r))))
-      , testCase "recognizes an argument rebuilt from its fields" $
-          -- \p -> letrec a = rec (MkPair (case p of MkPair c d -> c)
-          --                              (case p of MkPair c d -> d));
-          --              r = k a a
-          --       in r
-          let p = localId User "p" 30 pairTy
-              field i = C.Case (C.Var p) intTy [(C.DataPat pairDataCon [] [c, d], C.Var ([c, d] !! i))]
-              recP = C.App (C.Var (globalId User "rec" 300 (C.mkFunTy pairTy intTy)))
-              e = C.Lam p
-                    (C.Letrec [ (a, recP (C.mkApps (C.Data pairDataCon) [Left (field 0), Left (field 1)]))
-                              , (r, app "k" 12 [C.Var a, C.Var a]) ]
-                      (C.Var r))
-          in  agrees (recState (C.mkFunTy pairTy intTy)) (rootCtx []) recToLetRecC recToLetRecS e
-      , testCase "merges nested let-expressions, and moves their ticks to the bindings" $
-          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
-            (C.Lam x (C.Lam y (C.Tick srcTick
-              (C.Let (C.NonRec a (recApp [C.Var x, C.Var y]))
-                (C.Letrec [(b, app "g" 10 [C.Var a]), (r, app "k" 12 [C.Var b, C.Var a])]
-                  (C.Var r))))))
-      , testCase "doesn't fire without other bindings" $
-          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
-            (C.Lam x (C.Lam y (C.Letrec [(r, recApp [C.Var x, C.Var y])] (C.Var r))))
-      , testCase "doesn't fire on a term that is not in normal form" $
-          agrees (recState (intFunTy 2)) (rootCtx []) recToLetRecC recToLetRecS
-            (C.Lam x (C.Lam y (app "k" 12 [recApp [C.Var x, C.Var y], C.Var x])))
-      , testCase "doesn't fire outside the root" $
-          agrees (recState (intFunTy 2)) (TransformContext (inScopeOf [x, y]) [C.LamBody y])
-            recToLetRecC recToLetRecS
-            (C.Letrec [ (a, recApp [C.Var x, C.Var y]), (b, app "g" 10 [C.Var a])
-                      , (r, app "k" 12 [C.Var b, C.Var a]) ]
-              (C.Var r))
-        -- The Clash Core version would replace @r@ by itself, leaving it
-        -- unbound
-      , testCase "doesn't fire when the result is a recursive call" $ do
-          let e = C.Lam x (C.Lam y
-                    (C.Letrec [(r, recApp [C.Var x, C.Var y]), (b, app "g" 10 [C.Var r])]
-                      (C.Var r)))
-          (t, ch) <- runIn (recState (intFunTy 2)) (rootCtx []) recToLetRecS e
-          assertAlphaEq e t
-          ch @?= False
-      ]
+  [ testCase "replaces recursive calls with the original arguments by the result" $
+      recTo
+        (recTm "\\(x :: Int) (y :: Int) -> let { (a :: Int) = rec_G300 x y; (b :: Int) = g_G10 a; (r :: Int) = k_G12 b a } in r")
+        (recTm "\\(x :: Int) (y :: Int) -> let { (b :: Int) = g_G10 r; (r :: Int) = k_G12 b r } in r")
+  , testCase "keeps recursive calls with other arguments" $
+      recKeeps []
+        (recTm "\\(x :: Int) (y :: Int) -> let { (a :: Int) = rec_G300 y x; (r :: Int) = k_G12 a a } in r")
+  , testCase "recognizes an argument rebuilt from its fields" $
+      assertRewritesTo env (recState "Pair -> Int") recToLetRecS []
+        (tm [strQQ|
+          \(p :: Pair) ->
+            let
+              { (a :: Int) = (rec_G300 :: Pair -> Int)
+                  (MkPair
+                    ((case p of { MkPair (c :: Int) (d :: Int) -> c }) :: Int)
+                    ((case p of { MkPair (c :: Int) (d :: Int) -> d }) :: Int))
+              ; (r :: Int) = k_G12 a a
+              } in r
+        |])
+        (tm "\\(p :: Pair) -> let { (r :: Int) = k_G12 r r } in r")
+  , testCase "merges nested let-expressions, and moves their ticks to the bindings" $
+      recTo
+        (recTm [strQQ|
+          \(x :: Int) (y :: Int) -> Core.srcSpan
+            (let { !(a :: Int) = rec_G300 x y } in
+              let { (b :: Int) = g_G10 a; (r :: Int) = k_G12 b a } in r)
+        |])
+        (recTm "\\(x :: Int) (y :: Int) -> let { (b :: Int) = Core.srcSpan (g_G10 r); (r :: Int) = Core.srcSpan (k_G12 b r) } in r")
+  , testCase "doesn't fire without other bindings" $
+      recKeeps [] (recTm "\\(x :: Int) (y :: Int) -> let { (r :: Int) = rec_G300 x y } in r")
+  , testCase "doesn't fire on a term that is not in normal form" $
+      recKeeps [] (recTm "\\(x :: Int) (y :: Int) -> k_G12 (rec_G300 x y) x")
+  , testCase "doesn't fire outside the root" $
+      assertNoRewriteAt env (recState "Int -> Int -> Int") [LamStep] recToLetRecS [varD "x_4" "Int"]
+        (recTm "\\(y :: Int) -> let { (a :: Int) = rec_G300 x_4 y; (b :: Int) = g_G10 a; (r :: Int) = k_G12 b a } in r")
+    -- The Clash Core version would replace @r@ by itself, leaving it unbound
+  , testCase "doesn't fire when the result is a recursive call" $
+      recKeeps [] (recTm "\\(x :: Int) (y :: Int) -> let { (r :: Int) = rec_G300 x y; (b :: Int) = g_G10 r } in r")
+  ]
