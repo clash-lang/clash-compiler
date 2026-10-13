@@ -628,5 +628,6 @@ test-suite unittests
                  Test.Clash.Scoped.Evaluator.Adapter
                  Test.Clash.Scoped.ViaFoil
                  Test.Clash.Scoped.Evaluator.Primitives
+                 Test.Clash.Scoped.Gen
                  Test.Clash.Scoped.Gen.Clash
                  Test.Clash.TermLiteral
