@@ -29,7 +29,7 @@ import Clash.Rewrite.Scoped
 
 import Test.Clash.Scoped
   ( TestScope (..), assertTermAlphaEq, assertTermIs, closedTerm, emptyTestScope
-  , runScopedClosed, sunkD, testPrim, withClashing, withTerm)
+  , runRewriteClosed, sunkD, testPrim, withClashing, withTerm)
 
 -- | A transformation that changes nothing
 idT :: Applicative m => Transform m
@@ -141,23 +141,23 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
   , testCase "repeatR, !-> and >-! signal change like their Clash Core versions" $ do
       let one = closedTerm "1"
           inc = apply "inc" incrementOdd
-      (r1, n1, c1) <- runScopedClosed inc one
+      (r1, n1, c1) <- runRewriteClosed inc one
       (show r1, n1, c1) @?= (show (closedTerm "2"), 1, True)
-      (_, n2, c2) <- runScopedClosed (repeatR inc) one
+      (_, n2, c2) <- runRewriteClosed (repeatR inc) one
       (n2, c2) @?= (1, True)
       -- The second transformation runs after a change, but doesn't fire
-      (_, n3, _) <- runScopedClosed (inc !-> inc) one
+      (_, n3, _) <- runRewriteClosed (inc !-> inc) one
       n3 @?= 1
       -- The second transformation doesn't run after a change
-      (_, n4, c4) <- runScopedClosed (inc >-! apply "never" (Transform (\_ _ -> error "ran"))) one
+      (_, n4, c4) <- runRewriteClosed (inc >-! apply "never" (Transform (\_ _ -> error "ran"))) one
       (n4, c4) @?= (1, True)
 
   , testCase "topdownFixR reaches the fixpoint of repeatR topdownR" $ do
       -- @f (case (let x = 1 in x) of { 1 -> 2; _ -> 3 })@
       let tm = closedTerm "(f_G2 :: Int -> Int) ((case (let { !(x_0 :: Int) = 1 } in x_0) of { 1 -> 2; _ -> 3 }) :: Int)"
           r = apply "caseLit" caseLit >-> apply "inlineTrivialLet" inlineTrivialLet
-      (fixed, _, _) <- runScopedClosed (topdownFixR r) tm
-      (reference, _, _) <- runScopedClosed (repeatR (topdownR r)) tm
+      (fixed, _, _) <- runRewriteClosed (topdownFixR r) tm
+      (reference, _, _) <- runRewriteClosed (repeatR (topdownR r)) tm
       assertBool "same result" (aeqTm fixed reference)
       assertTermIs emptyTestScope "(f_G2 :: Int -> Int) 2" fixed
   ]

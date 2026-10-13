@@ -32,7 +32,7 @@ import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped (Rewrite, Transform (..), changed)
 import qualified Clash.Rewrite.Scoped as S
 
-import Test.Clash.Scoped (TestTerm, assertTermIs, runScopedIn, withTerm)
+import Test.Clash.Scoped (TestTerm, assertTermIs, runRewriteIn, withTerm)
 
 -- | Replace every variable that evaluates to a literal by that literal
 evalVars :: Rewrite NormalizeState
@@ -46,7 +46,7 @@ evalVars = S.topdownR $ Transform $ \ctx -> \case
 -- variables, to the expected one
 evalVarsGives :: TestTerm -> TestTerm -> Assertion
 evalVarsGives tm expected = withTerm tm $ \ts e -> do
-  (res, _, _) <- runScopedIn def st ts evalVars e
+  (res, _, _) <- runRewriteIn def st ts evalVars e
   assertTermIs ts expected res
  where
   st :: RewriteState NormalizeState

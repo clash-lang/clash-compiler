@@ -35,7 +35,7 @@ import Test.Clash.Rewrite
   , strQQ, testDataCon, testGlobalId, varD )
 import Test.Clash.Scoped
   ( assertCaptureRewritesTo, assertLintClean, assertNoRewrite, assertRewritesTo, assertTermIs
-  , closedTerm, emptyTestScope, newBindings, runScopedIn, termIn, withCurFun )
+  , closedTerm, emptyTestScope, newBindings, runRewriteIn, termIn, withCurFun )
 import Test.Clash.Scoped.Print (showTestTerm)
 
 -- * Definitions
@@ -148,8 +148,8 @@ regressionTests =
   , testCase "ANF does not lift expressions out of lambdas" $ do
       let st0 = withCurFun (testGlobalId "top_G42" "Int -> Int") st
           e = closedTerm (tm "(Prim.p :: (Int -> Int) -> Int) (\\(z :: Int) -> k_G33 (h_G50 z) z)")
-      (e1, st1, ch1) <- runScopedIn def st0 emptyTestScope nonRepANFS e
-      (e2, _, _) <- runScopedIn def st1 emptyTestScope anfS e1
+      (e1, st1, ch1) <- runRewriteIn def st0 emptyTestScope nonRepANFS e
+      (e2, _, _) <- runRewriteIn def st1 emptyTestScope anfS e1
       ch1 @?= True
       assertLintClean emptyTestScope e2
       case newBindings st0 st1 of

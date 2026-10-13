@@ -33,13 +33,13 @@
   > withTestScope [tyVarD "a_1", varD "x_2" "a_1", atRaw 10 (varD "y_3" "Int")] $ \ts ->
   >   termIn ts "\\(z :: a_1) -> x_2"
 
-  Running a transformation in the root context of the scope ('runScopedIn'),
-  or at a subterm ('runScopedAt'), with global bindings from
+  Running a transformation in the root context of the scope ('runRewriteIn'),
+  or at a subterm ('runRewriteAt'), with global bindings from
   'mkGlobalBindings' if it needs them. Results that refer to new global
   bindings compare after 'globalsByOcc'.
 
   > withTerm "let { !(x :: Int) = 1 } in 2" $ \ts e -> do
-  >   (e', _, changed) <- runScopedIn def def ts $(asRewriteQ deadCode) e
+  >   (e', _, changed) <- runRewriteIn def def ts $(asRewriteQ deadCode) e
   >   assertTermIs ts "2" e'
   >   changed @?= True
 
@@ -135,8 +135,8 @@ module Test.Clash.Scoped
   , assertTermIs
   , assertTypeIs
     -- * Running scoped transformations in a test scope
-  , runScopedIn
-  , runScopedAt
+  , runRewriteIn
+  , runRewriteAt
   , assertRewritesTo
   , assertRewritesAt
   , assertNoRewrite
@@ -176,7 +176,7 @@ module Test.Clash.Scoped
     -- * Properties
   , withTests
     -- * Running scoped transformations
-  , runScopedClosed
+  , runRewriteClosed
   , Step (..)
   , atPath
     -- * Tests
@@ -465,7 +465,7 @@ assertTypeIs ts expected0 actual =
 
 -- | Run a scoped transformation on a term, in the root context of its scope.
 -- Gives the result, the final state, and whether a change was signaled.
-runScopedIn
+runRewriteIn
   :: Distinct n
   => RewriteEnv
   -> RewriteState extra
@@ -473,7 +473,7 @@ runScopedIn
   -> Rewrite extra
   -> Term n
   -> IO (Term n, RewriteState extra, Bool)
-runScopedIn env st ts t e =
+runRewriteIn env st ts t e =
   runRewriteTest env st (runTransform t (rootContext (testScope ts)) e)
 
 -- | Run a scoped transformation on the subterm at a path (see 'atPath'), in
@@ -482,9 +482,9 @@ runScopedIn env st ts t e =
 -- they may be renamed. E.g. to run a transformation in the body of a lambda:
 --
 -- > withTerm "\\(x :: Int) -> f_1 x" $ \ts e -> do
--- >   (e', _, _) <- runScopedAt def def ts [LamStep] topLetR e
+-- >   (e', _, _) <- runRewriteAt def def ts [LamStep] topLetR e
 -- >   assertTermIs ts "\\(x :: Int) -> let { (r :: Int) = f_1 x } in r" e'
-runScopedAt
+runRewriteAt
   :: forall n extra
    . (HasCallStack, Distinct n)
   => RewriteEnv
@@ -494,7 +494,7 @@ runScopedAt
   -> Rewrite extra
   -> Term n
   -> IO (Term n, RewriteState extra, Bool)
-runScopedAt env st ts path0 t e0 =
+runRewriteAt env st ts path0 t e0 =
   runRewriteTest env st (go path0 (rootContext (testScope ts)) e0)
  where
   go :: Distinct x => [Step] -> Scoped.TransformContext x -> Term x -> RewriteMonad extra (Term x)
@@ -517,7 +517,7 @@ runScopedAt env st ts path0 t e0 =
     (TickStep, Tick tk a) -> Tick tk <$> go path (pushFrame (Scoped.TickC tk) ctx) a
     (CastStep, Cast a t1 t2) -> (\a' -> Cast a' t1 t2) <$> go path (pushFrame Scoped.CastBody ctx) a
     (SubjStep, Case a ty alts) -> (\a' -> Case a' ty alts) <$> go path (pushFrame Scoped.CaseScrut ctx) a
-    _ -> error ("runScopedAt: " <> show step <> " doesn't fit the term:\n" <> showPprU e)
+    _ -> error ("runRewriteAt: " <> show step <> " doesn't fit the term:\n" <> showPprU e)
 
   replaceAt :: Int -> a -> [a] -> [a]
   replaceAt i x xs = take i xs <> [x] <> drop (i + 1) xs
@@ -542,7 +542,7 @@ assertRewritesTo
 assertRewritesTo env st = assertRewritesAt env st []
 
 -- | 'assertRewritesTo', for a transformation run at the subterm at a path
--- (see 'runScopedAt')
+-- (see 'runRewriteAt')
 assertRewritesAt
   :: HasCallStack
   => RewriteEnv
@@ -561,7 +561,7 @@ assertRewritesAt env st path rw decls input expected =
  where
   check :: Distinct n => TestScope n -> Term n -> Assertion
   check ts e = do
-    (e', _, ch) <- runScopedAt env st ts path rw e
+    (e', _, ch) <- runRewriteAt env st ts path rw e
     assertLintClean ts e'
     assertTermIs ts expected e'
     assertBool "no change signaled" ch
@@ -581,7 +581,7 @@ assertNoRewrite
 assertNoRewrite env st = assertNoRewriteAt env st []
 
 -- | 'assertNoRewrite', for a transformation run at the subterm at a path (see
--- 'runScopedAt')
+-- 'runRewriteAt')
 assertNoRewriteAt
   :: HasCallStack
   => RewriteEnv
@@ -599,7 +599,7 @@ assertNoRewriteAt env st path rw decls input =
  where
   check :: Distinct n => TestScope n -> Term n -> Assertion
   check ts e = do
-    (e', _, ch) <- runScopedAt env st ts path rw e
+    (e', _, ch) <- runRewriteAt env st ts path rw e
     assertTermAlphaEq e e'
     assertBool "a change signaled" (not ch)
 
@@ -679,7 +679,7 @@ assertCaptureRewritesTo
   -> Assertion
 assertCaptureRewritesTo env st rw decls part new mk expected =
   withCapture decls part new mk $ \ts e -> do
-    (e', _, _) <- runScopedIn env st ts rw e
+    (e', _, _) <- runRewriteIn env st ts rw e
     assertLintClean ts e'
     assertTermIs ts expected e'
 
@@ -719,7 +719,7 @@ assertSpecializesTo env st rw decls input expected newFuns =
  where
   check :: Distinct n => TestScope n -> Term n -> Assertion
   check ts e = do
-    (e', st1, ch) <- runScopedIn env st ts rw e
+    (e', st1, ch) <- runRewriteIn env st ts rw e
     let new = List.sortOn (globalIdUniq . bindingId) (newBindings st st1)
         rename g = maybe g snd (List.find ((== globalIdUniq g) . globalIdUniq . fst)
                      (zip (map bindingId new) (map fst newFuns)))
@@ -779,7 +779,7 @@ globalsByOcc = go
 -- | The context of a component whose local variables are the term variables
 -- of a test scope, with their occurrence names as their HDL identifiers. The
 -- context has the type environment 'testTypeEnv', like
--- 'Test.Clash.Rewrite.runScopedNetlistTest'.
+-- 'Test.Clash.Rewrite.runNetlistTest'.
 testCompCtx :: Distinct n => TestScope n -> CompCtx n
 testCompCtx ts =
   compCtxFromList (testScope ts) testTypeEnv
@@ -1311,8 +1311,8 @@ withTests n = adjustOption $ \(QuickCheckTests k) ->
 -- | Run a scoped transformation on a closed term, in the root context, in the
 -- default (silent) environment. Gives the result, the number of
 -- transformations applied, and whether a change was signaled.
-runScopedClosed :: Rewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Bool)
-runScopedClosed t e = do
+runRewriteClosed :: Rewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Bool)
+runRewriteClosed t e = do
   (e', st, changed) <- runRewriteTest def def (runTransform t (rootContext emptyScope) e)
   pure (e', _transformCounter st, changed)
 
@@ -1490,10 +1490,10 @@ testScopeTests = testGroup "Test.Clash.Scoped"
       ]
 
   , testGroup "running transformations"
-      [ testCase "runScopedAt runs a transformation in the body of a lambda" $
+      [ testCase "runRewriteAt runs a transformation in the body of a lambda" $
           withTerm "\\(x :: Int) -> \\(y :: Int) -> y" $ \ts e -> do
             let inc = Transform $ \_ _ -> Util.changed (Literal (C.IntLiteral 1))
-            (e', _, ch) <- runScopedAt def (def :: RewriteState ()) ts [LamStep, LamStep] inc e
+            (e', _, ch) <- runRewriteAt def (def :: RewriteState ()) ts [LamStep, LamStep] inc e
             assertTermIs ts "\\(x :: Int) (y :: Int) -> 1" e'
             ch @?= True
       , testCase "whnfIn evaluates in a test scope" $

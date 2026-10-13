@@ -36,7 +36,7 @@ import Test.Clash.Rewrite
   , testGlobalId )
 import Test.Clash.Scoped
   ( ScopeDecl, Step (..), TestScope (..), assertNoRewrite, assertRewritesAt, assertRewritesTo
-  , closedType, runScopedAt, runScopedIn, termIn, testTypeEnv, varD, withTestScope )
+  , closedType, runRewriteAt, runRewriteIn, termIn, testTypeEnv, varD, withTestScope )
 import Test.Clash.Scoped.Print (showTestType)
 
 -- | Global functions @gp :: Int -> ClkPair -> Int@, @gq :: ClkPair -> Int ->
@@ -78,7 +78,7 @@ lamBinderOccs path e = case (path, e) of
 -- the lambda at a path as expected
 assertNames :: [Step] -> [ScopeDecl] -> TestTerm -> [Text.Text] -> Assertion
 assertNames path decls input expected = withTestScope decls $ \ts -> do
-  (e, _, _) <- runScopedIn rewriteEnvWithTyCons st ts separateArgumentsS (termIn ts input)
+  (e, _, _) <- runRewriteIn rewriteEnvWithTyCons st ts separateArgumentsS (termIn ts input)
   assertEqual "the names of the binders" expected (lamBinderOccs path e)
 
 lambdaTests :: TestTree
@@ -108,7 +108,7 @@ lambdaTests = testGroup "Lambdas"
           } in p
         |])
       withTestScope [varD "h_40" "ClkPair -> Int"] $ \ts -> do
-        (e, _, _) <- runScopedAt rewriteEnvWithTyCons st ts [LetRhsStep 0] separateArgumentsS (termIn ts input)
+        (e, _, _) <- runRewriteAt rewriteEnvWithTyCons st ts [LetRhsStep 0] separateArgumentsS (termIn ts input)
         assertEqual "the names of the binders" ["c$p_p", "c$p_p"] (lamBinderOccs [LetRhsStep 0] e)
   , testCase "doesn't split another binder" $
       keeps [] (tm "\\(x :: Int) -> x")
@@ -170,7 +170,7 @@ spineTests = testGroup "Application spines"
 assertGlobalType :: [ScopeDecl] -> String -> TestTerm -> Assertion
 assertGlobalType decls expected input = withTestScope decls $ \ts -> do
   let e = termIn ts input
-  (res, _, _) <- runScopedIn rewriteEnvWithTyCons st ts separateArgumentsS e
+  (res, _, _) <- runRewriteIn rewriteEnvWithTyCons st ts separateArgumentsS e
   case collectArgs res of
     (GlobalVar g, _) ->
       assertBool

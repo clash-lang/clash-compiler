@@ -188,8 +188,8 @@ whnfAt path tm expected = do
 
 -- | 'whnfRW' uses the let-bindings of scoped contexts, which are never
 -- shadowed
-whnfScopedContextTests :: [TestTree]
-whnfScopedContextTests =
+whnfContextTests :: [TestTree]
+whnfContextTests =
   [ testCase "let x = 3 in \\y -> x" $
       whnfAt [LetBodyStep, LamStep] "let { !(x :: Int) = 3 } in \\(y :: Int) -> x" "3"
         >>= assertBool "3" . snd
@@ -421,7 +421,7 @@ tests =
         , testCase "keeps a local that shares a unique with the lifted function"
             liftBindingLocalSharesUniqueWithGlobal
         ]
-    , testGroup "whnfRW uses the let-bindings of a scoped context" whnfScopedContextTests
+    , testGroup "whnfRW uses the let-bindings of a scoped context" whnfContextTests
 
     -- @-fclash-debug-transformations-limit@ counts from
     -- @-fclash-debug-transformations-from@. 'applyDebug' used to subtract the

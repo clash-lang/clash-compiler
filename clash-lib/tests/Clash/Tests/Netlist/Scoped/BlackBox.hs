@@ -28,7 +28,7 @@ import Clash.Netlist.Types
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv, singletonGlobalEnv)
 import Clash.Core.Scoped.Syntax (GlobalId (..), Term (..))
 
-import Test.Clash.Rewrite (runScopedNetlistTest)
+import Test.Clash.Rewrite (runNetlistTest)
 import Test.Clash.Scoped
   ( TestTerm, atRaw, mkGlobalBindings, termIn, testCompCtx, testGlobalId, varD, withTerms
   , withTestScope )
@@ -56,7 +56,7 @@ mkFunInputLocalShadowingGlobal = do
   result <- try $ withTestScope [atRaw 60 (varD "f" "Int -> Int"), varD "res" "Int"] $ \ts ->
     case termIn ts "res" of
       Var o ty n ->
-        runScopedNetlistTest (mkGlobalBindings [(fGlobal, fBody)]) $ do
+        runNetlistTest (mkGlobalBindings [(fGlobal, fBody)]) $ do
           componentNames .= singletonGlobalEnv fGlobal (Id.unsafeMake "f")
           mkBlackBoxContext (testCompCtx ts) "prim" Concurrent [LocalId o ty n] [Left (termIn ts "f")]
       _ -> error "unexpected terms"
@@ -71,7 +71,7 @@ mkFunInputGlobal :: Assertion
 mkFunInputGlobal = do
   bbCtx <- withTestScope [varD "res" "Int"] $ \ts -> case termIn ts "res" of
     Var o ty n ->
-      fmap fst $ runScopedNetlistTest (mkGlobalBindings [(fGlobal, fBody)]) $ do
+      fmap fst $ runNetlistTest (mkGlobalBindings [(fGlobal, fBody)]) $ do
         componentNames .= singletonGlobalEnv fGlobal (Id.unsafeMake "f")
         mkBlackBoxContext (testCompCtx ts) "prim" Concurrent [LocalId o ty n] [Left (GlobalVar fGlobal)]
     _ -> error "unexpected terms"
@@ -88,7 +88,7 @@ mkFunInputLambda = do
   bbCtx <- withTerms ["\\(a :: Int) -> let { (r :: Int) = a } in r", "res :: Int"] $ \ts tms ->
     case tms of
       [f, Var o ty n] ->
-        fst <$> runScopedNetlistTest emptyGlobalEnv
+        fst <$> runNetlistTest emptyGlobalEnv
           (mkBlackBoxContext (testCompCtx ts) "prim" Concurrent [LocalId o ty n] [Left f])
       _ -> error "unexpected terms"
   case functionDecls bbCtx of

@@ -44,8 +44,8 @@ import Test.Clash.Rewrite
 import Test.Clash.Scoped
   ( ScopeDecl, Step (..), TestScope (..), assertLintClean, assertNoRewrite, assertRewritesTo
   , assertCaptureRewritesTo, assertSpecializesTo, assertTermAlphaEq, assertTermIs, closedTerm
-  , newBindings, runScopedAt
-  , runScopedIn, termIn, varD, withBinderClashes, withCurFun, withTestScope )
+  , newBindings, runRewriteAt
+  , runRewriteIn, termIn, varD, withBinderClashes, withCurFun, withTestScope )
 import Test.Clash.Scoped.Print (showTestTerm)
 
 -- * The transformations
@@ -365,8 +365,8 @@ bindConstantVarThenAppProp decls input expected =
   check ts e = do
     -- 'bindConstantVar' looks at the function being normalized
     let st0 = withCurFun (testGlobalId "top_G200" "Int") def
-    (inlined, _, _) <- runScopedIn def st0 ts $(asRewriteQ InlineS.bindConstantVar) e
-    (e', _, _) <- runScopedAt def st0 ts [LamStep] appPropS inlined
+    (inlined, _, _) <- runRewriteIn def st0 ts $(asRewriteQ InlineS.bindConstantVar) e
+    (e', _, _) <- runRewriteAt def st0 ts [LamStep] appPropS inlined
     assertLintClean ts e'
     assertTermIs ts expected e'
 
@@ -602,10 +602,10 @@ specializeTests =
   , testCase "specialize orders free variables by occurrence (#1087)" $ do
       let st0 = stWith fBinding
       (r1, st1) <- withTestScope [varD "x_123" "Int", varD "y_456" "Int"] $ \ts -> do
-        (e, st1, _) <- runScopedIn def st0 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_123 y_456)"))
+        (e, st1, _) <- runRewriteIn def st0 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_123 y_456)"))
         pure (headGlobal e, st1)
       withTestScope [varD "y_123" "Int", varD "x_456" "Int"] $ \ts -> do
-        (e, st2, _) <- runScopedIn def st1 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_456 y_123)"))
+        (e, st2, _) <- runRewriteIn def st1 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_456 y_123)"))
         assertEqual "Number of specializations" 1
           (Map.size (Lens.view (extra . specialisationCache) st2))
         case r1 of
@@ -641,7 +641,7 @@ specializeTests =
           bs = fBinding <> globalEnvFromList [(v, mkGlobalBinding v t) | (v, t) <- victims]
           st0 = (stWith bs) {_uniqSupply = supply}
       withTestScope [varD "x_12" "Int", varD "y_13" "Int"] $ \ts -> do
-        (_, st1, _) <- runScopedIn def st0 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_12 y_13)"))
+        (_, st1, _) <- runRewriteIn def st0 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_12 y_13)"))
         assertEqual "new global bindings" 1 (length (newBindings st0 st1))
         sequence_
           [ case lookupGlobalEnv v (_bindings st1) of

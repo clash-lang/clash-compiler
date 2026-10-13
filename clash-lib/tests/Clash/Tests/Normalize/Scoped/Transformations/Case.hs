@@ -41,7 +41,7 @@ import Test.Clash.Rewrite
   ( TestDefs (..), TestTerm, parseTestTermWith, strQQ, testDataCon, varD )
 import Test.Clash.Scoped
   ( ScopeDecl, TestScope, assertCaptureRewritesTo, assertLintClean, assertRewritesTo, binderRaws
-  , closedType, extendTestScope, runScopedIn, sunkD, termIn, typeIn, withTestScope, assertTermIs )
+  , closedType, extendTestScope, runRewriteIn, sunkD, termIn, typeIn, withTestScope, assertTermIs )
 
 -- * Definitions
 
@@ -99,7 +99,7 @@ assertSunk :: Rewrite NormalizeState -> [ScopeDecl] -> String -> String -> Asser
 assertSunk rw decls input expected =
   withTestScope decls $ \ts0 ->
     extendTestScope ts0 [sunkD] $ \ts -> do
-      (e, _, _) <- runScopedIn def st ts rw (sink (termIn ts0 (tm input)))
+      (e, _, _) <- runRewriteIn def st ts rw (sink (termIn ts0 (tm input)))
       assertLintClean ts e
       assertTermIs ts (tm expected) e
       assertBool ("binders that are not fresh: " <> show (binderRaws e))

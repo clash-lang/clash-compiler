@@ -310,16 +310,16 @@ classifyTests =
 -- * Normalizing global binders
 
 -- | 'incLits' on scoped Core
-incLitsScoped :: Rewrite NormalizeState
-incLitsScoped = Scoped.bottomupR $ Transform $ \_ -> \case
+incLits :: Rewrite NormalizeState
+incLits = Scoped.bottomupR $ Transform $ \_ -> \case
   Literal (IntLiteral i) -> Scoped.changed (Literal (IntLiteral (i + 1)))
   e -> pure e
 
--- | A state with the given bindings, normalized by 'incLitsScoped', in which
+-- | A state with the given bindings, normalized by 'incLits', in which
 -- the first of them is the function being normalized
 normState :: [(GlobalId, Term 'VoidS)] -> RewriteState NormalizeState
 normState bs = st
-  { _extra = (_extra st) { _normalizationStrategy = incLitsScoped } }
+  { _extra = (_extra st) { _normalizationStrategy = incLits } }
  where
   st = withCurFun curF def
     {_bindings = globalEnvFromList [(g, mkGlobalBinding g t) | (g, t) <- bs]}

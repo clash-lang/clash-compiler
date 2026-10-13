@@ -34,7 +34,7 @@ import Test.Clash.Rewrite
   ( TestDefs (..), TestTerm, kindedTyVarD, parseTestTermWith, strQQ, testDataCon
   , testGlobalId )
 import Test.Clash.Scoped
-  ( ScopeDecl, assertCaptureRewritesTo, assertNoRewrite, assertRewritesTo, runScopedIn, termIn
+  ( ScopeDecl, assertCaptureRewritesTo, assertNoRewrite, assertRewritesTo, runRewriteIn, termIn
   , typeIn, varD, withCurFun, withTestScope )
 
 -- * Definitions
@@ -152,7 +152,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Cast"
           withTestScope [kindedTyVarD "a_50" "Type", varD "x_31" "Int"] $ \ts -> do
             let e = termIn ts (tm "Core.cast @Int @Int (Core.cast @Int @a_50 x_31)")
                 st1 = withCurFun (testGlobalId "top_G60" "Int") st
-            r <- try (runScopedIn def st1 ts elimCastCastS e)
+            r <- try (runRewriteIn def st1 ts elimCastCastS e)
             case r of
               Left (_ :: ClashException) -> pure ()
               Right _ -> assertFailure "no exception"

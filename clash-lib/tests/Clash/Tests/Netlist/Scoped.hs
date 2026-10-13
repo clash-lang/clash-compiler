@@ -28,7 +28,7 @@ import Clash.Core.Scoped.Syntax
 import Clash.Netlist.Scoped (mkFunApp)
 import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), localIdVar)
 
-import Test.Clash.Rewrite (runScopedNetlistTest)
+import Test.Clash.Rewrite (runNetlistTest)
 import Test.Clash.Scoped
   (TestTerm, atRaw, mkGlobalBindings, termIn, testCompCtx, testGlobalId, varD, withTestScope)
 
@@ -43,7 +43,7 @@ withLocal
 withLocal bs compNames act =
   withTestScope [atRaw 60 (varD "y" "Int")] $ \ts -> case termIn ts "y" of
     Var o ty n ->
-      runScopedNetlistTest (mkGlobalBindings bs) $ do
+      runNetlistTest (mkGlobalBindings bs) $ do
         componentNames .= mconcat [ singletonGlobalEnv g i | (g, i) <- compNames ]
         act (testCompCtx ts) (LocalId o ty n)
     _ -> error "withLocal: not a variable"

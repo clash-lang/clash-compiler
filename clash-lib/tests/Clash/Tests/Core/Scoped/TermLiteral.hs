@@ -96,13 +96,13 @@ case_termToData_strips_ticks_in_subterm =
 
 -- * Decoding encoded values
 
-deriveToScopedTerm ''Bool
-deriveToScopedTerm ''Maybe
-deriveToScopedTerm ''Either
-deriveToScopedTerm ''Cv.RenderAs
-deriveToScopedTerm ''Cv.Assertion'
-deriveToScopedTerm ''Cv.Property'
-deriveToScopedTerm ''Attr
+deriveToTerm ''Bool
+deriveToTerm ''Maybe
+deriveToTerm ''Either
+deriveToTerm ''Cv.RenderAs
+deriveToTerm ''Cv.Assertion'
+deriveToTerm ''Cv.Property'
+deriveToTerm ''Attr
 
 deriveArbitrary ''Cv.RenderAs
 deriveArbitrary ''Cv.Assertion'
@@ -112,22 +112,22 @@ deriveArbitrary ''Attr
 -- | Decoding the encoding of a value at type @b@ fails
 failsAt
   :: forall b a
-   . (TermLiteral b, Show b, ToScopedTerm a)
+   . (TermLiteral b, Show b, ToTerm a)
   => a -> Property
 failsAt x =
   counterexample (showPpr t) $
     counterexample (either showPpr show r) (isLeft r)
  where
-  t = toScopedTerm x
+  t = toTerm x
   r = termToData @b t
 
 -- | The decoder decodes the encoding of a value to the value
 roundTrip
   :: forall a
-   . (TermLiteral a, Show a, ToScopedTerm a)
+   . (TermLiteral a, Show a, ToTerm a)
   => a -> Property
 roundTrip x =
-  bimap showPpr show (termToData @a (toScopedTerm x)) === Right (show x)
+  bimap showPpr show (termToData @a (toTerm x)) === Right (show x)
 
 prop_roundTrip_bool :: Bool -> Property
 prop_roundTrip_bool = roundTrip
@@ -205,7 +205,7 @@ prop_property_term_leaves x =
         t)
       === Right (show (fmap (fmap (Right :: Int -> Either String Int)) x))
  where
-  t = toScopedTerm x
+  t = toTerm x
   decodeLeaf :: Term 'VoidS -> Either String Int
   decodeLeaf = bimap showPpr id . termToData @Int
 

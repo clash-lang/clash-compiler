@@ -26,14 +26,14 @@ import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
 
 import Clash.Tests.Rewrite.Scoped.StrategyDSL.Stubs
-import Test.Clash.Scoped (closedTerm, runScopedClosed)
+import Test.Clash.Scoped (closedTerm, runRewriteClosed)
 
 -- | Assert that two scoped rewrites agree on a closed term: same result
 -- (syntactically), same transformation count, same change flag
 assertAgree :: Rewrite () -> Rewrite () -> Term 'VoidS -> Assertion
 assertAgree candidate reference term = do
-  (candidateTerm, candidateCount, candidateChanged) <- runScopedClosed candidate term
-  (referenceTerm, referenceCount, referenceChanged) <- runScopedClosed reference term
+  (candidateTerm, candidateCount, candidateChanged) <- runRewriteClosed candidate term
+  (referenceTerm, referenceCount, referenceChanged) <- runRewriteClosed reference term
   assertEqual "result" (show referenceTerm) (show candidateTerm)
   assertEqual "transformation count" referenceCount candidateCount
   assertEqual "change flag" referenceChanged candidateChanged
@@ -75,27 +75,27 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
 
   , testGroup "bucket chain semantics"
       [ testCase "guarded suffix: later same-bucket member fires on changed constructor" $ do
-          (result, count, changedFlag) <- runScopedClosed
+          (result, count, changedFlag) <- runRewriteClosed
             $(dispatchQ (chain [collapseApplication, incrementBoth]))
             simpleApplication
           assertEqual "result" (show (integer 4 :: Term 'VoidS)) (show result)
           assertEqual "count" 2 count
           assertEqual "changed" True changedFlag
       , testCase "guarded suffix includes members of other buckets" $ do
-          (result, count, _) <- runScopedClosed
+          (result, count, _) <- runRewriteClosed
             $(dispatchQ (chain [collapseApplication, incrementOdd]))
             simpleApplication
           assertEqual "result" (show (integer 4 :: Term 'VoidS)) (show result)
           assertEqual "count" 2 count
       , testCase "no members for the node's constructor: untouched, no change" $ do
-          (result, count, changedFlag) <- runScopedClosed
+          (result, count, changedFlag) <- runRewriteClosed
             $(dispatchQ (one inlineTrivialLet))
             simpleApplication
           assertEqual "result" (show simpleApplication) (show result)
           assertEqual "count" 0 count
           assertEqual "changed" False changedFlag
       , testCase "anyConstructor member joins every bucket" $ do
-          (result, count, _) <- runScopedClosed
+          (result, count, _) <- runRewriteClosed
             $(dispatchQ (chain [collapseApplication, incrementOddAny]))
             simpleApplication
           assertEqual "result" (show (integer 4 :: Term 'VoidS)) (show result)
@@ -200,14 +200,14 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
   , testGroup "descent"
       [ testCase "NonRec lets stay NonRec" $ do
           let term = closedTerm "let { !(x_0 :: T) = 3 } in 5"
-          (result, _, _) <- runScopedClosed
+          (result, _, _) <- runRewriteClosed
             $(compileStrategy (topdown literalStep)) term
           case result of
             Let (NonRec _ boundTerm) _body ->
               assertEqual "binder rewritten" (show (integer 4 :: Term 'VoidS)) (show boundTerm)
             _ -> assertFailure ("expected a NonRec let, got: " <> show result)
       , testCase "AppArg context in the probe result mentions the primitive" $ do
-          (result, _, _) <- runScopedClosed
+          (result, _, _) <- runRewriteClosed
             $(compileStrategy (topdown appArgProbeStep))
             appArgProbeTerm
           case result of
@@ -219,7 +219,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.StrategyDSL"
 
   , testGroup "asRewriteQ"
       [ testCase "fires without instrumentation" $ do
-          (result, count, changedFlag) <- runScopedClosed
+          (result, count, changedFlag) <- runRewriteClosed
             $(asRewriteQ inlineTrivialLet) nestedLet
           assertEqual "result" (show (integer 5 :: Term 'VoidS)) (show result)
           assertEqual "count" 0 count
