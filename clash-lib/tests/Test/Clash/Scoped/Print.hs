@@ -37,12 +37,11 @@ import qualified Data.Text as Text
 import qualified Clash.Core.DataCon as C (dcName)
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C (NameMod (..))
-import qualified Clash.Core.TysPrim as C (liftedTypeKind, typeNatKind, typeSymbolKind)
-import qualified Clash.Core.Type as C (ConstTy (..), LitTy (..), Type (ConstTy))
+import qualified Clash.Core.Basic as C (ConstTy (..), LitTy (..), NameMod (..))
 import Clash.Core.Scoped.FreeVars (HasNameBinder (..))
 import Clash.Core.Scoped.Internal.Scope (nameId, nameOf)
 import Clash.Core.Scoped.Syntax
+import qualified Clash.Core.Scoped.TysPrim as P
 
 
 -- | The names of the variables in scope: of the binders by raw name, and the
@@ -388,9 +387,9 @@ ppConst :: C.ConstTy -> String
 ppConst = \case
   C.Arrow -> "<<ARROW>>"
   C.TyCon nm
-    | isKind C.liftedTypeKind -> "Type"
-    | isKind C.typeNatKind -> "Nat"
-    | isKind C.typeSymbolKind -> "Symbol"
+    | nm == P.liftedTypeKindTyConName -> "Type"
+    | nm == P.typeNatKindTyConName -> "Nat"
+    | nm == P.typeSymbolKindTyConName -> "Symbol"
     -- The parser finds the type constructors it knows by their names, see
     -- 'Test.Clash.Rewrite.resolveTyConName'. Others it gives the unique it
     -- derives from a short name.
@@ -399,6 +398,3 @@ ppConst = \case
         _ -> qualName occ
    where
     occ = Text.unpack (C.nameOcc nm)
-    isKind = \case
-      C.ConstTy (C.TyCon k) -> k == nm
-      _ -> False

@@ -29,10 +29,7 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
-import qualified Clash.Core.Var as C
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
-import Clash.Core.VarEnv (InScopeSet, emptyInScopeSet)
 import Clash.Driver.Types
   ( Binding (..), ClashEnv (..), ClashOpts (..), DebugOpts, IsPrim (IsFun),
     defClashOpts, debugSilent )
@@ -86,7 +83,7 @@ import Language.Haskell.Exts.Parser
   , parseTypeWithMode )
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
-import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase)
+import Test.Tasty.HUnit (Assertion, assertEqual, assertFailure, testCase, (@?=))
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 import GHC.Builtin.Names
@@ -106,17 +103,6 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified Data.IntSet as IntSet
 import qualified Data.Text as Text
-
-type TypeMap = HashMap.HashMap Unique C.Type
-
-lookupTM :: Unique -> TypeMap -> C.Type
-lookupTM u tm = case HashMap.lookup u tm of
-  Just t -> t
-  Nothing ->
-    error [I.i|
-      Tried to lookup unique '#{u}' in typemap, but couldn't find it. This
-      usually means you forgot to (explicitely) declare a variable's type.
-    |]
 
 instance Default RewriteEnv where
   def = withTyConMap (UniqMap.singletonUnique intTyCon) RewriteEnv
@@ -195,9 +181,6 @@ instance Default NormalizeState where
     , _scopedWorkFreeAppCache=Map.empty
     }
 
-instance Default InScopeSet where
-  def = emptyInScopeSet
-
 -- | Set the function that is being normalized ('Clash.Rewrite.Types.curFun')
 withCurFun :: GlobalId -> RewriteState extra -> RewriteState extra
 withCurFun g st = st{_curFun = (g, C.noSrcSpan)}
@@ -226,50 +209,6 @@ rewriteEnvWithDebug opts = def{_clashEnv = clashEnv0{envOpts = opts0{opt_debug =
 rewriteEnvWithTyCons :: RewriteEnv
 rewriteEnvWithTyCons = withTyConMap testTyConMap def
 
-parseType :: (HasCallStack, Show l) => Type l -> C.Type
-parseType = \case
-  -- Parentheses: (..)
-  TyParen _ t ->
-    parseType t
-
-  -- Type constructor: T
-  TyCon _ (UnQual _ nm) ->
-    -- TODO: We could/should build a TyConMap here
-    C.ConstTy (C.TyCon (parseName nm))
-
-  -- Type variable: a
-  TyVar _ nm ->
-    C.VarTy (parseTyVar nm)
-
-  -- Universal quantification: forall a b. t
-  TyForall _ (Just tvs) Nothing t ->
-    foldr (C.ForAllTy . parseTyVarBind) (parseType t) tvs
-
-  -- Type application: f a
-  TyApp _ t1 t2 ->
-    C.AppTy (parseType t1) (parseType t2)
-
-  -- Unsupported type:
-  t ->
-    error ("parseType: " <> show t)
-
--- | Parse an identifier into a 'C.TyVar'. Type variables are always of kind
--- 'liftedTypeKind': there is no way to spell out anything else, and nothing in
--- these tests needs one. See 'parseNameScope' for the format of identifiers.
-parseTyVar :: (HasCallStack, Show l) => Name l -> C.TyVar
-parseTyVar nm0 = C.TyVar nm1 (C.nameUniq nm1) C.liftedTypeKind
- where
-  nm1 = parseName nm0
-
--- | Parse the binder of a @forall@ into a 'C.TyVar'. See 'parseTyVar'.
-parseTyVarBind :: (HasCallStack, Show l) => TyVarBind l -> C.TyVar
-parseTyVarBind = \case
-  UnkindedVar _ nm -> parseTyVar nm
-
-  -- A kind annotation would have to name a kind, and 'parseTyVar' only produces
-  -- 'liftedTypeKind' anyway
-  b -> error ("parseTyVarBind: " <> show b)
-
 -- | Derive a 'Unique' from a human readable name, by interpreting each of its
 -- characters as a byte and concatenating those bytes. Used for identifiers that
 -- don't spell out their unique, see 'parseName'.
@@ -291,9 +230,14 @@ nameToUnique nm
     |]
   | otherwise = List.foldl' (\acc c -> acc * 256 + fromIntegral (ord c)) 0 nm
 
--- | Parse an identifier into a Clash Name and an 'C.IdScope'. Identifiers might
+-- | Whether an identifier denotes a local or a global variable, see
+-- 'parseNameScope'
+data IdentScope = LocalIdent | GlobalIdent
+  deriving (Eq, Show)
+
+-- | Parse an identifier into a Clash Name and an 'IdentScope'. Identifiers might
 -- include a unique, and might include modifiers indicating their 'C.NameSort'
--- and 'C.IdScope'. Examples:
+-- and 'IdentScope'. Examples:
 --
 --   * x_3:  User, local identifier with human readable name "x", unique "3"
 --   * x_I3: Internal, local identifier with human readable name "x", unique "3"
@@ -309,9 +253,9 @@ nameToUnique nm
 -- System, global identifier with unique "3". Identifiers that don't spell out
 -- their unique derive it from their human readable name, see 'nameToUnique'.
 --
--- Identifiers default to 'C.User' and 'C.LocalId'.
+-- Identifiers default to 'C.User' and 'LocalIdent'.
 --
-parseNameScope :: (HasCallStack, Show l) => Name l -> (C.Name a, C.IdScope)
+parseNameScope :: (HasCallStack, Show l) => Name l -> (C.Name a, IdentScope)
 parseNameScope = \case
   Ident _ s -> mkName s
   Symbol _ s -> mkName s
@@ -322,7 +266,7 @@ parseNameScope = \case
       , scope )
     -- No '_'-delimited suffix at all: the whole identifier is the name
     Nothing ->
-      (C.mkUnsafeName C.User (Text.pack s) (nameToUnique s), C.LocalId)
+      (C.mkUnsafeName C.User (Text.pack s) (nameToUnique s), LocalIdent)
 
   go _seen "" = Nothing
   go seen0 ('_':s:ss) = fmap withName (parseSuffix (s:ss)) <|> cont
@@ -334,14 +278,14 @@ parseNameScope = \case
   -- Parse a suffix such as "3", "S", or "SG3": zero or more modifiers followed
   -- by an optional unique. Yields 'Nothing' if the suffix is malformed, in which
   -- case it is considered part of the human readable name.
-  parseSuffix = goSuffix C.User C.LocalId
+  parseSuffix = goSuffix C.User LocalIdent
    where
     goSuffix nmSort scope = \case
       'U':ss -> goSuffix C.User scope ss
       'S':ss -> goSuffix C.System scope ss
       'I':ss -> goSuffix C.Internal scope ss
-      'G':ss -> goSuffix nmSort C.GlobalId ss
-      'L':ss -> goSuffix nmSort C.LocalId ss
+      'G':ss -> goSuffix nmSort GlobalIdent ss
+      'L':ss -> goSuffix nmSort LocalIdent ss
       -- Modifiers are either followed by a unique, or end the identifier
       "" -> Just (nmSort, scope, Nothing)
       ss -> fmap ((nmSort,scope,) . Just) (readMaybe ss)
@@ -351,21 +295,6 @@ parseNameScope = \case
 parseName :: (HasCallStack, Show l) => Name l -> C.Name a
 parseName = fst . parseNameScope
 
--- | Parse an identifier into an 'C.Id' of the given type. See 'parseNameScope'.
-parseIdWithType :: (HasCallStack, Show l) => C.Type -> Name l -> C.Id
-parseIdWithType typ nm0 = C.Id nm1 (C.nameUniq nm1) typ scope
- where
-  (nm1, scope) = parseNameScope nm0
-
--- | Parse an identifier into an 'C.Id', looking its type up in the given
--- 'TypeMap'. Fails if the identifier's type wasn't declared. See
--- 'parseIdWithType'.
-parseId :: (HasCallStack, Show l) => TypeMap -> Name l -> C.Id
-parseId typs nm0 = C.Id nm1 uniq (lookupTM uniq typs) scope
- where
-  (nm1, scope) = parseNameScope nm0
-  uniq = C.nameUniq nm1
-
 -- | Type given to free variables, i.e. to variables that aren't bound anywhere
 -- in the term and don't spell out their type. There's nothing to infer such a
 -- type from, and it is irrelevant to most tests - notably, alpha equivalence
@@ -373,213 +302,8 @@ parseId typs nm0 = C.Id nm1 uniq (lookupTM uniq typs) scope
 --
 -- Note that this only applies to /references/: binders always need their type
 -- declared, see 'parsePats'.
-freeVarType :: C.Type
-freeVarType =
-  C.ConstTy (C.TyCon (C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan))
-
--- | Parse a reference to a variable, looking its type up in the given 'TypeMap'.
--- References that aren't in it are free variables, and get 'freeVarType'.
-parseVarRef :: (HasCallStack, Show l) => TypeMap -> Name l -> C.Id
-parseVarRef typs nm0 = C.Id nm1 uniq typ scope
- where
-  (nm1, scope) = parseNameScope nm0
-  uniq = C.nameUniq nm1
-  typ = fromMaybe freeVarType (HashMap.lookup uniq typs)
-
--- | Parse the operator of an infix application into a variable reference
-parseOp :: (HasCallStack, Show l) => TypeMap -> QOp l -> C.Term
-parseOp typs = \case
-  -- Operator: `f` or +
-  QVarOp _ (UnQual _ nm) ->
-    C.Var (parseVarRef typs nm)
-
-  -- Unsupported operator:
-  o ->
-    error ("parseOp: " <> show o)
-
--- | Parse binder patterns, as used by let bindings and lambdas. Note that every
--- binder needs an explicit type annotation, as we don't do any type inference.
--- The annotation may be spelled out in the pattern itself, or declared in an
--- enclosing let. I.e., all of these are OK:
---
---    \(x_0 :: Int) -> x_0
---
---    let
---      (x_0 :: Int) = 2
---    in
---      x_0
---
---    let
---      x_0 :: Int
---      x_0 = 2
---    in
---      \x_0 -> x_0
---
--- But this is not:
---
---    let
---      x_0 = 2
---    in
---      x_0
---
--- Binders are added to the type map, so the scope they bind can refer to them
--- without repeating their type.
-parsePats
-  :: forall l
-   . (HasCallStack, Show l)
-  => TypeMap
-  -> [Pat l]
-  -> (TypeMap, [C.Id])
-parsePats = List.mapAccumL parsePat
- where
-  parsePat :: HasCallStack => TypeMap -> Pat l -> (TypeMap, C.Id)
-  parsePat typs = \case
-    -- Parentheses: (...)
-    PParen _ p ->
-      parsePat typs p
-
-    -- Binder with type signature: x :: t
-    PatTypeSig _ (PVar _ nm) (parseType -> t) ->
-      let i = parseIdWithType t nm
-      in (HashMap.insert (C.varUniq i) t typs, i)
-
-    -- Binder: x
-    PVar _ nm ->
-      (typs, parseId typs nm)
-
-    -- Unsupported pattern
-    p ->
-      error ("parsePat: " <> show p)
-
--- | Parse lambda binders. Like 'parsePats', except that a binder annotated with
--- the kind @Type@ binds a /type/ variable rather than a term variable:
---
---    \\(a :: Type) (x :: a) -> x
---
--- is @/\\a. \\x. x@, a 'C.TyLam' around a 'C.Lam'. Haskell has no syntax for a
--- type lambda, and @\\ \@a -> e@ is not something @haskell-src-exts@ parses, so
--- the kind annotation is what marks one here.
---
--- Type binders are not added to the type map: it maps a term variable to its
--- type, and a reference to a type variable is parsed by 'parseType', which needs
--- no context. See 'parseTyVar'.
-parseLamPats
-  :: forall l
-   . (HasCallStack, Show l)
-  => TypeMap
-  -> [Pat l]
-  -> (TypeMap, [Either C.TyVar C.Id])
-parseLamPats = List.mapAccumL parseLamPat
- where
-  parseLamPat
-    :: HasCallStack => TypeMap -> Pat l -> (TypeMap, Either C.TyVar C.Id)
-  parseLamPat typs pat
-    | Just nm <- typeBinder pat = (typs, Left (parseTyVar nm))
-    | otherwise = fmap Right (head' (parsePats typs [pat]))
-   where
-    head' (typs1, [i]) = (typs1, i)
-    head' _ = error "parseLamPats: impossible"
-
-  -- A binder annotated with the kind 'Type', modulo parentheses
-  typeBinder :: Pat l -> Maybe (Name l)
-  typeBinder = \case
-    PParen _ p -> typeBinder p
-    PatTypeSig _ (PVar _ nm) (TyCon _ (UnQual _ (Ident _ "Type"))) -> Just nm
-    _ -> Nothing
-
--- | Parse declarations (as, amongst others, used in let expressions). See
--- 'parsePats' for how binders get their type.
---
--- The type map returned includes the types of all binders declared here, so it
--- can be used to parse the body of the let these declarations belong to.
-parseDecls
-  :: forall l
-   . (HasCallStack, Show l)
-  => TypeMap
-  -> [Decl l]
-  -> (TypeMap, [C.LetBinding])
-parseDecls typs0 decls = (typs2, zip ids (map (expToTerm typs2) rhss))
- where
-  (typDecls, otherDecls) = List.partition isTypeDecl decls
-
-  -- Types declared by separate type signatures
-  insertTyp (nm, t) = HashMap.insert nm t
-  typs1 = foldr insertTyp typs0 (concatMap parseTypeDecl typDecls)
-
-  -- Binders, plus the types they declare in their patterns. Note that all
-  -- right-hand sides are parsed with the /final/ type map, so bindings may refer
-  -- to each other irrespective of the order they're declared in.
-  (typs2, ids) = parsePats typs1 pats
-  (pats, rhss) = unzip (map splitOtherDecl otherDecls)
-
-  splitOtherDecl :: HasCallStack => Decl l -> (Pat l, Exp l)
-  splitOtherDecl = \case
-    PatBind _ p (UnGuardedRhs _ e) Nothing -> (p, e)
-    d -> error ("splitOtherDecl: " <> show d)
-
-  parseTypeDecl :: Decl l -> [(Unique, C.Type)]
-  parseTypeDecl (TypeSig _ nms t) =
-    map (\nm -> (C.nameUniq (parseName nm), parseType t)) nms
-  parseTypeDecl _ = error "impossible"
-
-  isTypeDecl :: Decl l -> Bool
-  isTypeDecl (TypeSig {}) = True
-  isTypeDecl _ = False
-
--- | Parse a haskell-src-exts expression into Clash Core.
-expToTerm
-  :: forall l
-   . (HasCallStack, Show l)
-  => TypeMap
-  -> Exp l
-  -> C.Term
-expToTerm typs0 = \case
-  -- Parentheses: (...)
-  Paren _ e ->
-    expToTerm typs0 e
-
-  -- Variable reference with type signature: x :: t
-  ExpTypeSig _ (Var _ (UnQual _ nm)) (parseType -> t) ->
-    C.Var (parseIdWithType t nm)
-
-  -- Type application: e @t
-  App _ e1 (TypeApp _ t) ->
-    C.TyApp (expToTerm typs0 e1) (parseType t)
-
-  -- Term application: e1 e2
-  App _ e1 e2 ->
-    C.App (expToTerm typs0 e1) (expToTerm typs0 e2)
-
-  -- Infix application: e1 + e2
-  InfixApp _ e1 op e2 ->
-    C.App (C.App (parseOp typs0 op) (expToTerm typs0 e1)) (expToTerm typs0 e2)
-
-  -- Lambda: \x y -> e. A binder annotated @:: Type@ binds a type variable, so
-  -- it becomes a 'C.TyLam': @\\(a :: Type) (x :: a) -> x@ is @/\\a. \\x. x@.
-  Lambda _ pats body0 ->
-    let
-      (typs1, binders) = parseLamPats typs0 pats
-      body1 = expToTerm typs1 body0
-    in
-      foldr (either C.TyLam C.Lam) body1 binders
-
-  -- Variable reference: e
-  Var _ (UnQual _ nm) ->
-    C.Var (parseVarRef typs0 nm)
-
-  -- Literal: 3
-  Lit _ (Int _ i _) -> C.Literal (C.IntLiteral i)
-
-  -- Let expression: let {e1 = .., e2 = ..} in r
-  Let _ (BDecls _ decls0) body0 ->
-    let
-      (typs1, decls1) = parseDecls typs0 decls0
-      body1 = expToTerm typs1 body0
-    in
-      C.Letrec decls1 body1
-
- -- Unsupported expression
-  e -> error ("expToTerm: " <> show e)
+freeVarType :: C.TyConName
+freeVarType = C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan
 
 -- | Parse mode used by 'parseToTerm'. Enables:
 --
@@ -594,14 +318,6 @@ termParseMode = defaultParseMode
       map EnableExtension [ScopedTypeVariables, RankNTypes, TypeApplications]
         <> extensions defaultParseMode
   }
-
--- | Parse a string representing a Haskell expression into Clash Core. This can
--- only parse very simple expressions. In the future we should make an effort to
--- build a proper TyConMap (using LoadModules) to faithfully reproduce more
--- complex expressions.
-parseToTerm :: HasCallStack => String -> C.Term
-parseToTerm =
-  expToTerm HashMap.empty . fromParseResult . parseExpWithMode termParseMode
 
 -- * Parsing scoped Core
 --
@@ -749,8 +465,8 @@ atRaw r d = d {declRaw = Just r}
 -- | The name of a local variable, by its identifier
 parseLocalName :: HasCallStack => String -> C.Name a
 parseLocalName s = case parseNameScope (Ident () s) of
-  (nm, C.LocalId) -> nm
-  (_, C.GlobalId) -> error ("parseLocalName: not a local variable: " <> s)
+  (nm, LocalIdent) -> nm
+  (_, GlobalIdent) -> error ("parseLocalName: not a local variable: " <> s)
 
 -- | The key of a variable with the given name
 nameKey :: C.Name a -> Key
@@ -886,18 +602,12 @@ freeDecls (Free tys tms) =
 
 type P = Writer Free
 
--- | The type constructor of a builtin type that is a single type constructor
-constOf :: HasCallStack => C.Type -> C.ConstTy
-constOf = \case
-  C.ConstTy c -> c
-  ty -> error ("constOf: not a type constructor: " <> show ty)
-
 liftedTypeKindB :: TyB
-liftedTypeKindB = constTyB (constOf C.liftedTypeKind)
+liftedTypeKindB = constTyB (C.TyCon P.liftedTypeKindTyConName)
 
 -- | 'freeVarType' as a builder
 freeVarTyB :: TyB
-freeVarTyB = constTyB (constOf freeVarType)
+freeVarTyB = constTyB (C.TyCon freeVarType)
 
 -- | A qualified or unqualified name as a string
 qNameString :: (HasCallStack, Show l) => QName l -> String
@@ -984,8 +694,8 @@ resolveDataConIn dcs s = case lookupByOcc (C.nameOcc . C.dcName) dcs s <|> looku
 tyConB :: HasCallStack => String -> TyB
 tyConB = \case
   "Type" -> liftedTypeKindB
-  "Nat" -> constTyB (constOf C.typeNatKind)
-  "Symbol" -> constTyB (constOf C.typeSymbolKind)
+  "Nat" -> constTyB (C.TyCon P.typeNatKindTyConName)
+  "Symbol" -> constTyB (C.TyCon P.typeSymbolKindTyConName)
   s -> constTyB (C.TyCon (resolveTyConName s))
 
 spTy :: (HasCallStack, Show l) => PEnv -> Type l -> P TyB
@@ -1134,7 +844,7 @@ negateLiteral = \case
 -- | A reference to a variable, with an optional type annotation
 varRef :: (HasCallStack, Show l) => PEnv -> Name l -> Maybe (Type l) -> P TmB
 varRef env@(PEnv _ tms _ defs) nm0 annot = case parseNameScope nm0 of
-  (nm, C.GlobalId)
+  (nm, GlobalIdent)
     | Nothing <- annot
     , Just g <- List.find ((== C.nameUniq nm) . C.nameUniq . globalIdName) (testDefGlobals defs)
     -> pure (globalB g)
@@ -1143,7 +853,7 @@ varRef env@(PEnv _ tms _ defs) nm0 annot = case parseNameScope nm0 of
     -- variables of the term
     let ty = maybe freeVarTyB (fst . runWriter . spTy env) annot
     in  pure (globalB (S.mkGlobalId nm (runClosedType ty)))
-  (nm, C.LocalId)
+  (nm, LocalIdent)
     | IntSet.member k tms -> pure (varB k)
     | otherwise -> do
         ty <- traverse (spTy env) annot
@@ -1330,36 +1040,9 @@ testAlgTyCon nm tvs dcs =
 parseTyConName :: HasCallStack => String -> C.TyConName
 parseTyConName nm = C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan
 
--- | The type 'parseType' produces for a type constructor whose name it derives
--- a unique from, e.g. @Int@
-parseTyConTy :: HasCallStack => String -> C.Type
-parseTyConTy = C.ConstTy . C.TyCon . parseTyConName
-
--- | The type 'parseType' produces for the type constructor @Int@
-intTy :: C.Type
-intTy = parseTyConTy "Int"
-
 -- | The type constructor of 'intTy'. The default 'RewriteEnv' knows it.
 intTyCon :: C.TyCon
 intTyCon = S.mkPrimTyCon (parseTyConName "Int") (runClosedType typeB) 0
-
--- | An 'C.Id' with the given scope, name sort, human readable name, unique, and
--- type
-mkId :: C.IdScope -> C.NameSort -> String -> Unique -> C.Type -> C.Id
-mkId scope nmSort nm uniq typ =
-  C.Id (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq typ scope
-
--- | A local 'C.Id'. See 'mkId'.
-localId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
-localId = mkId C.LocalId
-
--- | A global 'C.Id'. See 'mkId'.
-globalId :: C.NameSort -> String -> Unique -> C.Type -> C.Id
-globalId = mkId C.GlobalId
-
--- | A local 'C.Id' of type @Int@. See 'localId'.
-intId :: C.NameSort -> String -> Unique -> C.Id
-intId nmSort nm uniq = localId nmSort nm uniq intTy
 
 -- * Fixtures
 --
@@ -1938,17 +1621,6 @@ zeroWidthTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     , fxAlgTyCon streamTyConName [zwA] [streamDataCon]
     ]
 
--- | A 'C.TyVar' with the given name sort, human readable name, unique, and
--- kind
-kindedTyVar :: C.NameSort -> String -> Unique -> C.Kind -> C.TyVar
-kindedTyVar nmSort nm uniq =
-  C.TyVar (C.mkUnsafeName nmSort (Text.pack nm) uniq) uniq
-
--- | A 'C.TyVar' of kind 'C.liftedTypeKind', the only kind 'parseTyVar' produces.
--- See 'kindedTyVar'.
-tyVar :: C.NameSort -> String -> Unique -> C.TyVar
-tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
-
 -- | A global binding of the given term, of a function without an inline
 -- pragma, e.g. of a term of scoped Core
 mkGlobalBinding :: GlobalId -> a -> Binding a
@@ -1960,18 +1632,6 @@ mkGlobalBinding i t = Binding
   , bindingTerm = t
   , bindingRecursive = False
   }
-
--- | A reference to a local variable of type @Int@. See 'intId'.
-intVar :: C.NameSort -> String -> Unique -> C.Term
-intVar nmSort nm uniq = C.Var (intId nmSort nm uniq)
-
--- | A reference to a global variable of type @Int@. See 'globalId'.
-globalIntVar :: C.NameSort -> String -> Unique -> C.Term
-globalIntVar nmSort nm uniq = C.Var (globalId nmSort nm uniq intTy)
-
--- | A reference to a variable without a declared type. See 'freeVarType'.
-freeVar :: C.NameSort -> String -> Unique -> C.Term
-freeVar nmSort nm uniq = C.Var (localId nmSort nm uniq freeVarType)
 
 -- | The first /n/ uniques a supply hands out. Tests use these to give a
 -- binder the unique a transformation would otherwise pick for a new binder.
@@ -2025,252 +1685,78 @@ assertErrorContainsIO needle action = do
 
 tests :: TestTree
 tests = testGroup "Test.Clash.Rewrite"
-  [ testGroup "parseToTerm"
-      [ testCase "literal" $
-          assertStructurallyEqual
-            (C.Literal (C.IntLiteral 3))
-            (parseToTerm "3")
-
-      , testCase "variable" $
-          assertStructurallyEqual
-            (intVar C.User "x" 3)
-            (parseToTerm "x_3 :: Int")
-
-      , testCase "parentheses" $
-          assertStructurallyEqual
-            (intVar C.User "x" 3)
-            (parseToTerm "((x_3 :: Int))")
-
-      , testCase "application" $
-          assertStructurallyEqual
-            (C.App (intVar C.User "f" 0) (intVar C.User "x" 1))
-            (parseToTerm "(f_0 :: Int) (x_1 :: Int)")
-
-      , testCase "let" $
-          assertStructurallyEqual
-            (C.Letrec
-              [ (localId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))
-              , (localId C.User "x" 1 intTy, intVar C.User "x" 0)
-              ]
-              (intVar C.User "x" 1))
-            (parseToTerm "let { x_0, x_1 :: Int; x_0 = 5; x_1 = x_0 } in x_1")
-
-      , testCase "let with an inline type annotation" $
-          assertStructurallyEqual
-            (C.Letrec
-              [(localId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))]
-              (intVar C.User "x" 0))
-            (parseToTerm "let { (x_0 :: Int) = 5 } in x_0")
-
-      -- Bindings may refer to each other regardless of the order they're
-      -- declared in, so their types have to be collected up front
-      , testCase "let with a forward reference" $
-          assertStructurallyEqual
-            (C.Letrec
-              [ (localId C.User "x" 0 intTy, intVar C.User "y" 1)
-              , (localId C.User "y" 1 intTy, C.Literal (C.IntLiteral 5))
-              ]
-              (intVar C.User "x" 0))
-            (parseToTerm "let { (x_0 :: Int) = y_1; (y_1 :: Int) = 5 } in x_0")
-
-      , testCase "let without a type annotation" $
-          assertErrorContains "forgot to (explicitely) declare"
-            (parseToTerm "let { x_0 = 5 } in x_0")
-
-      -- 0x2b == ord '+'
-      , testCase "infix application" $
-          assertStructurallyEqual
-            (C.App
-              (C.App (freeVar C.User "+" 0x2b) (intVar C.User "x" 0))
-              (intVar C.User "y" 1))
-            (parseToTerm "(x_0 :: Int) + (y_1 :: Int)")
-
-      , testCase "infix application of a named function" $
-          assertStructurallyEqual
-            (C.App
-              (C.App (freeVar C.User "add" 2) (intVar C.User "x" 0))
-              (intVar C.User "y" 1))
-            (parseToTerm "(x_0 :: Int) `add_2` (y_1 :: Int)")
-
-      , testCase "free variable" $
-          assertStructurallyEqual
-            (C.App (freeVar C.User "f" 0) (intVar C.User "x" 1))
-            (parseToTerm "f_0 (x_1 :: Int)")
-
-      , testCase "lambda" $
-          assertStructurallyEqual
-            (C.Lam (localId C.User "x" 0 intTy) (intVar C.User "x" 0))
-            (parseToTerm "\\(x_0 :: Int) -> x_0")
-
-      , testCase "lambda with multiple binders" $
-          assertStructurallyEqual
-            (C.Lam (localId C.User "x" 0 intTy)
-              (C.Lam (localId C.User "y" 1 intTy) (intVar C.User "y" 1)))
-            (parseToTerm "\\(x_0 :: Int) (y_1 :: Int) -> y_1")
-
-      , testCase "lambda with a modified binder" $
-          assertStructurallyEqual
-            (C.Lam (localId C.System "x" 0 intTy) (intVar C.System "x" 0))
-            (parseToTerm "\\(x_S0 :: Int) -> x_S0")
-
-      , testCase "lambda application" $
-          assertStructurallyEqual
-            (C.App
-              (C.Lam (localId C.User "x" 0 intTy) (intVar C.User "x" 0))
-              (intVar C.User "y" 1))
-            (parseToTerm "(\\(x_0 :: Int) -> x_0) (y_1 :: Int)")
-
-      , testCase "lambda binder typed by an enclosing let" $
-          assertStructurallyEqual
-            (C.Letrec
-              [(localId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))]
-              (C.Lam (localId C.User "y" 1 intTy) (intVar C.User "x" 0)))
-            (parseToTerm "let { x_0, y_1 :: Int; x_0 = 5 } in \\y_1 -> x_0")
-
-      , testCase "lambda without a type annotation" $
-          assertErrorContains "forgot to (explicitely) declare"
-            (parseToTerm "\\x_0 -> x_0")
-
-      , testCase "type lambda" $
-          assertStructurallyEqual
-            (C.TyLam (tyVar C.User "a" 0)
-              (C.Lam (localId C.User "x" 1 (C.VarTy (tyVar C.User "a" 0)))
-                (C.Var (localId C.User "x" 1 (C.VarTy (tyVar C.User "a" 0))))))
-            (parseToTerm "\\(a_0 :: Type) (x_1 :: a_0) -> x_1")
-
-      , testCase "type application" $
-          assertStructurallyEqual
-            (C.TyApp (freeVar C.User "f" 0) intTy)
-            (parseToTerm "f_0 @Int")
-
-      , testCase "forall" $
-          assertStructurallyEqual
-            (C.Lam
-              (localId C.User "v" 0
-                (C.ForAllTy (tyVar C.User "a" 1)
-                  (C.ForAllTy (tyVar C.User "b" 2)
-                    (C.VarTy (tyVar C.User "b" 2)))))
-              (C.Var
-                (localId C.User "v" 0
-                  (C.ForAllTy (tyVar C.User "a" 1)
-                    (C.ForAllTy (tyVar C.User "b" 2)
-                      (C.VarTy (tyVar C.User "b" 2)))))))
-            (parseToTerm "\\(v_0 :: forall a_1 b_2. b_2) -> v_0")
-
-      , testCase "type application of a type constructor" $
-          let maybeInt =
-                C.AppTy
-                  (C.ConstTy
-                    (C.TyCon
-                      (C.Name C.User (Text.pack "Maybe") 9 C.noSrcSpan)))
-                  intTy
-          in assertStructurallyEqual
-               (C.Lam
-                 (localId C.User "v" 0 maybeInt)
-                 (C.Var (localId C.User "v" 0 maybeInt)))
-               (parseToTerm "\\(v_0 :: Maybe_9 Int) -> v_0")
-      ]
-
-  , testGroup "parseNameScope"
+  [ testGroup "parseNameScope"
       [ testCase "explicit unique" $
-          assertStructurallyEqual
-            (intVar C.User "x" 3)
-            (parseToTerm "x_3 :: Int")
+          nameScope "x_3" @?= (C.User, "x", 3, LocalIdent)
 
       , testCase "explicit unique, user" $
-          assertStructurallyEqual
-            (intVar C.User "x" 3)
-            (parseToTerm "x_U3 :: Int")
+          nameScope "x_U3" @?= (C.User, "x", 3, LocalIdent)
 
       , testCase "explicit unique, system" $
-          assertStructurallyEqual
-            (intVar C.System "x" 3)
-            (parseToTerm "x_S3 :: Int")
+          nameScope "x_S3" @?= (C.System, "x", 3, LocalIdent)
 
       , testCase "explicit unique, internal" $
-          assertStructurallyEqual
-            (intVar C.Internal "x" 3)
-            (parseToTerm "x_I3 :: Int")
+          nameScope "x_I3" @?= (C.Internal, "x", 3, LocalIdent)
 
-      -- 0x78 == ord 'x'
-      , testCase "derived unique" $
-          assertStructurallyEqual
-            (intVar C.User "x" 0x78)
-            (parseToTerm "x :: Int")
+      , -- 0x78 == ord 'x'
+      testCase "derived unique" $
+          nameScope "x" @?= (C.User, "x", 0x78, LocalIdent)
 
       , testCase "derived unique, user" $
-          assertStructurallyEqual
-            (intVar C.User "x" 0x78)
-            (parseToTerm "x_U :: Int")
+          nameScope "x_U" @?= (C.User, "x", 0x78, LocalIdent)
 
       , testCase "derived unique, system" $
-          assertStructurallyEqual
-            (intVar C.System "x" 0x78)
-            (parseToTerm "x_S :: Int")
+          nameScope "x_S" @?= (C.System, "x", 0x78, LocalIdent)
 
       , testCase "derived unique, internal" $
-          assertStructurallyEqual
-            (intVar C.Internal "x" 0x78)
-            (parseToTerm "x_I :: Int")
+          nameScope "x_I" @?= (C.Internal, "x", 0x78, LocalIdent)
 
       , testCase "derived unique, four characters" $
-          assertStructurallyEqual
-            (intVar C.User "abcd" 0x61626364)
-            (parseToTerm "abcd :: Int")
+          nameScope "abcd" @?= (C.User, "abcd", 0x61626364, LocalIdent)
 
       , testCase "derived unique, four characters and a modifier" $
-          assertStructurallyEqual
-            (intVar C.System "abcd" 0x61626364)
-            (parseToTerm "abcd_S :: Int")
+          nameScope "abcd_S" @?= (C.System, "abcd", 0x61626364, LocalIdent)
 
       , testCase "name containing an underscore" $
-          assertStructurallyEqual
-            (intVar C.User "foo_bar" 3)
-            (parseToTerm "foo_bar_3 :: Int")
+          nameScope "foo_bar_3" @?= (C.User, "foo_bar", 3, LocalIdent)
 
       , testCase "explicit scope, local" $
-          assertStructurallyEqual
-            (intVar C.User "x" 3)
-            (parseToTerm "x_L3 :: Int")
+          nameScope "x_L3" @?= (C.User, "x", 3, LocalIdent)
 
       , testCase "explicit scope, global" $
-          assertStructurallyEqual
-            (globalIntVar C.User "x" 3)
-            (parseToTerm "x_G3 :: Int")
+          nameScope "x_G3" @?= (C.User, "x", 3, GlobalIdent)
 
       , testCase "explicit scope, derived unique" $
-          assertStructurallyEqual
-            (globalIntVar C.User "x" 0x78)
-            (parseToTerm "x_G :: Int")
+          nameScope "x_G" @?= (C.User, "x", 0x78, GlobalIdent)
 
       , testCase "explicit scope and name sort" $
-          assertStructurallyEqual
-            (globalIntVar C.System "x" 3)
-            (parseToTerm "x_SG3 :: Int")
+          nameScope "x_SG3" @?= (C.System, "x", 3, GlobalIdent)
 
       , testCase "explicit scope and name sort, reversed" $
-          assertStructurallyEqual
-            (globalIntVar C.System "x" 3)
-            (parseToTerm "x_GS3 :: Int")
+          nameScope "x_GS3" @?= (C.System, "x", 3, GlobalIdent)
 
       , testCase "explicit scope and name sort, derived unique" $
-          assertStructurallyEqual
-            (globalIntVar C.Internal "x" 0x78)
-            (parseToTerm "x_IG :: Int")
-
-      , testCase "explicit scope on a let binder" $
-          assertStructurallyEqual
-            (C.Letrec
-              [(mkId C.GlobalId C.User "x" 0 intTy, C.Literal (C.IntLiteral 5))]
-              (globalIntVar C.User "x" 0))
-            (parseToTerm "let { x_G0 :: Int; x_G0 = 5 } in x_G0")
+          nameScope "x_IG" @?= (C.Internal, "x", 0x78, GlobalIdent)
 
       , testCase "name too long to derive a unique from" $
-          assertErrorContains "names of more than four characters don't fit"
-            (parseToTerm "abcde :: Int")
+          assertNameError "names of more than four characters don't fit" "abcde"
 
       , testCase "name too long to derive a unique from, with a modifier" $
-          assertErrorContains "names of more than four characters don't fit"
-            (parseToTerm "abcde_S :: Int")
+          assertNameError "names of more than four characters don't fit" "abcde_S"
       ]
   ]
+ where
+  -- The sort, human readable name, unique and scope of an identifier
+  nameScope :: String -> (C.NameSort, String, Unique, IdentScope)
+  nameScope ident =
+    let (nm, sc) = parseNameScope (Ident () ident)
+    in  (C.nameSort nm, Text.unpack (C.nameOcc nm), C.nameUniq nm, sc)
+
+  assertNameError :: String -> String -> Assertion
+  assertNameError needle ident = do
+    result <- try (evaluate (length (show (nameScope ident))))
+    case result of
+      Left (ErrorCall msg)
+        | needle `List.isInfixOf` msg -> pure ()
+        | otherwise -> assertFailure ("Expected an error mentioning '" <> needle <> "', but got:\n" <> msg)
+      Right _ -> assertFailure ("Expected an error, but got: " <> show (nameScope ident))
