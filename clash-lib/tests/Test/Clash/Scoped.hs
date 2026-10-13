@@ -223,7 +223,7 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkLams, mkTyLams)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Netlist.Id as Id
-import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), compCtxFromList)
+import Clash.Netlist.Types (CompCtx, LocalId (..), compCtxFromList)
 import Clash.Rewrite.Scoped
   ( Rewrite, Transform (..), Frame (LetBinding), pushFrame, rootContext
   , underAlt, underLam, underLet, underLetRec, underTyLam)

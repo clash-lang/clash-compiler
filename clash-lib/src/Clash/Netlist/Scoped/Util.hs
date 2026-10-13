@@ -92,12 +92,7 @@ import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta (..))
 import qualified Clash.Netlist.Id            as Id
 import {-# SOURCE #-} Clash.Netlist.Scoped.BlackBox (extractPrimWarnOrFail, mkBlackBoxContext)
-import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Types
-  (BlackBox, CommentOrDirective (..), Declaration (..), DeclarationType (..), ExpandedPortName,
-   ExpandedTopEntity (..),
-   FilteredHWType (..), HWType, Identifier, NetlistEnv (..), NetlistMonad, backend, bindings,
-   curCompNm, customReprs, htyCache, tcCache, typeEnv, typeTranslator)
 import           Clash.Netlist.Util
   (containsBiSignalIn, coreTypeToHWType, evalBlackBox, expandTopEntityOrErrM, isBiSignalIn,
    applyNameMod, isVoid, mkTopInput, mkTopOutput, preserveVarEnv, stripFiltered,

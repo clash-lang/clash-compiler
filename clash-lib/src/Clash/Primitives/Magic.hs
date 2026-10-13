@@ -18,8 +18,7 @@ import GHC.Stack (HasCallStack)
 import Text.Show.Pretty
 
 import Clash.Core.Scoped.TermLiteral (termToDataError)
-import Clash.Netlist.Scoped.Types (BlackBoxFunction)
-import Clash.Netlist.Types ()
+import Clash.Netlist.Types (BlackBoxFunction)
 
 clashCompileErrorBBF :: HasCallStack => BlackBoxFunction
 clashCompileErrorBBF _env _isD _primName args _ty

@@ -34,11 +34,11 @@ module Clash.Primitives.Types
   ) where
 
 import Clash.Core.Basic (WorkInfo (..))
-import {-# SOURCE #-} Clash.Netlist.Types (BlackBox, Usage(..))
+import {-# SOURCE #-} Clash.Netlist.Types
+  (BlackBox, SomeBlackBoxFunction, Usage(..))
 import           Clash.Annotations.Primitive  (PrimitiveGuard)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, TemplateKind (..), RenderVoid(..))
-import           Clash.Netlist.Scoped.Types   (SomeBlackBoxFunction)
 import           Control.Applicative          ((<|>))
 import           Control.DeepSeq              (NFData)
 import           Control.Monad                (when)

@@ -106,10 +106,9 @@ import           Clash.Edalize.Edam
 import           Clash.Netlist.Scoped             (genNetlist, genTopNames, topEntityEnv)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
-import           Clash.Netlist.Scoped.Types       (SomeBlackBoxFunction (..))
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
-  (IdentifierText, BlackBox (..), Component (..), HWTypeTranslator, SomeBackend (..),
+  (IdentifierText, BlackBox (..), SomeBlackBoxFunction (..), Component (..), HWTypeTranslator, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Rewrite.Scoped.History     (startRewriteHistory)
@@ -680,8 +679,8 @@ interpretFunctions idirs pkgDbs topDir reqs = do
     InterpretBlackBoxFunction ->
       InterpretBBF <$>
         Hint.unsafeInterpret
-          ("ClashNetlistScopedTypes.SomeBlackBoxFunction (" ++ ifrFuncName req ++ ")")
-          "ClashNetlistScopedTypes.SomeBlackBoxFunction"
+          ("SomeBlackBoxFunction (" ++ ifrFuncName req ++ ")")
+          "SomeBlackBoxFunction"
     InterpretTemplateFunction ->
       InterpretTF <$> Hint.unsafeInterpret (ifrFuncName req) "TemplateFunction"
 
@@ -691,7 +690,6 @@ interpretFunctions idirs pkgDbs topDir reqs = do
   setImports req = Hint.setImportsQ
     [ ("Clash.Netlist.Types", Nothing)
     , ("Clash.Netlist.BlackBox.Types", Nothing)
-    , ("Clash.Netlist.Scoped.Types", Just "ClashNetlistScopedTypes")
     , (interpretFunctionRequestToModuleName req, Nothing) ]
 
   interpretGlobal req = do

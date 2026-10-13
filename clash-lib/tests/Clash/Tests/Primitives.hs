@@ -22,9 +22,8 @@ import Clash.Core.Scoped.Builder (TyB, appTyB, constTyB, litTyB)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
 import Clash.Core.Scoped.Syntax
 import qualified Clash.Netlist.Id as Id
-import Clash.Netlist.Scoped.Types
-  ( LocalId (..), SomeBlackBoxFunction (..), compCtxFromList )
-import Clash.Netlist.Types (Declaration (Assignment, NetDecl))
+import Clash.Netlist.Types
+  (LocalId (..), SomeBlackBoxFunction (..), compCtxFromList, Declaration (Assignment, NetDecl))
 import Clash.Primitives.Types
   ( BlackBoxFunctionName (..), CompiledPrimitive, Primitive (BlackBoxHaskell)
   , UsedArguments (UsedArguments) )

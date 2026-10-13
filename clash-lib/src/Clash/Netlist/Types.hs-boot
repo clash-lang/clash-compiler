@@ -28,8 +28,10 @@ data Component
 data Expr
 data BlackBox
 data TopEntityT
+data SomeBlackBoxFunction
 
 instance NFData BlackBox
+instance NFData SomeBlackBoxFunction
 
 class Monad m => IdentifierSetMonad m where
   identifierSetM :: (IdentifierSet -> IdentifierSet) -> m IdentifierSet

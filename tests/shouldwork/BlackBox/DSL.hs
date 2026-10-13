@@ -14,7 +14,7 @@ import Clash.Netlist.Id (Identifier)
 import qualified Clash.Netlist.Id as Id
 import qualified Clash.Netlist.Types as N
 import qualified Clash.Netlist.BlackBox.Types as N
-import qualified Clash.Netlist.Scoped.Types as N (BlackBoxFunction)
+import qualified Clash.Netlist.Types as N (BlackBoxFunction)
 import Data.String.Interpolate (i)
 
 funcBBF :: N.BlackBoxFunction

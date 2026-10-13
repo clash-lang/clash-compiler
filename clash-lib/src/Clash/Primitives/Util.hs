@@ -54,9 +54,8 @@ import           Clash.Primitives.Types
   , includes, template, TemplateSource(TFile, TInline), Primitive(..)
   , UnresolvedPrimitive, UnresolvedPrimitiveEntry(..)
   , CompiledPrimMap, GuardedResolvedPrimitive)
-import           Clash.Netlist.Types    (BlackBox(..), NetlistMonad)
-import           Clash.Netlist.Scoped.Types
-  (BlackBoxEnv, SomeBlackBoxFunction, callBlackBoxFunction)
+import           Clash.Netlist.Types
+  (BlackBox(..), NetlistMonad, BlackBoxEnv, SomeBlackBoxFunction, callBlackBoxFunction)
 import           Clash.Netlist.Util     (preserveState)
 import           Clash.Netlist.BlackBox.Util
   (walkElement)
