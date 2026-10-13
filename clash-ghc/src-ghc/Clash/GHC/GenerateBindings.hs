@@ -68,7 +68,7 @@ import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
 import           Clash.Core.DataCon      (dcExtTyVars)
 import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc, tyConDataCons)
-import           Clash.Core.TysPrim      (tysPrimMap)
+import           Clash.Core.Scoped.TysPrim (tysPrimMap)
 import           Clash.Core.Util         (dataConInstArgTys, mkInternalVar, mkSelectorCase)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
