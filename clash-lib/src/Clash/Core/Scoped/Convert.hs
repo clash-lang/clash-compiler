@@ -16,6 +16,10 @@
 
   Converting /from/ scoped Core uses the raw names as uniques.
 
+  This module also has the constructors of the types that scoped Core shares
+  with Clash Core, which derive one side from the other, see the section
+  "Constructors" below.
+
   = Coercions
 
   The types of primitives are closed in scoped Core (see
@@ -560,11 +564,18 @@ toClashTermEnv env@(ToEnv _ ids) = go
 -- * Constructors
 
 {- $constructors
-The types of scoped Core that Clash Core shares, such as 'GlobalId', hold
-both their scoped parts, which are the truth, and the parts that Clash Core
-needs. The constructors below take one side and derive the other one lazily,
-by conversion. They are transitional: once Clash Core is gone, so are the
-legacy parts.
+The types that scoped Core shares with Clash Core ('GlobalId', 'PrimInfo',
+'DataCon' and 'TyCon') hold both their scoped parts, which are the truth, and
+the parts that Clash Core needs (see the section "Transition" of
+"Clash.Core.Scoped.Syntax"). The constructors below take one side and derive
+the other one lazily, by conversion: @mk*@ take the scoped side, and
+@mk*FromClash@ the side of Clash Core. They are transitional: once Clash Core
+is gone, so are the legacy parts, and the constructors only take the scoped
+side.
+
+The 'Data.Binary.Binary' instances of 'DataCon' and 'TyCon' decode the side of
+Clash Core, and reach the @mk*FromClash@ constructors through the boot file of
+this module.
 -}
 
 -- | A global variable with the given name and closed type
