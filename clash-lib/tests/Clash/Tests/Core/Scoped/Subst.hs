@@ -514,6 +514,19 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
                 (problems, tm2) = reopenTerm (testScope ts) tm
             problems === [] .&&. binderRaws tm2 === binderRaws tm .&&.
               property (aeqTm tm tm2)
+
+        -- Substitution without type entries keeps the binders that don't
+        -- clash as they are
+      , testProperty "substitution keeps the binders of a freshened term" $
+          forAllShrink genInScope shrinkInScope $ \(InScope ts tm0) -> case IntMap.elems (testVars ts) of
+            Var _ _ xn : _ -> do
+              let sc = testScope ts
+                  tm = freshenDistinct sc tm0
+                  lit = Literal (IntLiteral 1)
+                  tm2 = substTm (tmVarsSubst sc (singletonNameMap xn lit)) tm
+              binderRaws tm2 === binderRaws tm .&&.
+                counterexample "aeqTm" (aeqTm (naiveSubst IntMap.empty (IntMap.singleton (tmNameRaw xn) lit) tm) tm2)
+            _ -> discard
       ]
   , testGroup "rebinding variables" rebindTests
   , testGroup "closing over variables" closeOverTests
