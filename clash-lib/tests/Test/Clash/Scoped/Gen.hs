@@ -83,6 +83,7 @@ module Test.Clash.Scoped.Gen
   , shrinkTerm
     -- * Comparing
   , rawEqTm
+  , renameOccs
     -- * Free variables, by an independent oracle
   , refFreeTyVars
   , refFreeTmVars
@@ -943,6 +944,58 @@ rawEqTm = goTm
   goTick NoDeDup NoDeDup = True
   goTick (Attributes t1 e1) (Attributes t2 e2) = goTy t1 t2 && goTm e1 e2
   goTick _ _ = False
+
+-- | Add a million to the uniques of the human readable names of all
+-- variables, bound and free. Changes neither the raw names nor the meaning of
+-- a term.
+renameOccs :: Term n -> Term n
+renameOccs = goTm
+ where
+  ren :: C.Name a -> C.Name a
+  ren nm = nm {C.nameUniq = C.nameUniq nm + 1000000}
+
+  goTy :: Type x -> Type x
+  goTy = \case
+    VarTy occ k n -> VarTy (ren occ) (goTy k) n
+    ForAllTy b t -> ForAllTy (goTyB b) (goTy t)
+    AppTy s t -> AppTy (goTy s) (goTy t)
+    AnnType a t -> AnnType a (goTy t)
+    t -> t
+
+  goTyB :: TyBinder x x' -> TyBinder x x'
+  goTyB (TyBinder occ k n) = TyBinder (ren occ) (goTy k) n
+
+  goIdB :: IdBinder x x' -> IdBinder x x'
+  goIdB (IdBinder occ ty n) = IdBinder (ren occ) (goTy ty) n
+
+  goTele :: (forall a a'. b a a' -> b a a') -> Tele b x x' -> Tele b x x'
+  goTele _ TNil = TNil
+  goTele f (TCons b bs) = TCons (f b) (goTele f bs)
+
+  goTm :: Term x -> Term x
+  goTm = \case
+    Var occ ty n -> Var (ren occ) (goTy ty) n
+    Lam b e -> Lam (goIdB b) (goTm e)
+    TyLam b e -> TyLam (goTyB b) (goTm e)
+    App l r -> App (goTm l) (goTm r)
+    TyApp e t -> TyApp (goTm e) (goTy t)
+    Let (NonRec b x) e -> Let (NonRec (goIdB b) (goTm x)) (goTm e)
+    Let (Rec bs xs) e -> Let (Rec (goTele goIdB bs) (map goTm xs)) (goTm e)
+    Case e ty alts -> Case (goTm e) (goTy ty) (map goAlt alts)
+    Cast e l r -> Cast (goTm e) (goTy l) (goTy r)
+    Tick t e -> Tick (goTick t) (goTm e)
+    e -> e
+
+  goAlt :: Alt x -> Alt x
+  goAlt (Alt p e) = case p of
+    DataPat dc tvs ids -> Alt (DataPat dc (goTele goTyB tvs) (goTele goIdB ids)) (goTm e)
+    _ -> Alt p (goTm e)
+
+  goTick :: TickInfo x -> TickInfo x
+  goTick = \case
+    NameMod m t -> NameMod m (goTy t)
+    Attributes t e -> Attributes (goTy t) (goTm e)
+    t -> t
 
 -- * Free variables, by an independent oracle
 --

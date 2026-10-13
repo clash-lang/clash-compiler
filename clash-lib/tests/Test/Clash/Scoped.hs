@@ -174,6 +174,7 @@ module Test.Clash.Scoped
   , withFreeVars
   , extendFreeVars
   , abstractFreeVars
+  , closeFreeVars
   , sinkInto
   , atScope
   , roundTrip
@@ -275,6 +276,7 @@ import Clash.Core.Pretty (PrettyOptions (..), showPpr')
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (mkLams, mkTyLams)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), compCtxFromList)
@@ -928,6 +930,19 @@ testTypeEnv = mkTypeEnv testTyConMap
 -- variables if the term only has the given ones.
 abstractFreeVars :: FreeVars -> C.Term -> C.Term
 abstractFreeVars (FreeVars tvs ids) tm = foldr C.TyLam (foldr C.Lam tm ids) tvs
+
+-- | Abstract a term over its free variables: type lambdas for the type
+-- variables, in the order of their raw names, and lambdas for the term
+-- variables inside those. The kind of a type variable may only mention type
+-- variables with smaller raw names, as in the scopes of 'withTestScope'.
+closeFreeVars :: HasCallStack => Term n -> Term 'VoidS
+closeFreeVars tm =
+  case closeOver tys tms (\_ tvTele idTele cl -> (\t -> mkTyLams (mkLams t idTele) tvTele) <$> closureTerm cl tm) of
+    Just (Just closed) -> closed
+    _ -> error "closeFreeVars: can't close over the free variables"
+ where
+  (tys0, tms) = freeVarOccs tm
+  tys = List.sortOn (\case VarTy _ _ n -> tyNameRaw n; _ -> 0) tys0
 
 -- | Global bindings of the given closed terms, converted to scoped Core. See
 -- 'Test.Clash.Rewrite.mkBindingMap'.
