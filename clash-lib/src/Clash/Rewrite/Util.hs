@@ -28,7 +28,6 @@ module Clash.Rewrite.Util
 import           Control.Lens                ((^.), Lens')
 import qualified Control.Lens                as Lens
 import qualified Control.Monad.State.Strict  as State
-import qualified Control.Monad.Trans.RWS.CPS as RWS
 import qualified Control.Monad.Writer        as Writer
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
@@ -45,9 +44,9 @@ import           Clash.Rewrite.Types
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
 zoomExtra :: State.State extra a -> RewriteMonad extra a
-zoomExtra m = R . RWS.rwsT $ \_ s ->
+zoomExtra m = R $ \_ s w ->
   let (a, st') = State.runState m (_extra s)
-   in pure (a, s { _extra = st' }, mempty)
+   in pure (a, s { _extra = st' }, w)
 
 -- | Strictly bump a counter in 'RewriteState', typically 'transformTriedCounters'
 -- or 'transformAppliedCounters'.
