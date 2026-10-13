@@ -50,10 +50,9 @@ pattern TimeS t <- (getTimePat 15 -> Just t) where
 -- | This is an internal function.
 getTimePat :: Int -> Time -> Maybe Integer
 getTimePat k (TimeFS t) =
-  if t `rem` (10^k) == 0 then
-    Just (t `div` (10^k))
-  else
-    Nothing
+  if t `rem` (10^k) == 0
+  then Just (t `div` (10^k))
+  else Nothing
 
 -- | Time is shown, and can be read, in a @<value><unit>@ format.
 instance Show Time where

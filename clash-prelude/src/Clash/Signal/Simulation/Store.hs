@@ -114,7 +114,8 @@ storeTraces :: (Int,Int) -> [(String,Trace)] -> Either String ByteString
 storeTraces samples traces = do
   let same (a:r@(b:_)) = a==b && (same r)
       same _ = True
-  if same (map (\(_,(_,_,p,_)) -> p) traces) then do
+  if same (map (\(_,(_,_,p,_)) -> p) traces)
+  then do
     Right ()
   else do
     Left
@@ -227,10 +228,9 @@ loadTrace0 bs = do
 
   let k = (width+7) `div` 8
       values =
-        if storesUndefined then
-          undefinedValues
-        else
-          definedValues
+        if storesUndefined
+        then undefinedValues
+        else definedValues
 
       undefinedValues = f rawValues
        where

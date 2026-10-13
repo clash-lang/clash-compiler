@@ -223,18 +223,16 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
 
   values0 :: [a]
   values0 =
-    if statusMsgs then
-      zipWith ($) (progress $ stop - start) values
-    else
-      values
+    if statusMsgs
+    then zipWith ($) (progress $ stop - start) values
+    else values
 
   progress n = map go [0..n-1]
    where
     go k =
-      if (20*k `div` n) /= (20*(k-1) `div` n) then
-        Debug.Trace.trace $ show ((20*k) `div` n * 5) ++ "%"
-      else
-        id
+      if (20*k `div` n) /= (20*(k-1) `div` n)
+      then Debug.Trace.trace $ show ((20*k) `div` n * 5) ++ "%"
+      else id
 
   -- Reset the found and messages fields of the global data,
   -- returning their previous values.
@@ -267,7 +265,8 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
         mapM_ (hPutStrLn stderr) newMsgs
 
       let found0 = newFound <> found
-      if s `elem` (if firstTime then found0 else newFound) then do
+      if s `elem` (if firstTime then found0 else newFound)
+      then do
         lookFor0 xs ss found0 True
       else do
         evaluate $ rnfX x
@@ -306,10 +305,9 @@ clockWave name = (name, clockPeriodTime @dom)
 -- | Put a trace in the global data.
 registerTrace :: String -> Trace -> GlobalData -> Either String GlobalData
 registerTrace name trc glob@GlobalData{globTraces} =
-  if Map.member name globTraces then
-    Left ("Trace " <> name <> " already exists")
-  else
-    Right glob{globTraces = Map.insert name trc globTraces}
+  if Map.member name globTraces
+  then Left ("Trace " <> name <> " already exists")
+  else Right glob{globTraces = Map.insert name trc globTraces}
 
 -- | Mark a signal/signals as found.
 registerFound :: [String] -> GlobalData -> GlobalData
@@ -477,10 +475,9 @@ addTrace ::
   Simulation ->
   Either String Simulation
 addTrace name trc sim@Simulation{simTraces} =
-  if Map.member name simTraces then
-    Left ("Trace " <> name <> " already exists")
-  else
-    Right sim{simTraces = Map.insert name trc simTraces}
+  if Map.member name simTraces
+  then Left ("Trace " <> name <> " already exists")
+  else Right sim{simTraces = Map.insert name trc simTraces}
 
 -- | Retrieve a captured 'Trace'.
 fetchTrace ::
