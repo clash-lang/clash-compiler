@@ -1,55 +1,84 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
--- | When the evaluator puts a let-binding on its heap, it renames the binder
--- to a unique from its unique supply. That unique must not belong to a
--- variable in scope. Not all uniques in a term come from the supply, e.g.
--- those 'Clash.Core.VarEnv.uniqAway' derives, so checking only the heap isn't
--- enough.
+-- | When the evaluator puts a let-binding on its heap, the binder must not
+-- capture a variable in scope.
+--
+-- The evaluator of Clash Core renamed the binder to a unique from its unique
+-- supply, which needn't be fresh for the variables in scope: not all uniques
+-- in a term come from the supply. The scoped evaluator
+-- ("Clash.Core.Scoped.Evaluator") gives the binders it allocates the name
+-- just above the watermark of its scope, which is fresh by construction:
+-- capture can't be expressed in scoped Core. The closest check is that the
+-- machine allocates above the watermark, not at it.
 --
 -- This test evaluates
 --
 -- > let x = 1# in h x z
 --
--- where @h@ and @z@ are free, and @z@ has the unique the supply hands out
--- next. The let-binding must not capture @z@.
+-- where @h@ and @z@ are free, and @z@ has the highest name of the scope, the
+-- watermark: the name a machine that doesn't go above the watermark would
+-- give a binder. The let-binding must not capture @z@: @z@ must not be bound
+-- on the heap, no binder the machine allocates may have its name, and the
+-- result must still refer to it. More generally, the binders the machine
+-- allocates must have distinct names above the watermark.
 module LetAllocationFreshness where
 
 import Prelude
 
-import Control.Monad (unless)
+import Control.Monad (unless, when)
+import qualified Data.IntMap.Strict as IntMap
+import qualified Data.List as List
 
-import Clash.Core.Evaluator.Types (whnf')
 import Clash.Core.Literal (Literal (IntLiteral))
 import Clash.Core.Name (mkUnsafeSystemName)
-import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (Bind (NonRec), Term (..), mkApps, stripTicks)
-import Clash.Core.Type (mkFunTy)
-import Clash.Core.TysPrim (intPrimTy)
-import Clash.Core.Var (mkLocalId)
-import Clash.Core.VarEnv (emptyVarEnv, lookupVarEnv, mkInScopeSet, mkVarSet)
 import qualified Clash.Data.UniqMap as UniqMap
-import Clash.Util.Supply (freshId, newSupply)
 
-import Clash.GHC.Evaluator (evaluator)
+import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
+import Clash.Core.Scoped.Evaluator.Types (Machine (..), allocTele, initMachine)
+import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
+import Clash.Core.Scoped.NameMap (emptyGlobalEnv, emptyNameMap, memberNameMap)
+import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Scoped.Subst (teleIdVars, withFreshIdBinder)
+import Clash.Core.Scoped.Syntax
+import Clash.Core.Scoped.Term (mkTmApps, stripAllTicks)
+import Clash.Core.Scoped.Type (mkFunTy)
+import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
+import Clash.Core.Scoped.TysPrim (intPrimTy)
+import Clash.Core.Pretty (showPpr)
+import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
 mainVerilog :: IO ()
-mainVerilog = do
-  ids <- newSupply
-  let (u, _) = freshId ids
-      x = mkLocalId intPrimTy (mkUnsafeSystemName "x" (u + 1))
-      z = mkLocalId intPrimTy (mkUnsafeSystemName "z" u)
-      h = mkLocalId (mkFunTy intPrimTy (mkFunTy intPrimTy intPrimTy))
-                    (mkUnsafeSystemName "h" (u + 2))
-      lit = Literal (IntLiteral 1)
-      e = Let (NonRec x lit) (mkApps (Var h) [Left (Var x), Left (Var z)])
-      inScope = mkInScopeSet (mkVarSet [h, z])
-      (_, heap, result) =
-        whnf' evaluator emptyVarEnv emptyVarEnv UniqMap.empty (mempty, 0) ids
-              inScope False e
-  -- 'z' is free, so it must not be bound on the heap, and the result must
-  -- still refer to it
-  case (lookupVarEnv z heap, stripTicks result) of
-    (Nothing, App (App (Var h') _) (Var z'))
-      | h' == h, z' == z -> pure ()
-    _ -> error ("Evaluating " <> showPpr e <> " gave " <> showPpr result
-                  <> ", which binds or replaces 'z'")
+mainVerilog =
+  withFreshIdBinder emptyScope (mkUnsafeSystemName "h" 0) (mkFunTy intPrimTy (mkFunTy intPrimTy intPrimTy)) $ \sc1 hB ->
+  withFreshIdBinder sc1 (mkUnsafeSystemName "z" 0) intPrimTy $ \(sc2 :: Scope l2) zB ->
+  withFreshIdBinder sc2 (mkUnsafeSystemName "x" 0) intPrimTy $ \_ xB ->
+    let h :: Term l2
+        h = sink (idBinderVar hB)
+        z = idBinderVar zB
+        zName = tmNameOf zB
+        e = Let (NonRec xB (Literal (IntLiteral 1))) (mkTmApps (sink h) [idBinderVar xB, sink z])
+        env = evaluatorEnv (mkTypeEnv UniqMap.empty)
+        m0 = initMachine sc2 emptyNameMap emptyGlobalEnv (IntMap.empty, 0) e
+    in whnf env False m0 $ \m -> do
+         let result = bindAllocated m (mTerm m)
+             zRaw = tmNameRaw zName
+             allocatedRaws = [tmNameRaw x | Var _ _ x <- teleIdVars (allocTele (mAlloc m))]
+             failure msg = error ("Evaluating " <> showPpr e <> " gave " <> showPpr result <> ": " <> msg)
+         -- The precondition: z has the highest name of the scope
+         unless (zRaw == scopeWatermark sc2) (failure "z is not the watermark")
+         -- z is free, so it must not be bound on the heap, nor by a binder
+         -- the machine allocated
+         when (memberNameMap (sink zName) (mHeapLocal m)) (failure "z is bound on the heap")
+         when (zRaw `elem` allocatedRaws) (failure "a binder captures z")
+         -- More generally, the binders the machine allocated have distinct
+         -- names above the watermark of the scope
+         unless (List.nub allocatedRaws == allocatedRaws && all (> scopeWatermark sc2) allocatedRaws)
+           (failure "the allocated binders are not fresh")
+         -- and the result must still refer to it
+         case stripAllTicks (mTerm m) of
+           App (App (Var _ _ h') _) (Var _ _ z')
+             | Var _ _ hName <- sink h, h' == hName, z' == sink zName -> pure ()
+           _ -> failure "it doesn't apply h to z"
