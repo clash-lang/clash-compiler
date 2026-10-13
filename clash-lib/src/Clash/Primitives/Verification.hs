@@ -32,7 +32,7 @@ import           Clash.Core.Syntax        (Distinct, Term(Var))
 import           Clash.Core.TermLiteral
   (liftTermToData#, termToDataError, termToDataErrorWith)
 import           Clash.Util                      (indexNote)
-import           Clash.Netlist.Scoped            (mkExpr)
+import           Clash.Netlist            (mkExpr)
 import           Clash.Netlist.Types
   (BlackBoxEnv, BlackBoxFunction, NetlistId(..), bbLocalIdentifier, bbScope,
    bbTypeEnv, BlackBox(BBFunction), TemplateFunction(..), BlackBoxContext, Identifier,

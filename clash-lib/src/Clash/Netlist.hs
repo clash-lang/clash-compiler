@@ -14,7 +14,7 @@
   'mkDeclarations'' and 'mkExpr' dispatch on the form of a term to the other
   handlers. Handlers that go under binders, e.g. those of case alternatives
   ('withAlt'), extend the context. Their signatures are fixed in
-  @Clash.Netlist.Scoped.hs-boot@.
+  @Clash.Netlist.hs-boot@.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -28,7 +28,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Netlist.Scoped
+module Clash.Netlist
   ( -- * Netlists
     genNetlist
   , genComponent
@@ -120,7 +120,7 @@ import           Clash.Core.TermInfo
 import           Clash.Core.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 
-import           Clash.Netlist.Scoped.BlackBox
+import           Clash.Netlist.BlackBox
   (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive, prepareBlackBox)
 
 -- | Run a NetlistMonad action in a given environment

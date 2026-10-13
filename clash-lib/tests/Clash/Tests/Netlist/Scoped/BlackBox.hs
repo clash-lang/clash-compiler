@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Netlist.Scoped.BlackBox"
+  Tests for "Clash.Netlist.BlackBox"
 -}
 
 {-# LANGUAGE LambdaCase #-}
@@ -19,7 +19,7 @@ import qualified Data.List as List
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Netlist.Scoped.BlackBox (mkBlackBoxContext)
+import Clash.Netlist.BlackBox (mkBlackBoxContext)
 import Clash.Netlist.Types
   (LocalId (..), BlackBoxContext (..), Declaration (Assignment, InstDecl), DeclarationType (Concurrent)
   , Expr (Identifier), componentNames)

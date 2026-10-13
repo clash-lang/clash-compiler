@@ -144,11 +144,11 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
 ### Clash Core to Netlist
 
-  * `Clash.Netlist.Scoped.genNetlist`
+  * `Clash.Netlist.genNetlist`
 
     Convert the normalized core to a netlist. This representation is closer to a hardware description, specifying components and their connections.
 
-  * `Clash.Netlist.Scoped.genComponentT`
+  * `Clash.Netlist.genComponentT`
 
     Convert a single component to a netlist. This corresponds to an individual entity in VHDL, or a module in Verilog/SystemVerilog. For each component the following is performed:
 
@@ -156,11 +156,11 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
       Create wrappers / unwrappers for the arguments and results of top entities. Additionally, this ensures that there are no naming conflicts between the identifiers in the generated HDL.
 
-    * `Clash.Netlist.Scoped.mkNetDecl`
+    * `Clash.Netlist.mkNetDecl`
 
       Create net declarations for all let bindings in the normalized core.
 
-    * `Clash.Netlist.Scoped.mkDeclarations`
+    * `Clash.Netlist.mkDeclarations`
 
       Create net assignements for all let bindings in the normalized core.
 

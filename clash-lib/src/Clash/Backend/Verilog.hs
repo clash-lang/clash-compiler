@@ -105,7 +105,7 @@ data VerilogState =
     -- ^ Import directories passed in with @-i@
     , _memoryDataFiles:: [(String,String)]
     -- ^ Files to be stored: (filename, contents). These files are generated
-    -- during the execution of 'Clash.Netlist.Scoped.genNetlist'.
+    -- during the execution of 'Clash.Netlist.genNetlist'.
     , _customConstrs :: HashMap TextS.Text Identifier
     -- ^ Custom data constructor => Verilog function name
     , _intWidth  :: Int -- ^ Int/Word/Integer bit-width
