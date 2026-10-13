@@ -28,14 +28,11 @@ module Clash.GHC.GHC2Core
   , srcSpan
   , famInstEnvs
   , tyConMap
-  , coreToTerm
-  , coreToId
   , coreToName
   , modNameM
   , qualifiedNameString
   , qualifiedNameString'
   , makeAllTyCons
-  , makeAllTyConsClash
   , emptyGHC2CoreState
   , pendingWarnings
     -- * Types of scoped Core
@@ -48,9 +45,7 @@ module Clash.GHC.GHC2Core
   , withoutSrcSpan
     -- * For "Clash.GHC.Scoped.GHC2Core"
   , SrcSpanRB (..)
-  , coreToType
   , coreToVar
-  , coreToVarType
   , coreToPrimVar
   , coreToDataCon
   , coreToLiteral
@@ -63,12 +58,11 @@ module Clash.GHC.GHC2Core
 where
 
 -- External Modules
-import           Control.Lens                ((^.), (%~), (&), (%=), (.~), (<>=), use, view, makeLenses)
+import           Control.Lens ((^.), (%~), (&), (%=), (.~), use, view, makeLenses)
 import           Control.Applicative         ((<|>))
 import           Control.Monad.Extra         (ifM, andM)
 import           Control.Monad.RWS.Strict    (RWS)
 import qualified Control.Monad.RWS.Strict    as RWS
-import           Data.Bifunctor              (second)
 import           GHC.Float                   (castDoubleToWord64, castFloatToWord32)
 import qualified Data.ByteString.Char8       as Char8
 import           Data.Char                   (isDigit)
@@ -85,56 +79,36 @@ import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
 import           Data.Text.Extra             (showt)
-import qualified GHC.Magic
-import qualified GHC.Prim
-import qualified GHC.Stack
-import qualified GHC.Stack.Types
 import qualified Data.Traversable            as T
 import           Data.String.Interpolate     (__i)
-import qualified Text.Read                   as Text
 import           Data.Primitive.ByteArray    (ByteArray(ByteArray))
-import qualified GHC.Data.Strict             as GHC
 import           GHC.Num.Integer             (integerToBigNatClamp#)
 import           Language.Haskell.Syntax.Basic (FieldLabelString (..))
 
 -- GHC API
 import GHC.Core.Reduction (Reduction(Reduction), HetReduction(..))
-import GHC.Builtin.Types (falseDataCon)
 import GHC.Core.Coercion.Axiom
   (CoAxiom (co_ax_branches), CoAxBranch (cab_lhs,cab_rhs), fromBranches)
-import GHC.Core.Coercion (Role (Nominal), coercionType, coercionKind)
-import GHC.Core.FVs  (exprSomeFreeVars)
-import GHC.Core
-  (AltCon (..), Bind (..), CoreExpr, Expr (..), Unfolding (..),
-   Alt(..),
-#if MIN_VERSION_ghc(9,14,0)
-   isTypeArg, isValArg,
-#endif
-   collectArgs, rhssOfAlts)
-import GHC.Types.Tickish (GenTickish (..))
+import GHC.Core.Coercion (Role (Nominal))
 import GHC.Core.DataCon
-  (DataCon, dataConExTyCoVars, dataConName,
-   dataConRepArgTys,
-   dataConTag, dataConTyCon, dataConUnivTyVars, dataConWorkId,
-   dataConFieldLabels, flLabel, HsImplBang(..), dataConImplBangs)
+  ( DataCon, dataConExTyCoVars, dataConName, dataConRepArgTys, dataConTag,
+    dataConUnivTyVars, dataConWorkId, dataConFieldLabels, flLabel,
+    HsImplBang(..), dataConImplBangs )
 import GHC.Core.FamInstEnv
-  ( FamInst (..), FamInstEnvs
-  , familyInstances, normaliseType, emptyFamInstEnvs, topReduceTyFamApp_maybe
-  )
+  ( FamInst (..), FamInstEnvs, familyInstances, normaliseType,
+    topReduceTyFamApp_maybe )
 import GHC.Data.FastString (FastString, mkFastString, unpackFS, bytesFS)
-import GHC.Types.Id (isDataConId_maybe)
-import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
-import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
+import GHC.Types.Id.Info (IdDetails (..))
+import GHC.Types.Literal (Literal (..), LitNumType (..))
 import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
 import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
 import GHC.Types.Name.Occurrence (occNameFS, occNameString)
-import GHC.Data.Pair (Pair (..))
-import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
+import GHC.Types.SrcLoc (isGoodSrcSpan)
 import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
-   isNewTyCon, isPrimTyCon, isTupleTyCon,
+   isPrimTyCon, isTupleTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
    tyConDataCons, tyConKind,
 #if MIN_VERSION_ghc(9,14,0)
@@ -147,36 +121,31 @@ import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type (tyConAppFunTy_maybe)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
 import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
+#if !MIN_VERSION_ghc(9,12,0)
+import GHC.Core.Coercion (coercionKind)
+import GHC.Data.Pair (Pair (..))
+#endif
 import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
 import GHC.Types.Var
-  (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
-   varUnique, idInfo, isGlobalId)
+  ( Id, TyVar, Var, VarBndr (..), idDetails, varName, varType, varUnique,
+    isGlobalId )
 import GHC.Types.Var.Env (lookupVarEnv, mkVarEnv)
-import GHC.Types.Var.Set (elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet)
+import GHC.Types.Var.Set (elemVarSet, emptyVarSet, extendVarSet)
 
 -- Local imports
-import Clash.Core.Basic
-  (ConstTy (..), IsMultiPrim (..), LitTy (..), NameMod (..), WorkInfo (..), undefinedXPrims)
-import           Clash.Annotations.Primitive (extractPrim)
+import Clash.Core.Basic (ConstTy (..), LitTy (..))
 import           Clash.Annotations.SynthesisAttributes (Annotate, Attr(..))
 import qualified Clash.Core.DataCon          as C
 import qualified Clash.Core.Literal          as C
 import qualified Clash.Core.Name             as C
-import qualified Clash.Core.Pretty           as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
-import qualified Clash.Core.Util             as C (undefinedTy)
-import qualified Clash.Core.Var              as C
 import qualified Clash.Core.Scoped.Convert   as C
-  (mkAlgTyCon, mkAlgTyConFromClash, mkDataConFromClash, mkFunTyCon,
-   mkFunTyConFromClash, mkNewTyConRhs, mkNewTyConRhsFromClash, mkPrimTyCon,
-   mkPrimTyConFromClash, mkPromotedDataCon, mkPromotedDataConFromClash)
+  ( mkAlgTyCon, mkFunTyCon, mkNewTyConRhs, mkPrimTyCon, mkPromotedDataCon )
 import qualified Clash.Data.UniqMap          as C
 import           Clash.Driver.Types          (ClashOpts, HasClashOpts(..))
 import           Clash.Driver.Warning        (CanWarn(..), PendingWarning)
-import           Clash.Normalize.Primitives  as C
-import           Clash.Primitives.Types      hiding (name)
 import           Clash.Unique                (fromGhcUnique)
 import           Clash.Util
 import           Clash.GHC.Util
@@ -267,11 +236,6 @@ data GHC2CoreState
   = GHC2CoreState
   { _tyConMap :: C.UniqMap TyCon
   , _nameMap  :: HashMap Name Text
-  , _varTypeMap :: HashMap Name C.Type
-  -- ^ Cache for converted types of global variables ('varType'). See
-  -- 'coreToVarType'.
-  , _convertedTypeCache :: HashMap StructuralType C.Type
-  -- ^ Cache for converted types, keyed on the GHC type. See 'coreToType'.
   , _scopedTypeCache :: HashMap StructuralType TyB
   -- ^ Cache for types converted to scoped Core, keyed on the GHC type. See
   -- 'coreToTypeB'.
@@ -307,8 +271,7 @@ instance CanWarn C2C where
 
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState =
-  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty HashMap.empty
-    HashMap.empty mempty Seq.empty
+  GHC2CoreState mempty HashMap.empty HashMap.empty HashMap.empty mempty Seq.empty
 
 newtype SrcSpanRB = SrcSpanRB {unSrcSpanRB :: SrcSpan}
 
@@ -458,484 +421,6 @@ makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
   newTyConRhs dc tvs rhsEtad =
     C.mkNewTyConRhs <$> coreToDataCon dc
                     <*> (runNewTyConSig <$> mapM coreToTyVarB tvs <*> coreToTypeB rhsEtad)
-
--- | 'makeAllTyCons' through the types of Clash Core: the type constructors
--- of the conversion through Clash Core, which "Clash.GHC.Scoped.Check"
--- compares with.
-makeAllTyConsClash
-  :: ClashOpts
-  -> GHC2CoreState
-  -> FamInstEnvs
-  -> C.UniqMap C.TyCon
-makeAllTyConsClash opts hm fiEnvs = go hm hm
-  where
-    go old new
-        | C.null (new ^. tyConMap) = mempty
-        | otherwise                = tcm <> tcm'
-      where
-        (tcm,old', _) = RWS.runRWS (T.mapM makeTyConClash (new ^. tyConMap))
-                                   (GHC2CoreEnv noSrcSpan fiEnvs opts)
-                                   old
-        tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
-
--- | See 'makeAllTyConsClash'
-makeTyConClash :: TyCon
-          -> C2C C.TyCon
-makeTyConClash tc = tycon
-  where
-    tycon
-      | isFamilyTyCon tc    = mkFunTyCon
-      | isTupleTyCon tc     = mkTupleTyCon
-      | isAlgTyCon tc       = mkAlgTyCon
-      | isPrimTyCon tc      = mkPrimTyCon
-      | Just dc <- isPromotedDataCon_maybe tc = mkPromotedDataCon dc
-      | otherwise           = mkVoidTyCon
-      where
-        tcArity = tyConArity tc
-
-        mkAlgTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-          tcKind <- coreToType (tyConKind tc)
-          tcRhsM <- makeAlgTyConRhsClash tc $ algTyConRhs tc
-          case tcRhsM of
-            Just tcRhs ->
-              return $
-                C.mkAlgTyConFromClash
-                  (C.nameUniq tcName)
-                  tcName
-                  tcKind
-                  tcArity
-                  tcRhs
-                  (isClassTyCon tc)
-            Nothing -> return (C.mkPrimTyConFromClash (C.nameUniq tcName) tcName tcKind tcArity)
-
-        mkFunTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-          tcKind <- coreToType (tyConKind tc)
-          substs <- case isClosedSynFamilyTyConWithAxiom_maybe tc of
-            Nothing -> do
-                       instances <- familyInstances <$> view famInstEnvs <*> pure tc
-                       mapM famInstToSubst instances
-            Just cx -> let bx = fromBranches (co_ax_branches cx)
-                       in  mapM (\b -> (,) <$> mapM coreToType (cab_lhs b)
-                                           <*> coreToType (cab_rhs b))
-                                bx
-          return $
-            C.mkFunTyConFromClash
-              (C.nameUniq tcName)
-              tcName
-              tcKind
-              tcArity
-              substs
-
-        mkTupleTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-          tcKind <- coreToType (tyConKind tc)
-          case tyConDataCons tc of
-            dc:_ -> do
-              tcDc   <- fmap (C.DataTyCon . (:[])) (coreToDataConClash dc)
-              return $
-                C.mkAlgTyConFromClash
-                  (C.nameUniq tcName)
-                  tcName
-                  tcKind
-                  tcArity
-                  tcDc
-                  (isClassTyCon tc)
-            _ -> error "impossible"
-
-        mkPrimTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-          tcKind <- coreToType (tyConKind tc)
-          return $
-            C.mkPrimTyConFromClash
-              (C.nameUniq tcName)
-              tcName
-              tcKind
-              tcArity
-
-        mkPromotedDataCon dc = do
-          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-          tcKind <- coreToType (tyConKind tc)
-          tcData <- coreToDataConClash dc
-
-          return $
-            C.mkPromotedDataConFromClash
-              (C.nameUniq tcName)
-              tcName
-              tcKind
-              tcArity
-              tcData
-
-        mkVoidTyCon = do
-          tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-          tcKind <- coreToType (tyConKind tc)
-          return (C.mkPrimTyConFromClash (C.nameUniq tcName) tcName tcKind tcArity)
-
-        famInstToSubst :: FamInst -> C2C ([C.Type],C.Type)
-        famInstToSubst fi = do
-          tys <- mapM coreToType  (fi_tys fi)
-          ty  <- coreToType (fi_rhs fi)
-          return (tys,ty)
-
--- | See 'makeAllTyConsClash'
-makeAlgTyConRhsClash :: TyCon
-                -> AlgTyConRhs
-                -> C2C (Maybe C.AlgTyConRhs)
-makeAlgTyConRhsClash _tc algTcRhs = case algTcRhs of
-#if MIN_VERSION_ghc(9,14,0)
-  -- GHC 9.14 represents unary classes (a class with a single method or a single
-  -- superclass) with their own AlgTyConRhs constructor instead of as a newtype.
-  -- See Note [Unary class magic] in GHC.Core.TyCon. We map it back to Clash's
-  -- 'NewTyCon' so that the wrapper data constructor (e.g. 'C:KnownNat') is
-  -- treated as identity by clash's normalizer, which is what its semantics is.
-  UnaryClassTyCon {data_con = dc} -> do
-    let tvs = tyConTyVars _tc
-        -- The DataCon for a unary class has exactly one field; that's the
-        -- newtype's RHS (e.g. 'SNat n' for 'KnownNat n').
-        rhsEtad = case dataConRepArgTys dc of
-          [scaled] -> scaledThing scaled
-          args -> error [__i|
-            makeAlgTyConRhsClash: UnaryClassTyCon DataCon does not have one field
-              Type constructor: #{showPprUnsafe _tc}
-              Data constructor: #{showPprUnsafe dc}
-              Representation argument types (#{length args}): #{showPprUnsafe args}
-            |]
-    Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataConClash dc
-                         <*> ((,) <$> mapM coreToTyVar tvs
-                                  <*> coreToType rhsEtad))
-#endif
-  DataTyCon {data_cons = dcs} -> Just <$> C.DataTyCon <$> mapM coreToDataConClash dcs
-  SumTyCon dcs _ -> Just <$> C.DataTyCon <$> mapM coreToDataConClash dcs
-
-  NewTyCon dc _ (rhsTvs,rhsEtad) _ _ ->
-                                      Just <$> (C.mkNewTyConRhsFromClash <$> coreToDataConClash dc
-                                                           <*> ((,) <$> mapM coreToTyVar rhsTvs
-                                                                    <*> coreToType rhsEtad
-                                                               )
-                                               )
-  AbstractTyCon {} -> return Nothing
-  TupleTyCon {}    -> error "Cannot handle tuple tycons"
-
-coreToTerm
-  :: CompiledPrimMap
-  -> [Var]
-  -> CoreExpr
-  -> C2C C.Term
-coreToTerm primMap unlocs = term
-  where
-    term :: CoreExpr -> C2C C.Term
-    term e
-#if MIN_VERSION_ghc(9,14,0)
-      -- See Note [Unary class magic] in GHC.Core.TyCon. The worker for a unary
-      -- class data constructor (e.g. 'C:KnownNat') is semantically the identity
-      -- on its single value field. Peel it off here so that downstream
-      -- transformations (in particular the evaluator's literal extractors) see
-      -- the underlying value directly, as they would have on GHC < 9.14 when
-      -- unary classes were represented as newtypes.
-      -- Match a fully-saturated worker application: all type args, then
-      -- exactly one value arg. A naive '[Type _, val]' pattern would also
-      -- match a partial application like 'C:IP @"callStack" @CallStack'
-      -- (two 'Type' args, no value yet), binding 'val' to a 'Type' node
-      -- and producing '_TY_'-wrapped junk when peeled.
-      | (Var x, args) <- collectArgs e
-      , Just dc <- isDataConId_maybe x
-      , isUnaryClassTyCon (dataConTyCon dc)
-      , (tyArgs, [val]) <- break isValArg args
-      , all isTypeArg tyArgs
-      , isValArg val
-      = term val
-#endif
-      | (Var x,args) <- collectArgs e
-      = do
-        opts <- askClashOpts
-        let (nm, st, _) = RWS.runRWS (qualifiedNameString (varName x))
-                                     (GHC2CoreEnv noSrcSpan emptyFamInstEnvs opts)
-                                     emptyGHC2CoreState
-        pendingWarnings <>= st ^. pendingWarnings
-        go nm args
-      | otherwise
-      = term' e
-      where
-        -- Remove most Signal transformers
-        go "Clash.Signal.Internal.mapSignal#"  args
-          | length args == 5
-          = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.signal#"     args
-          | length args == 3
-          = term (args!!2)
-        go "Clash.Signal.Internal.appSignal#"  args
-          | length args == 5
-          = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.joinSignal#" args
-          | length args == 3
-          = term (args!!2)
-        go "Clash.Signal.Bundle.vecBundle#"    args
-          | length args == 4
-          = term (args!!3)
-        --- Remove `$`
-        go nm args
-          | nm == showt '($), length args == 5
-          = term (App (args!!3) (args!!4))
-        go nm args  -- noinline :: forall a. a -> a
-          | nm == showt 'GHC.Magic.noinline, [_ty, x] <- args
-          = term x
-        -- Remove most CallStack logic
-        go nm args
-          | nm == showt 'GHC.Stack.Types.PushCallStack
-          = term (last args)
-        go nm args
-          | nm == showt 'GHC.Stack.Types.FreezeCallStack
-          = term (last args)
-        go nm args
-          | nm == showt 'GHC.Stack.withFrozenCallStack, length args == 3
-          = term (App (args!!2) (args!!1))
-        go "Clash.Sized.BitVector.Internal.checkUnpackUndef" args
-          | [_nTy,_aTy,_kn,_typ,f] <- args
-          = term f
-        go "Clash.Magic.prefixName" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod PrefixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixName" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod SuffixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameFromNat" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod SuffixName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameP" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod SuffixNameP <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.suffixNameFromNatP" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod SuffixNameP <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.setName" args
-          | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod SetName <$> coreToType nmTy) <*> term f
-        go "Clash.Magic.deDup" args
-          | [_aTy,f] <- args
-          = C.Tick C.DeDup <$> term f
-        go "Clash.Magic.noDeDup" args
-          | [_aTy,f] <- args
-          = C.Tick C.NoDeDup <$> term f
-        go "Clash.Magic.clashSimulation" _
-          = C.Data <$> coreToDataConClash falseDataCon
-        go "Clash.XException.xToErrorCtx" args
-          -- xToErrorCtx :: forall a. String -> a -> a
-          | [_ty, _msg, x] <- args
-          = term x
-        go "Clash.Annotations.SynthesisAttributes.annotateReg" args
-          | [ Type nTy, _domTy, _aTy, attrs, x] <- args
-          = C.Tick <$> (C.Attributes <$> coreToType nTy <*> term attrs) <*> term x
-        go nm args
-          | Just n <- parseBundle "bundle" nm
-            -- length args = domain tyvar + signal arg + number of type vars
-          , length args == 2 + n
-          = term (last args)
-        go nm args
-          | Just n <- parseBundle "unbundle" nm
-            -- length args = domain tyvar + signal arg + number of type vars
-          , length args == 2 + n
-          = term (last args)
-        go _ _ = term' e
-
-    parseBundle :: Text -> Text -> Maybe Int
-    parseBundle fNm nm0 = do
-      nm1 <- Text.stripPrefix ("Clash.Signal.Bundle." <> fNm) nm0
-      nm2 <- Text.stripSuffix "#" nm1
-      Text.readMaybe (Text.unpack nm2)
-
-    term' (Var x)                 = var x
-    term' (Lit l@LitRubbish{}) = do
-      ty <- coreToType (literalType l)
-      return (C.Prim (C.PrimInfo (pack "_RUBBISH_")
-                                 ty
-                                 WorkNever
-                                 SingleResult
-                                 C.NoUnfolding))
-    term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
-    term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
-    term' (App eFun eArg)         = C.App   <$> term eFun <*> term eArg
-    term' (Lam x e)
-      | isTyVar x
-      = C.TyLam <$> coreToTyVar x <*> addUsefull (getSrcSpan x) (term e)
-      | otherwise
-      = do
-        (e',sp) <- termSP (getSrcSpan x) e
-        x' <- coreToIdSP sp x
-        return (C.Lam  x' e')
-    term' (Let (NonRec x e1) e2)  = do
-      (e1',sp) <- termSP (getSrcSpan x) e1
-      x'  <- coreToIdSP sp x
-      e2' <- term e2
-      return (C.Let (C.NonRec x' e1') e2')
-
-    term' (Let (Rec xes) e) = do
-      xes' <- mapM go xes
-      e'   <- term e
-      return (C.Let (C.Rec xes') e')
-     where
-      go (x,b) = do
-        (b',sp) <- termSP (getSrcSpan x) b
-        x' <- coreToIdSP sp x
-        return (x',b')
-
-    term' (Case s _ ty [])  = do
-      s'  <- term' s
-      ty' <- coreToType ty
-      case C.collectArgs s' of
-        (C.Prim p, _) | C.primName p `elem` undefinedXPrims ->
-          -- GHC translates things like:
-          --
-          --   xToBV (Index.pack# (errorX @TY "QQ"))
-          --
-          -- to
-          --
-          --   xToBV (case (errorX @TY "QQ") of {})
-          --
-          --
-          -- Here we then translate
-          --
-          --   case (errorX @TY "QQ") of {}
-          --
-          -- to
-          --
-          --   undefinedX @TY
-          --
-          -- So that the evaluator rule for 'xToBV' can recognize things that
-          -- would normally throw XException
-          return (C.TyApp (C.Prim C.undefinedX) ty')
-        _ ->
-          return (C.TyApp (C.Prim C.undefined) ty')
-
-    term' (Case e b ty alts) = do
-     let usesBndr = any ( not . isEmptyVarSet . exprSomeFreeVars (== b))
-                  $ rhssOfAlts alts
-     (e',sp) <- termSP (getSrcSpan b) e
-     b'  <- coreToIdSP sp b
-     ty' <- coreToType ty
-     let caseTerm v =
-             C.Case v ty' <$> mapM (addUsefull sp . alt sp) alts
-     if usesBndr
-      then do
-        ct <- caseTerm (C.Var b')
-        return (C.Let (C.NonRec b' e') ct)
-      else caseTerm e'
-
-    term' (Cast e co) = do
-      let (Pair ty1 ty2) = coercionKind co
-      hasPrimCoM <- hasPrimCo co
-      sizedCast <- isSizedCast ty1 ty2
-      case hasPrimCoM of
-        Just _ | sizedCast
-          -> C.Cast <$> term e <*> coreToType ty1 <*> coreToType ty2
-        _ -> term e
-    term' (Tick (SourceNote rsp _) e) =
-      C.Tick (C.SrcSpan (RealSrcSpan rsp GHC.Nothing)) <$>
-             addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
-    term' (Tick _ e) = term e
-    term' (Type t) =
-      C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy WorkNever SingleResult C.NoUnfolding))
-        <$> coreToType t
-    term' (Coercion co) =
-      C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy WorkNever SingleResult C.NoUnfolding))
-        <$> coreToType (coercionType co)
-
-
-    termSP sp = fmap (second unSrcSpanRB) . RWS.listen . addUsefullR sp . term
-    coreToIdSP sp = addUsefullR sp . coreToId
-
-
-    lookupPrim :: Text -> Maybe (Maybe CompiledPrimitive)
-    lookupPrim nm = extractPrim <$> HashMap.lookup nm primMap
-
-    var x = do
-        xPrim <- if isGlobalId x then coreToPrimVar x else coreToVar x
-        let xNameS = C.nameOcc xPrim
-        xType  <- coreToVarType x
-        case isDataConId_maybe x of
-          Just dc -> case lookupPrim xNameS of
-            Just p  ->
-              -- Primitive will be marked MultiResult in Transformations if it
-              -- is a multi result primitive.
-              return $ C.Prim (C.PrimInfo xNameS xType (maybe WorkVariable workInfo p) SingleResult C.NoUnfolding)
-            Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
-              then let xInfo = idInfo x
-                       unfolding = unfoldingInfo xInfo
-                   in  case unfolding of
-                          CoreUnfolding {uf_tmpl} -> do
-                            sp <- view srcSpan
-                            RWS.censor (const (SrcSpanRB sp)) (term uf_tmpl)
-                          NoUnfolding -> error ("No unfolding for DC wrapper: " ++ showPprUnsafe x)
-                          _ -> error ("Unexpected unfolding for DC wrapper: " ++ showPprUnsafe x)
-              else C.Data <$> coreToDataConClash dc
-          Nothing -> case lookupPrim xNameS of
-            Just (Just (Primitive f wi _))
-              | Just n <- parseBundle "bundle" f        -> return (bundleUnbundleTerm (n+1) xType)
-              | Just n <- parseBundle "unbundle" f      -> return (bundleUnbundleTerm (n+1) xType)
-              | f == "Clash.Signal.Internal.mapSignal#" -> return (mapSignalTerm xType)
-              | f == "Clash.Signal.Internal.signal#"    -> return (signalTerm xType)
-              | f == "Clash.Signal.Internal.appSignal#" -> return (appSignalTerm xType)
-              | f == "Clash.Signal.Internal.traverse#"  -> return (traverseTerm xType)
-              | f == "Clash.Signal.Internal.joinSignal#" -> return (joinTerm xType)
-              | f == "Clash.Signal.Bundle.vecBundle#"   -> return (vecUnwrapTerm xType)
-              | f == showt '($)                           -> return (dollarTerm xType)
-              | f == showt 'GHC.Stack.withFrozenCallStack -> return (withFrozenCallStackTerm xType)
-              | f == showt 'GHC.Magic.noinline            -> return (idTerm xType)
-              | f == showt 'GHC.Magic.lazy                -> return (idTerm xType)
-              -- 'nospec' is a wired-in magic Id in 'GHC.Magic' (resp.
-              -- 'GHC.Internal.Magic' on GHC >= 9.14). It is not user-importable,
-              -- so we can't quote it via TH. Both module names need a literal
-              -- match here so that this clause fires across GHC versions.
-              | f == "GHC.Magic.nospec"                   -> return (idTerm xType)
-              | f == "GHC.Internal.Magic.nospec"          -> return (idTerm xType)
-              | f == showt 'GHC.Magic.runRW#              -> return (runRWTerm xType)
-              | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
-              | f == "Clash.Magic.prefixName"
-              -> return (nameModTerm PrefixName xType)
-              | f == "Clash.Magic.postfixName"
-              -> return (nameModTerm SuffixName xType)
-              | f == "Clash.Magic.setName"
-              -> return (nameModTerm SetName xType)
-              | f == "Clash.XException.xToErrorCtx"
-              -> return (xToErrorCtxTerm xType)
-              | f == "Clash.Annotations.SynthesisAttributes.annotateReg"
-              -> return (annotateRegTerm xType)
-              | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType wi SingleResult C.NoUnfolding))
-              | otherwise
-              -> do bndr <- coreToId x
-                    return (C.Prim (C.PrimInfo xNameS xType wi SingleResult (C.Unfolding bndr)))
-            Just (Just (BlackBox {workInfo = wi}))
-              | x `elem` unlocs
-              -> return $ C.Prim (C.PrimInfo xNameS xType wi SingleResult C.NoUnfolding)
-              | otherwise
-              -> do bndr <- coreToId x
-                    return (C.Prim (C.PrimInfo xNameS xType wi SingleResult (C.Unfolding bndr)))
-            Just (Just (BlackBoxHaskell {workInfo = wi}))
-              | x `elem` unlocs
-              -> return $ C.Prim (C.PrimInfo xNameS xType wi SingleResult C.NoUnfolding)
-              | otherwise
-              -> do bndr <- coreToId x
-                    return $ C.Prim (C.PrimInfo xNameS xType wi SingleResult (C.Unfolding bndr))
-            Just Nothing ->
-              -- Was guarded by "DontTranslate". We don't know yet if Clash will
-              -- actually use it later on, so we don't err here.
-              return $ C.Prim (C.PrimInfo xNameS xType WorkVariable SingleResult C.NoUnfolding)
-            Nothing
-              | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType WorkVariable SingleResult C.NoUnfolding))
-              | otherwise
-              -> C.Var <$> coreToId x
-
-    alt _   (Alt DEFAULT      _  e) = (C.DefaultPat,) <$> term e
-    alt _   (Alt (LitAlt l)   _  e) = (C.LitPat (coreToLiteral l),) <$> term e
-    alt sp0 (Alt (DataAlt dc) xs e) = case span isTyVar xs of
-      (tyvs,tmvs) -> do
-        (e',sp1) <- termSP sp0 e
-        (,) <$> (C.DataPat <$> coreToDataConClash dc
-                           <*> mapM coreToTyVar tyvs
-                           <*> mapM (coreToIdSP sp1) tmvs)
-            <*> pure e'
 
 coreToLiteral :: Literal
               -> C.Literal
@@ -1097,28 +582,6 @@ coreToDataCon dc = makeCachedU (fromGhcUnique (getUnique dc)) dataConCache $ wit
       (dataConStrictness dc)
       (dataConLabels dc)
 
--- | Convert a data constructor through the types of Clash Core, see
--- 'coreToDataCon'. For the conversion through Clash Core ('coreToTerm'),
--- which "Clash.GHC.Scoped.Check" compares with.
-coreToDataConClash :: DataCon
-                   -> C2C C.DataCon
-coreToDataConClash dc = withoutSrcSpan $ do
-    repTys <- mapM (coreToType . scaledThing) (dataConRepArgTys dc)
-    dcTy   <- coreToType (varType $ dataConWorkId dc)
-    nm   <- coreToName dataConName getUnique qualifiedNameString dc
-    uTvs <- mapM coreToTyVar (dataConUnivTyVars dc)
-    eTvs <- mapM coreToTyVar (dataConExTyCoVars dc)
-    return $ C.mkDataConFromClash
-      nm
-      (C.nameUniq nm)
-      (dataConTag dc)
-      dcTy
-      uTvs
-      eTvs
-      repTys
-      (dataConStrictness dc)
-      (dataConLabels dc)
-
 -- | The strictness of the fields of a data constructor
 dataConStrictness :: DataCon -> [C.DcStrictness]
 dataConStrictness = fmap hsImplBangToBool . dataConImplBangs
@@ -1269,71 +732,6 @@ coreToAttrs (TyConApp tycon kindsOrTypes)
 coreToAttrs _ =
     return []
 
--- | Wrap given type in an annotation if it is annotated using the constructs
--- defined in Clash.Annotations.SynthesisAttributes.
-annotateType
-  :: Type
-  -> C.Type
-  -> C2C C.Type
-annotateType ty cty = do
-  attrs <- coreToAttrs ty
-  case attrs of
-    [] -> return cty
-    _  -> return $ C.AnnType attrs cty
-
--- | Converts GHC Type to a Clash Type. Strips newtypes and signals, with the
--- exception of newtypes used as annotations (see: SynthesisAttributes).
---
--- Conversions are memoized on the GHC type, which also shares the converted
--- types. The conversion runs 'withoutSrcSpan' so that it depends on the GHC
--- type alone; nothing ever reads back the source spans of names inside a
--- type, so no information is lost.
-coreToType
-  :: Type
-  -> C2C C.Type
-coreToType ty = do
-  cache <- use convertedTypeCache
-  case HashMap.lookup (StructuralType ty) cache of
-    Just ty1 -> pure ty1
-    Nothing -> do
-      ty1 <- withoutSrcSpan convert
-      convertedTypeCache %= HashMap.insert (StructuralType ty) ty1
-      pure ty1
-  where
-    convert = ty'' >>= annotateType ty
-
-    ty'' | Just ty' <- coreView ty = coreToType ty'
-         | TyConApp tc xs <- ty = do
-             envs <- view famInstEnvs
-             case topReduceTyFamApp_maybe envs tc xs of
-               Nothing -> coreToType' ty
-               Just (HetReduction (Reduction _ ty') _) -> coreToType ty'
-         | otherwise = coreToType' ty
-
-coreToType'
-  :: Type
-  -> C2C C.Type
-coreToType' (TyVarTy tv) = C.VarTy <$> coreToTyVar tv
-coreToType' (TyConApp tc args)
-  | Just (FunTy _ _ ty1 ty2) <- tyConAppFunTy_maybe tc args = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-  | otherwise     = case expandSynTyCon_maybe tc args of
-                      ExpandsSyn substs synTy remArgs -> do
-                        let substs' = mkTvSubstPrs substs
-                            synTy'  = substTy substs' synTy
-                        foldl C.AppTy <$> coreToType synTy' <*> mapM coreToType remArgs
-                      _ -> do
-                        tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
-                        tyConMap %= C.insertIfAbsent tcName tc
-                        C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
-coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
--- TODO: save the distinction between => and ->
-coreToType' (FunTy _ _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
-coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
-coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
-coreToType' (CastTy t (Refl{})) = coreToType' t
-coreToType' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPprUnsafe t)
-coreToType' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPprUnsafe t)
-
 -- * Types of scoped Core
 
 -- | The key of a GHC variable in the builders of scoped Core, see
@@ -1460,33 +858,9 @@ coreToTyLit (NumTyLit i) = NumTy (fromInteger i)
 coreToTyLit (StrTyLit s) = SymTy (unpackFS s)
 coreToTyLit (CharTyLit c) = CharTy c
 
-coreToTyVar :: TyVar
-            -> C2C C.TyVar
-coreToTyVar tv =
-  C.mkTyVar <$> coreToType (varType tv) <*> coreToVar tv
-
-coreToId :: Id
-         -> C2C C.Id
-coreToId i = do
-  C.mkId <$> coreToVarType i <*> pure scope <*> coreToVar i
- where
-  scope = if isGlobalId i then C.GlobalId else C.LocalId
-
 coreToVar :: Var
           -> C2C (C.Name a)
 coreToVar = coreToName varName varUnique qualifiedNameStringM
-
--- | Convert the type of a variable, memoized on the variable's name.
---
--- Only global variables are memoized: their names come from GHC's name cache
--- and are globally unique, so the same name always refers to the same
--- variable, whose type is intrinsic. Names of local variables (e.g. binders
--- instantiated when loading unfoldings from interface files) can collide
--- between declarations and must not share cache entries.
-coreToVarType :: Var -> C2C C.Type
-coreToVarType v
-  | isGlobalId v = makeCached (varName v) varTypeMap (coreToType (varType v))
-  | otherwise = coreToType (varType v)
 
 coreToPrimVar :: Var
               -> C2C (C.Name C.Term)
@@ -1544,450 +918,6 @@ modNameM n = do
   module_ <- nameModule_maybe n
   let moduleNm = moduleName module_
   return (pack (moduleNameString moduleNm))
-
--- | Given the type:
---
--- @
---     forall dom a0 a1 .. aN
---   . Signal dom (a0, a1, .., aN)
---  -> (Signal dom a0, Signal dom a1, .., Signal dom aN)
--- @
---
--- or the type
---
--- @
---     forall dom a0 a1 .. aN
---   . (Signal dom a0, Signal dom a1, .., Signal dom aN)
---  -> Signal dom (a0, a1, .., aN)
--- @
---
--- Generate the term:
---
--- @/\dom. /\a0. /\a1. .. /\aN. \x -> x@
---
--- In other words: treat "bundle" and "unbundle" primitives as id.
---
-bundleUnbundleTerm :: Int -> C.Type -> C.Term
-bundleUnbundleTerm nTyVarsExpected = go []
- where
-  go :: [C.TyVar] -> C.Type -> C.Term
-  go tvs (C.ForAllTy tv typ) = go (tv:tvs) typ
-  go tvs (C.tyView -> C.FunTy argTy _resTy) =
-    if length tvs /= nTyVarsExpected then
-      -- Internal error: should never happen unless we change the type of
-      -- bundle / unbundle.
-      error $ $(curLoc) ++ show (length tvs) ++ " vs " ++ show nTyVarsExpected
-    else
-      let sigName = C.mkLocalId argTy (C.mkUnsafeSystemName "c$s" 0) in
-      foldr C.TyLam (C.Lam sigName (C.Var sigName)) (reverse tvs)
-  go tvs ty = error $ $(curLoc) ++ show ty ++ " " ++ show tvs
-
-
--- | Given the type:
---
--- @forall a. forall b. forall clk. (a -> b) -> Signal clk a -> Signal clk b@
---
--- Generate the term:
---
--- @
--- /\(a:*)./\(b:*)./\(clk:Clock).\(f : (Signal clk a -> Signal clk b)).
--- \(x : Signal clk a).f x
--- @
-mapSignalTerm :: C.Type
-              -> C.Term
-mapSignalTerm (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy clkTV funTy)))
-  | (C.FunTy _ funTy'') <- C.tyView funTy
-  , (C.FunTy aTy bTy)   <- C.tyView funTy''
-  = let
-      fName = C.mkUnsafeSystemName "f" 0
-      xName = C.mkUnsafeSystemName "x" 1
-      fTy   = C.mkFunTy aTy bTy
-      fId   = C.mkLocalId fTy fName
-      xId   = C.mkLocalId aTy xName
-    in
-      C.TyLam aTV (
-      C.TyLam bTV (
-      C.TyLam clkTV (
-      C.Lam   fId (
-      C.Lam   xId (
-      C.App (C.Var fId) (C.Var xId))))))
-
-mapSignalTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type:
---
--- @forall a. forall dom. a -> Signal dom a@
---
--- Generate the term
---
--- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
-signalTerm :: C.Type
-           -> C.Term
-signalTerm (C.ForAllTy aTV (C.ForAllTy domTV funTy))
-  | (C.FunTy _ saTy) <- C.tyView funTy
-  = let
-      xName = C.mkUnsafeSystemName "x" 0
-      xId   = C.mkLocalId saTy xName
-    in
-      C.TyLam aTV (
-      C.TyLam domTV (
-      C.Lam   xId (
-      C.Var   xId)))
-
-signalTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type:
---
--- @
--- forall dom. forall a. forall b. Signal dom (a -> b) -> Signal dom a ->
--- Signal dom b
--- @
---
--- Generate the term:
---
--- @
--- /\(dom:Domain)./\(a:*)./\(b:*).\(f : (Signal dom a -> Signal dom b)).
--- \(x : Signal dom a).f x
--- @
-appSignalTerm :: C.Type
-              -> C.Term
-appSignalTerm (C.ForAllTy domTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
-  | (C.FunTy _ funTy'') <- C.tyView funTy
-  , (C.FunTy saTy sbTy) <- C.tyView funTy''
-  = let
-      fName = C.mkUnsafeSystemName "f" 0
-      xName = C.mkUnsafeSystemName "x" 1
-      fTy   = C.mkFunTy saTy sbTy
-      fId   = C.mkLocalId fTy fName
-      xId   = C.mkLocalId saTy xName
-    in
-      C.TyLam domTV (
-      C.TyLam aTV (
-      C.TyLam bTV (
-      C.Lam   fId (
-      C.Lam   xId (
-      C.App (C.Var fId) (C.Var xId))))))
-
-appSignalTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type:
---
--- @
--- forall t.forall n.forall a.Vec n (Signal t a) ->
--- Signal t (Vec n a)
--- @
---
--- Generate the term:
---
--- @
--- /\(t:Domain)./\(n:Nat)./\(a:*).\(vs:Signal t (Vec n a)).vs
--- @
-vecUnwrapTerm :: C.Type
-              -> C.Term
-vecUnwrapTerm (C.ForAllTy tTV (C.ForAllTy nTV (C.ForAllTy aTV funTy)))
-  | (C.FunTy _ vsTy) <- C.tyView funTy
-  = let
-        vsName = C.mkUnsafeSystemName "vs" 0
-        vsId   = C.mkLocalId vsTy vsName
-    in
-        C.TyLam tTV (
-        C.TyLam nTV (
-        C.TyLam aTV (
-        C.Lam   vsId (
-        C.Var vsId))))
-
-vecUnwrapTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type:
---
--- @
--- forall f.forall a.forall b.forall dom.Applicative f => (a -> f b) ->
--- Signal dom a -> f (Signal dom b)
--- @
---
--- Generate the term:
---
--- @
--- /\(f:* -> *)./\(a:*)./\(b:*)./\(dom:Clock).\(dict:Applicative f).
--- \(g:a -> f b).\(x:Signal dom a).g x
--- @
-traverseTerm :: C.Type
-             -> C.Term
-traverseTerm (C.ForAllTy fTV (C.ForAllTy aTV (C.ForAllTy bTV (C.ForAllTy domTV funTy))))
-    | (C.FunTy dictTy funTy1) <- C.tyView funTy
-    , (C.FunTy gTy    funTy2) <- C.tyView funTy1
-    , (C.FunTy xTy    _)      <- C.tyView funTy2
-    = let
-        dictName = C.mkUnsafeSystemName "dict" 0
-        gName    = C.mkUnsafeSystemName "g" 1
-        xName    = C.mkUnsafeSystemName "x" 2
-        dictId   = C.mkLocalId dictTy dictName
-        gId      = C.mkLocalId gTy gName
-        xId      = C.mkLocalId xTy xName
-      in
-        C.TyLam fTV (
-        C.TyLam aTV (
-        C.TyLam bTV (
-        C.TyLam domTV (
-        C.Lam   dictId (
-        C.Lam   gId (
-        C.Lam   xId (
-        C.App (C.Var gId) (C.Var xId))))))))
-
-traverseTerm ty = error $ $(curLoc) ++ show ty
-
--- ∀ (r :: GHC.Types.RuntimeRep)
---   (a :: GHC.Prim.TYPE GHC.Types.PtrRepLifted)
---   (b :: GHC.Prim.TYPE r).
--- (a -> b) -> a -> b
-
-
--- | Given the type:
---
--- @forall (r :: Rep) (a :: TYPE Lifted) (b :: TYPE r). (a -> b) -> a -> b@
---
--- Generate the term:
---
--- @/\(r:Rep)/\(a:TYPE Lifted)./\(b:TYPE r).\(f : (a -> b)).\(x : a).f x@
-dollarTerm :: C.Type
-           -> C.Term
-#if MIN_VERSION_ghc(9,8,0)
-dollarTerm (C.ForAllTy raTV (C.ForAllTy rbTV (C.ForAllTy aTV (C.ForAllTy bTV funTy))))
-  | (C.FunTy fTy funTy'') <- C.tyView funTy
-  , (C.FunTy aTy _)       <- C.tyView funTy''
-  = let
-      fName = C.mkUnsafeSystemName "f" 0
-      xName = C.mkUnsafeSystemName "x" 1
-      fId   = C.mkLocalId fTy fName
-      xId   = C.mkLocalId aTy xName
-    in
-      C.TyLam raTV (
-      C.TyLam rbTV (
-      C.TyLam aTV (
-      C.TyLam bTV (
-      C.Lam   fId (
-      C.Lam   xId (
-      C.App (C.Var fId) (C.Var xId)))))))
-#else
-dollarTerm (C.ForAllTy rTV (C.ForAllTy aTV (C.ForAllTy bTV funTy)))
-  | (C.FunTy fTy funTy'') <- C.tyView funTy
-  , (C.FunTy aTy _)       <- C.tyView funTy''
-  = let
-      fName = C.mkUnsafeSystemName "f" 0
-      xName = C.mkUnsafeSystemName "x" 1
-      fId   = C.mkLocalId fTy fName
-      xId   = C.mkLocalId aTy xName
-    in
-      C.TyLam rTV (
-      C.TyLam aTV (
-      C.TyLam bTV (
-      C.Lam   fId (
-      C.Lam   xId (
-      C.App (C.Var fId) (C.Var xId))))))
-#endif
-
-dollarTerm ty = error $ $(curLoc) ++ C.showPpr ty
-
--- | Given the type:
---
--- @forall a. forall dom. Signal dom (Signal dom a) -> Signal dom a@
---
--- Generate the term
---
--- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
-joinTerm :: C.Type
-         -> C.Term
-joinTerm ty@(C.ForAllTy {}) = signalTerm ty
-joinTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type:
---
--- @forall a. CallStack -> (HasCallStack => a) -> a@
---
--- Generate the term
---
--- @/\(a:*)./\(callStack:CallStack).\(f:HasCallStack => a).f callStack@
-withFrozenCallStackTerm
-  :: C.Type
-  -> C.Term
-withFrozenCallStackTerm (C.ForAllTy aTV funTy)
-  | (C.FunTy callStackTy fTy) <- C.tyView funTy
-  = let
-      callStackName = C.mkUnsafeSystemName "callStack" 0
-      fName         = C.mkUnsafeSystemName "f" 1
-      callStackId   = C.mkLocalId callStackTy callStackName
-      fId           = C.mkLocalId fTy fName
-    in
-      C.TyLam  aTV (
-      C.Lam    callStackId (
-      C.Lam    fId (
-      C.App (C.Var fId) (C.Var callStackId))))
-
-withFrozenCallStackTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type:
---
--- @forall a. a -> a@
---
--- Generate the term
---
--- @/\(a:*).\(x:a).x@
-idTerm
-  :: C.Type
-  -> C.Term
-idTerm (C.ForAllTy aTV funTy)
-  | (C.FunTy xTy _) <- C.tyView funTy
-  = let
-      xName           = C.mkUnsafeSystemName "x" 0
-      xId             = C.mkLocalId xTy xName
-    in
-      C.TyLam aTV (
-      C.Lam   xId (
-      C.Var xId))
-
-idTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given type type:
---
--- @forall (r :: RuntimeRep) (o :: TYPE r).(State# RealWorld -> o) -> o@
---
--- Generate the term:
---
--- @/\(r:RuntimeRep)./\(o:TYPE r).\(f:State# RealWord -> o) -> f realWorld#@
-runRWTerm
-  :: C.Type
-  -> C.Term
-runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy))
-  | (C.FunTy fTy _)  <- C.tyView funTy
-  , (C.FunTy rwTy _) <- C.tyView fTy
-  = let
-      fName            = C.mkUnsafeSystemName "f" 0
-      fId              = C.mkLocalId fTy fName
-      rwNm             = showt 'GHC.Prim.realWorld#
-    in
-      C.TyLam rTV (
-      C.TyLam oTV (
-      C.Lam   fId (
-      (C.App (C.Var fId)
-             (C.Prim (C.PrimInfo rwNm rwTy WorkNever SingleResult C.NoUnfolding))))))
-
-runRWTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given type type:
---
--- @forall (n :: Nat) (a :: Type) .Knownnat n => Typeable a => (BitVector n -> a) -> BitVector n -> a@
---
--- Generate the term:
---
--- @/\(n:Nat)./\(a:TYPE r).\(kn:KnownNat n).\(f:a -> BitVector n).f@
-checkUnpackUndefTerm
-  :: C.Type
-  -> C.Term
-checkUnpackUndefTerm (C.ForAllTy nTV (C.ForAllTy aTV funTy))
-  | C.FunTy knTy r0Ty <- C.tyView funTy
-  , C.FunTy tpTy r1Ty <- C.tyView r0Ty
-  , C.FunTy fTy _     <- C.tyView r1Ty
-  = let
-      knName            = C.mkUnsafeSystemName "kn" 0
-      tpName            = C.mkUnsafeSystemName "tp" 1
-      fName             = C.mkUnsafeSystemName "f" 2
-      knId              = C.mkLocalId knTy knName
-      tpId              = C.mkLocalId tpTy tpName
-      fId               = C.mkLocalId fTy fName
-    in
-      C.TyLam nTV (
-      C.TyLam aTV (
-      C.Lam knId (
-      C.Lam tpId (
-      C.Lam fId (
-      C.Var fId)))))
-
-checkUnpackUndefTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type:
---
--- @forall (name :: Symbol) (a :: Type) . a -> (name ::: a)@
---
--- Generate the term:
---
--- @/\(name:Symbol)./\(a:Type).\(x:a) -> <TICK>x@
-nameModTerm
-  :: C.NameMod
-  -> C.Type
-  -> C.Term
-nameModTerm sa (C.ForAllTy nmTV (C.ForAllTy aTV funTy))
-  | (C.FunTy xTy _) <- C.tyView funTy
-  = let
-      -- Safe to use `mkUnsafeSystemName` here, because we're building the
-      -- identity \x.x, so any shadowing of 'x' would be the desired behavior.
-      xName            = C.mkUnsafeSystemName "x" 0
-      xId              = C.mkLocalId xTy xName
-    in
-      C.TyLam nmTV (
-      C.TyLam aTV (
-      C.Lam   xId (
-      (C.Tick (C.NameMod sa (C.VarTy nmTV)) (C.Var xId)))))
-
-nameModTerm _ ty = error $ $(curLoc) ++ show ty
-
-
--- | Given the type:
---
--- @forall (a :: Type) . String -> a -> a@
---
--- Generate the term:
---
--- @/\(a:Type).\(ctx:String).\(x:a) -> x@
-xToErrorCtxTerm
-  :: C.Type
-  -> C.Term
-xToErrorCtxTerm (C.ForAllTy aTV funTy)
-  | (C.FunTy ctxTy rTy) <- C.tyView funTy
-  , (C.FunTy xTy _)     <- C.tyView rTy
-  = let
-      -- Safe to use `mkUnsafeSystemName` here, because we're building the
-      -- identity \_ x.x, so any shadowing of 'x' would be the desired behavior.
-      ctxName = C.mkUnsafeSystemName "ctx" 0
-      ctxId   = C.mkLocalId ctxTy ctxName
-      xName   = C.mkUnsafeSystemName "x" 1
-      xId     = C.mkLocalId xTy xName
-    in
-      C.TyLam aTV (
-      C.Lam ctxId (
-      C.Lam xId (
-      C.Var xId)))
-
-xToErrorCtxTerm ty = error $ $(curLoc) ++ show ty
-
--- | Given the type
---
--- > forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
---
--- Generate the term:
---
--- > /\(n:Nat) (dom:Symbol) (a:Type).\(attrs:Vec n (Attr String)) (x:Signal dom a).<TICK attrs> x
-annotateRegTerm
-  :: C.Type
-  -> C.Term
-annotateRegTerm (C.ForAllTy nTV (C.ForAllTy domTV (C.ForAllTy aTV funTy)))
-  | C.FunTy attrTy rTy <- C.tyView funTy
-  , C.FunTy xTy _ <- C.tyView rTy
-  = let
-      -- Safe to use `mkUnsafeSystemName` here, because we're building the
-      -- identity \x.x, so any shadowing of 'x' would be the desired behavior.
-      xName            = C.mkUnsafeSystemName "x" 0
-      xId              = C.mkLocalId xTy xName
-      attrName         = C.mkUnsafeSystemName "attrs" 1
-      attrId           = C.mkLocalId attrTy attrName
-    in
-      C.TyLam nTV (
-      C.TyLam domTV (
-      C.TyLam aTV (
-      C.Lam   attrId (
-      C.Lam   xId (
-      C.Tick (C.Attributes (C.VarTy nTV) (C.Var attrId)) (C.Var xId))))))
-
-annotateRegTerm ty = error ($(curLoc) ++ show ty)
 
 isDataConWrapId :: Id -> Bool
 isDataConWrapId v = case idDetails v of

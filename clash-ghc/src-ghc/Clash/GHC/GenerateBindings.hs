@@ -16,18 +16,14 @@ module Clash.GHC.GenerateBindings
   (generateBindings)
 where
 
-import           Control.Arrow           ((***))
 import           Control.DeepSeq         (NFData, deepseq)
 import           Control.Lens            ((%~),(&),(.~),(^.))
-import           Control.Monad           (forM, forM_, unless, when)
-import qualified Control.Monad.State     as State
+import           Control.Monad (forM, unless, when)
 import qualified Control.Monad.RWS.Strict as RWS
-import           Data.Coerce             (coerce)
-import           Data.Either             (partitionEithers, lefts ,rights)
+import           Data.Either (partitionEithers)
 import           Data.Foldable           (traverse_)
 import           Data.IntMap.Strict      (IntMap)
 import qualified Data.IntMap.Strict      as IMS
-import qualified Data.IntSet             as IS
 import qualified Data.HashMap.Strict     as HashMap
 import qualified Data.HashSet            as HashSet
 #if !MIN_VERSION_base(4,20,0)
@@ -35,10 +31,8 @@ import           Data.List               (foldl')
 #endif
 import           Data.List               (isPrefixOf)
 import           Data.List.Split         (chunksOf)
-import           Data.Maybe              (listToMaybe)
 import qualified Data.Text               as Text
 import qualified Data.Time.Clock         as Clock
-import           System.Environment      (lookupEnv)
 import           GHC.Conc                (numCapabilities, par, pseq)
 
 import qualified GHC                     as GHC (Ghc)
@@ -63,22 +57,13 @@ import           GHC.BasicTypes.Extra (isOpaque)
 import           Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import           Clash.Annotations.Primitive (HDL, extractPrim)
 
-import           Clash.Core.Name         (mkUnsafeInternalName, nameOcc)
-import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
-import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
-import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc, tyConName)
+import           Clash.Core.Name (mkUnsafeInternalName)
+import           Clash.Core.TyCon (TyConMap, TyConName, isNewTypeTc)
 import           Clash.Core.Scoped.TysPrim (tysPrimMap)
-import           Clash.Core.Util         (mkInternalVar, mkSelectorCase)
-import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
-import           Clash.Core.VarEnv
-  (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
-  ,mkVarEnv, unionVarEnv)
-import           Clash.Core.Scoped.Convert (fromClashTermClosed)
+import           Clash.Core.VarEnv (VarEnv, unionVarEnv)
 import           Clash.Core.Scoped.NameMap (globalEnvFromList)
 import           Clash.Core.Scoped.Syntax
-  (GlobalId, S (VoidS), globalIdLegacy, globalIdName, globalIdType)
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+  ( GlobalId, S (VoidS), globalIdName, globalIdType )
 import           Clash.Core.Scoped.Subst (openTyBinder, withFreshIdBinder)
 import qualified Clash.Core.Scoped.Syntax as S
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
@@ -90,21 +75,18 @@ import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.Driver.Warning    (warnAbout, warnAboutM)
 import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToGlobalIdB, coreToId, coreToName, coreToTerm,
-   makeAllTyCons, makeAllTyConsClash, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
+  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToGlobalIdB, coreToName,
+   makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Core.Scoped.Builder
   (TmB, letrecB, runClosedTerm, varB)
-import           Clash.GHC.Scoped.Check
-  (Outcome (..), compareTerms, compareTyCons, compareTypes, primAtTypeShape)
 import           Clash.GHC.Scoped.GHC2Core (coreToTermB, coreToTypeB, varKey)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
   (Primitive (..), CompiledPrimMap)
 import           Clash.Primitives.Util   (generatePrimMap)
-import           Clash.Unique            (Unique)
 import           Clash.Util              (reportTimeDiff)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Warning           (ClashWarning(WarnPrimitiveDefinition))
@@ -186,12 +168,6 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   -- 'C2C' is pure, so the warnings it ran into were collected rather than
   -- printed. Report them now, in the order the binders were converted.
   traverse_ (warnAbout opts) (tcMap ^. pendingWarnings)
-
-  -- Compare with the conversion through Clash Core, see 'checkGHC2Core'
-  checkLog <- lookupEnv "CLASH_DEBUG_CHECK_GHC2CORE"
-  forM_ checkLog $ \logFile ->
-    checkGHC2Core logFile modName c2cEnv primMapC bindings clsOps unlocatable
-      allTcCache tcCache tcMap allBindings
 
   return
     ( ClashEnv
@@ -300,145 +276,12 @@ processBind primMap unlocatable = \case
     checkPrimitive primMap v
     return (Binding v' sp inl pr tm r)
 
--- | Convert a single (possibly recursive) binder group to Clash Core bindings,
--- for 'checkGHC2Core'.
-processBindClash
-  :: CompiledPrimMap
-  -> [GHC.CoreBndr]
-  -> GHC.CoreBind
-  -> C2C [Binding Term]
-processBindClash primMap unlocatable = \case
-  GHC.NonRec v e -> do
-    let sp = GHC.getSrcSpan v
-        inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-    tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
-    v' <- coreToId v
-    nm <- qualifiedNameString (GHC.varName v)
-    let pr = if HashMap.member nm primMap then IsPrim else IsFun
-    checkPrimitive primMap v
-    return [Binding (mkGlobalIdFromClash v') sp inl pr tm False]
-  GHC.Rec bs -> do
-    tms <- forM bs $ \(v,e) -> do
-      let sp  = GHC.getSrcSpan v
-          inl = GHC.inlinePragmaSpec . GHC.inlinePragInfo $ GHC.idInfo v
-      tm <- RWS.local (srcSpan .~ sp) (coreToTerm primMap unlocatable e)
-      v' <- coreToId v
-      nm <- qualifiedNameString (GHC.varName v)
-      let pr = if HashMap.member nm primMap then IsPrim else IsFun
-      checkPrimitive primMap v
-      return (Binding (mkGlobalIdFromClash v') sp inl pr tm True)
-    case tms of
-      [b] -> return [b]
-
-      -- Rewrite the bindings to avoid triggering the recursion check.
-      -- See NOTE [bindings in recursive groups]
-      _ -> let vsL   = map (setIdScope LocalId . globalIdLegacy . bindingId) tms
-               vsV   = map Var vsL
-               subst = extendGblSubstList (mkSubst emptyInScopeSet) (zip vsL vsV)
-               lbs   = zipWith (\b vL -> (vL,substTm "mkBindings" subst (bindingTerm b))) tms vsL
-               tms1  = zipWith (\b (i, _) -> b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False }) tms lbs
-           in  return tms1
-
 -- | Convert a single class operation: its binder and the index of its method.
 -- See 'processBind'.
 processClsOp :: (GHC.CoreBndr, Int) -> C2C (GlobalId, Int)
 processClsOp (v,i) = do
   v' <- coreToGlobalIdB v
   return (v',i)
-
--- | 'processClsOp' through Clash Core, for 'checkGHC2Core'
-processClsOpClash :: (GHC.CoreBndr, Int) -> C2C (Id, Int)
-processClsOpClash (v,i) = do
-  v' <- coreToId v
-  return (v',i)
-
--- | Compare the bindings that "Clash.Core.Scoped.GHC2Core" gives with the
--- conversion of the bindings of 'Clash.GHC.GHC2Core.coreToTerm' to scoped
--- Core, see "Clash.GHC.Scoped.Check", and the types of their binders. Also
--- compares the maps of type constructors that the two find, and the warnings
--- they report.
---
--- Runs when the environment variable @CLASH_DEBUG_CHECK_GHC2CORE@ is set, to
--- a file to which it appends a summary. Errors if a term is not
--- alpha-equivalent. Temporary, see "Clash.GHC.Scoped.Check".
-checkGHC2Core
-  :: FilePath
-  -> String
-  -> GHC2CoreEnv
-  -> CompiledPrimMap
-  -> [GHC.CoreBind]
-  -> [(GHC.CoreBndr,Int)]
-  -> [GHC.CoreBndr]
-  -> TyConMap
-  -> TyConMap
-  -> GHC2CoreState
-  -> VarEnv (Binding (S.Term 'VoidS))
-  -> IO ()
-checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm tcCache st new = do
-  let
-    ((bindingsMap, clsOps'), stClash, _) =
-      RWS.runRWS (mkBindings (processBindClash primMap unlocatable) processClsOpClash bindings clsOps)
-                 env emptyGHC2CoreState
-    inScope0 = mkInScopeSet (
-                    (fmap (coerce . globalIdLegacy . bindingId) bindingsMap) <>
-                    (fmap (coerce . globalIdLegacy . bindingId) clsMap))
-    clsMap =
-      mkVarEnv
-        [ (v, Binding (mkGlobalIdFromClash v) GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
-                (mkClassSelectorClash inScope0 tcm (varType v) i) False)
-        | (v, i) <- clsOps' ]
-    old = bindingsMap `unionVarEnv` clsMap
-
-    outcome b1 b2
-      | bindingId b1 /= bindingId b2
-        || globalIdName (bindingId b1) /= globalIdName (bindingId b2)
-        || bindingLoc b1 /= bindingLoc b2
-        || bindingIsPrim b1 /= bindingIsPrim b2
-        || bindingRecursive b1 /= bindingRecursive b2
-        || show (bindingSpec b1) /= show (bindingSpec b2)
-      = Different "binding metadata"
-      | otherwise
-      = compareTypes (globalIdType (bindingId b1)) (globalIdType (bindingId b2))
-          <> compareTerms (fromClashTermClosed (primAtTypeShape (bindingTerm b1))) (bindingTerm b2)
-
-    outcomes =
-      [ (nameOcc (globalIdName (bindingId b1)), o)
-      | b1 <- UniqMap.elems old
-      , let o = maybe (Different "missing") (outcome b1) (UniqMap.lookup (globalIdName (bindingId b1)) new)
-      ]
-    missing = length (UniqMap.keys new) - length (UniqMap.keys old)
-    identical = length [ () | (_, Identical) <- outcomes ]
-    alpha = [ (nm, d) | (nm, AlphaEquivalent d) <- outcomes ]
-    different = [ (nm, d) | (nm, Different d) <- outcomes ]
-    tcsClash = UniqMap.keys (stClash ^. tyConMap)
-    tcs = UniqMap.keys (st ^. tyConMap)
-    tyConsSame = IS.fromList (map fromIntegral tcsClash) == IS.fromList (map fromIntegral tcs)
-    GHC2CoreEnv _ fiEnvs opts = env
-    tcCacheClash = makeAllTyConsClash opts (fst (mkTupTyCons opts stClash)) fiEnvs
-    tyConDiffs =
-      [ Text.unpack (nameOcc (tyConName tc)) <> ": " <> d
-      | tc <- UniqMap.elems tcCacheClash
-      , Just d <- [maybe (Just "missing") (compareTyCons tc) (UniqMap.lookup (tyConName tc) tcCache)] ]
-      <> [ Text.unpack (nameOcc (tyConName tc)) <> ": extra"
-         | tc <- UniqMap.elems tcCache, not (UniqMap.elem (tyConName tc) tcCacheClash) ]
-    warnings = (length (stClash ^. pendingWarnings), length (st ^. pendingWarnings))
-    ok = null different && tyConsSame && null tyConDiffs && missing == 0 && uncurry (==) warnings
-    detail kind (nm, d) = kind <> " " <> Text.unpack nm <> ": " <> d
-    report = unlines $
-      [ modName <> ": " <> show (length outcomes) <> " bindings, "
-          <> show identical <> " identical, "
-          <> show (length alpha) <> " alpha-equivalent, "
-          <> show (length different) <> " different, "
-          <> show missing <> " extra; type constructors "
-          <> (if tyConsSame then "equal" else "DIFFERENT") <> ", "
-          <> show (length (UniqMap.elems tcCacheClash)) <> " converted, "
-          <> show (length tyConDiffs) <> " different; warnings "
-          <> show warnings ]
-      <> map ("  TYCON " <>) (take 20 tyConDiffs)
-      <> map (detail "  ALPHA") (take 5 alpha)
-      <> map (detail "  DIFFERENT") (take 20 different)
-  appendFile logFile report
-  unless ok (error ("checkGHC2Core: " <> report))
 
 -- | Run a list of independent 'C2C' computations, each starting from an empty
 -- 'GHC2CoreState', forcing their results to normal form in parallel across the
@@ -590,36 +433,6 @@ mkClassSelector tcm ty0 sel = go S.emptyScope ty0
         , not (isNewTypeTc tc)
         -> S.mkSelectorCase "mkClassSelector" sc tenv dict 1 sel
       _ -> dict
-
--- | 'mkClassSelector' in Clash Core, for 'checkGHC2Core'
-mkClassSelectorClash
-  :: InScopeSet
-  -> TyConMap
-  -> Type
-  -> Int
-  -> Term
-mkClassSelectorClash inScope0 tcm ty sel = newExpr
-  where
-    -- TODO: why can't we just use partitionEithers here?
-    (tvs,dicts) = (lefts *** rights)
-                . span (\l -> case l of {Left _ -> True; _ -> False})
-                $ fst (splitFunForallTy ty)
-    newExpr = case listToMaybe dicts of
-      Just dictTy@(tyView -> TyConApp tcNm _)
-        | Just tc <- UniqMap.lookup tcNm tcm
-        , not (isNewTypeTc tc)
-        -> flip State.evalState (0 :: Unique) $ do
-              dcId <- mkInternalVar inScope0 "dict" dictTy
-              let inScope1 = extendInScopeSet inScope0 dcId
-              selE <- mkSelectorCase "mkClassSelector" inScope1 tcm (Var dcId) 1 sel
-              return (mkTyLams (mkLams selE [dcId]) tvs)
-      Just (tyView -> FunTy arg res) -> flip State.evalState (0 :: Unique) $ do
-              dcId <- mkInternalVar inScope0 "dict" (mkFunTy arg res)
-              return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
-      Just dictTy -> flip State.evalState (0 :: Unique) $ do
-              dcId <- mkInternalVar inScope0 "dict" dictTy
-              return (mkTyLams (mkLams (Var dcId) [dcId]) tvs)
-      Nothing -> error "mkClassSelector: expected at least one dictionary argument"
 
 mkTupTyCons :: ClashOpts -> GHC2CoreState -> (GHC2CoreState,IntMap TyConName)
 mkTupTyCons opts tcMap = (tcMap'',tupTcCache)
