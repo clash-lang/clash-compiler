@@ -40,7 +40,7 @@ import Clash.Core.Scoped.Syntax
 import qualified Clash.Normalize.Scoped.Transformations.DEC as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
 import Test.Clash.Rewrite
@@ -121,11 +121,11 @@ decTo :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
 decTo = assertRewritesTo env st decS
 
 decS :: Rewrite NormalizeState
-decS = $(asScopedRewriteQ Scoped.disjointExpressionConsolidation)
+decS = $(asRewriteQ Scoped.disjointExpressionConsolidation)
 
 -- | Assert that DEC leaves a term as it is
 decKeeps :: [ScopeDecl] -> TestTerm -> Assertion
-decKeeps = assertNoRewrite env st $(asScopedRewriteQ Scoped.disjointExpressionConsolidation)
+decKeeps = assertNoRewrite env st $(asRewriteQ Scoped.disjointExpressionConsolidation)
 
 tests :: TestTree
 tests =

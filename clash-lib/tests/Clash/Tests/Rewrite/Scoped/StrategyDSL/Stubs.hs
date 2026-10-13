@@ -30,7 +30,7 @@ import Clash.Rewrite.Scoped
   (Rewrite, Transform (..), TransformContext, changed, ctxFrames)
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
-  (compileScopedStrategy, compileScopedStrategyReference)
+  (compileStrategy, compileStrategyReference)
 import Clash.Rewrite.Types (RewriteMonad)
 
 import Test.Clash.Scoped (TestTerm (..), TestType (..), builtTerm, closedTerm, testGlobalId, testPrim)
@@ -59,7 +59,7 @@ collapseApplicationWorker _ctx node _function _argument = pure node
 
 collapseApplication :: Transformation
 collapseApplication =
-  toScopedTransformation "collapseApplication" (onApp 'collapseApplicationWorker)
+  toTransformation "collapseApplication" (onApp 'collapseApplicationWorker)
 
 collapseApplicationRewrite :: Rewrite ()
 collapseApplicationRewrite = Transform $ \_ctx -> \case
@@ -74,7 +74,7 @@ collapseSpineWorker _ctx = \case
 
 collapseSpine :: Transformation
 collapseSpine =
-  toScopedTransformation "collapseSpine" (onAppNode 'collapseSpineWorker)
+  toTransformation "collapseSpine" (onAppNode 'collapseSpineWorker)
 
 -- | Increments odd integer literals
 incrementOddWorker
@@ -83,7 +83,7 @@ incrementOddWorker _ctx _node (IntLiteral i) | odd i = changed (integer (i + 1))
 incrementOddWorker _ctx node _literal = pure node
 
 incrementOdd :: Transformation
-incrementOdd = toScopedTransformation "incrementOdd" (onLiteral 'incrementOddWorker)
+incrementOdd = toTransformation "incrementOdd" (onLiteral 'incrementOddWorker)
 
 -- | Like 'incrementOdd', but constructor-agnostic
 incrementOddAnyWorker :: TransformContext n -> Term n -> RewriteMonad () (Term n)
@@ -92,7 +92,7 @@ incrementOddAnyWorker _ctx = \case
   term -> pure term
 
 incrementOddAny :: Transformation
-incrementOddAny = scopedAnyConstructor "incrementOddAny" 'incrementOddAnyWorker
+incrementOddAny = anyConstructor "incrementOddAny" 'incrementOddAnyWorker
 
 -- | Increments an odd integer literal, either as the argument of an
 -- application or bare
@@ -109,7 +109,7 @@ incrementBothLiteralWorker _ctx _node (IntLiteral i)
 incrementBothLiteralWorker _ctx node _literal = pure node
 
 incrementBoth :: Transformation
-incrementBoth = toScopedTransformation "incrementBoth"
+incrementBoth = toTransformation "incrementBoth"
   (onApp 'incrementBothAppWorker <> onLiteral 'incrementBothLiteralWorker)
 
 incrementBothRewrite :: Rewrite ()
@@ -131,7 +131,7 @@ inlineTrivialLetWorker _ctx node bind body = case (bind, body) of
 
 inlineTrivialLet :: Transformation
 inlineTrivialLet =
-  toScopedTransformation "inlineTrivialLet" (onLet 'inlineTrivialLetWorker)
+  toTransformation "inlineTrivialLet" (onLet 'inlineTrivialLetWorker)
 
 inlineTrivialLetRewrite :: Rewrite ()
 inlineTrivialLetRewrite = Transform $ \ctx -> \case
@@ -145,7 +145,7 @@ reifyContextWorker ctx _node =
   changed (Literal (StringLiteral (show (ctxFrames ctx))))
 
 reifyContext :: Transformation
-reifyContext = toScopedTransformation "reifyContext" (onVarNode 'reifyContextWorker)
+reifyContext = toTransformation "reifyContext" (onVarNode 'reifyContextWorker)
 
 -- | Rewrites references to 'fGlobal' to a primitive, so the
 -- 'Clash.Rewrite.Scoped.Types.AppArg' frame of a sibling argument is computed
@@ -156,7 +156,7 @@ functionToPrimWorker _ctx = \case
   node -> pure node
 
 functionToPrim :: Transformation
-functionToPrim = toScopedTransformation "functionToPrim" (onVarNode 'functionToPrimWorker)
+functionToPrim = toTransformation "functionToPrim" (onVarNode 'functionToPrimWorker)
 
 -- * Test terms
 
@@ -225,7 +225,7 @@ callStrategyStrat callee = callStrategy callee >-> topdown collapseApplication
 -- | Every fused traversal of a 'Step' next to its unfused reference
 allTraversals :: Step -> Q Exp
 allTraversals step = listE
-  [ [| ($(stringE name), $(compileScopedStrategy strat), $(compileScopedStrategyReference strat)) |]
+  [ [| ($(stringE name), $(compileStrategy strat), $(compileStrategyReference strat)) |]
   | (name, strat) <-
       [ ("topdown", topdown step)
       , ("bottomup", bottomup step)

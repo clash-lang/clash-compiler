@@ -57,7 +57,7 @@ import Clash.Core.TyCon (TyCon (..), tyConDataCons)
 import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
 import Clash.Normalize.Scoped.Primitives (removedArg)
 import Clash.Normalize.Types (NormalizeSession)
-import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types (normalizeUltra, typeEnv)
 import qualified Clash.Sized.Internal.BitVector
 import qualified Clash.Sized.RTree
@@ -134,7 +134,7 @@ reduceBinders sc !subst processed (lb : rest)
 
 -- | Evaluate applied primitives to WHNF with the evaluator
 reduceConst :: Transformation
-reduceConst = toScopedTransformation "reduceConst" (onApp 'reduceConstWorker)
+reduceConst = toTransformation "reduceConst" (onApp 'reduceConstWorker)
 
 -- | The 'App' handler of 'reduceConst'
 reduceConstWorker
@@ -207,7 +207,7 @@ See https://github.com/clash-lang/clash-compiler/issues/1606
 -- Currently, it only handles the functions in 'reducePrimImpls'. See the
 -- module header for how the handlers work.
 reducePrim :: Transformation
-reducePrim = toScopedTransformation "reducePrim" (onApp 'reducePrimWorker)
+reducePrim = toTransformation "reducePrim" (onApp 'reducePrimWorker)
 
 -- | The 'App' handler of 'reducePrim'
 reducePrimWorker

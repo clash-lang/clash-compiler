@@ -27,7 +27,7 @@ import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 
 import Test.Clash.Rewrite
@@ -75,7 +75,7 @@ st = def
 
 anfS, nonRepANFS :: Rewrite NormalizeState
 anfS = Transform Scoped.makeANF
-nonRepANFS = $(asScopedRewriteQ Scoped.nonRepANF)
+nonRepANFS = $(asRewriteQ Scoped.nonRepANF)
 
 -- | Assert that 'Scoped.makeANF' rewrites a closed term to the expected one,
 -- with the type constructors of 'Test.Clash.Rewrite.testTyConMap'

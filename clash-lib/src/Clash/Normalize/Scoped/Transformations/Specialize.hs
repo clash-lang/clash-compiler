@@ -92,7 +92,7 @@ import           Clash.Driver.Types
 import           Clash.Normalize.Types
   (NormalizeSession, specialisationCache, specialisationHistory)
 import           Clash.Rewrite.StrategyDSL
-  (Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode, toScopedTransformation)
+  (Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode, toTransformation)
 import           Clash.Rewrite.Types
   (censor, curFun, debugOpts, extra, typeEnv, specializationLimit)
 import           Clash.Unique                (Unique)
@@ -144,7 +144,7 @@ import           Clash.Rewrite.Scoped.Whnf   (whnfRW)
 -- argument. That holds for the binders of the function part, and for those of
 -- arguments that end up as the function part after substitution alike.
 appProp :: Transformation
-appProp = toScopedTransformation "applicationPropagation"
+appProp = toTransformation "applicationPropagation"
   (onAppNode 'appPropWorker <> onTyAppNode 'appPropWorker)
 
 -- | The application-spine handler of 'appProp'. Matches the constructors it
@@ -258,7 +258,7 @@ sinkArgs = map (bimap sink sink)
 -- | Specialize functions on arguments which are constant, except when they
 -- are clock, reset generators.
 constantSpec :: Transformation
-constantSpec = toScopedTransformation "constantSpec" (onApp 'constantSpecWorker)
+constantSpec = toTransformation "constantSpec" (onApp 'constantSpecWorker)
 
 -- | The 'App' handler of 'constantSpec'
 constantSpecWorker
@@ -595,7 +595,7 @@ specializeName (spec0, n0) (spec1, n1)
 
 -- | Specialize functions on their non-representable argument
 nonRepSpec :: Transformation
-nonRepSpec = toScopedTransformation "nonRepSpec" (onApp 'nonRepSpecWorker)
+nonRepSpec = toTransformation "nonRepSpec" (onApp 'nonRepSpecWorker)
 
 -- | The 'App' handler of 'nonRepSpec'
 nonRepSpecWorker
@@ -638,7 +638,7 @@ nonRepSpecWorker ctx e e1 e2
 
 -- | Specialize functions on their type
 typeSpec :: Transformation
-typeSpec = toScopedTransformation "typeSpec" (onTyApp 'typeSpecWorker)
+typeSpec = toTransformation "typeSpec" (onTyApp 'typeSpecWorker)
 
 -- | The 'TyApp' handler of 'typeSpec'
 typeSpecWorker
@@ -665,7 +665,7 @@ typeSpecWorker ctx e e1 ty
 -- the type of a term), we instead substitute all occurrences of a lambda-bound
 -- variable with a zero-width type with the only value of that type.
 zeroWidthSpec :: Transformation
-zeroWidthSpec = toScopedTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecWorker)
+zeroWidthSpec = toTransformation "zeroWidthSpec" (onLam 'zeroWidthSpecWorker)
 
 -- | The 'Lam' handler of 'zeroWidthSpec'
 zeroWidthSpecWorker

@@ -27,7 +27,7 @@
 
   Transformations are declared in the strategy DSL
   ("Clash.Rewrite.StrategyDSL"), with
-  'Clash.Rewrite.StrategyDSL.toScopedTransformation'. The shapes of the
+  'Clash.Rewrite.StrategyDSL.toTransformation'. The shapes of the
   workers:
 
   * @onCase 'w@: @w :: Distinct n => TransformContext n -> Term n -> Term n
@@ -42,12 +42,12 @@
     needed): until then, @l@ is not known to be 'Distinct'.
 
   * @onAppNode 'w@ (and the other @on*Node@ builders, and
-    'Clash.Rewrite.StrategyDSL.scopedAnyConstructor'):
+    'Clash.Rewrite.StrategyDSL.anyConstructor'):
     @w :: Distinct n => TransformContext n -> Term n -> m (Term n)@, getting
     the node only. @onVarNode@ fires at both local ('Var') and global
     ('GlobalVar') variables. There is no @onVar@ for scoped Core.
 
-  * 'Clash.Rewrite.StrategyDSL.scopedPass' takes a function of that same type,
+  * 'Clash.Rewrite.StrategyDSL.pass' takes a function of that same type,
     which traverses the term itself (with "Clash.Rewrite.Scoped.Combinators").
 
   A worker that doesn't fire returns the node it was given, unchanged. A
@@ -103,7 +103,7 @@
 
   @
   deadCode :: Transformation
-  deadCode = toScopedTransformation \"deadCode\" (onLet 'deadCodeWorker)
+  deadCode = toTransformation \"deadCode\" (onLet 'deadCodeWorker)
 
   deadCodeWorker
     :: Distinct n
@@ -122,7 +122,7 @@
 
   The strategies ("Clash.Normalize.Strategy.Spec") refer to the scoped
   transformations, and the strategy compiler
-  ("Clash.Rewrite.StrategyDSL.TH", 'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy')
+  ("Clash.Rewrite.StrategyDSL.TH", 'Clash.Rewrite.StrategyDSL.TH.compileStrategy')
   compiles them into fused traversals that open the binders they go under.
 
   Tests: "Test.Clash.Scoped" has test scopes to write the inputs and the

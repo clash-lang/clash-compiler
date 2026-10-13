@@ -33,7 +33,7 @@ import qualified Clash.Normalize.Scoped.Transformations.MultiPrim as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite.Scoped (Rewrite)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState)
 
 import Test.Clash.Rewrite
@@ -103,7 +103,7 @@ st :: RewriteState NormalizeState
 st = def
 
 setupS :: Rewrite NormalizeState
-setupS = $(asScopedRewriteQ Scoped.setupMultiResultPrim)
+setupS = $(asRewriteQ Scoped.setupMultiResultPrim)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.MultiPrim"

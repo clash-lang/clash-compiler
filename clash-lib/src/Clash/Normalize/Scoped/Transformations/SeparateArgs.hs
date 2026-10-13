@@ -35,7 +35,7 @@ import Clash.Core.Name (nameOcc)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onLam, onTickNode, onTyAppNode, onVarNode
-  , toScopedTransformation )
+  , toTransformation )
 import Clash.Rewrite.Types (typeEnv)
 
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
@@ -59,7 +59,7 @@ import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
 --
 -- > f :: Clock System -> Reset System -> Signal System Int
 separateArguments :: Transformation
-separateArguments = toScopedTransformation "separateArguments"
+separateArguments = toTransformation "separateArguments"
   (  onLam 'separateArgumentsLambdaWorker
   <> onVarNode 'separateArgumentsSpineWorker
   <> onAppNode 'separateArgumentsSpineWorker

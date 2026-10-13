@@ -110,8 +110,8 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding)
 import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.Types (NormalizeSession)
-import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types
   (globalHeap, bindings, typeEnv, tupleTcCache)
 import Clash.Util (curLoc)
@@ -199,7 +199,7 @@ import qualified GHC.Prim
 -- primitives, see 'interestingHead'.
 disjointExpressionConsolidation :: Transformation
 disjointExpressionConsolidation =
-  toScopedTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)
+  toTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)
 
 -- | The 'Case' handler of 'disjointExpressionConsolidation'
 disjointExpressionConsolidationWorker
@@ -276,7 +276,7 @@ disjointExpressionConsolidationWorker _ e _ _ _ = return e
 
 -- | 'Letrec.deadCode'
 deadCodeR :: Transform NormalizeSession
-deadCodeR = $(asScopedRewriteQ Letrec.deadCode)
+deadCodeR = $(asRewriteQ Letrec.deadCode)
 
 -- * The environment
 

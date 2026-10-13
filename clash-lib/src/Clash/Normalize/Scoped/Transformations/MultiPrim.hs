@@ -32,7 +32,7 @@ import qualified Clash.Core.Name as C (mkUnsafeSystemName)
 import Clash.Core.TyCon (TyConMap)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..))
-import Clash.Rewrite.StrategyDSL (Transformation, onPrim, toScopedTransformation)
+import Clash.Rewrite.StrategyDSL (Transformation, onPrim, toTransformation)
 import Clash.Rewrite.Types (primitives, tcCache)
 import Clash.Util (curLoc)
 
@@ -94,7 +94,7 @@ with a non-tuple return type.
 -- type].
 setupMultiResultPrim :: Transformation
 setupMultiResultPrim =
-  toScopedTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)
+  toTransformation "setupMultiResultPrim" (onPrim 'setupMultiResultPrimWorker)
 
 -- | The 'Prim' handler of 'setupMultiResultPrim'
 setupMultiResultPrimWorker

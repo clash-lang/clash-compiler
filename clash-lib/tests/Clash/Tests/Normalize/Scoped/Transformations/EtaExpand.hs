@@ -22,7 +22,7 @@ import Clash.Core.Scoped.Syntax (GlobalId)
 import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState)
 
 import Test.Clash.Rewrite (TestDefs (..), TestTerm, parseTestTermWith, testGlobalId)
@@ -43,7 +43,7 @@ st = def
 
 etaTLS, etaExpandSynS :: Rewrite NormalizeState
 etaTLS = Transform Scoped.etaExpansionTL
-etaExpandSynS = $(asScopedRewriteQ Scoped.etaExpandSyn)
+etaExpandSynS = $(asRewriteQ Scoped.etaExpandSyn)
 
 -- | An environment in which @f@ and @k@ are top entities
 topsEnv :: RewriteEnv

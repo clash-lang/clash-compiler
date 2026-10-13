@@ -34,7 +34,7 @@ import Clash.Core.Scoped.Syntax
 import qualified Clash.Normalize.Scoped.Transformations.Case as S
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Scoped (Rewrite, Transform (..))
-import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 
 import Test.Clash.Rewrite
@@ -73,11 +73,11 @@ st :: RewriteState NormalizeState
 st = def
 
 caseCaseS, caseConS, caseFlatS, caseLetS, elimCaseBigNumS :: Rewrite NormalizeState
-caseCaseS = $(asScopedRewriteQ S.caseCase)
-caseConS = $(asScopedRewriteQ S.caseCon)
-caseFlatS = $(asScopedRewriteQ S.caseFlat)
-caseLetS = $(asScopedRewriteQ S.caseLet)
-elimCaseBigNumS = $(asScopedRewriteQ S.elimCaseBigNumInternals)
+caseCaseS = $(asRewriteQ S.caseCase)
+caseConS = $(asRewriteQ S.caseCon)
+caseFlatS = $(asRewriteQ S.caseFlat)
+caseLetS = $(asRewriteQ S.caseLet)
+elimCaseBigNumS = $(asRewriteQ S.elimCaseBigNumInternals)
 
 -- | Assert that a transformation rewrites a term to the expected one, see
 -- 'assertRewritesTo'

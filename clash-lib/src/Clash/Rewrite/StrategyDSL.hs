@@ -22,8 +22,8 @@
   = Scoped Core
 
   The transformations are those of scoped Clash Core ("Clash.Rewrite.Scoped"):
-  declare one with 'toScopedTransformation', and a whole-term pass with
-  'scopedPass'. 'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy' compiles
+  declare one with 'toTransformation', and a whole-term pass with
+  'pass'. 'Clash.Rewrite.StrategyDSL.TH.compileStrategy' compiles
   a strategy. Workers take a 'Clash.Rewrite.Scoped.Types.TransformContext'
   and terms of any scope. A 'FieldWorker' of 'CVar' is not supported, as
   scoped Core has separate constructors for local and global variables: use a
@@ -41,8 +41,8 @@ module Clash.Rewrite.StrategyDSL
     Constructor (..)
   , TransformationWorker (..)
   , Transformation (..)
-  , toScopedTransformation
-  , scopedAnyConstructor
+  , toTransformation
+  , anyConstructor
   , named
     -- ** Worker builders: workers receiving the constructor's fields
   , onData
@@ -75,7 +75,7 @@ module Clash.Rewrite.StrategyDSL
   , topdownFix
   , topdownSuc
   , innerMost
-  , scopedPass
+  , pass
   , callStrategy
   , repeatR
     -- * Combinators
@@ -134,12 +134,12 @@ data Transformation = Transformation
 -- | Declare a transformation's workers: at most one per constructor, and
 -- either an 'AnyWorker' or per-constructor workers, never both. Checked when
 -- the transformation is compiled.
-toScopedTransformation :: String -> [TransformationWorker] -> Transformation
-toScopedTransformation = Transformation
+toTransformation :: String -> [TransformationWorker] -> Transformation
+toTransformation = Transformation
 
 -- | Declare a transformation that fires at any constructor. See 'AnyWorker'.
-scopedAnyConstructor :: String -> Name -> Transformation
-scopedAnyConstructor name worker = Transformation name [AnyWorker worker]
+anyConstructor :: String -> Name -> Transformation
+anyConstructor name worker = Transformation name [AnyWorker worker]
 
 -- | Give a transformation a different name; used for deliberate debug
 -- aliases of a transformation that runs at several strategy positions (the
@@ -252,8 +252,8 @@ innerMost  = InnerMost . toStep
 -- | A whole-term pass of a rewrite of scoped Core, i.e. a function of type
 -- @forall n. Distinct n => TransformContext n -> Term n -> RewriteMonad extra
 -- (Term n)@, see "Clash.Rewrite.Scoped".
-scopedPass :: String -> Name -> Strat
-scopedPass = Pass
+pass :: String -> Name -> Strat
+pass = Pass
 
 -- | Reference another compiled strategy by the name of its binding.
 callStrategy :: Name -> Strat

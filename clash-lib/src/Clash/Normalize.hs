@@ -70,7 +70,7 @@ import           Clash.Normalize.Strategy.Spec    (flattenSpec)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Scoped.Util
   (isCheapFunction, normalizeTopLvlBndr, rewriteExpr, tvSubstWithTyEq)
-import           Clash.Rewrite.StrategyDSL.TH     (compileScopedStrategy)
+import           Clash.Rewrite.StrategyDSL.TH     (compileStrategy)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), debugOpts, extra, bindings,
    topEntities, newInlineStrategy, typeEnv)
@@ -484,7 +484,7 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
       else return (CBranch (nm,(Binding nm' sp inl pr newExpr r)) allUsed)
 
   -- The flattening strategy is described in Clash.Normalize.Strategy.Spec.
-  flatten = $(compileScopedStrategy flattenSpec)
+  flatten = $(compileStrategy flattenSpec)
 
   goCheap c@(CLeaf   (nm2,(Binding _ _ inl2 _ e _)))
     | isNoInline inl2  = (Nothing     ,[c])
