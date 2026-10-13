@@ -3,7 +3,13 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Utilities to write unit tests on transformations
+  Utilities to write unit tests on transformations: environments to run them
+  in, type constructors to test them with ('testTyConMap'), and parsers of
+  terms from strings.
+
+  'parseToTerm' parses a term of Clash Core. 'parseTestTerm' parses the same
+  language into scoped Clash Core, see the section "Parsing scoped Core" and
+  "Test.Clash.Scoped" for the test scopes that build its terms.
 -}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -18,8 +24,8 @@ module Test.Clash.Rewrite where
 import Clash.Annotations.BitRepresentation.Internal (buildCustomReprs)
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Scoped.Convert as C
-  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash, mkGlobalIdFromClash,
-   mkNewTyConRhsFromClash, mkPrimTyConFromClash)
+  (mkAlgTyConFromClash, mkDataConFromClash, mkFunTyConFromClash,
+   mkGlobalIdFromClash, mkNewTyConRhsFromClash, mkPrimTyConFromClash)
 import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
@@ -50,7 +56,14 @@ import Clash.Netlist.Types
 import Clash.Rewrite.Scoped.Globals (fromClashBindings)
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (apply, changed, runRewrite)
+import Clash.Core.Scoped.Builder
+  ( Key, TmB, TyB, appB, appTyB, caseB, constTyB, dataAltB, dataB, defaultAltB
+  , forAllTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB, runClosedType
+  , tyAppB, tyLamB, uniqueKey, varB, varTyB )
+import qualified Clash.Core.Scoped.Convert as S (mkGlobalId)
 import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
+import Clash.Core.Scoped.Sig (DataConSig (..))
+import Clash.Core.Scoped.Syntax (GlobalId, teleLength)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
@@ -62,18 +75,23 @@ import Clash.Util.Supply (Supply, freshId, newSupply)
 import Clash.Unique (Unique, fromGhcUnique)
 
 import Control.Applicative ((<|>))
+import qualified Control.Monad as Monad
+import Control.Monad.Trans.Writer.Strict (Writer, runWriter, tell)
 import qualified Control.Lens as Lens
 import Control.DeepSeq (NFData, force)
 import Control.Exception (ErrorCall (..), evaluate, try)
 import Data.Char (isAscii, ord)
 import Data.Default
 import Data.Maybe (fromMaybe)
+import qualified Data.Maybe as Maybe
 import Data.Monoid (Any (..))
+import Data.String (IsString (..))
 import GHC.Types.Basic (InlineSpec (NoUserInlinePrag))
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Extension (Extension (..), KnownExtension (..))
 import Language.Haskell.Exts.Parser
-  (ParseMode (..), defaultParseMode, fromParseResult, parseExpWithMode)
+  ( ParseMode (..), defaultParseMode, fromParseResult, parseExpWithMode
+  , parseTypeWithMode )
 import System.IO.Unsafe (unsafePerformIO)
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit
@@ -95,6 +113,7 @@ import qualified Data.List as List
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
+import qualified Data.IntSet as IntSet
 import qualified Data.Text as Text
 import qualified Data.Hashable as Hashable
 
@@ -704,6 +723,543 @@ parseToTermQQ = TH.QuasiQuoter{
   , TH.quoteDec = error "parseToTerm.quoteDec: NYI"
   }
 
+-- * Parsing scoped Core
+--
+-- The parser of scoped Clash Core. It parses the same language as
+-- 'parseToTerm', with the same identifiers (see 'parseNameScope'), but builds
+-- builders ("Clash.Core.Scoped.Builder") rather than terms of Clash Core, so
+-- that a test can build the term in a scope of its choice. See
+-- "Test.Clash.Scoped" for how tests use it.
+--
+-- Compared to 'parseToTerm', it also parses:
+--
+--   * Type constructors and data constructors of 'zeroWidthTyConMap', by
+--     their names, see 'resolveTyConName' and 'resolveDataCon':
+--     @Maybe Int@, @Clash.Sized.Vector.Vec 2 Int@, @Just \@Int 1@.
+--
+--   * Function types @Int -> Int@, type-level numbers and strings, and the
+--     kinds @Type@, @Nat@ and @Symbol@, also on type binders:
+--     @\\(n :: Nat) -> ..@ and @forall (n :: Nat). ..@.
+--
+--   * Case-expressions, annotated with the type of their alternatives:
+--     @(case m of { Just (x :: Int) -> x; Nothing -> 0 }) :: Int@. Patterns
+--     are constructors applied to typed binders, integer literals, and @_@.
+--     The existentially quantified type variables of a constructor are its
+--     first binders, annotated with their kinds, like the type binders of a
+--     lambda: @MkE (b :: Type) (y :: b)@.
+--
+--   * Non-recursive let-bindings, written with a bang:
+--     @let { !(x :: Int) = 1 } in x@. Like in Haskell, where a bang binding
+--     can't be recursive, its right-hand side is outside of its scope. A let
+--     with several bang bindings binds them one after the other. A let
+--     without bangs is recursive, as in 'parseToTerm'.
+--
+-- Variables refer to their binders by /key/: the unique of the identifier,
+-- see 'Clash.Core.Scoped.Builder.Key'. So an identifier that a binder binds
+-- again refers to the inner binder within its scope, like in Haskell:
+-- @\\(x_1 :: Int) -> let { !(x_1 :: Int) = f x_1 } in x_1@ binds @x_1@ twice,
+-- and the right-hand side refers to the lambda's binder.
+--
+-- Global variables (@f_G1@) are not scoped. Their type is their annotation,
+-- which must be closed, or 'freeVarType'. Local variables that no binder
+-- binds are free: the scope that the term is built in must have them (see
+-- 'Test.Clash.Scoped.termIn'), or the test declares them from the term (see
+-- 'Test.Clash.Scoped.withTerm', and 'testTermFree').
+
+-- | A term of scoped Clash Core to build in the scope of a test, see
+-- 'Test.Clash.Scoped.termIn'. Parse it from a string with 'parseTestTerm',
+-- the quasiquoter 'termQQ', or a string literal (with @OverloadedStrings@).
+data TestTerm = TestTerm
+  { testTermB :: TmB
+  -- ^ The term
+  , testTermFree :: [ScopeDecl]
+  -- ^ The free local variables it mentions, in the order in which
+  -- 'Test.Clash.Scoped.withTerm' declares them: the type variables (of kind
+  -- @Type@) by key, then the term variables by key, with the type of their
+  -- first annotated occurrence, or 'freeVarType'.
+  }
+
+instance IsString TestTerm where
+  fromString = parseTestTerm
+
+-- | A type of scoped Clash Core to build in the scope of a test, see
+-- 'TestTerm' and 'Test.Clash.Scoped.typeIn'
+data TestType = TestType
+  { testTypeB :: TyB
+  , testTypeFree :: [ScopeDecl]
+  -- ^ The free type variables it mentions, of kind @Type@, by key
+  }
+
+instance IsString TestType where
+  fromString = parseTestType
+
+-- | A term made with the builders ("Clash.Core.Scoped.Builder"), e.g. for
+-- what the parser can't parse, such as primitives. The builders of a parsed
+-- term are 'testTermB'. Its free variables are not known: a scope that the
+-- term is built in must have them.
+builtTerm :: TmB -> TestTerm
+builtTerm b = TestTerm b []
+
+-- | A type made with the builders, see 'builtTerm'
+builtType :: TyB -> TestType
+builtType b = TestType b []
+
+-- | A variable of the scope of a test, see 'Test.Clash.Scoped.withTestScope'
+data ScopeDecl = ScopeDecl
+  { declRaw :: !(Maybe Int)
+  -- ^ The raw name it must get, see 'atRaw'
+  , declVar :: !DeclVar
+  }
+
+-- | A variable of the scope of a test: its key, name, and kind or type. The
+-- type of a term variable is 'freeVarType' if it has none.
+data DeclVar
+  = DeclTyVar !Key !(C.Name C.Type) TestType
+  | DeclId !Key !(C.Name C.Term) !(Maybe TestType)
+
+-- | A type variable of kind @Type@, by its identifier (see 'parseNameScope')
+tyVarD :: HasCallStack => String -> ScopeDecl
+tyVarD nm = kindedTyVarD nm (parseTestType "Type")
+
+-- | A type variable of the given kind, see 'tyVarD'
+kindedTyVarD :: HasCallStack => String -> TestType -> ScopeDecl
+kindedTyVarD s k = ScopeDecl Nothing (DeclTyVar (nameKey nm) nm k)
+ where
+  nm = parseLocalName s
+
+-- | A term variable of the given type, by its identifier (see
+-- 'parseNameScope'), e.g. @varD "x_1" "Maybe a_2"@
+varD :: HasCallStack => String -> TestType -> ScopeDecl
+varD s ty = ScopeDecl Nothing (DeclId (nameKey nm) nm (Just ty))
+ where
+  nm = parseLocalName s
+
+-- | Give a variable a raw name above those of the variables before it,
+-- rather than the next one. E.g. a variable with a raw name above the names of
+-- all binders of a term, see 'Test.Clash.Scoped.sunkD'.
+atRaw :: Int -> ScopeDecl -> ScopeDecl
+atRaw r d = d {declRaw = Just r}
+
+-- | The name of a local variable, by its identifier
+parseLocalName :: HasCallStack => String -> C.Name a
+parseLocalName s = case parseNameScope (Ident () s) of
+  (nm, C.LocalId) -> nm
+  (_, C.GlobalId) -> error ("parseLocalName: not a local variable: " <> s)
+
+-- | The key of a variable with the given name
+nameKey :: C.Name a -> Key
+nameKey = uniqueKey . C.nameUniq
+
+-- | A global variable of the given closed type, by its identifier (see
+-- 'parseNameScope'). Equal to the global variable that a term with the same
+-- identifier refers to, as global variables are equal by unique.
+testGlobalId :: HasCallStack => String -> TestType -> GlobalId
+testGlobalId s ty = S.mkGlobalId (parseName (Ident () s)) (runClosedType (testTypeB ty))
+
+-- | Parse a term of scoped Core, see the section header
+parseTestTerm :: HasCallStack => String -> TestTerm
+parseTestTerm s = TestTerm b (freeDecls fr)
+ where
+  (b, fr) = runWriter (spTm emptyPEnv (fromParseResult (parseExpWithMode scopedParseMode s)))
+
+-- | Parse a type of scoped Core, see the section header
+parseTestType :: HasCallStack => String -> TestType
+parseTestType s = TestType b (freeDecls fr)
+ where
+  (b, fr) = runWriter (spTy emptyPEnv (fromParseResult (parseTypeWithMode scopedParseMode s)))
+
+-- | 'parseTestTerm' as a quasiquoter, for terms that span several lines:
+--
+-- > [termQQ|
+-- >   let
+-- >     !(x :: Int) = 1
+-- >   in
+-- >     x
+-- > |]
+termQQ :: TH.QuasiQuoter
+termQQ = stringQQ 'parseTestTerm
+
+-- | 'parseTestType' as a quasiquoter
+typeQQ :: TH.QuasiQuoter
+typeQQ = stringQQ 'parseTestType
+
+-- | A quasiquoter that applies the given function to the quoted string
+stringQQ :: TH.Name -> TH.QuasiQuoter
+stringQQ f = TH.QuasiQuoter
+  { TH.quoteExp = fmap (TH.AppE (TH.VarE f)) . TH.lift
+  , TH.quotePat = error "stringQQ.quotePat: NYI"
+  , TH.quoteType = error "stringQQ.quoteType: NYI"
+  , TH.quoteDec = error "stringQQ.quoteDec: NYI"
+  }
+
+-- | The parse mode of 'parseTestTerm': that of 'parseToTerm', with
+-- @BangPatterns@ for non-recursive let-bindings, @DataKinds@ for type-level
+-- literals, @KindSignatures@ for kinded type binders, and @MagicHash@ for
+-- names like @Int#@
+scopedParseMode :: ParseMode
+scopedParseMode = termParseMode
+  { extensions =
+      map EnableExtension [BangPatterns, DataKinds, KindSignatures, MagicHash]
+        <> extensions termParseMode
+  }
+
+-- | The keys of the variables bound around a subterm, and the types that let
+-- expressions declare for binders by key, see 'parsePats'
+data PEnv = PEnv
+  { _peTyVars :: !IntSet.IntSet
+  , _peVars :: !IntSet.IntSet
+  , _peSigs :: !(IntMap.IntMap TyB)
+  }
+
+emptyPEnv :: PEnv
+emptyPEnv = PEnv IntSet.empty IntSet.empty IntMap.empty
+
+bindTyKey :: Key -> PEnv -> PEnv
+bindTyKey k (PEnv tys tms sigs) = PEnv (IntSet.insert k tys) tms sigs
+
+bindTmKey :: Key -> PEnv -> PEnv
+bindTmKey k (PEnv tys tms sigs) = PEnv tys (IntSet.insert k tms) sigs
+
+-- | The free variables of a parsed term: the type variables by key, and the
+-- term variables by key, with the type of the first occurrence that has one
+data Free = Free !(IntMap.IntMap (C.Name C.Type)) !(IntMap.IntMap (C.Name C.Term, Maybe TyB))
+
+instance Semigroup Free where
+  Free tys1 tms1 <> Free tys2 tms2 =
+    Free (IntMap.union tys1 tys2) (IntMap.unionWith firstTyped tms1 tms2)
+   where
+    firstTyped (nm, Nothing) (_, ty) = (nm, ty)
+    firstTyped v _ = v
+
+instance Monoid Free where
+  mempty = Free IntMap.empty IntMap.empty
+
+-- | The declarations of free variables, see 'testTermFree'
+freeDecls :: Free -> [ScopeDecl]
+freeDecls (Free tys tms) =
+  [ ScopeDecl Nothing (DeclTyVar k nm (builtType liftedTypeKindB))
+  | (k, nm) <- IntMap.toAscList tys ] <>
+  [ ScopeDecl Nothing (DeclId k nm (builtType <$> ty))
+  | (k, (nm, ty)) <- IntMap.toAscList tms ]
+
+type P = Writer Free
+
+-- | The type constructor of a builtin type that is a single type constructor
+constOf :: HasCallStack => C.Type -> C.ConstTy
+constOf = \case
+  C.ConstTy c -> c
+  ty -> error ("constOf: not a type constructor: " <> show ty)
+
+liftedTypeKindB :: TyB
+liftedTypeKindB = constTyB (constOf C.liftedTypeKind)
+
+-- | 'freeVarType' as a builder
+freeVarTyB :: TyB
+freeVarTyB = constTyB (constOf freeVarType)
+
+-- | The function type
+funTyB :: TyB -> TyB -> TyB
+funTyB t1 = appTyB (appTyB (constTyB C.Arrow) t1)
+
+-- | A qualified or unqualified name as a string
+qNameString :: (HasCallStack, Show l) => QName l -> String
+qNameString = \case
+  UnQual _ nm -> nameString nm
+  Qual _ (ModuleName _ m) nm -> m <> "." <> nameString nm
+  q -> error ("qNameString: " <> show q)
+
+nameString :: Name l -> String
+nameString = \case
+  Ident _ s -> s
+  Symbol _ s -> s
+
+-- | The type constructors that 'parseTestType' knows by name
+testTyCons :: [C.TyCon]
+testTyCons = UniqMap.elems zeroWidthTyConMap
+
+-- | The data constructors that 'parseTestTerm' knows by name
+testDataCons :: [C.DataCon]
+testDataCons = concatMap C.tyConDataCons testTyCons
+
+-- | Look a value up by its name: one whose name is the given string, or the
+-- given string spelled for the GHC that compiled the tests (see 'ghcName'), or
+-- else the only one whose name ends in the given string after a dot, e.g.
+-- @Vec@ for @Clash.Sized.Vector.Vec@
+lookupByOcc :: (a -> Text.Text) -> [a] -> String -> Maybe a
+lookupByOcc occ xs s = case filter ((== t) . occ) xs <> filter ((== ghcName t) . occ) xs of
+  x : _ -> Just x
+  [] -> case filter ((== t) . Text.takeWhileEnd (/= '.') . occ) xs of
+    [x] -> Just x
+    _ -> Nothing
+ where
+  t = Text.pack s
+
+-- | Spell a qualified name of GHC, written with the module names of GHC 9.12,
+-- with the module names of the GHC that compiled the tests, so that tests can
+-- name the types, constructors and primitives of GHC independently of its
+-- version. GHC 9.14 defines them in @ghc-internal@, e.g. @GHC.Prim.Int#@ is
+-- @GHC.Internal.Prim.Int#@ there.
+ghcName :: Text.Text -> Text.Text
+#if __GLASGOW_HASKELL__ >= 914
+ghcName nm
+  | nm `elem` clashSpelledGhcNames = nm
+  | otherwise = go
+    [ ("GHC.Num.Integer.", "GHC.Internal.Bignum.Integer.")
+    , ("GHC.Num.Natural.", "GHC.Internal.Bignum.Natural.")
+    , ("GHC.Prim.", "GHC.Internal.Prim.")
+    , ("GHC.Types.", "GHC.Internal.Types.")
+    , ("GHC.Classes.", "GHC.Internal.Classes.")
+    , ("GHC.Tuple.", "GHC.Internal.Tuple.")
+    , ("GHC.CString.", "GHC.Internal.CString.")
+    , ("GHC.Magic.", "GHC.Internal.Magic.")
+    ]
+ where
+  go [] = nm
+  go ((old, new) : ps) =
+    maybe (go ps) (Text.pack new <>) (Text.stripPrefix (Text.pack old) nm)
+#else
+ghcName = id
+#endif
+
+-- | Names in the modules of GHC that Clash spells itself, the same for every
+-- version of GHC: those of the unsafe coercion primitive and of the type
+-- constructor of equality constraints. 'ghcName' leaves them as they are.
+clashSpelledGhcNames :: [Text.Text]
+clashSpelledGhcNames = map Text.pack ["GHC.Prim.unsafeCoerce#", "GHC.Prim.~#"]
+
+-- | The name of a type constructor: one of 'testTyCons' (see 'lookupByOcc'),
+-- or else as 'parseType' names it, e.g. @Maybe_9@ is the name @Maybe@ with
+-- unique 9
+resolveTyConName :: HasCallStack => String -> C.TyConName
+resolveTyConName s = case lookupByOcc (C.nameOcc . C.tyConName) testTyCons s of
+  Just tc -> C.tyConName tc
+  Nothing -> parseName (Ident () s)
+
+-- | A data constructor of 'testDataCons', see 'lookupByOcc'
+resolveDataCon :: HasCallStack => String -> C.DataCon
+resolveDataCon s = case lookupByOcc (C.nameOcc . C.dcName) testDataCons s of
+  Just dc -> dc
+  Nothing -> error ("resolveDataCon: unknown or ambiguous data constructor: " <> s)
+
+-- | A type constructor, or one of the kinds @Type@, @Nat@ and @Symbol@
+tyConB :: HasCallStack => String -> TyB
+tyConB = \case
+  "Type" -> liftedTypeKindB
+  "Nat" -> constTyB (constOf C.typeNatKind)
+  "Symbol" -> constTyB (constOf C.typeSymbolKind)
+  s -> constTyB (C.TyCon (resolveTyConName s))
+
+spTy :: (HasCallStack, Show l) => PEnv -> Type l -> P TyB
+spTy env@(PEnv tvs _ _) = \case
+  TyParen _ t -> spTy env t
+  TyCon _ qn -> pure (tyConB (qNameString qn))
+  TyVar _ nm0 -> do
+    let nm = parseName nm0
+        k = nameKey nm
+    Monad.unless (IntSet.member k tvs) (tell (Free (IntMap.singleton k nm) IntMap.empty))
+    pure (varTyB k)
+  TyForall _ (Just tvbs) Nothing t ->
+    spTyVarBinds env tvbs $ \env' bs -> do
+      body <- spTy env' t
+      pure (foldr (\(k, nm, ki) -> forAllTyB k nm ki) body bs)
+  TyApp _ t1 t2 -> appTyB <$> spTy env t1 <*> spTy env t2
+  TyFun _ t1 t2 -> funTyB <$> spTy env t1 <*> spTy env t2
+  TyPromoted _ (PromotedInteger _ i _) -> pure (litTyB (C.NumTy i))
+  TyPromoted _ (PromotedString _ s _) -> pure (litTyB (C.SymTy s))
+  t -> error ("parseTestType: " <> show t)
+
+-- | Type variable binders, each in the scope of the ones before it
+spTyVarBinds
+  :: (HasCallStack, Show l)
+  => PEnv -> [TyVarBind l] -> (PEnv -> [(Key, C.Name C.Type, TyB)] -> P r) -> P r
+spTyVarBinds env [] k = k env []
+spTyVarBinds env (tvb : tvbs) k = do
+  (nm, ki) <- case tvb of
+    UnkindedVar _ nm -> pure (parseName nm, liftedTypeKindB)
+    KindedVar _ nm ki -> (parseName nm,) <$> spTy env ki
+  let key = nameKey nm
+  spTyVarBinds (bindTyKey key env) tvbs $ \env' bs -> k env' ((key, nm, ki) : bs)
+
+spTm :: (HasCallStack, Show l) => PEnv -> Exp l -> P TmB
+spTm env = \case
+  Paren _ e -> spTm env e
+  ExpTypeSig _ e t -> case stripParens e of
+    Var _ (UnQual _ nm) -> varRef env nm (Just t)
+    Case _ scrut alts -> spCase env scrut alts t
+    _ -> error ("parseTestTerm: unsupported type annotation: " <> show e)
+  App _ e1 (TypeApp _ t) -> tyAppB <$> spTm env e1 <*> spTy env t
+  App _ e1 e2 -> appB <$> spTm env e1 <*> spTm env e2
+  InfixApp _ e1 op e2 -> do
+    f <- case op of
+      QVarOp _ (UnQual _ nm) -> varRef env nm Nothing
+      QConOp _ qn -> pure (dataB (resolveDataCon (qNameString qn)))
+      o -> error ("parseTestTerm: unsupported operator: " <> show o)
+    a1 <- spTm env e1
+    a2 <- spTm env e2
+    pure (appB (appB f a1) a2)
+  Lambda _ pats body -> spLams env pats body
+  Var _ (UnQual _ nm) -> varRef env nm Nothing
+  Con _ qn -> pure (dataB (resolveDataCon (qNameString qn)))
+  Lit _ (Int _ i _) -> pure (literalB (C.IntLiteral i))
+  Let _ (BDecls _ decls) body -> spLet env decls body
+  e@Case {} ->
+    error ("parseTestTerm: annotate a case-expression with the type of its alternatives: " <> show e)
+  e -> error ("parseTestTerm: " <> show e)
+ where
+  stripParens = \case
+    Paren _ e -> stripParens e
+    e -> e
+
+-- | A reference to a variable, with an optional type annotation
+varRef :: (HasCallStack, Show l) => PEnv -> Name l -> Maybe (Type l) -> P TmB
+varRef env@(PEnv _ tms _) nm0 annot = case parseNameScope nm0 of
+  (nm, C.GlobalId) ->
+    -- The type of a global is closed, so its type variables are not free
+    -- variables of the term
+    let ty = maybe freeVarTyB (fst . runWriter . spTy env) annot
+    in  pure (globalB (S.mkGlobalId nm (runClosedType ty)))
+  (nm, C.LocalId)
+    | IntSet.member k tms -> pure (varB k)
+    | otherwise -> do
+        ty <- traverse (spTy env) annot
+        tell (Free IntMap.empty (IntMap.singleton k (nm, ty)))
+        pure (varB k)
+   where
+    k = nameKey nm
+
+-- | A binder of a term variable: its key, name and type. The type is its
+-- annotation, or that of a type signature of an enclosing let-expression, see
+-- 'parsePats'.
+spIdBinder :: (HasCallStack, Show l) => PEnv -> Pat l -> P (Key, C.Name C.Term, TyB)
+spIdBinder env@(PEnv _ _ sigs) = \case
+  PParen _ p -> spIdBinder env p
+  PatTypeSig _ (PVar _ nm0) t -> do
+    let nm = parseName nm0
+    (nameKey nm, nm,) <$> spTy env t
+  PVar _ nm0 ->
+    let nm = parseName nm0
+        k = nameKey nm
+    in  case IntMap.lookup k sigs of
+          Just ty -> pure (k, nm, ty)
+          Nothing -> error [I.i|
+            The binder '#{C.nameOcc nm}' has no type: you forgot to
+            (explicitely) declare it, see 'parsePats'.
+          |]
+  p -> error ("parseTestTerm: unsupported binder: " <> show p)
+
+-- | Lambdas. A binder annotated with a kind binds a type variable, see
+-- 'parseLamPats'.
+spLams :: (HasCallStack, Show l) => PEnv -> [Pat l] -> Exp l -> P TmB
+spLams env [] body = spTm env body
+spLams env (p : ps) body = case kindBinderPat p of
+  Just (nm0, ki0) -> do
+    let nm = parseName nm0
+        k = nameKey nm
+    ki <- spTy env ki0
+    tyLamB k nm ki <$> spLams (bindTyKey k env) ps body
+  Nothing -> do
+    (k, nm, ty) <- spIdBinder env p
+    lamB k nm ty <$> spLams (bindTmKey k env) ps body
+
+-- | A binder annotated with a kind, which binds a type variable: its name and
+-- kind. The kinds are @Type@, @Nat@, @Symbol@, and functions between them.
+kindBinderPat :: Pat l -> Maybe (Name l, Type l)
+kindBinderPat = \case
+  PParen _ q -> kindBinderPat q
+  PatTypeSig _ (PVar _ nm) ki | isKind ki -> Just (nm, ki)
+  _ -> Nothing
+ where
+  isKind = \case
+    TyParen _ t -> isKind t
+    TyCon _ (UnQual _ (Ident _ s)) -> s `elem` ["Type", "Nat", "Symbol"]
+    TyFun _ t1 t2 -> isKind t1 && isKind t2
+    _ -> False
+
+-- | A let-expression: recursive, or non-recursive if all its bindings have a
+-- bang
+spLet :: (HasCallStack, Show l) => PEnv -> [Decl l] -> Exp l -> P TmB
+spLet env0@(PEnv tys tms sigs0) decls body = do
+  sigs <- IntMap.fromList . concat <$> sequence
+    [ (\ty -> [ (nameKey (parseName nm), ty) | nm <- nms ]) <$> spTy env0 t
+    | TypeSig _ nms t <- decls ]
+  let env = PEnv tys tms (IntMap.union sigs sigs0)
+      binds = [ (p, e) | PatBind _ p (UnGuardedRhs _ e) Nothing <- decls ]
+      others = [ d | d <- decls, not (isTypeSig d), not (isPatBind d) ]
+  Monad.unless (null others) (error ("parseTestTerm: unsupported declarations: " <> show others))
+  case (all (isBang . fst) binds, any (isBang . fst) binds) of
+    (True, _) | not (null binds) -> nonRec env binds
+    (_, False) -> do
+      bs <- mapM (spIdBinder env . fst) binds
+      let env' = List.foldl' (\acc (k, _, _) -> bindTmKey k acc) env bs
+      rhss <- mapM (spTm env' . snd) binds
+      letrecB [ (k, nm, ty, rhs) | ((k, nm, ty), rhs) <- zip bs rhss ] <$> spTm env' body
+    _ -> error "parseTestTerm: a let-expression with some, but not all bindings with a bang"
+ where
+  nonRec env [] = spTm env body
+  nonRec env ((p, e) : rest) = do
+    rhs <- spTm env e
+    (k, nm, ty) <- spIdBinder env (unBang p)
+    letB k nm ty rhs <$> nonRec (bindTmKey k env) rest
+
+  isBang = \case
+    PParen _ p -> isBang p
+    PBangPat {} -> True
+    _ -> False
+
+  unBang = \case
+    PParen _ p -> unBang p
+    PBangPat _ p -> p
+    p -> p
+
+  isTypeSig = \case
+    TypeSig {} -> True
+    _ -> False
+
+  isPatBind = \case
+    PatBind {} -> True
+    _ -> False
+
+-- | A case-expression, with the type of its alternatives
+spCase :: (HasCallStack, Show l) => PEnv -> Exp l -> [Alt l] -> Type l -> P TmB
+spCase env scrut alts ty = caseB <$> spTm env scrut <*> spTy env ty <*> mapM pAlt alts
+ where
+  pAlt = \case
+    Alt _ p (UnGuardedRhs _ rhs) Nothing -> pPat p rhs
+    a -> error ("parseTestTerm: unsupported alternative: " <> show a)
+
+  pPat p rhs = case p of
+    PParen _ q -> pPat q rhs
+    PWildCard _ -> defaultAltB <$> spTm env rhs
+    PLit _ sign (Int _ i _) ->
+      litAltB (C.IntLiteral (case sign of Negative _ -> negate i; Signless _ -> i)) <$> spTm env rhs
+    PApp _ qn ps -> do
+      let dc = resolveDataCon (qNameString qn)
+          nExt = case C.dcSig dc of DataConSig _ ext _ -> teleLength ext
+          (exPs, idPs) = List.splitAt nExt ps
+      Monad.unless (length exPs == nExt && all (Maybe.isJust . kindBinderPat) exPs) $
+        error [I.i|
+          parseTestTerm: the data constructor #{C.nameOcc (C.dcName dc)} has
+          #{nExt} existentially quantified type variables, so its pattern
+          must start with as many binders annotated with a kind, e.g.
+          (b :: Type).
+        |]
+      exTvs env exPs $ \env1 tvs -> do
+        bs <- mapM (spIdBinder env1) idPs
+        let env2 = List.foldl' (\acc (k, _, _) -> bindTmKey k acc) env1 bs
+        dataAltB dc tvs bs <$> spTm env2 rhs
+    _ -> error ("parseTestTerm: unsupported pattern: " <> show p)
+
+  -- The existentially quantified type variables of a pattern, each in the
+  -- scope of the ones before it
+  exTvs env1 [] k = k env1 []
+  exTvs env1 (q : qs) k = case kindBinderPat q of
+    Just (nm0, ki0) -> do
+      let nm = parseName nm0
+          key = nameKey nm
+      ki <- spTy env1 ki0
+      exTvs (bindTyKey key env1) qs $ \env2 tvs -> k env2 ((key, nm, ki) : tvs)
+    Nothing -> error "parseTestTerm: impossible"
+
 -- | The name 'parseType' produces for a type constructor whose name it
 -- derives a unique from, e.g. @Int@
 parseTyConName :: HasCallStack => String -> C.TyConName
@@ -765,7 +1321,7 @@ mkTestDataCon nm uniq univTvs extTvs argTys resTy = C.mkDataConFromClash
 
 -- | A type constructor name with the given human readable name and unique
 mkTyConName :: String -> Unique -> C.TyConName
-mkTyConName nm = C.mkUnsafeName C.User (Text.pack nm)
+mkTyConName nm = C.mkUnsafeName C.User (ghcName (Text.pack nm))
 
 -- | The kind @Type -> .. -> Type@ of a type constructor with the given type
 -- variables, which must be of kind 'C.liftedTypeKind'
@@ -1353,6 +1909,7 @@ testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
     , C.mkPrimTyConFromClash (C.nameUniq resetTcNm) resetTcNm C.liftedTypeKind 1
     , C.mkPrimTyConFromClash (C.nameUniq enableTcNm) enableTcNm C.liftedTypeKind 1
     , mkTestAlgTyCon clkPairTcNm [] [clkPairDc]
+    , mkTestAlgTyCon (parseTyConName "E") [] [existentialDataCon]
     , mkTestAlgTyCon orderingTcNm [] [ltDc, eqDc, gtDc]
     , mkTestAlgTyCon doubleTcNm [] [doubleDc]
     , mkTestAlgTyCon t3TyConName [fxA, fxB, t3C] [t3DataCon]
@@ -1475,8 +2032,13 @@ tyVar nmSort nm uniq = kindedTyVar nmSort nm uniq C.liftedTypeKind
 
 -- | A global binding of the given term, of a function without an inline pragma
 mkBinding :: C.Id -> C.Term -> Binding C.Term
-mkBinding i t = Binding
-  { bindingId = C.mkGlobalIdFromClash i
+mkBinding i = mkGlobalBinding (C.mkGlobalIdFromClash i)
+
+-- | A global binding of the given term, of a function without an inline
+-- pragma, e.g. of a term of scoped Core
+mkGlobalBinding :: GlobalId -> a -> Binding a
+mkGlobalBinding i t = Binding
+  { bindingId = i
   , bindingLoc = C.noSrcSpan
   , bindingSpec = NoUserInlinePrag
   , bindingIsPrim = IsFun
