@@ -103,7 +103,7 @@ import           Clash.Core.VarEnv
   (InScopeSet, elemInScopeSet, extendInScopeSetList, uniqAway,
    emptyInScopeSet, mkInScopeSet, unionInScope)
 import           Clash.Core.Scoped.NameMap (lookupGlobalEnv)
-import           Clash.Core.Scoped.Syntax (GlobalId, globalIdLegacy)
+import           Clash.Core.Scoped.Syntax (GlobalId)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Core.Scoped.Alpha (AlphaType (..))
 import           Clash.Core.Scoped.Convert
@@ -239,9 +239,8 @@ unsafeCoreTypeToHWType sp loc builtInTranslation reprs te sc ty =
 -- | Run a function on scoped types on a type of Clash Core: its free type
 -- variables become the variables of the scope.
 --
--- TODO(D4): remove, together with the functions on Clash Core that use it.
--- Netlist generation and normalization only use them on the types that
--- 'GlobalId' and 'PrimInfo' still give as Clash Core types.
+-- Only the code for Clash Core uses this: its transformations and netlist
+-- generation. It goes together with them (package B of the port).
 withLegacyType
   :: HasCallStack
   => Type
@@ -1720,7 +1719,7 @@ mkTopUnWrapper topEntity annM dstId args tickDecls = do
     topName = Id.toText topIdentifier
     topIdentifier = flip fromMaybe compNameM (error [I.i|
      Internal error in 'mkTopUnWrapper': tried to lookup (netlist) name
-     of #{showPpr (varName (globalIdLegacy topEntity))}, but couldn't find it in NetlistState's
+     of #{showPpr (S.globalIdName topEntity)}, but couldn't find it in NetlistState's
      'componentNames'. This should have been put there by 'runNetlistMonad' /
      'genNames'. |])
 
@@ -2109,18 +2108,16 @@ checkTopEntityPorts
   -- ^ Hardcoded 'Type' -> 'HWType' translator
   -> CustomReprs
   -> TypeEnv
-  -> Id
+  -> GlobalId
   -- ^ Top entity binder
   -> Maybe TopEntity
   -- ^ Top entity annotation, if any. Expected to be already split, see above.
   -> ()
 checkTopEntityPorts typeTrans reprs te topId topM =
   let
-    -- TODO(D4): use the scoped type of the top entity once 'GlobalId' carries
-    -- one
     hwtysE =
       flip evalState mempty $ fmap sequence $
-        withLegacyType (coreTypeOf topId) (\sc ty -> portTypes sc ty ty)
+        portTypes S.emptyScope (S.globalIdType topId) (S.globalIdType topId)
   in
     case hwtysE of
       -- A port type is polymorphic or otherwise untranslatable. Skip the check
