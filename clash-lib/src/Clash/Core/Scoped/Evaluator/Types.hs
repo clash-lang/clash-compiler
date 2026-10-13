@@ -220,9 +220,8 @@ instance Sinkable StackFrame where
 -- * Heaps
 
 -- | The heap of the primitives: byte arrays, by number, and the next number.
--- It only holds literals, so it is not scoped, and it is shared with the
--- evaluator of Clash Core ('Clash.Core.Evaluator.Types.PrimHeap').
-type PrimHeap = (IntMap C.Term, Int)
+-- It only holds literals, so it is not scoped: its terms are closed.
+type PrimHeap = (IntMap (Term 'VoidS), Int)
 
 -- | The local heap: right-hand sides in scope @n@ for local variables of
 -- scope @n@. See the module header.

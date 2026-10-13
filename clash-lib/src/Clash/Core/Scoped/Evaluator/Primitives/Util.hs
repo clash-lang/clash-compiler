@@ -296,7 +296,7 @@ import qualified Clash.Sized.Vector
 
 import Clash.Core.Scoped.Builder
   (Key, TyB, forAllTyB, funTyB, litTyB, runClosedType, tyConAppB, varTyB)
-import Clash.Core.Scoped.Convert (fromClashTermClosedIn, toClashTerm, mkPrimInfo)
+import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.TysPrim
   (integerPrimTyConName, liftedTypeKindTyConName, naturalPrimTyConName, typeNatAdd,
    typeNatKindTyConName, wordPrimTyConName)
@@ -305,6 +305,7 @@ import Clash.Core.Scoped.Evaluator
 import qualified Clash.Core.Scoped.Evaluator as E
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.HasType (piResultTys, primInfoType)
+import Clash.Core.Scoped.Subst (closeTerm)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (mkApps)
 import Clash.Core.Scoped.Type
@@ -1726,20 +1727,26 @@ primCount = snd . mHeapPrim
 
 -- | A byte array on the primitive heap
 primLookup :: Distinct n => Int -> Machine o n -> Maybe (Term n)
-primLookup i m = fromClashTermClosedIn (mScope m) <$> IntMap.lookup i (fst (mHeapPrim m))
+primLookup i m = sinkClosed <$> IntMap.lookup i (fst (mHeapPrim m))
 
 -- | Allocate a byte array on the primitive heap, with the given number, see
 -- 'primCount'
 primInsert :: Int -> Term n -> Machine o n -> Machine o n
 primInsert i x m =
   let (heap, count) = mHeapPrim m
-  in m {mHeapPrim = (IntMap.insert i (toClashTerm x) heap, count + 1)}
+  in m {mHeapPrim = (IntMap.insert i (closePrimHeapTerm x) heap, count + 1)}
 
 -- | Update a byte array on the primitive heap
 primUpdate :: Int -> Term n -> Machine o n -> Machine o n
 primUpdate i x m =
   let (heap, count) = mHeapPrim m
-  in m {mHeapPrim = (IntMap.insert i (toClashTerm x) heap, count)}
+  in m {mHeapPrim = (IntMap.insert i (closePrimHeapTerm x) heap, count)}
+
+-- | A term of the primitive heap, which mentions no variables
+closePrimHeapTerm :: HasCallStack => Term n -> Term 'VoidS
+closePrimHeapTerm x = case closeTerm x of
+  Just c -> c
+  Nothing -> error ("closePrimHeapTerm: a term of the primitive heap mentions variables")
 
 -- | Run a state transformer of GHC for its effect
 svoid :: (State# RealWorld -> State# RealWorld) -> IO ()
