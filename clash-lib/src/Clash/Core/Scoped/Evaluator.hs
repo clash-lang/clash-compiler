@@ -105,7 +105,7 @@ import qualified Clash.Core.Type as C
 import Clash.Core.Util (undefinedPrims, undefinedXPrims)
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Normalize.Primitives as NP
+import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Util (curLoc)
 import Clash.XException (isX)
 
@@ -116,7 +116,6 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, stripTicks)
 import Clash.Core.Scoped.Type (TypeView (..), tyView)
 
@@ -422,7 +421,7 @@ stepTyApp env x ty m = case collectArgsTicks (TyApp x ty) of
   (Prim p, args, _) -> case compare (length args) (closedArity (C.primType (primLegacy p))) of
     EQ -> case Either.lefts args of
       []
-        | primName p `elem` map C.primName [NP.removedArg, NP.undefined, NP.undefinedX]
+        | primName p `elem` map primName [NP.removedArg, NP.undefined, NP.undefinedX]
         -> unwind env (PrimVal p (Either.rights args) []) m
         | otherwise
         -> primStep env (forcePrims m) p (Either.rights args) [] m
@@ -482,8 +481,8 @@ apply :: Distinct n => Env -> Value n -> HeapVar n -> Machine o n -> Machine o n
 apply env v hv@(HeapVar _ hvTy _) m = case v of
   Lambda b e -> m {mTerm = substTm (extendTmSubst (idSubst sc) b (heapVarTerm hv)) e}
   PrimVal p tys vs
-    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefinedX)) (resTy p tys vs)}
-    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (resTy p tys vs)}
+    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim NP.undefinedX) (resTy p tys vs)}
+    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim NP.undefined) (resTy p tys vs)}
   _ -> error ($(curLoc) ++ "Not a lambda: " ++ show v)
  where
   sc = mScope m
@@ -500,8 +499,8 @@ instantiate env v ty m = case v of
   -- anything of type 'forall a . ty' must be a ty-lambda. However, sometimes
   -- we evaluate to an error /value/, see 'Clash.GHC.Evaluator.instantiate'.
   PrimVal p tys es
-    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefinedX)) (resTy p tys es)}
-    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) (resTy p tys es)}
+    | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim NP.undefinedX) (resTy p tys es)}
+    | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim NP.undefined) (resTy p tys es)}
   _ -> error ($(curLoc) ++ "Not a tylambda: " ++ show v)
  where
   sc = mScope m
@@ -535,8 +534,8 @@ scrutinise sc (DC dc xs) _ alts
              ++ [ altE | Alt DefaultPat altE <- alts ]
   = altE
 scrutinise _ v@(PrimVal p _ vs) altTy alts
-  | isUndefinedXPrimVal v = TyApp (Prim (mkPrimInfoFromClash NP.undefinedX)) altTy
-  | isUndefinedPrimVal v = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) altTy
+  | isUndefinedXPrimVal v = TyApp (Prim NP.undefinedX) altTy
+  | isUndefinedPrimVal v = TyApp (Prim NP.undefined) altTy
   | any isLitAlt alts = case alts of
       Alt DefaultPat e : alts1 -> go e alts1
       _ -> go (error ($(curLoc) ++ "no match")) alts
@@ -657,23 +656,23 @@ primUnwind env p tys vs (collectValueTicks -> (v, ts)) (e : es) m
 -- primitive
 undefinedResult
   :: Distinct n
-  => C.PrimInfo -> Env -> PrimInfo -> [Type n] -> [Value n] -> [Term n]
+  => PrimInfo -> Env -> PrimInfo -> [Type n] -> [Value n] -> [Term n]
   -> Machine o n -> Maybe (Next o n)
 undefinedResult undef env p tys vs es m =
   let sc = mScope m
       args = map Right tys ++ map (Left . valToTerm) vs ++ map Left es
       ty = applyTypeToArgs (Prim p) (envTypeEnv env) sc (primInfoType sc p) args
-  in Just (stay m {mTerm = TyApp (Prim (mkPrimInfoFromClash undef)) ty})
+  in Just (stay m {mTerm = TyApp (Prim undef) ty})
 
 -- | Primitives that are values, not operations
 valuePrims :: [Text]
 valuePrims =
   [ showt 'Clash.Sized.Internal.Index.fromInteger#
   , showt 'GHC.CString.unpackCString#
-  , C.primName NP.removedArg
+  , primName NP.removedArg
   , showt ''MutableByteArray#
-  , C.primName NP.undefined
-  , C.primName NP.undefinedX
+  , primName NP.undefined
+  , primName NP.undefinedX
   ]
 
 -- | Primitives that are lazy in their last argument, see Note [Lazy
@@ -721,7 +720,7 @@ reduceIn pc m e = case isX e of
   Left msg ->
     let sc = mScope m
         resTy = primResultType (pcEnv pc) sc (pcInfo pc) (sink1 (pcTys pc))
-    in trace (warning msg) (Just (Next m {mTerm = TyApp (Prim (mkPrimInfoFromClash NP.undefined)) resTy}))
+    in trace (warning msg) (Just (Next m {mTerm = TyApp (Prim NP.undefined) resTy}))
   Right e' -> Just (Next m {mTerm = e'})
  where
   warning msg = unlines

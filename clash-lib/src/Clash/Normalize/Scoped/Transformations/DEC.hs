@@ -114,7 +114,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Term as C (PrimInfo (..))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding)
-import qualified Clash.Normalize.Primitives as NP
+import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
@@ -135,7 +135,6 @@ import Clash.Core.Scoped.NameMap
   , memberNameSet )
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, mkApps, mkTicks, stripTicks)
 import Clash.Core.Scoped.Type
@@ -884,7 +883,7 @@ addDefault te sc scrut ty alts
   | otherwise
   = alts
  where
-  defaultAlt = Alt DefaultPat (TyApp (Prim (mkPrimInfoFromClash NP.undefined)) ty)
+  defaultAlt = Alt DefaultPat (TyApp (Prim NP.undefined) ty)
 
   isDefaultAlt (Alt DefaultPat _) = True
   isDefaultAlt _ = False

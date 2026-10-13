@@ -326,6 +326,7 @@ Library
                       Clash.Normalize
                       Clash.Normalize.PrimitiveReductions
                       Clash.Normalize.Primitives
+                      Clash.Normalize.Scoped.Primitives
                       Clash.Normalize.Scoped.PrimitiveReductions
                       Clash.Normalize.Scoped.Transformations
                       Clash.Normalize.Scoped.Transformations.ANF

@@ -58,7 +58,7 @@ import qualified Clash.Core.Term as C (PrimInfo (..))
 import Clash.Core.TyCon (TyCon (..), tyConDataCons)
 import qualified Clash.Core.Type as C
 import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
-import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Scoped.Primitives (removedArg)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
 import Clash.Rewrite.Types (normalizeUltra, scopedTypeEnv)
@@ -74,7 +74,6 @@ import Clash.Core.Scoped.NameMap (NameMap, insertNameMap)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (unsinkType, withFreshIdBinder)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkPrimInfoFromClash)
 import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)
 import Clash.Core.Scoped.Type
   ( PiTele (..), SplitFunForall (..), TypeView (..), coreView, mkTyConApp
@@ -729,7 +728,7 @@ reduceSplitHandler rpc@ReducePrimContext{..}
                              [Right (sink lTy)
                              ,Right (sink rTy)
                              ,Left  bvArg
-                             ,Left  (TyApp (Prim (mkPrimInfoFromClash removedArg)) (sink rTy))
+                             ,Left  (TyApp (Prim removedArg) (sink rTy))
                              ]
                 changed (mkTicks tup (map sink primTicks))
               _ -> error "reducePrim: split# arity"
@@ -739,7 +738,7 @@ reduceSplitHandler rpc@ReducePrimContext{..}
                 let tup = mkApps (Data tupDc)
                              [Right (sink lTy)
                              ,Right (sink rTy)
-                             ,Left  (TyApp (Prim (mkPrimInfoFromClash removedArg)) (sink lTy))
+                             ,Left  (TyApp (Prim removedArg) (sink lTy))
                              ,Left  bvArg
                              ]
                 changed (mkTicks tup (map sink primTicks))

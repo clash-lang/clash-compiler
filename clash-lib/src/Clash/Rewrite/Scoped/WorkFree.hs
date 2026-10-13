@@ -27,14 +27,13 @@ module Clash.Rewrite.Scoped.WorkFree
 import Control.Lens (Lens', use, (%=))
 import Control.Monad.Extra (allM, andM)
 import Control.Monad.State.Class (MonadState)
-import qualified Data.Text.Extra as Text
 import GHC.Stack (HasCallStack)
 
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C
 import Clash.Driver.Types (Binding (..))
-import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Scoped.Primitives (removedArg)
 
 import Clash.Core.Scoped.FreeVars (termGlobalIds)
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
@@ -136,7 +135,7 @@ isConstantNotClockReset
 isConstantNotClockReset tenv sc e
   | isClockOrReset tenv sc (inferCoreTypeOf tenv sc e) =
       case fst (collectArgs e) of
-        Prim pr -> primName pr == Text.showt 'removedArg
+        Prim pr -> primName pr == primName removedArg
         _ -> False
   | otherwise = isConstant e
 
@@ -149,7 +148,7 @@ isWorkFreeClockOrResetOrEnable tenv sc e =
   let eTy = inferCoreTypeOf tenv sc e in
   if isClockOrReset tenv sc eTy || isEnable tenv sc eTy then
     case collectArgs e of
-      (Prim p, _) -> Just (primName p == Text.showt 'removedArg)
+      (Prim p, _) -> Just (primName p == primName removedArg)
       -- Only local variables with a clock type are work-free. A global
       -- variable is probably backed by a clock generator, see #2845.
       (Var {}, []) -> Just True
