@@ -697,7 +697,7 @@ mkSelectorCase caller sc tenv scrut dcI fieldI = go (inferCoreTypeOf tenv sc scr
 -- * Primitives
 
 -- | A coercion of the given type. The type is a type argument of the
--- primitive, as "Clash.GHC.Scoped.GHC2Core" makes them: the type of a
+-- primitive, as "Clash.GHC.GHC2Core" makes them: the type of a
 -- primitive is closed.
 primCo :: Type n -> Term n
 primCo = TyApp (Prim coPrimInfo)
