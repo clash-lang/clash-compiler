@@ -423,7 +423,7 @@ mkPrimStepContext pc = PrimStepContext{..}
 
   makeUndefinedIf :: Exception e => (e -> Bool) -> Term n -> Term n
   makeUndefinedIf wantToHandle tm =
-    case unsafeDupablePerformIO $ tryJust selectException (evaluate $ force $ toClashTerm tm) of
+    case unsafeDupablePerformIO $ tryJust selectException (evaluate (force tm)) of
       Right _ -> tm
       Left e -> trace (msg e) (TyApp (Prim NP.undefined) (getResultTy te sc ty tys))
    where
