@@ -9,6 +9,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Clash.Tests.Rewrite.Scoped.History (tests) where
@@ -19,11 +20,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-
 import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Convert
 import Clash.Core.Scoped.FreeVars (freeTmVars, freeTyVars, hasFreeVars)
 import Clash.Core.Scoped.NameMap (nameSetToList)
 import Clash.Core.Scoped.Syntax
@@ -31,9 +28,9 @@ import Clash.Core.Scoped.Binary (putHeader)
 import Clash.Rewrite.Scoped.History (closeRewriteStep, decodeRewriteHistory)
 import Clash.Rewrite.Types (RewriteStep (..))
 
-import Test.Clash.Rewrite (intId)
-import Test.Clash.Scoped (withFreeVars, withFreeVarsOf, withTests)
-import Test.Clash.Scoped.Gen.Clash (InScope (..), genInScope, shrinkInScope)
+import Test.Clash.Rewrite (varD)
+import Test.Clash.Scoped (closedTerm, termIn, withTestScope, withTests)
+import Test.Clash.Scoped.Gen (InScope (..), genInScope, shrinkInScope)
 
 -- | The number of leading type lambdas and lambdas of a term
 leadingBinders :: Term n -> Int
@@ -45,32 +42,28 @@ leadingBinders = \case
 tests :: TestTree
 tests = testGroup "Clash.Tests.Rewrite.Scoped.History"
   [ -- Before @x@, after @y@: both are abstracted over both variables
-    testCase "abstracts over the free variables of both terms" $ do
-      let x = intId C.User "x" 1
-          y = intId C.User "y" 2
-      withFreeVarsOf [C.Var x, C.Var y] $ \env -> do
-        let st = closeRewriteStep "t" "f" (fromClashTerm env (C.Var x)) (fromClashTerm env (C.Var y))
+    testCase "abstracts over the free variables of both terms" $
+      withTestScope [varD "x_1" "Int", varD "y_2" "Int"] $ \ts -> do
+        let st = closeRewriteStep "t" "f" (termIn ts "x_1") (termIn ts "y_2")
         t_free st @?= 2
-        assertBool "before" (aeqTm (t_before st) (fromClashTermClosed (C.Lam x (C.Lam y (C.Var x)))))
-        assertBool "after" (aeqTm (t_after st) (fromClashTermClosed (C.Lam x (C.Lam y (C.Var y)))))
+        assertBool "before" (aeqTm (t_before st) (closedTerm "\\(x :: Int) (y :: Int) -> x"))
+        assertBool "after" (aeqTm (t_after st) (closedTerm "\\(x :: Int) (y :: Int) -> y"))
 
   , testCase "a history is the header followed by steps" $ do
-      let x = intId C.User "x" 1
-          st1 = closeRewriteStep "t1" "f" (fromClashTermClosed (C.Lam x (C.Var x))) (fromClashTermClosed (C.Lam x (C.Var x)))
+      let idInt = closedTerm "\\(x :: Int) -> x"
+          st1 = closeRewriteStep "t1" "f" idInt idInt
           st2 = st1 {t_name = "t2", t_free = 3}
           hist = decodeRewriteHistory (runPut putHeader <> encode st1 <> encode st2)
       map t_name hist @?= ["t1", "t2"]
       map t_free hist @?= [0, 3]
 
   , withTests 300 $ testProperty "closes over the free variables of a term" $
-      forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
-        withFreeVars fvs $ \env ->
-          let e = fromClashTerm env tm
-              st = closeRewriteStep "t" "f" e e
-              nFree = length (nameSetToList (freeTyVars e)) + length (nameSetToList (freeTmVars e))
-          in counterexample "count" (t_free st === nFree)
-               .&&. counterexample "leading binders" (property (leadingBinders (t_before st) >= nFree))
-               .&&. counterexample "closed" (property (not (hasFreeVars (t_before st))))
-               .&&. counterexample "before and after" (property (aeqTm (t_before st) (t_after st)))
-               .&&. counterexample "Binary" (property (aeqTm (t_before st) (t_before (decode (encode st)))))
+      forAllShrink genInScope shrinkInScope $ \(InScope _ e) ->
+        let st = closeRewriteStep "t" "f" e e
+            nFree = length (nameSetToList (freeTyVars e)) + length (nameSetToList (freeTmVars e))
+        in counterexample "count" (t_free st === nFree)
+             .&&. counterexample "leading binders" (property (leadingBinders (t_before st) >= nFree))
+             .&&. counterexample "closed" (property (not (hasFreeVars (t_before st))))
+             .&&. counterexample "before and after" (property (aeqTm (t_before st) (t_after st)))
+             .&&. counterexample "Binary" (property (aeqTm (t_before st) (t_before (decode (encode st)))))
   ]

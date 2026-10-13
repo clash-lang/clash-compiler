@@ -3,8 +3,9 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the pretty-printer of scoped Clash Core: it prints the same text
-  as printing the conversion to Clash Core, and annotates the same places.
+  Tests for the pretty-printer of scoped Clash Core: what it prints for
+  global variables and type constructors, and that the names it prints for
+  local variables only depend on their human readable names and raw names.
 -}
 
 {-# LANGUAGE CPP #-}
@@ -25,34 +26,29 @@ import Data.Text.Prettyprint.Doc (SimpleDocStream, alterAnnotationsS, defaultLay
 import Data.Text (Text)
 
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Var as C
 import Clash.Core.Pretty
-  (ClashAnnotation (..), ClashDoc, PrettyOptions (..), SubtermPos (..), ppr, showPpr,
+  (ClashAnnotation (..), ClashDoc, PrettyOptions (..), SubtermPos (..), ppr', showPpr,
    showPpr')
-import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 import qualified Data.List as List
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.TysPrim as C
 
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Builder (runTyFamEqn, tyConAppB, varTyB)
+import Clash.Core.Scoped.Convert (mkFunTyCon, mkGlobalId)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax
 
-import Test.Clash.Rewrite (globalId, intTy, tyVar)
-import Test.Clash.Scoped (extendFreeVars, forAllScrambled, sinkInto, withFreeVars, withTests)
-import Test.Clash.Scoped.Gen.Clash
-  (InScope (..), Sunk (..), ctxOf, genFreeVars, genInScope, genSunk, genType, runG,
-   shrinkInScope, shrinkSunk, showType, tyConMap)
+import Test.Clash.Rewrite (liftedTypeKindB)
+import Test.Clash.Scoped (closedType, forAllScrambled, testScope, withTests)
+import Test.Clash.Scoped.Gen
+  (InScope (..), Sunk (..), genInScope, genSunk, renameOccs, shrinkInScope, shrinkSunk,
+   tyConMap)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Pretty"
-  [ testCase "a global variable prints like its variable of Clash Core" $ do
-      let a = tyVar C.User "a" 4302
-          ty = C.ForAllTy a (C.mkFunTy (C.VarTy a) intTy)
-          g = mkGlobalId (C.varName (globalId C.User "f" 4301 ty)) (fromClashTypeClosed emptyScope ty)
-      showPpr g @?= showPpr (globalIdLegacy g)
+  [ testCase "a global variable prints its name and type" $ do
+      let g = mkGlobalId (C.mkUnsafeName C.User "f" 4301) (closedType "forall a. a -> Int")
+      showPpr g @?= "f :: forall (a :: Type). a -> Int"
 
   , testCase "a data type prints its kind and data constructors" $
       showPpr' noUniques maybeTyCon @?= List.intercalate "\n"
@@ -63,54 +59,43 @@ tests = testGroup "Clash.Tests.Core.Scoped.Pretty"
     -- The uniques of the pattern variables of the equations are their raw
     -- names
   , testCase "a type family prints its kind and equations" $ do
-      let a = tyVar C.User "a" 7001
-          maybeNm = C.tyConName maybeTyCon
-          gTc = mkFunTyConFromClash 3001 (C.mkUnsafeName C.User "G" 3001)
-                  (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
-                  [ ([C.mkTyConApp maybeNm [C.VarTy a]], C.VarTy a)
-                  , ([C.VarTy a], C.mkTyConApp maybeNm [C.VarTy a]) ]
+      let maybeNm = C.tyConName maybeTyCon
+          a = C.mkUnsafeName C.User "a" 7001
+          eqn lhs rhs = runTyFamEqn [(7001, a, liftedTypeKindB)] [lhs] rhs
+          gTc = mkFunTyCon (C.mkUnsafeName C.User "G" 3001) (closedType "Type -> Type") 1
+                  [ eqn (tyConAppB maybeNm [varTyB 7001]) (varTyB 7001)
+                  , eqn (varTyB 7001) (tyConAppB maybeNm [varTyB 7001]) ]
       -- The uniques of the wired-in kinds depend on the version of GHC
       take 1 (lines (showPpr' noUniques gTc)) @?= ["type family G :: Type -> Type"]
       drop 1 (lines (showPpr' noQualifiers gTc)) @?=
-        [ "type instance G[3001] (Maybe[2001] a[1]) = a[1]"
-        , "type instance G[3001] a[1] = Maybe[2001] a[1]" ]
+        [ "type instance G[3001] (Maybe[3011] a[1]) = a[1]"
+        , "type instance G[3001] a[1] = Maybe[3011] a[1]" ]
 
   , withTests 500 $ testGroup "properties"
-      [ testProperty "terms print like their conversion to Clash Core" $
-          forAllShrink genInScope shrinkInScope $ \(InScope fvs tm) ->
-            withFreeVars fvs $ \env ->
-              samePrinting (fromClashTerm env tm)
+      [ -- Binders that shadow variables in scope, and each other, print with
+        -- the same names
+        testProperty "with uniques hidden, terms print regardless of their raw names" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk _ ts1 tm) ->
+            let sc = testScope ts1
+                tm0 = sink tm
+            in  forAllScrambled sc tm0 $ \tm1 ->
+                  conjoin
+                    [ counterexample (showOptions opts) (showPpr' opts tm0 === showPpr' opts tm1)
+                    | opts <- allOptions, not (displayUniques opts) ]
+                  .&&. counterexample "annotations"
+                         (annotations (ppr' hidden tm0) === annotations (ppr' hidden tm1))
 
-        -- Binders that shadow variables in scope, and each other
-      , testProperty "terms with scrambled binders print like their conversion" $
-          forAllShrink genSunk shrinkSunk $ \(Sunk fvs0 fvs1 tm) ->
-            withFreeVars fvs0 $ \env0 -> do
-              let tm0 = fromClashTerm env0 tm
-              extendFreeVars env0 fvs1 $ \env1 -> do
-                let sc = convScope env1
-                forAllScrambled sc (sinkInto sc tm0) samePrinting
-
-      , testProperty "types print like their conversion to Clash Core" $
-          forAllBlind genFreeVars $ \fvs ->
-            forAllShow (runG 30 (genType (ctxOf fvs) C.liftedTypeKind 4)) showType $ \ty ->
-              withFreeVars fvs $ \env -> do
-                let ty1 = fromClashType env ty
-                    ty2 = toClashType ty1
-                conjoin
-                  [ counterexample (showOptions opts) (showPpr' opts ty1 === showPpr' opts ty2)
-                  | opts <- allOptions ]
+      , testProperty "terms print regardless of the uniques of human readable names" $
+          forAllShrink genInScope shrinkInScope $ \(InScope _ tm) ->
+            conjoin
+              [ counterexample (showOptions opts) (showPpr' opts tm === showPpr' opts (renameOccs tm))
+              | opts <- allOptions ]
       ]
   ]
 
--- | The text, under every combination of options, and the annotations of a
--- term are those of its conversion to Clash Core
-samePrinting :: Term n -> Property
-samePrinting tm =
-  let tm1 = toClashTerm tm
-  in conjoin
-       [ counterexample (showOptions opts) (showPpr' opts tm === showPpr' opts tm1)
-       | opts <- allOptions ]
-     .&&. counterexample "annotations" (annotations (ppr tm) === annotations (ppr tm1))
+-- | All options, except that uniques are hidden
+hidden :: PrettyOptions
+hidden = PrettyOptions False True True True
 
 noUniques, noQualifiers :: PrettyOptions
 noUniques = PrettyOptions False True False True
@@ -132,25 +117,13 @@ showOptions :: PrettyOptions -> String
 showOptions (PrettyOptions u t q k) =
   "PrettyOptions " <> unwords (map show [u, t, q, k])
 
--- | The laid out document, with the annotations of a subterm or context as the
--- kind of subterm. The bodies of ticks have no context in Clash Core.
+-- | The laid out document, with the annotations of a subterm as the kind of
+-- subterm
 annotations :: ClashDoc -> SimpleDocStream Ann
 annotations = alterAnnotationsS ann . layoutPretty defaultLayoutOptions
  where
   ann = \case
     AnnSyntax s -> Just (Syntax (show s))
-    AnnContext c -> Just $ case c of
-      C.AppFun -> Subterm "AppFun" Nothing
-      C.AppArg a -> Subterm "AppArg" a
-      C.TyAppC -> Subterm "TyAppFun" Nothing
-      C.LetBinding {} -> Subterm "LetRhs" Nothing
-      C.LetBody {} -> Subterm "LetBody" Nothing
-      C.LamBody {} -> Subterm "LamBody" Nothing
-      C.TyLamBody {} -> Subterm "TyLamBody" Nothing
-      C.CaseAlt {} -> Subterm "CaseAlt" Nothing
-      C.CaseScrut -> Subterm "CaseScrut" Nothing
-      C.CastBody -> Subterm "CastBody" Nothing
-      C.TickC {} -> Subterm "TickBody" Nothing
     AnnSubterm p -> case p of
       PosAppFun -> Just (Subterm "AppFun" Nothing)
       PosAppArg a -> Just (Subterm "AppArg" a)
@@ -162,7 +135,8 @@ annotations = alterAnnotationsS ann . layoutPretty defaultLayoutOptions
       PosCaseScrut -> Just (Subterm "CaseScrut" Nothing)
       PosCaseAlt _ -> Just (Subterm "CaseAlt" Nothing)
       PosCastBody -> Just (Subterm "CastBody" Nothing)
-      PosTickBody -> Nothing
+      PosTickBody -> Just (Subterm "TickBody" Nothing)
+    _ -> Nothing
 
 data Ann
   = Syntax String
