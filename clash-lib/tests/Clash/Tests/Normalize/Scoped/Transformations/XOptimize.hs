@@ -34,7 +34,7 @@ import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
 import qualified Clash.Normalize.Scoped.Transformations.XOptimize as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
-import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.Scoped (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState)
 
@@ -99,7 +99,7 @@ env = withTyConMap tcm def{_clashEnv = cenv}
 st :: RewriteState NormalizeState
 st = def
 
-xOptS :: ScopedRewrite NormalizeState
+xOptS :: Rewrite NormalizeState
 xOptS = $(asScopedRewriteQ Scoped.xOptimize)
 
 -- | Assert that 'Scoped.xOptimize' rewrites a term to the expected one

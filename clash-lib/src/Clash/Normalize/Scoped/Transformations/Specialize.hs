@@ -121,7 +121,7 @@ import           Clash.Rewrite.Scoped.Combinators (topdownR)
 import           Clash.Rewrite.Scoped.Globals
   (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
 import           Clash.Rewrite.Scoped.Types
-  (ScopedTransform (..), TransformContext, mkDerivedName, tfScope)
+  (Transform (..), TransformContext, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Util
   ( abstractOver, changed, dependencySortTyVars, isUntranslatableType, mkTmBinderFor
   , normalizeTermTypes, setChanged )
@@ -630,7 +630,7 @@ nonRepSpecWorker ctx e e1 e2
       Just b
         | C.nameSort (globalIdName (bindingId b)) == C.Internal
         -> censor (const mempty)
-             (runScopedTransform (topdownR (ScopedTransform appPropWorker)) ctx
+             (runTransform (topdownR (Transform appPropWorker)) ctx
                (mkApps (mkTicks (sinkClosed (bindingTerm b)) ticks) fArgs))
       _ -> return app
     _ -> return app

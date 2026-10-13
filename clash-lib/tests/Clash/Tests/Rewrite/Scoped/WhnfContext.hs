@@ -27,7 +27,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..), changed)
+import Clash.Rewrite.Scoped (Rewrite, Transform (..), changed)
 import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.Types (RewriteState (..))
 
@@ -37,8 +37,8 @@ import Test.Clash.Scoped
   , withBinderClashes, withTestScope )
 
 -- | Replace a term by its WHNF
-whnfS :: ScopedRewrite NormalizeState
-whnfS = ScopedTransform $ \ctx t -> S.whnfRW False ctx t (\_ v -> changed v)
+whnfS :: Rewrite NormalizeState
+whnfS = Transform $ \ctx t -> S.whnfRW False ctx t (\_ v -> changed v)
 
 -- | Assert that evaluating the variable at a path of a term gives the
 -- expected term, also in a scope that the binders of the term clash with

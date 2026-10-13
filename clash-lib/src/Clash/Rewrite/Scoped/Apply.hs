@@ -57,10 +57,10 @@ import           Clash.Rewrite.Scoped.Util   (closeOverOrError, dependencySortTy
 apply
   :: String
   -- ^ Name of the transformation
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -- ^ Transformation to be applied
-  -> ScopedRewrite extra
-apply = \s (ScopedTransform rewrite) -> ScopedTransform $ \ctx expr0 ->
+  -> Rewrite extra
+apply = \s (Transform rewrite) -> Transform $ \ctx expr0 ->
   fst <$> applyWith s ctx expr0 (rewrite ctx expr0)
 {-# INLINE apply #-}
 
@@ -206,9 +206,9 @@ runRewrite
   => String
   -- ^ Name of the transformation
   -> Scope n
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -- ^ Transformation to perform
   -> Term n
   -- ^ Term to transform
   -> RewriteMonad extra (Term n)
-runRewrite name sc rewrite = runScopedTransform (apply name rewrite) (rootContext sc)
+runRewrite name sc rewrite = runTransform (apply name rewrite) (rootContext sc)

@@ -20,7 +20,7 @@ import Test.Tasty.HUnit
 import Clash.Core.Literal (Literal (..))
 
 import Clash.Core.Scoped.Syntax
-import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.Scoped (Rewrite)
 import qualified Clash.Rewrite.Scoped as S
 import Clash.Rewrite.StrategyDSL
 import Clash.Rewrite.StrategyDSL.TH
@@ -30,7 +30,7 @@ import Test.Clash.Scoped (closedTerm, runScopedClosed)
 
 -- | Assert that two scoped rewrites agree on a closed term: same result
 -- (syntactically), same transformation count, same change flag
-assertAgree :: ScopedRewrite () -> ScopedRewrite () -> Term 'VoidS -> Assertion
+assertAgree :: Rewrite () -> Rewrite () -> Term 'VoidS -> Assertion
 assertAgree candidate reference term = do
   (candidateTerm, candidateCount, candidateChanged) <- runScopedClosed candidate term
   (referenceTerm, referenceCount, referenceChanged) <- runScopedClosed reference term
@@ -38,10 +38,10 @@ assertAgree candidate reference term = do
   assertEqual "transformation count" referenceCount candidateCount
   assertEqual "change flag" referenceChanged candidateChanged
 
-calleeFast :: ScopedRewrite ()
+calleeFast :: Rewrite ()
 calleeFast = $(compileScopedStrategy (topdown literalStep))
 
-calleeReference :: ScopedRewrite ()
+calleeReference :: Rewrite ()
 calleeReference = $(compileScopedStrategyReference (topdown literalStep))
 
 tests :: TestTree

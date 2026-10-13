@@ -123,7 +123,7 @@ import Clash.Core.Scoped.Util
   ( appendToVec, extractElems, extractTElems, internalName, mkRTree, mkVec, primCo
   , selectField, systemName )
 import Clash.Rewrite.Scoped
-  (Frame (AppArg), ScopedTransform (..), TransformContext, changed, pushFrame, tfScope)
+  (Frame (AppArg), Transform (..), TransformContext, changed, pushFrame, tfScope)
 
 -- * Helpers
 
@@ -144,7 +144,7 @@ constantPropagation
   :: (HasCallStack, Distinct n) => TransformContext n -> Term n -> NormalizeSession (Term n)
 constantPropagation ctx fun = do
   strategy <- Lens.use (extra . constantPropagationStrategy)
-  runScopedTransform strategy (pushFrame (AppArg Nothing) ctx) fun
+  runTransform strategy (pushFrame (AppArg Nothing) ctx) fun
 
 -- | The type constructor of @Vec@, and its @Nil@ and @Cons@ constructors, if
 -- the type is a vector under 'coreView'. Errors otherwise.

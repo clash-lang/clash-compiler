@@ -25,7 +25,7 @@ import qualified Clash.Core.DataCon as C
 import Clash.Core.Scoped.Syntax (GlobalId, Term (Cast))
 import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (ScopedRewrite)
+import Clash.Rewrite.Scoped (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 import Clash.Util (ClashException)
@@ -57,7 +57,7 @@ tm = parseTestTermWith (TestDefs [mkE] [] globals)
 st :: RewriteState NormalizeState
 st = def
 
-caseCastS, elimCastCastS, letCastS, splitCastWorkS :: ScopedRewrite NormalizeState
+caseCastS, elimCastCastS, letCastS, splitCastWorkS :: Rewrite NormalizeState
 caseCastS = $(asScopedRewriteQ Scoped.caseCast)
 elimCastCastS = $(asScopedRewriteQ Scoped.elimCastCast)
 letCastS = $(asScopedRewriteQ Scoped.letCast)
@@ -65,11 +65,11 @@ splitCastWorkS = $(asScopedRewriteQ Scoped.splitCastWork)
 
 -- | Assert that a transformation rewrites a term to the expected one, see
 -- 'assertRewritesTo'
-rewrites :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+rewrites :: Rewrite NormalizeState -> [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
 rewrites = assertRewritesTo def st
 
 -- | Assert that a transformation leaves a term as it is
-keeps :: ScopedRewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
+keeps :: Rewrite NormalizeState -> [ScopeDecl] -> TestTerm -> Assertion
 keeps = assertNoRewrite def st
 
 tests :: TestTree

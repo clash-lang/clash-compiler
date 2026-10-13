@@ -137,7 +137,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv, typeEnvTyConMap)
 import Clash.Core.Scoped.Util (internalName, mkSelectorCase)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Letrec
 import Clash.Rewrite.Scoped
-  (ScopedTransform (..), TransformContext, bottomupR, changed, tfScope)
+  (Transform (..), TransformContext, bottomupR, changed, tfScope)
 import Clash.Rewrite.Scoped.Util (isFromInt, isUntranslatableType)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 import Clash.Rewrite.Scoped.WorkFree (isConstant)
@@ -269,13 +269,13 @@ disjointExpressionConsolidationWorker ctx e _scrut _ty (_:_:_) = do
                     (gSeen g) (sink l)
         (e1, _) <- collectTm env nbsOut replacements scOut [] (sink e)
         -- `mkDisjointGroup` doesn't clean up unused let-binders.
-        lb <- runScopedTransform (bottomupR deadCodeR) ctx (Let (Rec outs lifted1) e1)
+        lb <- runTransform (bottomupR deadCodeR) ctx (Let (Rec outs lifted1) e1)
         changed lb
 
 disjointExpressionConsolidationWorker _ e _ _ _ = return e
 
 -- | 'Letrec.deadCode'
-deadCodeR :: ScopedTransform NormalizeSession
+deadCodeR :: Transform NormalizeSession
 deadCodeR = $(asScopedRewriteQ Letrec.deadCode)
 
 -- * The environment

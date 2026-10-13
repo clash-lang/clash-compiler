@@ -26,7 +26,7 @@ import Clash.Core.Scoped.Syntax (GlobalId, Term (App, Data, GlobalVar, Prim))
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 
@@ -73,8 +73,8 @@ tm = parseTestTermWith (TestDefs [mkP, signalCons, mkE] [] globals)
 st :: RewriteState NormalizeState
 st = def
 
-anfS, nonRepANFS :: ScopedRewrite NormalizeState
-anfS = ScopedTransform Scoped.makeANF
+anfS, nonRepANFS :: Rewrite NormalizeState
+anfS = Transform Scoped.makeANF
 nonRepANFS = $(asScopedRewriteQ Scoped.nonRepANF)
 
 -- | Assert that 'Scoped.makeANF' rewrites a closed term to the expected one,

@@ -33,7 +33,7 @@ import Clash.Core.Scoped.Syntax
   (Alt (..), Distinct, Pat (DefaultPat), PrimUnfolding (NoUnfolding), PrimInfo, Term (..), sink)
 import qualified Clash.Normalize.Scoped.Transformations.Case as S
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState)
 
@@ -72,7 +72,7 @@ tm = parseTestTermWith defs
 st :: RewriteState NormalizeState
 st = def
 
-caseCaseS, caseConS, caseFlatS, caseLetS, elimCaseBigNumS :: ScopedRewrite NormalizeState
+caseCaseS, caseConS, caseFlatS, caseLetS, elimCaseBigNumS :: Rewrite NormalizeState
 caseCaseS = $(asScopedRewriteQ S.caseCase)
 caseConS = $(asScopedRewriteQ S.caseCon)
 caseFlatS = $(asScopedRewriteQ S.caseFlat)
@@ -81,13 +81,13 @@ elimCaseBigNumS = $(asScopedRewriteQ S.elimCaseBigNumInternals)
 
 -- | Assert that a transformation rewrites a term to the expected one, see
 -- 'assertRewritesTo'
-rewrites :: ScopedRewrite NormalizeState -> [ScopeDecl] -> String -> String -> Assertion
+rewrites :: Rewrite NormalizeState -> [ScopeDecl] -> String -> String -> Assertion
 rewrites rw decls input expected = assertRewritesTo def st rw decls (tm input) (tm expected)
 
 -- | Assert that a transformation gives the expected term on a capture
 -- scenario, see 'assertCaptureRewritesTo'
 capture
-  :: ScopedRewrite NormalizeState -> [ScopeDecl] -> String -> [ScopeDecl]
+  :: Rewrite NormalizeState -> [ScopeDecl] -> String -> [ScopeDecl]
   -> (forall l. Distinct l => TestScope l -> Term l -> Term l) -> String -> Assertion
 capture rw decls part new mk expected =
   assertCaptureRewritesTo def st rw decls (tm part) new mk (tm expected)
@@ -95,7 +95,7 @@ capture rw decls part new mk expected =
 -- | Assert that a transformation, run on a term sunk into a scope with
 -- 'sunkD', whose name is above those of all binders of the term, gives the
 -- expected term, with binders that are fresh for that scope
-assertSunk :: ScopedRewrite NormalizeState -> [ScopeDecl] -> String -> String -> Assertion
+assertSunk :: Rewrite NormalizeState -> [ScopeDecl] -> String -> String -> Assertion
 assertSunk rw decls input expected =
   withTestScope decls $ \ts0 ->
     extendTestScope ts0 [sunkD] $ \ts -> do
@@ -128,7 +128,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Case"
             "(case MkPair (Prim.work c_3) (Prim.work b_2) of { MkPair (x :: Int) (y :: Int) -> f_9 x y }) :: Int"
             "let { !(x :: Int) = Prim.work c_3; !(y :: Int) = Prim.work b_2 } in f_9 x y"
       , testCase "caseOneAlt moves equal alternatives out of the scope of their patterns" $
-          assertSunk (ScopedTransform (\_ -> S.caseOneAlt)) [varD "a_1" "T", varD "c_3" "Int"]
+          assertSunk (Transform (\_ -> S.caseOneAlt)) [varD "a_1" "T", varD "c_3" "Int"]
             "(case a_1 of { _ -> c_3; MkT (x :: Int) -> c_3 }) :: Int"
             "c_3"
       ]

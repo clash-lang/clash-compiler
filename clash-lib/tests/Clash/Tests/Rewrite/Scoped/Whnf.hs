@@ -29,14 +29,14 @@ import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types (RewriteState (..))
 
 import Clash.Core.Scoped.Syntax
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..), changed)
+import Clash.Rewrite.Scoped (Rewrite, Transform (..), changed)
 import qualified Clash.Rewrite.Scoped as S
 
 import Test.Clash.Scoped (TestTerm, assertTermIs, runScopedIn, withTerm)
 
 -- | Replace every variable that evaluates to a literal by that literal
-evalVars :: ScopedRewrite NormalizeState
-evalVars = S.topdownR $ ScopedTransform $ \ctx -> \case
+evalVars :: Rewrite NormalizeState
+evalVars = S.topdownR $ Transform $ \ctx -> \case
   e@(Var {}) -> S.whnfRW False ctx e $ \_ r -> case r of
     Literal _ -> changed r
     _ -> pure (sink e)

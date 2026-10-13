@@ -30,7 +30,7 @@ import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Normalize.Scoped.Transformations.Reduce (PrimReduction (..))
 import qualified Clash.Normalize.Scoped.Transformations.Reduce as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 
 import Test.Clash.Rewrite
@@ -40,8 +40,8 @@ import Test.Clash.Scoped (ScopeDecl, assertRewritesTo, closedType, varD, withCur
 
 -- | The scoped primitive reduction, as a transformation of the saturated
 -- application of the primitive
-reductionS :: PrimReduction -> ScopedRewrite NormalizeState
-reductionS red = ScopedTransform $ \ctx e ->
+reductionS :: PrimReduction -> Rewrite NormalizeState
+reductionS red = Transform $ \ctx e ->
   case collectArgs e of
     (Prim p, args) ->
       let (tms, tys) = Either.partitionEithers args

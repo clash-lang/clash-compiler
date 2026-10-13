@@ -89,8 +89,8 @@ callE target f ctxE tmE = [| $(target.call f ctxE) $tmE |]
 scopedTarget :: Target
 scopedTarget = Target
   { patterns = scopedPatterns
-  , wrap = \e -> [| S.ScopedTransform $e |]
-  , call = \f ctxE -> [| S.runScopedTransform $f $ctxE |]
+  , wrap = \e -> [| S.Transform $e |]
+  , call = \f ctxE -> [| S.runTransform $f $ctxE |]
   , applyWithName = 'SApply.applyWith
   , applyName = 'SApply.apply
   , seqName = '(SComb.>->)
@@ -106,7 +106,7 @@ scopedTarget = Target
   , goDec = scopedGoDec
   , descendDec = scopedDescendDec
   , passE = \name rewriteName ->
-      [| SApply.apply $(stringE name) (S.ScopedTransform $(varE rewriteName)) |]
+      [| SApply.apply $(stringE name) (S.Transform $(varE rewriteName)) |]
   }
 
 -- | The term constructors of scoped Core belonging to a 'Constructor'. A
@@ -429,7 +429,7 @@ guardExp target wrapInvoke transformation =
 -- rebuilt fields are in scope. The rebuilt node it gets is evaluated.
 genScopedDescend
   :: Constructor
-  -> Q Exp            -- ^ recursion: a 'S.ScopedTransform'
+  -> Q Exp            -- ^ recursion: a 'S.Transform'
   -> Q Exp            -- ^ the context
   -> Q Exp            -- ^ the node
   -> [Q Exp]          -- ^ the node's fields
@@ -483,7 +483,7 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
           [| traverse
                (\alt -> S.underAlt $ctxE alt
                   (\ctxAlt p e -> do
-                     e' <- S.runScopedTransform $go ctxAlt e
+                     e' <- S.runTransform $go ctxAlt e
                      pure $! SComb.rebuildAlt alt p e'))
                $alts |]
       , noBindS $ rebuilt [varE subj', altsTy, varE alts']
@@ -510,7 +510,7 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
  where
   leaf = continue fieldEs nodeE
 
-  rec' ctx' e = [| S.runScopedTransform $go $ctx' $e |]
+  rec' ctx' e = [| S.runTransform $go $ctx' $e |]
 
   -- The node itself when unchanged, a copy otherwise (one of the
   -- @SComb.rebuild*@ functions); evaluated, so that no thunk is allocated for
@@ -535,7 +535,7 @@ genScopedDescend con go ctxE nodeE fieldEs continue = case (con, fieldEs) of
                    [| $(varE rebuildName) $nodeE $b $e $(varE b') $(varE e'') |]
                ])) |]
 
--- | A recursive traversal of scoped Core: a 'S.ScopedTransform' of a lambda
+-- | A recursive traversal of scoped Core: a 'S.Transform' of a lambda
 -- with a case-expression on the node
 scopedGoDec
   :: Name -> (Constructor -> Q Exp -> Q Exp -> [Q Exp] -> Descend -> Q Exp) -> Q Dec
@@ -550,7 +550,7 @@ scopedGoDec go body = do
               (normalB (body con (varE ctx) (varE tm) fieldEs descend))
               []
   valD (varP go)
-    (normalB [| S.ScopedTransform
+    (normalB [| S.Transform
                   $(lamE [varP ctx, varP tm]
                       (caseE (varE tm) (map arm (allPatterns scopedTarget)))) |])
     []
@@ -570,7 +570,7 @@ scopedDescendDec descendD = do
               []
   valD (varP descendD)
     (normalB (lamE [varP rec']
-      [| S.ScopedTransform
+      [| S.Transform
            $(lamE [varP ctx, varP tm]
                (caseE (varE tm) (map arm (allPatterns scopedTarget)))) |]))
     []
@@ -765,7 +765,7 @@ dispatchQFor target step = do
 
 -- | Compile a strategy of transformations of scoped Core into its fused
 -- dispatch code. The result is an expression of type
--- @'Clash.Rewrite.Scoped.Types.ScopedRewrite' extra@, with @extra@ fixed by
+-- @'Clash.Rewrite.Scoped.Types.Rewrite' extra@, with @extra@ fixed by
 -- the workers the spec references.
 compileScopedStrategy :: Strat -> Q Exp
 compileScopedStrategy = compileStrategyFor scopedTarget
@@ -783,7 +783,7 @@ scopedDispatchQ :: Step -> Q Exp
 scopedDispatchQ = dispatchQFor scopedTarget
 
 -- | A transformation as a plain uninstrumented rewrite, an expression of type
--- @'Clash.Rewrite.Scoped.Types.ScopedRewrite' extra@: match the term against
+-- @'Clash.Rewrite.Scoped.Types.Rewrite' extra@: match the term against
 -- the worker table, run the worker on a match, return the term untouched
 -- otherwise. Splice this where a transformation is invoked from inside
 -- another transformation (any instrumentation is the caller's).

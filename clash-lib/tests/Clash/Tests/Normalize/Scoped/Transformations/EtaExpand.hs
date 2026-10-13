@@ -21,7 +21,7 @@ import Test.Tasty.HUnit
 import Clash.Core.Scoped.Syntax (GlobalId)
 import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
+import Clash.Rewrite.Scoped (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState)
 
@@ -41,8 +41,8 @@ tm = parseTestTermWith (TestDefs [] [] [f, g, k])
 st :: RewriteState NormalizeState
 st = def
 
-etaTLS, etaExpandSynS :: ScopedRewrite NormalizeState
-etaTLS = ScopedTransform Scoped.etaExpansionTL
+etaTLS, etaExpandSynS :: Rewrite NormalizeState
+etaTLS = Transform Scoped.etaExpansionTL
 etaExpandSynS = $(asScopedRewriteQ Scoped.etaExpandSyn)
 
 -- | An environment in which @f@ and @k@ are top entities
@@ -58,7 +58,7 @@ etaSynTo :: [ScopeDecl] -> String -> String -> Assertion
 etaSynTo decls input expected = assertRewritesTo topsEnv st etaExpandSynS decls (tm input) (tm expected)
 
 -- | Assert that a transformation, at the given path, leaves a term as it is
-keepsAt :: RewriteEnv -> ScopedRewrite NormalizeState -> [Step] -> [ScopeDecl] -> String -> Assertion
+keepsAt :: RewriteEnv -> Rewrite NormalizeState -> [Step] -> [ScopeDecl] -> String -> Assertion
 keepsAt env rw path decls = assertNoRewriteAt env st path rw decls . tm
 
 tests :: TestTree

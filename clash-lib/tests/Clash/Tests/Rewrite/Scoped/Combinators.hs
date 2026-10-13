@@ -32,47 +32,47 @@ import Test.Clash.Scoped
   , runScopedClosed, sunkD, testPrim, withClashing, withTerm)
 
 -- | A transformation that changes nothing
-idT :: Applicative m => ScopedTransform m
-idT = ScopedTransform (\_ e -> pure e)
+idT :: Applicative m => Transform m
+idT = Transform (\_ e -> pure e)
 
 -- | Run a transformation in the root context of a closed term
-runClosed :: ScopedTransform m -> Term 'VoidS -> m (Term 'VoidS)
-runClosed t = runScopedTransform t (rootContext emptyScope)
+runClosed :: Transform m -> Term 'VoidS -> m (Term 'VoidS)
+runClosed t = runTransform t (rootContext emptyScope)
 
 -- | 'topdownR' for any monad: 'topdownR' itself is specific to the rewrite
 -- monad, because it repeats the transformation while it signals change
-topdownAny :: Monad m => ScopedTransform m -> ScopedTransform m
+topdownAny :: Monad m => Transform m -> Transform m
 topdownAny r = go where go = r >-> allR go
 
 -- | Records the kind of the innermost frame of the context of every subterm
 -- it is offered
-recordFrames :: ScopedTransform (Writer [[FrameKind]])
-recordFrames = ScopedTransform $ \ctx e -> do
+recordFrames :: Transform (Writer [[FrameKind]])
+recordFrames = Transform $ \ctx e -> do
   tell [take 1 (ctxFrames ctx)]
   pure e
 
 -- | Records the literals it is offered, in order
-recordLits :: ScopedTransform (Writer [Integer])
-recordLits = ScopedTransform $ \_ e -> case e of
+recordLits :: Transform (Writer [Integer])
+recordLits = Transform $ \_ e -> case e of
   Literal (IntLiteral i) -> tell [i] >> pure e
   _ -> pure e
 
 -- | Turns odd integer literals into even ones, signalling a change
-incrementOdd :: ScopedRewrite ()
-incrementOdd = ScopedTransform $ \_ -> \case
+incrementOdd :: Rewrite ()
+incrementOdd = Transform $ \_ -> \case
   Literal (IntLiteral i) | odd i -> changed (Literal (IntLiteral (i + 1)))
   e -> pure e
 
 -- | @case l of { l -> e; ... }@ becomes @e@
-caseLit :: ScopedRewrite ()
-caseLit = ScopedTransform $ \_ -> \case
+caseLit :: Rewrite ()
+caseLit = Transform $ \_ -> \case
   Case (Literal l) _ alts
     | (e : _) <- [e | Alt (LitPat l') e <- alts, l == l'] -> changed e
   e -> pure e
 
 -- | @let x = e in x@ becomes @e@
-inlineTrivialLet :: ScopedRewrite ()
-inlineTrivialLet = ScopedTransform $ \_ -> \case
+inlineTrivialLet :: Rewrite ()
+inlineTrivialLet = Transform $ \_ -> \case
   Let (NonRec b x) (Var _ _ n) | tmNameRaw n == tmNameRaw (tmNameOf b) -> changed x
   e -> pure e
 
@@ -89,7 +89,7 @@ tests :: TestTree
 tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
   [ testCase "allR keeps a NonRec let non-recursive" $
       assertTermAlphaEq shadowingNonRec
-        (runIdentity (runClosed (allR (allR (idT :: ScopedTransform Identity))) shadowingNonRec))
+        (runIdentity (runClosed (allR (allR (idT :: Transform Identity))) shadowingNonRec))
 
   , testCase "allR scopes a NonRec binder over the body only" $ do
       -- The right-hand side gets a LetBinding frame, the body a LetBody frame
@@ -108,12 +108,12 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
       -- The lambda is built in the empty scope, so its binder clashes with
       -- 'sunkD', whose raw name is larger than its name
       withTerm "\\(y :: Int) -> y" $ \ts0 lam0 -> withClashing ts0 [sunkD] lam0 $ \ts lam -> do
-        let probe = ScopedTransform $ \ctx e -> do
+        let probe = Transform $ \ctx e -> do
               case tfPath ctx of
                 PUnder (LamBody b) _ -> tell [tmNameRaw (tmNameOf b)]
                 _ -> pure ()
               pure e
-            (res, names) = runWriter (runScopedTransform (allR probe) (rootContext (testScope ts)) lam)
+            (res, names) = runWriter (runTransform (allR probe) (rootContext (testScope ts)) lam)
         case names of
           [n] -> assertBool "renamed" (n > 1000000)
           _ -> assertFailure ("unexpected binders: " <> show names)
@@ -124,7 +124,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
       -- frame of that primitive, applied to no arguments (like
       -- 'Clash.Core.Scoped.Term.primArg' of the function)
       let tm = closedTerm "(f_G2 :: Int -> Int) 3"
-          toPrim = ScopedTransform $ \ctx e -> case (ctxFrames ctx, e) of
+          toPrim = Transform $ \ctx e -> case (ctxFrames ctx, e) of
             (KAppFun : _, GlobalVar _) -> pure (Prim (testPrim "somePrim" "Int -> Int"))
             (KAppArg a : _, _) -> tell [a] >> pure e
             _ -> pure e
@@ -149,7 +149,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
       (_, n3, _) <- runScopedClosed (inc !-> inc) one
       n3 @?= 1
       -- The second transformation doesn't run after a change
-      (_, n4, c4) <- runScopedClosed (inc >-! apply "never" (ScopedTransform (\_ _ -> error "ran"))) one
+      (_, n4, c4) <- runScopedClosed (inc >-! apply "never" (Transform (\_ _ -> error "ran"))) one
       (n4, c4) @?= (1, True)
 
   , testCase "topdownFixR reaches the fixpoint of repeatR topdownR" $ do

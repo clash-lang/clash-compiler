@@ -226,7 +226,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), compCtxFromList)
 import Clash.Rewrite.Scoped
-  ( ScopedRewrite, ScopedTransform (..), Frame (LetBinding), pushFrame, rootContext
+  ( Rewrite, Transform (..), Frame (LetBinding), pushFrame, rootContext
   , underAlt, underLam, underLet, underLetRec, underTyLam)
 import qualified Clash.Rewrite.Scoped as Scoped
 import Clash.Rewrite.Types (RewriteEnv, RewriteMonad, RewriteState (..))
@@ -470,11 +470,11 @@ runScopedIn
   => RewriteEnv
   -> RewriteState extra
   -> TestScope n
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> Term n
   -> IO (Term n, RewriteState extra, Bool)
 runScopedIn env st ts t e =
-  runRewriteTest env st (runScopedTransform t (rootContext (testScope ts)) e)
+  runRewriteTest env st (runTransform t (rootContext (testScope ts)) e)
 
 -- | Run a scoped transformation on the subterm at a path (see 'atPath'), in
 -- its context, and put the result back. Gives the whole term, the final state,
@@ -491,14 +491,14 @@ runScopedAt
   -> RewriteState extra
   -> TestScope n
   -> [Step]
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> Term n
   -> IO (Term n, RewriteState extra, Bool)
 runScopedAt env st ts path0 t e0 =
   runRewriteTest env st (go path0 (rootContext (testScope ts)) e0)
  where
   go :: Distinct x => [Step] -> Scoped.TransformContext x -> Term x -> RewriteMonad extra (Term x)
-  go [] ctx e = runScopedTransform t ctx e
+  go [] ctx e = runTransform t ctx e
   go (step : path) ctx e = case (step, e) of
     (LamStep, Lam b body) -> underLam ctx b body $ \ctx' b' body' -> Lam b' <$> go path ctx' body'
     (TyLamStep, TyLam b body) -> underTyLam ctx b body $ \ctx' b' body' -> TyLam b' <$> go path ctx' body'
@@ -532,7 +532,7 @@ assertRewritesTo
   :: HasCallStack
   => RewriteEnv
   -> RewriteState extra
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> [ScopeDecl]
   -> TestTerm
   -- ^ The term
@@ -548,7 +548,7 @@ assertRewritesAt
   => RewriteEnv
   -> RewriteState extra
   -> [Step]
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> [ScopeDecl]
   -> TestTerm
   -> TestTerm
@@ -574,7 +574,7 @@ assertNoRewrite
   :: HasCallStack
   => RewriteEnv
   -> RewriteState extra
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> [ScopeDecl]
   -> TestTerm
   -> Assertion
@@ -587,7 +587,7 @@ assertNoRewriteAt
   => RewriteEnv
   -> RewriteState extra
   -> [Step]
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> [ScopeDecl]
   -> TestTerm
   -> Assertion
@@ -669,7 +669,7 @@ assertCaptureRewritesTo
   :: HasCallStack
   => RewriteEnv
   -> RewriteState extra
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> [ScopeDecl]
   -> TestTerm
   -> [ScopeDecl]
@@ -702,7 +702,7 @@ assertSpecializesTo
   :: HasCallStack
   => RewriteEnv
   -> RewriteState extra
-  -> ScopedRewrite extra
+  -> Rewrite extra
   -> [ScopeDecl]
   -> TestTerm
   -- ^ The term
@@ -1311,9 +1311,9 @@ withTests n = adjustOption $ \(QuickCheckTests k) ->
 -- | Run a scoped transformation on a closed term, in the root context, in the
 -- default (silent) environment. Gives the result, the number of
 -- transformations applied, and whether a change was signaled.
-runScopedClosed :: ScopedRewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Bool)
+runScopedClosed :: Rewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Bool)
 runScopedClosed t e = do
-  (e', st, changed) <- runRewriteTest def def (runScopedTransform t (rootContext emptyScope) e)
+  (e', st, changed) <- runRewriteTest def def (runTransform t (rootContext emptyScope) e)
   pure (e', _transformCounter st, changed)
 
 -- | A step down a term, to one of its subterms, see 'atPath'
@@ -1492,7 +1492,7 @@ testScopeTests = testGroup "Test.Clash.Scoped"
   , testGroup "running transformations"
       [ testCase "runScopedAt runs a transformation in the body of a lambda" $
           withTerm "\\(x :: Int) -> \\(y :: Int) -> y" $ \ts e -> do
-            let inc = ScopedTransform $ \_ _ -> Util.changed (Literal (C.IntLiteral 1))
+            let inc = Transform $ \_ _ -> Util.changed (Literal (C.IntLiteral 1))
             (e', _, ch) <- runScopedAt def (def :: RewriteState ()) ts [LamStep, LamStep] inc e
             assertTermIs ts "\\(x :: Int) (y :: Int) -> 1" e'
             ch @?= True

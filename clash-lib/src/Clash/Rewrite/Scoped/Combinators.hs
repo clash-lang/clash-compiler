@@ -169,8 +169,8 @@ was ~3% slower on a larger industrial design we've measured too. See #3250.
 -- | Apply a transformation on the subtrees of a term. Opens the binders it
 -- goes under. Gives the term itself when no subtree changed, see Note [sharing
 -- unchanged nodes].
-allR :: forall m. Monad m => ScopedTransform m -> ScopedTransform m
-allR (ScopedTransform trans) = ScopedTransform go
+allR :: forall m. Monad m => Transform m -> Transform m
+allR (Transform trans) = Transform go
  where
   go :: Distinct n => TransformContext n -> Term n -> m (Term n)
   go ctx tm = case tm of
@@ -192,7 +192,7 @@ allR (ScopedTransform trans) = ScopedTransform go
     Cast e ty1 ty2 -> do
       e' <- trans (pushFrame CastBody ctx) e
       pure $! rebuildCast tm e e' ty1 ty2
-    Let bind e -> descendLet (ScopedTransform trans) ctx bind e $ \bind' e' ->
+    Let bind e -> descendLet (Transform trans) ctx bind e $ \bind' e' ->
       pure $! rebuildLet tm bind e bind' e'
     Case scrut ty alts -> do
       scrut' <- trans (pushFrame CaseScrut ctx) scrut
@@ -214,7 +214,7 @@ allR (ScopedTransform trans) = ScopedTransform go
 -- scope of the body only, not of its own right-hand side.
 descendLet
   :: (Monad m, Distinct n)
-  => ScopedTransform m
+  => Transform m
   -- ^ The transformation to apply to the right-hand sides and the body
   -> TransformContext n
   -- ^ The context of the let-expression
@@ -222,7 +222,7 @@ descendLet
   -> Term l
   -> (forall l'. DExt n l' => Bind n l' -> Term l' -> m r)
   -> m r
-descendLet (ScopedTransform trans) ctx bind e k = case bind of
+descendLet (Transform trans) ctx bind e k = case bind of
   NonRec b x -> do
     x' <- trans (pushFrame (LetBinding b) ctx) x
     underLet ctx bind e $ \ctx' bind' e' -> case bind' of
@@ -350,16 +350,16 @@ rebuildTick tm e0 t e
 
 infixr 6 >->
 -- | Apply two transformations in succession
-(>->) :: Monad m => ScopedTransform m -> ScopedTransform m -> ScopedTransform m
-(>->) = \(ScopedTransform r1) (ScopedTransform r2) ->
-  ScopedTransform (\c -> r1 c >=> r2 c)
+(>->) :: Monad m => Transform m -> Transform m -> Transform m
+(>->) = \(Transform r1) (Transform r2) ->
+  Transform (\c -> r1 c >=> r2 c)
 {-# INLINE (>->) #-}
 
 infixr 6 >-!->
 -- | Apply two transformations in succession, and fully evaluate the term in
 -- between
-(>-!->) :: Monad m => ScopedTransform m -> ScopedTransform m -> ScopedTransform m
-(>-!->) = \(ScopedTransform r1) (ScopedTransform r2) -> ScopedTransform $ \c e -> do
+(>-!->) :: Monad m => Transform m -> Transform m -> Transform m
+(>-!->) = \(Transform r1) (Transform r2) -> Transform $ \c e -> do
   e' <- r1 c e
   forceTerm e' `seq` r2 c e'
 {-# INLINE (>-!->) #-}
@@ -389,7 +389,7 @@ forceTerm = \case
   forceList f = foldr (\a r -> f a `seq` r) ()
 
 -- | Apply a transformation in a topdown traversal
-topdownR :: ScopedRewrite extra -> ScopedRewrite extra
+topdownR :: Rewrite extra -> Rewrite extra
 -- See Note [topdown repeatR] and Note [combinator inlining]
 topdownR r = go
  where
@@ -398,28 +398,28 @@ topdownR r = go
 
 -- | Apply a transformation in a repeated top-down traversal. Optimized for
 -- local, context-stable transformations, see Note [topdownFixR].
-topdownFixR :: ScopedRewrite extra -> ScopedRewrite extra
+topdownFixR :: Rewrite extra -> Rewrite extra
 topdownFixR r = go True
  where
-  go tryParent = ScopedTransform $ \ctx term -> do
+  go tryParent = Transform $ \ctx term -> do
     term1 <-
       if tryParent
-        then runScopedTransform (repeatR r) ctx term
+        then runTransform (repeatR r) ctx term
         else pure term
     (term2, Monoid.getAny -> childChanged) <-
-      Writer.listen (runScopedTransform (allR (go True)) ctx term1)
+      Writer.listen (runTransform (allR (go True)) ctx term1)
     if childChanged
       then do
         (term3, Monoid.getAny -> parentChanged) <-
-          Writer.listen (runScopedTransform (repeatR r) ctx term2)
+          Writer.listen (runTransform (repeatR r) ctx term2)
         if parentChanged
-          then runScopedTransform (go False) ctx term3
+          then runTransform (go False) ctx term3
           else return term3
       else return term2
 {-# INLINE topdownFixR #-}
 
 -- | Apply a transformation in a bottomup traversal
-bottomupR :: Monad m => ScopedTransform m -> ScopedTransform m
+bottomupR :: Monad m => Transform m -> Transform m
 -- See Note [combinator inlining]
 bottomupR r = go
  where
@@ -428,8 +428,8 @@ bottomupR r = go
 
 infixr 5 !->
 -- | Only apply the second transformation if the first one succeeds
-(!->) :: ScopedRewrite extra -> ScopedRewrite extra -> ScopedRewrite extra
-(!->) = \(ScopedTransform r1) (ScopedTransform r2) -> ScopedTransform $ \c expr -> do
+(!->) :: Rewrite extra -> Rewrite extra -> Rewrite extra
+(!->) = \(Transform r1) (Transform r2) -> Transform $ \c expr -> do
   (expr', changed) <- Writer.listen $ r1 c expr
   if Monoid.getAny changed
     then r2 c expr'
@@ -438,8 +438,8 @@ infixr 5 !->
 
 infixr 5 >-!
 -- | Only apply the second transformation if the first one fails
-(>-!) :: ScopedRewrite extra -> ScopedRewrite extra -> ScopedRewrite extra
-(>-!) = \(ScopedTransform r1) (ScopedTransform r2) -> ScopedTransform $ \c expr -> do
+(>-!) :: Rewrite extra -> Rewrite extra -> Rewrite extra
+(>-!) = \(Transform r1) (Transform r2) -> Transform $ \c expr -> do
   (expr', changed) <- Writer.listen $ r1 c expr
   if Monoid.getAny changed
     then return expr'
@@ -447,7 +447,7 @@ infixr 5 >-!
 {-# INLINE (>-!) #-}
 
 -- | Keep applying a transformation until it fails
-repeatR :: ScopedRewrite extra -> ScopedRewrite extra
+repeatR :: Rewrite extra -> Rewrite extra
 -- See Note [combinator inlining]
 repeatR r = go
  where
@@ -455,7 +455,7 @@ repeatR r = go
 {-# INLINE repeatR #-}
 
 -- | Topdown traversal, stops upon first success
-topdownSucR :: ScopedRewrite extra -> ScopedRewrite extra
+topdownSucR :: Rewrite extra -> Rewrite extra
 -- See Note [combinator inlining]
 topdownSucR r = go
  where
@@ -464,7 +464,7 @@ topdownSucR r = go
 
 -- | Bottomup traversal; when the transformation succeeds, re-traverse the
 -- result until the innermost fixpoint is reached
-innerMost :: ScopedRewrite extra -> ScopedRewrite extra
+innerMost :: Rewrite extra -> Rewrite extra
 -- See Note [combinator inlining]
 innerMost r = go
  where

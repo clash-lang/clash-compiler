@@ -19,15 +19,15 @@ module Clash.Normalize.Strategy
 
 import Clash.Normalize.Strategy.Spec
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped.Types (ScopedRewrite)
+import Clash.Rewrite.Scoped.Types (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (compileScopedStrategy)
 
-constantPropagation :: ScopedRewrite NormalizeState
+constantPropagation :: Rewrite NormalizeState
 constantPropagation = $(compileScopedStrategy constantPropagationSpec)
 
 -- constantPropagation is defined first: the splice below quotes its name,
 -- and a top-level splice can only see the declarations above it.
 
 -- | Normalisation transformation
-normalization :: ScopedRewrite NormalizeState
+normalization :: Rewrite NormalizeState
 normalization = $(compileScopedStrategy (normalizationSpec 'constantPropagation))

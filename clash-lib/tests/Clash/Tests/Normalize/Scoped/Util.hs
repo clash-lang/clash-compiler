@@ -38,7 +38,7 @@ import Clash.Core.Scoped.TermInfo (isClosed)
 import Clash.Core.Scoped.Util (mkLets)
 import qualified Clash.Normalize.Scoped.Util as Scoped
 import Clash.Rewrite.Scoped.Types
-  (Frame (..), ScopedRewrite, ScopedTransform (..), pushFrame, rootContext)
+  (Frame (..), Rewrite, Transform (..), pushFrame, rootContext)
 import qualified Clash.Rewrite.Scoped.Combinators as Scoped (bottomupR)
 
 import Test.Clash.Rewrite
@@ -310,8 +310,8 @@ classifyTests =
 -- * Normalizing global binders
 
 -- | 'incLits' on scoped Core
-incLitsScoped :: ScopedRewrite NormalizeState
-incLitsScoped = Scoped.bottomupR $ ScopedTransform $ \_ -> \case
+incLitsScoped :: Rewrite NormalizeState
+incLitsScoped = Scoped.bottomupR $ Transform $ \_ -> \case
   Literal (IntLiteral i) -> Scoped.changed (Literal (IntLiteral (i + 1)))
   e -> pure e
 
