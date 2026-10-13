@@ -154,6 +154,7 @@ makeCached :: (MonadState s m, Hashable k, Eq k)
            -> Lens' s (HashMap k v) -- ^ The Lens to the HashMap that is the cache
            -> m v -- ^ The action to cache
            -> m v
+{-# INLINABLE makeCached #-}
 makeCached key l create = do
   cache <- use l
   case HashMapL.lookup key cache of
@@ -173,6 +174,7 @@ makeCachedU
   -> m v
   -- ^ Action to cache
   -> m v
+{-# INLINABLE makeCachedU #-}
 makeCachedU key l create = do
   cache <- use l
   case UniqMap.lookup key cache of
@@ -192,6 +194,7 @@ makeCachedO
   -> m v
   -- ^ Action to cache
   -> m v
+{-# INLINABLE makeCachedO #-}
 makeCachedO key l create = do
   cache <- use l
   case OMap.lookup (getUnique key) cache of
