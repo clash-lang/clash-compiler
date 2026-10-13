@@ -108,10 +108,10 @@ lib:unittests:
     - bin/clash-lib:unittests --hide-successes
 
 # Needs the build tree and cabal setup to typecheck against clash-lib
-lib:scoped-negative:
+lib:scope-negative:
   extends: .test-cache
   script:
-    - clash-lib/tests/scoped-negative/check.sh
+    - clash-lib/tests/scope-negative/check.sh
 
 # Normally, this job is small. But it was flaky on GHC 9.2; it sometimes fails
 # and we don't know yet why. When it fails, it recompiles things it should have
