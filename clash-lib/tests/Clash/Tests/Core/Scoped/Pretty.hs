@@ -30,6 +30,9 @@ import Clash.Core.Pretty
   (ClashAnnotation (..), ClashDoc, PrettyOptions (..), SubtermPos (..), ppr, showPpr,
    showPpr')
 import qualified Clash.Core.Term as C
+import qualified Clash.Core.TyCon as C
+import qualified Clash.Data.UniqMap as UniqMap
+import qualified Data.List as List
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 
@@ -41,7 +44,7 @@ import Test.Clash.Rewrite (globalId, intTy, tyVar)
 import Test.Clash.Scoped (extendFreeVars, forAllScrambled, sinkInto, withFreeVars, withTests)
 import Test.Clash.Scoped.Gen
   (InScope (..), Sunk (..), ctxOf, genFreeVars, genInScope, genSunk, genType, runG,
-   shrinkInScope, shrinkSunk, showType)
+   shrinkInScope, shrinkSunk, showType, tyConMap)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Pretty"
@@ -50,6 +53,27 @@ tests = testGroup "Clash.Tests.Core.Scoped.Pretty"
           ty = C.ForAllTy a (C.mkFunTy (C.VarTy a) intTy)
           g = mkGlobalId (C.varName (globalId C.User "f" 4301 ty)) (fromClashTypeClosed emptyScope ty)
       showPpr g @?= showPpr (globalIdLegacy g)
+
+  , testCase "a data type prints its kind and data constructors" $
+      showPpr' noUniques maybeTyCon @?= List.intercalate "\n"
+        [ "data Maybe :: Type -> Type"
+        , "Just :: forall (a :: Type). a -> Maybe a"
+        , "Nothing :: forall (a :: Type). Maybe a" ]
+
+    -- The uniques of the pattern variables of the equations are their raw
+    -- names
+  , testCase "a type family prints its kind and equations" $ do
+      let a = tyVar C.User "a" 7001
+          maybeNm = C.tyConName maybeTyCon
+          gTc = mkFunTyConFromClash 3001 (C.mkUnsafeName C.User "G" 3001)
+                  (C.mkFunTy C.liftedTypeKind C.liftedTypeKind) 1
+                  [ ([C.mkTyConApp maybeNm [C.VarTy a]], C.VarTy a)
+                  , ([C.VarTy a], C.mkTyConApp maybeNm [C.VarTy a]) ]
+      -- The uniques of the wired-in kinds depend on the version of GHC
+      take 1 (lines (showPpr' noUniques gTc)) @?= ["type family G :: Type -> Type"]
+      drop 1 (lines (showPpr' noQualifiers gTc)) @?=
+        [ "type instance G[3001] (Maybe[2001] a[1]) = a[1]"
+        , "type instance G[3001] a[1] = Maybe[2001] a[1]" ]
 
   , withTests 500 $ testGroup "properties"
       [ testProperty "terms print like their conversion to Clash Core" $
@@ -87,6 +111,17 @@ samePrinting tm =
        [ counterexample (showOptions opts) (showPpr' opts tm === showPpr' opts tm1)
        | opts <- allOptions ]
      .&&. counterexample "annotations" (annotations (ppr tm) === annotations (ppr tm1))
+
+noUniques, noQualifiers :: PrettyOptions
+noUniques = PrettyOptions False True False True
+noQualifiers = PrettyOptions True True False True
+
+-- | @Maybe@, see "Test.Clash.Scoped.Gen"
+maybeTyCon :: C.TyCon
+maybeTyCon =
+  case [tc | tc <- UniqMap.elems tyConMap, C.nameOcc (C.tyConName tc) == "Maybe"] of
+    tc : _ -> tc
+    [] -> error "maybeTyCon: not in Test.Clash.Scoped.Gen.tyConMap"
 
 allOptions :: [PrettyOptions]
 allOptions =

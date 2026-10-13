@@ -1,5 +1,6 @@
 module Main where
 
+import System.Environment (setEnv)
 import Test.Tasty
 import Test.Tasty.QuickCheck
 
@@ -191,7 +192,13 @@ tests = testGroup "Unittests"
   ]
 
 main :: IO ()
-main =
-    defaultMain
-  $ adjustOption setDefaultQuickCheckTests
-  $ tests
+main = do
+  -- The tests compare printed terms with what the pretty printer prints with
+  -- these settings, which otherwise come from the environment (see
+  -- 'Clash.Core.Pretty.PrettyOptions' and 'Clash.Pretty.defaultPprWidth')
+  mapM_ (uncurry setEnv)
+    [ ("CLASH_PPR_UNIQUES", "False"), ("CLASH_PPR_QUALIFIERS", "False")
+    , ("CLASH_PPR_TICKS", "False"), ("CLASH_PPR_WIDTH", "200") ]
+  defaultMain
+    $ adjustOption setDefaultQuickCheckTests
+    $ tests
