@@ -28,16 +28,13 @@ where
 
 -- External Import
 import Control.DeepSeq
-import Data.Binary                            (Binary (..), getWord8, putWord8)
 import Data.Function                          (on)
 import qualified Data.Text as T
 
 -- Internal Imports
 import Clash.Core.DataCon                     (DataCon)
 import Clash.Core.Name
-import {-# SOURCE #-} Clash.Core.Scoped.Convert
-  (mkAlgTyConFromClash, mkFunTyConFromClash, mkNewTyConRhsFromClash,
-   mkPrimTyConFromClash, mkPromotedDataConFromClash)
+import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkPrimTyConFromClash)
 import Clash.Core.Scoped.Sig                  (NewTyConSig, TyFamEqn)
 import qualified Clash.Core.Scoped.Syntax     as Scoped
 import {-# SOURCE #-} Clash.Core.Type         (Kind, Type)
@@ -116,26 +113,6 @@ instance NFData TyCon where
     FunTyCon {} -> ()
     PrimTyCon {} -> ()
 
--- | Transitional: through the types of Clash Core, in the format of the
--- derived instance of the type constructors of Clash Core, so that the
--- serialized inputs stay the same
-instance Binary TyCon where
-  put = \case
-    AlgTyCon u nm _ ar rhs cls k ->
-      putWord8 0 >> put u >> put nm >> put k >> put ar >> put rhs >> put cls
-    PromotedDataCon u nm _ ar dc k ->
-      putWord8 1 >> put u >> put nm >> put k >> put ar >> put dc
-    FunTyCon u nm _ ar _ k eqns ->
-      putWord8 2 >> put u >> put nm >> put k >> put ar >> put eqns
-    PrimTyCon u nm _ ar k ->
-      putWord8 3 >> put u >> put nm >> put k >> put ar
-  get = getWord8 >>= \case
-    0 -> mkAlgTyConFromClash <$> get <*> get <*> get <*> get <*> get <*> get
-    1 -> mkPromotedDataConFromClash <$> get <*> get <*> get <*> get <*> get
-    2 -> mkFunTyConFromClash <$> get <*> get <*> get <*> get <*> get
-    3 -> mkPrimTyConFromClash <$> get <*> get <*> get <*> get
-    t -> fail ("Binary TyCon: unknown tag " <> show t)
-
 {-
 instance Show TyCon where
   show (AlgTyCon       {tyConName = n}) = "AlgTyCon: " ++ show n
@@ -177,16 +154,6 @@ instance NFData AlgTyConRhs where
   rnf = \case
     DataTyCon dcs -> rnf dcs
     NewTyCon dc _ _ -> rnf dc
-
--- | Transitional, see the instance of 'TyCon'
-instance Binary AlgTyConRhs where
-  put = \case
-    DataTyCon dcs -> putWord8 0 >> put dcs
-    NewTyCon dc _ rhs -> putWord8 1 >> put dc >> put rhs
-  get = getWord8 >>= \case
-    0 -> DataTyCon <$> get
-    1 -> mkNewTyConRhsFromClash <$> get <*> get
-    t -> fail ("Binary AlgTyConRhs: unknown tag " <> show t)
 
 -- | Create a Kind out of a TyConName
 mkKindTyCon :: TyConName

@@ -12,8 +12,6 @@
 module Pretty (comparePretty) where
 
 import Control.Monad (forM_)
-import qualified Data.ByteString.Lazy as B
-import Data.Binary (decode)
 import qualified Data.List as List
 import System.IO (hFlush, stdout)
 
@@ -23,10 +21,9 @@ import Clash.Core.Scoped.NameMap (globalEnvElems)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Syntax (GlobalId (..))
 import Clash.Driver.Manifest ()
-import Clash.Driver.Types (Binding (..), BindingMap)
-import Clash.Rewrite.Scoped.Globals (fromClashBindings)
+import Clash.Driver.Types (Binding (..), GlobalBindings)
 
-import SerialiseInstances (NetlistInputs, NormalizationInputs)
+import SerialiseInstances (NetlistInputs, NormalizationInputs, readInputs)
 
 -- | Compare the printing of every binding of a design (@*.bin@, @*.net.bin@,
 -- or the normalized bindings @*.norm.bin@), showing the first given number of
@@ -34,7 +31,7 @@ import SerialiseInstances (NetlistInputs, NormalizationInputs)
 comparePretty :: Int -> FilePath -> IO Bool
 comparePretty nShow design = do
   bm <- loadBindings design
-  let bs = globalEnvElems (fromClashBindings bm)
+  let bs = globalEnvElems bm
       diffs =
         [ (showPpr (globalIdName (bindingId b)) <> ": " <> what, a, c)
         | b <- bs
@@ -57,14 +54,14 @@ comparePretty nShow design = do
   def = PrettyOptions True True True True
   hidden = PrettyOptions False False False False
 
-loadBindings :: FilePath -> IO BindingMap
+loadBindings :: FilePath -> IO GlobalBindings
 loadBindings f
-  | ".norm.bin" `List.isSuffixOf` f = decode <$> B.readFile f
+  | ".norm.bin" `List.isSuffixOf` f = readInputs f
   | ".net.bin" `List.isSuffixOf` f = do
-      (bm, _, _, _, _, _, _) <- decode <$> B.readFile f :: IO NetlistInputs
+      (bm, _, _, _, _, _, _) <- readInputs f :: IO NetlistInputs
       pure bm
   | otherwise = do
-      (bm, _, _, _, _, _, _, _) <- decode <$> B.readFile f :: IO NormalizationInputs
+      (bm, _, _, _, _, _, _, _) <- readInputs f :: IO NormalizationInputs
       pure bm
 
 -- | The first line in which two texts differ, with its line number

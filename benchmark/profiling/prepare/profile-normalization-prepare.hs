@@ -2,14 +2,10 @@
 
 import           System.Environment           (getArgs)
 
-import           Data.Binary (encode)
-import qualified Data.ByteString.Lazy as B
 import           Data.List                    (partition)
 
 import           Clash.Driver.Types           (ClashEnv(..), ClashDesign(..))
 import           Clash.Netlist.Types          (TopEntityT(topId))
-import           Clash.Rewrite.Scoped.Globals (toClashBindings)
-import qualified Clash.Util.Supply            as Supply
 
 import           SerialiseInstances
 import           BenchmarkCommon
@@ -29,14 +25,12 @@ prepareFile idirs fIn = do
   putStrLn $ "Preparing: " ++ fIn
   let fOut = fIn ++ ".bin"
   (clashEnv, clashDesign) <- runInputStage idirs fIn
-  supply <- Supply.newSupply
 
   let topNames = fmap topId (designEntities clashDesign)
 
   case topNames of
     topName:_ -> do
-      -- The bindings are serialized as bindings of Clash Core
-      let inputs = ( toClashBindings supply (designBindings clashDesign)
+      let inputs = ( designBindings clashDesign
                    , envTyConMap clashEnv
                    , envTupleTyCons clashEnv
                    , fmap (fmap removeBBfunc) (envPrimitives clashEnv)
@@ -47,6 +41,6 @@ prepareFile idirs fIn = do
                    )
 
       putStrLn $ "Serialising to : " ++ fOut
-      B.writeFile fOut $ encode inputs
+      writeInputs fOut (inputs :: NormalizationInputs)
       putStrLn "Done"
     _ -> error "no top entities"

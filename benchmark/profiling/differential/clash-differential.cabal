@@ -19,6 +19,7 @@ executable clash-differential
   other-modules:       Comparisons
                        Current
                        Demo
+                       Legacy
                        Normalized
                        Pretty
                        Prims

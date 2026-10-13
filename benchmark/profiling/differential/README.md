@@ -31,6 +31,8 @@ and `package clash-lib` / `flags: -debug`.
   `clash-profile-normalization-prepare` (see `../README.profiling.md`);
 * `*.net.bin`: normalized bindings, written by `clash-profile-netlist-prepare`.
 
+Both are files of scoped Clash Core, see `Clash.Core.Scoped.Binary`.
+
 It prints the first `--show` (default 3) differences of every design, then a
 summary per design:
 
@@ -269,6 +271,9 @@ uniques in both runs, so globals are matched by where they are used: from the
 top entity on, the globals that two matched bindings refer to are matched by
 the order in which they occur (see `Normalized.hs`). It reports the bindings
 that differ, and the globals that have a normalized binding in one run only.
+Either run may have written its bindings in the encoding of before
+`Clash.Core.Scoped.Binary`, so a run of a commit before it can be compared
+with one after it.
 
 ## Comparing the pretty-printer
 

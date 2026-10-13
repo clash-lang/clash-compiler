@@ -5,8 +5,7 @@ module BenchmarkCommon where
 import Clash.Annotations.Primitive (HDL(VHDL))
 import Clash.Backend
 import Clash.Backend.VHDL
-import Clash.Core.Var
-import Clash.Core.Scoped.Syntax (globalIdLegacy)
+import Clash.Core.Scoped.Syntax (GlobalId)
 import Clash.Driver
 import Clash.Driver.Types
 import Clash.Netlist.Types (TopEntityT(topId))
@@ -52,7 +51,7 @@ runInputStage idirs src = do
 runNormalisationStage
   :: [FilePath]
   -> String
-  -> IO (ClashEnv, ClashDesign, Id)
+  -> IO (ClashEnv, ClashDesign, GlobalId)
 runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
   (env, design) <- runInputStage idirs src
@@ -63,5 +62,5 @@ runNormalisationStage idirs src = do
             normalizeEntity env (designBindings design)
               (ghcTypeToHWType (opt_intWidth (opts idirs)))
               topEntityNames supplyN topEntity
-      return (env, design{designBindings=transformedBindings}, globalIdLegacy topEntity)
+      return (env, design{designBindings=transformedBindings}, topEntity)
     _ -> error "no top entities"

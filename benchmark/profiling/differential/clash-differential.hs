@@ -17,7 +17,6 @@
 module Main (main) where
 
 import Control.Monad (forM, forM_, unless, when)
-import Data.Binary (decode)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.List as List
 import qualified Data.Map.Strict as Map
@@ -40,7 +39,7 @@ import Clash.Core.TermInfo (termSizeSmallerThan)
 import Clash.Core.Var (varName)
 import Clash.Core.VarEnv (mapMaybeVarEnv, mkVarSet)
 import Clash.Driver.Types
-  (Binding (..), ClashEnv (..), ClashOpts (..), defClashOpts)
+  (Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), GlobalBindings, defClashOpts)
 -- For the orphan 'Binary' instance of 'TopEntityT'
 import Clash.Driver.Manifest ()
 import Clash.Netlist.Types (TopEntityT (topId))
@@ -50,8 +49,11 @@ import Clash.Rewrite.Types (RewriteEnv (..))
 import Clash.GHC.Evaluator (evaluator)
 import Clash.GHC.NetlistTypes (ghcTypeToHWType)
 
+import Clash.Rewrite.Scoped.Globals (toClashBindings)
+import qualified Clash.Util.Supply as Supply
+
 import SerialiseInstances
-  (NetlistInputs, NormalizationInputs, decodeCorpus, unremoveBBfunc)
+  (NetlistInputs, NormalizationInputs, decodeCorpus, readInputs, unremoveBBfunc)
 
 import Comparisons (comparisons, siteComparisons)
 import Registry (currentRewrites, lookupCurrent)
@@ -122,7 +124,9 @@ usage = unlines
   , "that clash-profile-normalization-run writes with CLASH_NORMALIZED_OUT set,"
   , "in DIR_A and DIR_B (DIR/<design>.norm.bin), e.g. of the normalizer of"
   , "Clash Core and that of scoped Clash Core. Globals are matched by where"
-  , "they are used, from the top entity on. See Normalized.hs."
+  , "they are used, from the top entity on. Either run may have written them in"
+  , "the encoding of before the native encoding of scoped Clash Core. See"
+  , "Normalized.hs."
   , ""
   , "The pretty command compares the pretty-printer of scoped Clash Core with"
   , "printing the conversion to Clash Core, on every binding of DESIGN.bin...,"
@@ -138,13 +142,13 @@ main :: IO ()
 main = getArgs >>= \case
   "whnf" : args -> case parseWhnfArgs (ReplayOptions 3 3 0 Nothing False False) args of
     Just (opts, design : dumps@(_:_)) -> do
-      (bm, tcm, _, _, _, _, _, _) <- decode <$> B.readFile design :: IO NormalizationInputs
+      (bm, tcm) <- loadBindings design
       forM_ dumps (whnfReplay opts tcm bm)
     _ -> die usage
   "prims" : args -> case parsePrimsArgs defPrimsOptions args of
     Just (opts, designs@(_:_)) -> do
       inputs <- forM designs $ \design -> do
-        (bm, tcm, _, _, _, _, _, _) <- decode <$> B.readFile design :: IO NormalizationInputs
+        (bm, tcm) <- loadBindings design
         pure (design, bm, tcm)
       ok <- comparePrims opts inputs
       unless ok exitFailure
@@ -248,6 +252,21 @@ run opts cmp files = do
     putStrLn (renderSummary "total" (mconcat summaries) {sumMismatches = []})
   unless (all ((== 0) . sumDifferent) summaries) exitFailure
 
+-- | The bindings of Clash Core, converted from scoped Core with fresh
+-- uniques, and the type constructors of the inputs of normalization of a
+-- design
+loadBindings :: FilePath -> IO (BindingMap, TyConMap)
+loadBindings design = do
+  (bm, tcm, _, _, _, _, _, _) <- readInputs design :: IO NormalizationInputs
+  bm' <- toClashBindingsIO bm
+  pure (bm', tcm)
+
+-- | Convert bindings to Clash Core, with uniques from a fresh supply
+toClashBindingsIO :: GlobalBindings -> IO BindingMap
+toClashBindingsIO bm = do
+  supply <- Supply.newSupply
+  pure (toClashBindings supply bm)
+
 -- | Load a serialized design
 loadDesign :: Options -> FilePath -> IO Design
 loadDesign opts f = do
@@ -255,12 +274,14 @@ loadDesign opts f = do
     if ".net.bin" `List.isSuffixOf` f
       then do
         (bm, topEnts, prims, tcm0, reprs0, _top, domains0) <-
-          decode <$> B.readFile f :: IO NetlistInputs
-        pure (bm, tcm0, mempty, prims, reprs0, map (globalIdLegacy . topId) topEnts, domains0)
+          readInputs f :: IO NetlistInputs
+        bm' <- toClashBindingsIO bm
+        pure (bm', tcm0, mempty, prims, reprs0, map (globalIdLegacy . topId) topEnts, domains0)
       else do
         (bm, tcm0, tupTcm0, prims, reprs0, tops0, _top, domains0) <-
-          decode <$> B.readFile f :: IO NormalizationInputs
-        pure (bm, tcm0, tupTcm0, prims, reprs0, tops0, domains0)
+          readInputs f :: IO NormalizationInputs
+        bm' <- toClashBindingsIO bm
+        pure (bm', tcm0, tupTcm0, prims, reprs0, map globalIdLegacy tops0, domains0)
   let clashEnv = ClashEnv
         { envOpts = defClashOpts
         , envTyConMap = tcm

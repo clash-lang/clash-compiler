@@ -3,9 +3,10 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  For the transitional 'Data.Binary.Binary' instances of "Clash.Core.DataCon"
-  and "Clash.Core.TyCon", which decode the types of Clash Core and convert
-  them, and for the builtin type constructors of "Clash.Core.Scoped.TysPrim".
+  For the modules of Clash Core that "Clash.Core.Scoped.Convert" depends on,
+  and that make data constructors and type constructors of Clash Core, such
+  as "Clash.Core.TysPrim", and for the builtin type constructors of
+  "Clash.Core.Scoped.TysPrim".
 -}
 
 {-# LANGUAGE DataKinds #-}

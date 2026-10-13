@@ -17,13 +17,15 @@ import qualified Clash.Netlist.BlackBox.Types                 as CL
 import qualified Data.HashMap.Strict                          as HM
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Core.Var (Id)
+import           Clash.Core.Scoped.Binary (decodeWithHeader, encodeWithHeader, getHeader, putHeader)
+import           Clash.Core.Scoped.Syntax (GlobalId)
 import           Clash.Core.TyCon (TyConMap,TyConName)
-import           Clash.Driver.Types (BindingMap, DomainMap)
+import           Clash.Driver.Types (DomainMap, GlobalBindings)
 import           Clash.Rewrite.Capture (CaptureLog)
 import           Clash.Rewrite.Capture.Encoding (decodeCaptureLog, hPutCaptureLog)
 import           System.IO (Handle)
 import           Data.Binary.Get (runGetOrFail)
+import           Data.Binary.Put (runPut)
 import qualified Data.ByteString.Lazy as BL
 import           Data.IntMap.Strict (IntMap)
 
@@ -51,37 +53,46 @@ instance (Binary k, Binary v, Eq k, Hashable k) => Binary (HM.HashMap k v) where
 
 -- data that's serialised to file between profile-normalization-prepare  and profile-normalization-run
 type NormalizationInputs =
-  ( BindingMap
+  ( GlobalBindings
   , TyConMap
   , IntMap TyConName
   , CompiledPrimMap'
   , CustomReprs
-  , [Id]
-  , Id
+  , [GlobalId]
+  , GlobalId
   , DomainMap
   )
 
 -- data that's serialised to file between profile-netlist-prepare  and profile-netlist-run
 type NetlistInputs =
-  ( BindingMap
+  ( GlobalBindings
   , [CL.TopEntityT]
   , CompiledPrimMap'
   , TyConMap
   , CustomReprs
-  , Id
+  , GlobalId
   , DomainMap
   )
+
+-- | Write inputs, or normalized bindings, to a file of scoped Clash Core: with
+-- the header of "Clash.Core.Scoped.Binary"
+writeInputs :: Binary a => FilePath -> a -> IO ()
+writeInputs f = BL.writeFile f . encodeWithHeader
+
+-- | Read a file written by 'writeInputs'
+readInputs :: Binary a => FilePath -> IO a
+readInputs f = decodeWithHeader f <$> BL.readFile f
 
 -- | Write the captured sites at which transformations fired while
 -- normalizing a design, see "Clash.Rewrite.Capture": the inputs of
 -- normalization, without their bindings, followed by the captures, which
 -- have the bindings at the end of normalization.
 hPutCorpus :: Handle -> NormalizationInputs -> CaptureLog -> IO ()
-hPutCorpus h inputs cl = BL.hPut h (encode inputs) >> hPutCaptureLog h cl
+hPutCorpus h inputs cl = BL.hPut h (runPut (putHeader >> put inputs)) >> hPutCaptureLog h cl
 
 -- | Decode a corpus written by 'hPutCorpus'. Decodes the captures lazily, see
 -- 'decodeCaptureLog'.
 decodeCorpus :: BL.ByteString -> (NormalizationInputs, CaptureLog)
-decodeCorpus bs = case runGetOrFail get bs of
+decodeCorpus bs = case runGetOrFail (getHeader >> get) bs of
   Left (_, _, err) -> error ("decodeCorpus: " <> err)
   Right (rest, _, inputs) -> (inputs, decodeCaptureLog rest)

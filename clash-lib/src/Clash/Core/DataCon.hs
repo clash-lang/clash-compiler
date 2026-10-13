@@ -35,7 +35,6 @@ import qualified Data.Text                    as Text
 import GHC.Generics                           (Generic)
 
 import Clash.Core.Name                        (Name (..))
-import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkDataConFromClash)
 import Clash.Core.Scoped.Sig                  (DataConSig)
 import qualified Clash.Core.Scoped.Syntax     as Scoped
 import {-# SOURCE #-} Clash.Core.Type         (Type)
@@ -117,24 +116,6 @@ instance NFData DataCon where
   rnf dc =
     rnf (dcName dc) `seq` rnf (dcTag dc) `seq` rnf (dcArgStrict dc)
       `seq` rnf (dcFieldLabels dc)
-
--- | Transitional: through the types of Clash Core, in the format of the
--- derived instance of the data constructors of Clash Core, so that the
--- serialized inputs and the hashes of the manifest stay the same
-instance Binary DataCon where
-  put dc = do
-    put (dcName dc)
-    put (dcUniq dc)
-    put (dcTag dc)
-    put (dcLegacyType dc)
-    put (dcUnivTyVars dc)
-    put (dcExtTyVars dc)
-    put (dcArgTys dc)
-    put (dcArgStrict dc)
-    put (dcFieldLabels dc)
-  get =
-    mkDataConFromClash
-      <$> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get <*> get
 
 instance Eq DataCon where
   (==) = (==) `on` dcUniq
