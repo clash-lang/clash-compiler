@@ -976,6 +976,7 @@ runClashTest = defaultMain
         , outputTest "T1102B" def{hdlTargets=[VHDL]}
         , runTest "T2069" def
         , runTest "T3432" def{hdlTargets=[Verilog], hdlSim=[]}
+        , runTest "T3434" def
         , clashTestGroup "BiSignal"
           [ runTest "Counter" def
           , runTest "CounterHalfTuple" def
