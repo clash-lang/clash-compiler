@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.EtaExpand".
+  Tests for "Clash.Normalize.Transformations.EtaExpand".
   'assertRewritesTo' runs every test in the scope of the free variables of its
   input, and in a scope that the binders of the input clash with.
 -}
@@ -19,7 +19,7 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import Clash.Core.Syntax (GlobalId)
-import qualified Clash.Normalize.Scoped.Transformations.EtaExpand as Scoped
+import qualified Clash.Normalize.Transformations.EtaExpand as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -84,7 +84,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.EtaExpand"
             "\\(y :: Int) (y2 :: Int) -> let { (i :: Int) = y } in i"
         -- 'etaExpandSyn' eta-expands references to top entities. It shares
         -- 'topEntities' with
-        -- 'Clash.Normalize.Scoped.Transformations.Specialize.specialize',
+        -- 'Clash.Normalize.Transformations.Specialize.specialize',
         -- and also looked up whether a variable is a top entity by its unique
         -- alone, so it eta-expanded a local that shares its unique with a top
         -- entity.

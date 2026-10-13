@@ -17,7 +17,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-module Clash.Normalize.Scoped.Transformations.MultiPrim
+module Clash.Normalize.Transformations.MultiPrim
   ( setupMultiResultPrim
   , setupMultiResultPrimWorker
   ) where

@@ -165,7 +165,7 @@ data Primitive a b c d
     -- void. Defaults to 'NoRenderVoid'.
   , multiResult :: Bool
     -- ^ Wether this blackbox assigns its results to multiple variables. See
-    -- 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'
+    -- 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
   , kind      :: TemplateKind
     -- ^ Whether this results in an expression or a declaration
   , warning  :: c
@@ -219,7 +219,7 @@ data Primitive a b c d
   -- ^ Arguments used by blackbox. Used to remove arguments during normalization.
   , multiResult :: Bool
   -- ^ Wether this blackbox assigns its results to multiple variables. See
-  -- 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'
+  -- 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
   , functionName :: BlackBoxFunctionName
   , function :: d
   -- ^ Holds blackbox function and its hash, (Int, BlackBoxFunction), in a

@@ -88,7 +88,7 @@ literalType = \case
 
 -- | The type of a primitive, in any scope. The type of a multi-result
 -- primitive returns its results as separate arguments, see Note [MultiResult
--- type] in "Clash.Normalize.Scoped.Transformations.MultiPrim".
+-- type] in "Clash.Normalize.Transformations.MultiPrim".
 primInfoType :: (HasCallStack, Distinct n) => PrimInfo -> Type n
 primInfoType p = case primMultiResult p of
   SingleResult -> sinkClosed (primType p)

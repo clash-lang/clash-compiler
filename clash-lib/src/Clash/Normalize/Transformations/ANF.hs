@@ -81,7 +81,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 
-module Clash.Normalize.Scoped.Transformations.ANF
+module Clash.Normalize.Transformations.ANF
   ( makeANF
   , nonRepANF
   , nonRepANFWorker
@@ -119,7 +119,7 @@ import Clash.Core.TermInfo (isCon, isLocalVar, isPrim, isVar)
 import Clash.Core.Type (TypeView (..), coreView, tyView)
 import Clash.Core.TypeEnv (TypeEnv)
 import Clash.Core.Util (internalName, mkSelectorCase, systemName)
-import Clash.Normalize.Scoped.Transformations.Specialize (specialize)
+import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite
   (TransformContext, changed, closestLetBinder, tfScope, underLam)
@@ -535,7 +535,7 @@ teleTyRaws (TCons b bs) = tyNameRaw (tyNameOf b) : teleTyRaws bs
 -- in the alternative, see 'anfAlt'. It doesn't occur in the result.
 unusedExistential :: Type n
 unusedExistential =
-  LitTy (SymTy "Clash.Normalize.Scoped.Transformations.ANF.unusedExistential")
+  LitTy (SymTy "Clash.Normalize.Transformations.ANF.unusedExistential")
 
 -- | Rebuild an alternative. The pattern of an 'APat' gets fresh binders, see
 -- the module header.

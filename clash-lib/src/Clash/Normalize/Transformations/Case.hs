@@ -36,7 +36,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Normalize.Scoped.Transformations.Case
+module Clash.Normalize.Transformations.Case
   ( caseCase
   , caseCaseWorker
   , caseCon
@@ -85,7 +85,7 @@ import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.Types (FilteredHWType(..), HWType(..))
 import Clash.Netlist.Util (coreTypeToHWType)
-import qualified Clash.Normalize.Scoped.Primitives as NP (undefined, undefinedX)
+import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.Types

@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Inline".
+  Tests for "Clash.Normalize.Transformations.Inline".
 
   'assertRewritesTo' runs every test in the scope of the free variables of
   its input, and in a scope that the binders of the input clash with.
@@ -25,7 +25,7 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkIdentity))
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Normalize.Scoped.Transformations.Inline as S
+import qualified Clash.Normalize.Transformations.Inline as S
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)

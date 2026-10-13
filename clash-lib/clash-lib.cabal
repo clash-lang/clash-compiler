@@ -300,21 +300,21 @@ Library
                       Clash.Netlist.Util
 
                       Clash.Normalize
-                      Clash.Normalize.Scoped.Primitives
-                      Clash.Normalize.Scoped.PrimitiveReductions
-                      Clash.Normalize.Scoped.Transformations
-                      Clash.Normalize.Scoped.Transformations.ANF
-                      Clash.Normalize.Scoped.Transformations.Case
-                      Clash.Normalize.Scoped.Transformations.Cast
-                      Clash.Normalize.Scoped.Transformations.DEC
-                      Clash.Normalize.Scoped.Transformations.EtaExpand
-                      Clash.Normalize.Scoped.Transformations.Inline
-                      Clash.Normalize.Scoped.Transformations.Letrec
-                      Clash.Normalize.Scoped.Transformations.MultiPrim
-                      Clash.Normalize.Scoped.Transformations.Reduce
-                      Clash.Normalize.Scoped.Transformations.SeparateArgs
-                      Clash.Normalize.Scoped.Transformations.Specialize
-                      Clash.Normalize.Scoped.Transformations.XOptimize
+                      Clash.Normalize.Primitives
+                      Clash.Normalize.PrimitiveReductions
+                      Clash.Normalize.Transformations
+                      Clash.Normalize.Transformations.ANF
+                      Clash.Normalize.Transformations.Case
+                      Clash.Normalize.Transformations.Cast
+                      Clash.Normalize.Transformations.DEC
+                      Clash.Normalize.Transformations.EtaExpand
+                      Clash.Normalize.Transformations.Inline
+                      Clash.Normalize.Transformations.Letrec
+                      Clash.Normalize.Transformations.MultiPrim
+                      Clash.Normalize.Transformations.Reduce
+                      Clash.Normalize.Transformations.SeparateArgs
+                      Clash.Normalize.Transformations.Specialize
+                      Clash.Normalize.Transformations.XOptimize
                       Clash.Normalize.Strategy
                       Clash.Normalize.Strategy.Spec
                       Clash.Normalize.Types

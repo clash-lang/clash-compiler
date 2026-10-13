@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Letrec".
+  Tests for "Clash.Normalize.Transformations.Letrec".
   'assertRewritesTo' runs every test in the scope of the free variables of
   its input, and in a scope that the binders of the input clash with.
 -}
@@ -20,7 +20,7 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Name (nameOcc)
 import Clash.Core.DataCon (DataCon (..))
-import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
+import qualified Clash.Normalize.Transformations.Letrec as S
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Core.Syntax (Distinct, GlobalId, Term)
 import qualified Clash.Rewrite.Combinators as SC (bottomupR)
@@ -52,7 +52,7 @@ globals =
   , testGlobalId "h_G104" "Int -> Int -> Int -> Int"
   , testGlobalId "c_G99" "Int" ]
 
--- | The constructor 'Clash.Normalize.Scoped.Transformations.Letrec.removeUnusedExpr'
+-- | The constructor 'Clash.Normalize.Transformations.Letrec.removeUnusedExpr'
 -- recognizes by its name
 vecCons :: DataCon
 vecCons = consDc {dcName = (dcName consDc) {nameOcc = "Clash.Sized.Vector.Cons"}}

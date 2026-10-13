@@ -37,7 +37,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Normalize.Scoped.Transformations.Specialize
+module Clash.Normalize.Transformations.Specialize
   ( appProp
   , appPropWorker
   , constantSpec

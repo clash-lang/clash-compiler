@@ -109,7 +109,7 @@ import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Normalize.Scoped.Primitives as NP
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Util (curLoc)
 import Clash.XException (isX)
 
@@ -155,10 +155,10 @@ The normalizer evaluates terms to WHNF ('Clash.Rewrite.Whnf.whnfRW')
 in two kinds of places:
 
   1. The case-of-known-constructor transformation
-     ('Clash.Normalize.Scoped.Transformations.Case.caseCon'), on the subject
+     ('Clash.Normalize.Transformations.Case.caseCon'), on the subject
      of a case-expression
   2. Transformations that reduce constants, such as reduceConst
-     ('Clash.Normalize.Scoped.Transformations.Reduce.reduceConst')
+     ('Clash.Normalize.Transformations.Reduce.reduceConst')
 
 The first transformation is needed to reach the required normal form. The
 second kind are more of cleanup transformations, so non-essential.

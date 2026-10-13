@@ -76,7 +76,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Clash.Normalize.Scoped.Transformations.DEC
+module Clash.Normalize.Transformations.DEC
   ( disjointExpressionConsolidation
   , disjointExpressionConsolidationWorker
   ) where
@@ -108,7 +108,7 @@ import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (Binding)
-import qualified Clash.Normalize.Scoped.Primitives as NP
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -135,7 +135,7 @@ import Clash.Core.Type
   (TypeView (..), coreView, mkTyConApp, splitFunTy, tyView, SplitFunForall (..), anyPiArg, isPolyFunTy, splitFunForallTy)
 import Clash.Core.TypeEnv (TypeEnv, typeEnvTyConMap)
 import Clash.Core.Util (internalName, mkSelectorCase)
-import qualified Clash.Normalize.Scoped.Transformations.Letrec as Letrec
+import qualified Clash.Normalize.Transformations.Letrec as Letrec
 import Clash.Rewrite
   (Transform (..), TransformContext, bottomupR, changed, tfScope)
 import Clash.Rewrite.Util (isFromInt, isUntranslatableType)

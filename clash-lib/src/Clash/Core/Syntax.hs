@@ -226,7 +226,7 @@ data PrimInfo = PrimInfo
   -- of synthesis tooling. It will be applied to its normal arguments, followed
   -- by the variables it should assign its results to.
   --
-  -- See: 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'
+  -- See: 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
   , primUnfolding :: !PrimUnfolding
   }
 

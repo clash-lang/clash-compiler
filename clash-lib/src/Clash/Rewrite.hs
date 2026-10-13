@@ -97,8 +97,8 @@
 
   = A worked example
 
-  'Clash.Normalize.Scoped.Transformations.Letrec.deadCode', in
-  "Clash.Normalize.Scoped.Transformations.Letrec", removes the let-bindings
+  'Clash.Normalize.Transformations.Letrec.deadCode', in
+  "Clash.Normalize.Transformations.Letrec", removes the let-bindings
   that aren't used:
 
   @

@@ -39,7 +39,7 @@ import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import Clash.Core.TysPrim (typeNatMul, typeNatSub)
-import qualified Clash.Normalize.Scoped.Primitives as NP
+import qualified Clash.Normalize.Primitives as NP
 import Clash.Util (curLoc, textNameLit)
 
 import qualified Clash.Sized.Internal.Index

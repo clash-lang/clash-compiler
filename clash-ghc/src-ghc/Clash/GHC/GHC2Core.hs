@@ -213,7 +213,7 @@ import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.Syntax    (mkPrimInfo)
 import           Clash.Core.TysPrim   (undefinedTy)
 import           Clash.Core.Builder
-import qualified Clash.Normalize.Scoped.Primitives as NP
+import qualified Clash.Normalize.Primitives as NP
 import           Clash.Primitives.Types      hiding (name)
 
 instance Hashable Name where

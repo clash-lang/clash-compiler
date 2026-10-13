@@ -38,7 +38,7 @@ data NormalizeState
   -- and GHC rejects Template Haskell splices in a module cycle.
   , _constantPropagationStrategy :: Rewrite NormalizeState
   -- ^ The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
-  -- for "Clash.Normalize.Scoped.PrimitiveReductions". See
+  -- for "Clash.Normalize.PrimitiveReductions". See
   -- '_normalizationStrategy'.
   , _normalized :: GlobalEnv (Binding (S.Term 'S.VoidS))
   -- ^ The normalized global binders

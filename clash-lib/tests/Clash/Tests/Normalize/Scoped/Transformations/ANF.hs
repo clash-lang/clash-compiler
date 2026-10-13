@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.ANF".
+  Tests for "Clash.Normalize.Transformations.ANF".
 
   'assertRewritesTo' runs the regression tests in the scope of the free
   variables of their inputs, and in a scope that the binders of their inputs
@@ -24,7 +24,7 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.DataCon as C
 import Clash.Core.Syntax (GlobalId, Term (App, Data, GlobalVar, Prim))
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Normalize.Scoped.Transformations.ANF as Scoped
+import qualified Clash.Normalize.Transformations.ANF as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)

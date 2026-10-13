@@ -25,7 +25,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
-module Clash.Normalize.Scoped.Transformations.XOptimize
+module Clash.Normalize.Transformations.XOptimize
   ( xOptimize
   , xOptimizeWorker
   ) where

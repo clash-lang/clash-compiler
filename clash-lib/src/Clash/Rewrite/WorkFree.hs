@@ -33,7 +33,7 @@ import GHC.Stack (HasCallStack)
 
 import Clash.Core.Basic (WorkInfo (..))
 import Clash.Driver.Types (Binding (..))
-import Clash.Normalize.Scoped.Primitives (removedArg)
+import Clash.Normalize.Primitives (removedArg)
 
 import Clash.Core.FreeVars (termGlobalIds)
 import Clash.Core.HasType (inferCoreTypeOf)
@@ -174,11 +174,11 @@ isWorkFreeClockOrResetOrEnable tenv sc e =
     Nothing
 
 -- | A conservative version of 'isWorkFree'. Is used in
--- 'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar' to
+-- 'Clash.Normalize.Transformations.Inline.bindConstantVar' to
 -- determine whether an expression can be \"bound\" (locally inlined). While
 -- binding work-free expressions won't result in extra work for the circuit,
 -- it might very well cause extra work for Clash. In fact, using 'isWorkFree'
--- in 'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar' makes
+-- in 'Clash.Normalize.Transformations.Inline.bindConstantVar' makes
 -- Clash two orders of magnitude slower for some of our test cases.
 --
 -- In effect, this function is a version of 'isConstant' that also considers

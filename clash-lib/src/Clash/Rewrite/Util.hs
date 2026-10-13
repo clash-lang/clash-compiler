@@ -809,7 +809,7 @@ bindPureHeap ctx bind v k = underLet ctx bind v $ \ctxL bind1 v1 -> do
 --      manner, Clash would get stuck in an infinite loop. The proper
 --      solution would be to use 'Clash.Rewrite.WorkFree.isWorkFree',
 --      instead of 'Clash.Rewrite.WorkFree.isWorkFreeIsh', in
---      'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar' such
+--      'Clash.Normalize.Transformations.Inline.bindConstantVar' such
 --      that these work-free constructs would get inlined again. However,
 --      this incurs a great performance penalty so we opt to prevent the
 --      evaluator from introducing this situation in the first place.

@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Specialize": regression
+  Tests for "Clash.Normalize.Transformations.Specialize": regression
   tests of the specializations and of 'appProp', and tests of the cases of the
   specializations. 'assertRewritesTo' and 'assertSpecializesTo' run every test
   in the scope of the free variables of its input, and in a scope that the
@@ -28,9 +28,9 @@ import Test.Tasty.HUnit
 import Clash.Core.NameMap (GlobalEnv, globalEnvFromList, lookupGlobalEnv)
 import Clash.Core.Syntax
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Normalize.Scoped.Transformations.Cast as Scoped
-import qualified Clash.Normalize.Scoped.Transformations.Inline as InlineS
-import qualified Clash.Normalize.Scoped.Transformations.Specialize as Scoped
+import qualified Clash.Normalize.Transformations.Cast as Scoped
+import qualified Clash.Normalize.Transformations.Inline as InlineS
+import qualified Clash.Normalize.Transformations.Specialize as Scoped
 import Clash.Normalize.Types (NormalizeState, specialisationCache)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -350,7 +350,7 @@ tests =
 -- a free variable of an argument, and 'assertRewritesTo' also runs it in a
 -- scope that the binders of the input clash with.
 
--- | Run the scoped 'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar'
+-- | Run the scoped 'Clash.Normalize.Transformations.Inline.bindConstantVar'
 -- on @let a = .. in \\x -> e@, and 'appProp' on the body of the resulting
 -- lambda. Asserts that this gives the expected term, also in a scope that the
 -- binders of the input clash with.

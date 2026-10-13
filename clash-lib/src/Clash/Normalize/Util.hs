@@ -82,7 +82,7 @@ import qualified Clash.Core.TyCon            as C (TyConName)
 import           Clash.Debug                 (traceIf)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (FinalTerm), hasTransformationInfo)
-import           Clash.Normalize.Scoped.Primitives  (removedArg)
+import           Clash.Normalize.Primitives  (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Primitives.Util       (constantArgs)
 import           Clash.Rewrite.Types
@@ -508,7 +508,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
 
 -- | Normalize a global function applied to closed arguments, i.e. a work-free
 -- application such as @f \@7 dict@.
--- 'Clash.Normalize.Scoped.Transformations.Inline.inlineWorkFree' inlines the
+-- 'Clash.Normalize.Transformations.Inline.inlineWorkFree' inlines the
 -- result at every occurrence of the application. Results are cached in
 -- 'workFreeAppCache'.
 --
@@ -520,7 +520,7 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
 --
 -- Note that a normalized constant can look different from its unnormalized
 -- form, see Note [bignum literals and specialization] in
--- "Clash.Normalize.Scoped.Transformations.Specialize".
+-- "Clash.Normalize.Transformations.Specialize".
 --
 -- The arguments must be closed. The application doesn't need to be
 -- deshadowed: its parts are closed.

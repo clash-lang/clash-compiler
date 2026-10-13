@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.DEC": regression tests,
+  Tests for "Clash.Normalize.Transformations.DEC": regression tests,
   and tests of the cases of DEC.
 
   The regression tests are about binders in the alternatives that shadow, or
@@ -37,7 +37,7 @@ import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.Syntax
   (Alt (..), GlobalId, Pat (DefaultPat), PrimInfo, PrimUnfolding (NoUnfolding), Term (Case))
-import qualified Clash.Normalize.Scoped.Transformations.DEC as Scoped
+import qualified Clash.Normalize.Transformations.DEC as Scoped
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
