@@ -60,6 +60,7 @@ import Test.Clash.Differential.Sites
 import Prims (PrimsOptions (..), defPrimsOptions, comparePrims)
 import WhnfReplay (ReplayOptions (..), whnfReplay)
 import Normalized (NormOptions (..), compareNormalized)
+import Pretty (comparePretty)
 
 data Options = Options
   { optShow :: Int
@@ -85,6 +86,7 @@ usage = unlines
   , "                               [--prims] [--check-prims] DESIGN.bin DUMP..."
   , "       clash-differential prims [--count N] [--seed N] [--show N] [--prim NAME] [--open] DESIGN.bin..."
   , "       clash-differential normalized [--show N] DIR_A DIR_B DESIGN.bin..."
+  , "       clash-differential pretty [--show N] DESIGN.bin..."
   , ""
   , "Runs COMPARISON on every binding of the serialized designs FILE..., which"
   , "are *.bin files written by clash-profile-normalization-prepare, or"
@@ -122,6 +124,10 @@ usage = unlines
   , "Clash Core and that of scoped Clash Core. Globals are matched by where"
   , "they are used, from the top entity on. See Normalized.hs."
   , ""
+  , "The pretty command compares the pretty-printer of scoped Clash Core with"
+  , "printing the conversion to Clash Core, on every binding of DESIGN.bin...,"
+  , "which may be *.bin, *.net.bin or *.norm.bin files. See Pretty.hs."
+  , ""
   , "The prims command compares every ported reduction of a primitive with the"
   , "reduction of Clash Core, through the adapter, on --count N (default 100)"
   , "calls generated from the type of the primitive in the designs. With"
@@ -142,6 +148,11 @@ main = getArgs >>= \case
         pure (design, bm, tcm)
       ok <- comparePrims opts inputs
       unless ok exitFailure
+    _ -> die usage
+  "pretty" : args -> case parseArgs defOptions args of
+    Just (opts, designs@(_:_)) -> do
+      oks <- forM designs (comparePretty (optShow opts))
+      unless (and oks) exitFailure
     _ -> die usage
   "normalized" : args -> case parseArgs defOptions args of
     Just (opts, dirA : dirB : designs@(_:_)) -> do

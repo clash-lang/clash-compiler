@@ -20,6 +20,7 @@ executable clash-differential
                        Current
                        Demo
                        Normalized
+                       Pretty
                        Prims
                        Registry
                        Test.Clash.Differential
