@@ -6,16 +6,14 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of the primitives of "GHC.Prim" in the scoped evaluator: ports
-  of @Clash.GHC.Evaluator.Primitives.GHC.Prim@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  Reductions of the primitives of "GHC.Prim" in the scoped evaluator. See
+  "Clash.Core.Scoped.Evaluator.Primitives" for how to write them.
 
   Byte arrays live on the primitive heap of the machine. A mutable byte array
-  is the primitive @MutableByteArray#@ applied to its number on that heap. The
-  reductions of Clash Core give that primitive the type @Int# ->
-  MutableByteArray# s@, with the @s@ of the type of @newByteArray#@, which is
-  free. Here it has the closed type @forall s. Int# -> MutableByteArray# s@,
-  and is applied to the instantiated @s@ as well, see 'mutableByteArray'.
+  is the primitive @MutableByteArray#@ applied to its number on that heap.
+  Like every primitive, it has a closed type, @forall s. Int# ->
+  MutableByteArray# s@, so it is applied to the @s@ of the type of
+  @newByteArray#@ as well, see 'mutableByteArray'.
 -}
 
 {-# LANGUAGE CPP #-}

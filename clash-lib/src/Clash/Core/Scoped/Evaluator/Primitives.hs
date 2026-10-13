@@ -7,14 +7,12 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The reductions of primitives of the scoped evaluator
-  ("Clash.Core.Scoped.Evaluator"), and a guide to porting the reductions of
-  "Clash.GHC.Evaluator" (phase 6.2 of the port).
+  ("Clash.Core.Scoped.Evaluator"), and a guide to writing them.
 
   = Where reductions live
 
   The reductions of the primitives of a module @M@ live in
-  @Clash.Core.Scoped.Evaluator.Primitives.M@, mirroring
-  @Clash.GHC.Evaluator.Primitives.M@ of @clash-ghc@. Each such module exports
+  @Clash.Core.Scoped.Evaluator.Primitives.M@. Each such module exports
 
   @
   primitives :: [(Text, PrimReduction)]
@@ -26,26 +24,20 @@
   else changes. To add a module, create it, and add its import and its list
   here, sorted.
 
-  They live in @clash-lib@, next to the machine, rather than in @clash-ghc@:
-  the scoped machine doesn't go through the frontend's
-  'Clash.Core.Evaluator.Types.Evaluator' record, and
-  'Clash.Rewrite.Scoped.Whnf.evaluatorEnv' builds its environment from this
-  module. Every reduction of @clash-ghc@ is ported, so the scoped evaluator
-  doesn't depend on them. The tests compare the reductions here with those of
-  @clash-ghc@, through "Test.Clash.Scoped.Evaluator.Adapter".
+  They live in @clash-lib@, next to the machine:
+  'Clash.Rewrite.Scoped.Whnf.evaluatorEnv' builds the environment of the
+  machine from this module.
 
   A reduction doesn't declare what it uses of the machine: it gets the
   whole machine, heap included.
 
-  = Porting a reduction
+  = Writing a reduction
 
-  "Clash.Core.Scoped.Evaluator.Primitives.Util" has the helpers of
-  @Clash.GHC.Evaluator.Primitive.Util@, with their names and argument orders,
-  and its @PrimStepContext@ has the fields of the current one. So most entries
-  port by copying them and making mechanical replacements. The modules here
-  have examples of every kind.
+  "Clash.Core.Scoped.Evaluator.Primitives.Util" has the helpers, and its
+  @PrimStepContext@ the arguments of a reduction. The modules here have
+  examples of every kind.
 
-  1. Copy the entry, e.g.
+  1. An entry associates the name of a primitive with its reduction, e.g.
 
       @
       , primStepEntry $(textNameLit 'GHC.Prim.gtChar#) $ \\case
@@ -54,9 +46,7 @@
           _ -> Nothing
       @
 
-      into the list of the scoped module. Replace the imports of
-      "Clash.Core.Evaluator.Types", @Clash.GHC.Evaluator.Primitive.Util@ and
-      the syntax of Clash Core by
+      with the imports
 
       @
       import Clash.Core.Scoped.Evaluator.Primitives.Util
@@ -64,74 +54,52 @@
       import Clash.Core.Scoped.Syntax
       @
 
-      Values, terms and types have the constructors of Clash Core, so
-      patterns like @PrimVal p _ [_, Lit (IntegerLiteral i)]@ and terms like
-      @mkApps (Data dc) [Left (Literal l)]@ stay as they are.
-
-  2. Replace the type environment. Helpers that look at types take the
+  2. Helpers that look at types take the
      t'Clash.Core.Scoped.TypeEnv.TypeEnv' @te@ and the scope @sc@ of the
-     machine where the current ones take @tcm@, except for those that only
-     look at the type constructor of the result:
+     machine, except for those that only look at the type constructor of the
+     result, such as @boolToBoolLiteral@ and @mkIntCLit@, which only take
+     @te@. @runExcept (tyNatSize te sc nTy)@ is the size of a type-level
+     natural ('Clash.Core.Scoped.Type.tyNatSize'), and @piResultTys te sc ty
+     tys@ instantiates a type ('Clash.Core.Scoped.HasType.piResultTys').
 
-      @
-      sed -E -i \\
-        -e 's\/\\btcm\\b\/te sc\/g' \\
-        -e 's\/\\b(boolToBoolLiteral|mkIntCLit|mkFloatCLit|mkDoubleCLit|mkSomeNat|liftBitVector2CInt) te sc\\b\/\\1 te\/g' \\
-        -e 's\/(liftBitVector2Bool .*) te sc \/\\1 te \/g' \\
-        FILE
-      @
-
-      After that, @runExcept (tyNatSize te sc nTy)@ is the spine's
-      'Clash.Core.Scoped.Type.tyNatSize', and @piResultTys te sc ty tys@ the
-      spine's 'Clash.Core.Scoped.HasType.piResultTys'.
-
-  3. Make the remaining changes, which the type checker points out:
+  3. Some things need care, but the type checker points them out:
 
       * __The result type.__ @ty@ is the type of the primitive, in the scope
-        of the machine. Instead of taking the result type apart with
-        @splitFunForallTy ty@, use @getResultTy te sc ty tys@ (the result
-        type, instantiated with the type arguments), @mkResultCon te sc ty
-        tys fields@ (e.g. an unboxed tuple), or @mkIntCLit@ (a boxed
-        number). Look up type constructors with
-        'Clash.Core.Scoped.TypeEnv.lookupTyCon' instead of @UniqMap.lookup@.
+        of the machine. Use @getResultTy te sc ty tys@ (the result type,
+        instantiated with the type arguments), @mkResultCon te sc ty tys
+        fields@ (e.g. an unboxed tuple), or @mkIntCLit@ (a boxed number).
+        Look up type constructors with
+        'Clash.Core.Scoped.TypeEnv.lookupTyCon'.
 
-      * __Nested evaluation.__ Replace
-
-          @
-          , mach2\@Machine{mStack=[],mTerm=argWHNF} <- whnf eval tcm True (setTerm arg $ stackClear mach)
-          -> ... Just mach2 {mStack = mStack mach, mTerm = e}
-          @
-
-          by @whnfArg arg $ \\mach2 argWHNF -> ... Just (Next mach2 {mTerm = e})@,
-          or @reduceWith mach2 e@. The nested machine lives in an extension of
-          the scope of the primitive, and has the stack of @mach@ again:
-          continue in it, and 'Clash.Core.Scoped.Syntax.sink' values from
-          before into it. Evaluate another term in that machine with
-          @whnfIn@. See @xToBV@ in
-          "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector"
-          and @(&&)@ in "Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes".
+      * __Nested evaluation.__ Evaluate an argument with
+        @whnfArg arg $ \\mach2 argWHNF -> ... Just (Next mach2 {mTerm = e})@,
+        or @reduceWith mach2 e@. The nested machine lives in an extension of
+        the scope of the primitive, and has the stack of @mach@ again:
+        continue in it, and 'Clash.Core.Scoped.Syntax.sink' values from
+        before into it. Evaluate another term in that machine with
+        @whnfIn@. See @xToBV@ in
+        "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector"
+        and @(&&)@ in "Clash.Core.Scoped.Evaluator.Primitives.GHC.Classes".
 
       * __Allocation.__ 'Clash.Core.Scoped.Evaluator.newLetBinding' takes a
         continuation, which gets the machine in the extended scope and the
         variable ('Clash.Core.Scoped.Evaluator.Types.heapVarTerm'); continue
         with @reduceWith@. Fresh binders come from
-        'Clash.Core.Scoped.Subst.withFreshIdBinder' and friends, not from a
-        unique supply. See @zipWith@ and @splitAt@ in
+        'Clash.Core.Scoped.Subst.withFreshIdBinder' and friends. See
+        @zipWith@ and @splitAt@ in
         "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector".
 
       * __The primitive heap.__ @primLookup@, @primInsert@ and @primUpdate@
-        take and give scoped terms. A reduction that sets the term of the
-        machine itself gives @Just . stay . setTerm e@ instead of
-        @Just . setTerm e@, see @setByteArray#@ in
-        "Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim".
+        take and give closed terms. A reduction that sets the term of the
+        machine itself gives @Just . stay . setTerm e@, see @setByteArray#@
+        in "Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim".
 
       * __Primitives in results__ are closed, like every
-        'Clash.Core.Term.PrimInfo': build their types with closed Clash types,
-        as the current reductions do. Some current reductions put a type of
-        their result into a 'Clash.Core.Term.PrimInfo' (e.g. @newByteArray#@
-        for @MutableByteArray#@), which mentions the type variables of their
-        own type: give such a primitive a closed polymorphic type, and apply
-        it to the type instead.
+        'Clash.Core.Term.PrimInfo': build their types with closed Clash
+        types. A primitive whose type mentions type variables of the type of
+        the reduced primitive (e.g. @MutableByteArray#@ in the result of
+        @newByteArray#@) gets a closed polymorphic type, and is applied to the
+        type instead.
 
   4. For entries that only combine literals, @liftLit1@ and @liftLit2@ are
      shorter:
@@ -140,30 +108,11 @@
       liftLit2 $(textNameLit 'GHC.Prim.andI#) intLiteral (\\i j -> integerToIntLiteral (i .&. j))
       @
 
-  Registering the entry is adding it to the list of its module; from then on
-  the scoped evaluator uses it.
-
   = Testing a reduction
 
-  * Unit tests check reductions on fixed inputs against expected results, see
-    "Clash.Tests.Core.Scoped.Evaluator.Primitives" in the unit tests of
-    @clash-lib@. They can't use the reductions of Clash Core, which live in
-    @clash-ghc@.
-
-  * @clash-differential prims DESIGN.bin...@ compares every ported reduction
-    with the reduction of Clash Core, through the adapter of the tests
-    ("Test.Clash.Scoped.Evaluator.Adapter"), on calls generated
-    from the types of the primitives in the designs (see
-    @Test.Clash.Scoped.Evaluator.genPrimCall@). It reports the primitives that
-    occur in none of the designs, or whose arguments it can't generate.
-
-  * @clash-differential whnf --prims DESIGN.bin DUMP@ replays real calls of
-    the evaluator, and reports per primitive how often a ported reduction
-    reduced it, and how often a primitive without one was offered to the
-    adapter. With @--check-prims@, it also runs the adapter on every call of
-    a ported reduction, and compares the results.
-
-  See the README of @clash-differential@.
+  Unit tests check reductions on fixed inputs against expected results, see
+  "Clash.Tests.Core.Scoped.Evaluator.Primitives" in the unit tests of
+  @clash-lib@.
 -}
 
 module Clash.Core.Scoped.Evaluator.Primitives
@@ -208,7 +157,7 @@ import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeNats as GHC.Type
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Types as GHC.Types
 import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Word as GHC.Word
 
--- | The ported reductions, by the name of their primitive. See the module
+-- | The reductions, by the name of their primitive. See the module
 -- header.
 scopedPrimReductions :: HashMap Text PrimReduction
 scopedPrimReductions
@@ -220,7 +169,7 @@ scopedPrimReductions
     HashMap.keys $ HashMap.filter (> 1) $
       HashMap.fromListWith (+) [(name, 1 :: Int) | (name, _) <- scopedPrimitives]
 
--- | The ported reductions, in the order of their modules
+-- | The reductions, in the order of their modules
 scopedPrimitives :: [(Text, PrimReduction)]
 scopedPrimitives = concat
   [ Clash.Annotations.BitRepresentation.Deriving.primitives

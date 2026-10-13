@@ -6,9 +6,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of the primitives of "GHC.Classes" in the scoped evaluator:
-  ports of @Clash.GHC.Evaluator.Primitives.GHC.Classes@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  Reductions of the primitives of "GHC.Classes" in the scoped evaluator. See
+  "Clash.Core.Scoped.Evaluator.Primitives" for how to write them.
 -}
 
 {-# LANGUAGE GADTs #-}

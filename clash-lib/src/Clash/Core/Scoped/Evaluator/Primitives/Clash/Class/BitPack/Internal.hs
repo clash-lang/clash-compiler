@@ -6,10 +6,9 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of the primitives of "Clash.Class.BitPack.Internal" in the
-  scoped evaluator: ports of
-  @Clash.GHC.Evaluator.Primitives.Clash.Class.BitPack.Internal@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  Reductions of the primitives of "Clash.Class.BitPack.Internal" in the scoped
+  evaluator. See "Clash.Core.Scoped.Evaluator.Primitives" for how to write
+  them.
 
   The @pack@ reductions evaluate the field of their boxed argument with a
   nested machine, and continue in that machine.

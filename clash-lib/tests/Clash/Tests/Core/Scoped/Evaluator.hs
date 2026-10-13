@@ -103,8 +103,8 @@ machineTests =
       withTestScope [atRaw 4 (varD "x_4" "Int")] $ \ts ->
         assertTermIs ts "x_4" (evalIn globals ts "x_4")
 
-    -- Like the machine of Clash Core, it doesn't expand a partial
-    -- application at the top: there is nothing to apply the abstraction to.
+    -- The machine doesn't expand a partial application at the top: there is
+    -- nothing to apply the abstraction to.
   , testCase "a partially applied constructor at the top is not eta-expanded" $
       assertTermAlphaEq (closedTerm "Just @Int") (evalT "Just @Int")
 

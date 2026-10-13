@@ -686,9 +686,10 @@ reduceFold n aTy fun arg ctx = do
 -- of @Clash.Sized.Vector.dfold@. For an empty vector, it gives the starting
 -- value.
 --
--- It builds the upper bound proof of each step by instantiating the type
--- variable that the type of the function quantifies over with the index of
--- the step.
+-- The upper bound proof it passes to the function for an element is the data
+-- constructor of the type of the proof argument, with the type variable that
+-- the type of the function quantifies over instantiated to the index of the
+-- element.
 reduceDFold
   :: (HasCallStack, Distinct n)
   => Integer
@@ -921,20 +922,19 @@ reduceReplicate n aTy eTy _sn arg ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.replace_int@ primitive
 -- on vectors of a known length @n@, by a vector of case-expressions that
--- select the new or the old element. Every element becomes:
+-- select the new or the old element: for the element @oldA@ at index @curI@,
 --
--- @
--- case eqInt i0 curI of
---   True -> newA
---   _    -> oldA
--- @
+-- > case eqInt i curI of
+-- >   True -> newA
+-- >   _    -> oldA
 --
--- where:
+-- where @i@ is the index and @newA@ the element given to @replace_int@.
 --
---   * @curI@ is the index of the current element, which we statically know
---   * @i0@ is the index given to @replace_int@
---   * @newA@ is the element given to @replace_int@ as a replacement for..
---   * @oldA@; an element at index @curI@
+-- TODO: Take a shortcut when the given index is a literal. Right now, this
+-- function simply creates a case-expression for every element in the vector,
+-- which Clash will eliminate one-by-one if the index turned out to be
+-- literal. It would of course be best to not create the cases in the first
+-- place!
 reduceReplace_int
   :: (HasCallStack, Distinct n)
   => Integer
@@ -979,22 +979,21 @@ reduceReplace_int n aTy vTy _kn v i newA ctx = do
 
 -- | Replace an application of the @Clash.Sized.Vector.index_int@ primitive on
 -- vectors of a known length @n@, by a right-biased tree of case-expressions
--- that select an element. Every element adds a node:
+-- that select an element: for the element @curA@ at index @curI@,
 --
--- @
--- case eqInt i0 curI of
---   True -> curA
---   _    -> next
--- @
+-- > case eqInt i curI of
+-- >   True -> curA
+-- >   _    -> next
 --
--- where:
+-- where @i@ is the index given to @index_int@, and @next@ the value if the
+-- current index is not equal to it. Every index is out of bounds of an empty
+-- vector, which gives an undefined value.
 --
---   * @curI@ is the index of the current element, which we statically know
---   * @i0@ is the index given to @index_int@
---   * @curA@ is the element at index @curI@
---   * @next@; the value if the current index is not equal to index argument
---
--- For an empty vector, every index is out of bounds, so it gives @undefined@.
+-- TODO: Take a shortcut when the given index is a literal. Right now, this
+-- function simply creates a case-expression for every element in the vector,
+-- which Clash will eliminate one-by-one if the index turned out to be
+-- literal. It would of course be best to not create the cases in the first
+-- place!
 reduceIndex_int
   :: (HasCallStack, Distinct n)
   => Integer

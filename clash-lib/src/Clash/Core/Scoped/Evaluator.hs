@@ -4,28 +4,33 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The call-by-need whnf evaluator of scoped Clash Core: a port of the machine
-  of "Clash.GHC.Evaluator", which is based on the evaluator described in:
+  The call-by-need whnf evaluator of scoped Clash Core, based on the
+  evaluator described in:
 
   Maximilian Bolingbroke, Simon Peyton Jones, "Supercompilation by
   evaluation", Haskell '10, Baltimore, Maryland, USA.
 
-  See "Clash.Core.Scoped.Evaluator.Types" for how the machine is scoped. The
-  differences with the machine of Clash Core that scoping forces or allows:
+  The machine has a term under evaluation, a stack and heaps (see
+  'Machine'). Evaluation alternates two kinds of transitions: a 'step'
+  applies the small-step reduction relation to the term, and when the term
+  is a value, 'unwind' pops a frame of the stack and continues with it.
+  Fully applied primitives are reduced by 'primStep', their arguments
+  evaluated with 'PrimApply' frames ('primUnwind').
 
-  * __No deshadowing on a heap lookup.__ The machine of Clash Core deshadows
-    every term it takes from a heap, because it then copies it into the term
-    under evaluation. Here, binders are renamed when they are opened, if they
-    clash with the scope, so a heap lookup is a lookup.
+  See "Clash.Core.Scoped.Evaluator.Types" for how the machine is scoped. In
+  particular:
+
+  * __A heap lookup is a lookup.__ Binders are renamed when they are opened,
+    if they clash with the scope, so a term taken from a heap is used as it
+    is.
 
   * __Allocation extends the scope.__ Let-binders are opened
     ('Clash.Core.Scoped.Subst.openBind'), which renames them only if they
     clash with the scope of the machine, and the whole machine moves into the
     extended scope ('extendMachine'). A step that holds on to a value across
     an allocation, e.g. the function of an application whose argument it
-    let-binds, has to 'sink' it. There is no unique supply nor in-scope set:
-    new binders are fresh for the scope of the machine, which includes the
-    variables of the caller.
+    let-binds, has to 'sink' it. New binders are fresh for the scope of the
+    machine, which includes the variables of the caller.
 
   * __Local and global variables are different.__ A local variable is looked
     up in the local heap, a global one in the global heap.
@@ -121,11 +126,10 @@ import Clash.Core.Scoped.Type
 
 -- * Running the machine
 
--- | Evaluate the term of a machine to WHNF, and give the machine with the
--- result, its stack unwound. When the term is the subject of a
--- case-expression, special primitives are forced, see
--- [Note: forcing special primitives] in "Clash.GHC.Evaluator". See
--- 'Clash.Core.Evaluator.Types.whnf'.
+-- | Evaluate the term of a machine to WHNF, given its heaps and stack, and
+-- give the machine with the result, its stack unwound ('unwindStack'). When
+-- the term is the subject of a case-expression, special primitives are
+-- forced, see [Note: forcing special primitives].
 whnf
   :: forall o n r
    . Distinct n
@@ -137,7 +141,7 @@ whnf
   -> r
 whnf env isSubj m0 k
   | isSubj =
-      -- See [Note: empty case expressions] in "Clash.GHC.Evaluator"
+      -- See [Note: empty case expressions]
       let ty = inferCoreTypeOf (envTypeEnv env) (mScope m0) (mTerm m0)
       in go (m0 {mStack = Scrutinise ty [] : mStack m0})
   | otherwise = go m0
@@ -147,12 +151,52 @@ whnf env isSubj m0 k
     Just (Next (m' :: Machine o l')) -> withExtTrans @n @l @l' (go m')
     Nothing -> k (unwindStack m)
 
+{- [Note: forcing special primitives]
+The normalizer evaluates terms to WHNF ('Clash.Rewrite.Scoped.Whnf.whnfRW')
+in two kinds of places:
+
+  1. The case-of-known-constructor transformation
+     ('Clash.Normalize.Scoped.Transformations.Case.caseCon'), on the subject
+     of a case-expression
+  2. Transformations that reduce constants, such as reduceConst
+     ('Clash.Normalize.Scoped.Transformations.Reduce.reduceConst')
+
+The first transformation is needed to reach the required normal form. The
+second kind are more of cleanup transformations, so non-essential.
+
+Normally, 'whnf' would force the evaluation of all primitives, which is needed
+in the case-of-known-constructor transformation. However, there are some
+primitives which we want to leave unevaluated in the reduceConst
+transformation. Such primitives are:
+
+  - Primitives such as `Clash.Sized.Vector.transpose`, `Clash.Sized.Vector.map`,
+    etc. that do not reduce to an expression in normal form, where the
+    reduceConst transformation is supposed to be normal-form preserving.
+  - Primitives such as `GHC.Int.I8#`, `GHC.Word.W32#`, etc. which seem like
+    wrappers around a 64-bit literal, but actually perform truncation to the
+    desired bit-size.
+
+This is why a primitive reduction gets a flag ('pcIsSubj') telling whether it
+should evaluate these special primitives. It is set when the term is the
+subject of a case-expression, or an argument of another primitive, see
+'forcePrims'.
+-}
+
+{- [Note: empty case expressions]
+Clash does not have empty case-expressions; instead, a 'Scrutinise' frame
+without alternatives is used to indicate that 'whnf' was called in the
+context of a case-expression, which means certain special primitives must be
+forced ('forcePrims' sees the frame). 'scrutinise' continues with the value
+itself on such a frame, and 'unwindStack' drops it. See also [Note: forcing
+special primitives].
+-}
+
 -- | Evaluate the term of a machine as far as it is data: to WHNF, and then the
 -- fields of a constructor application, recursively. Subterms that don't
 -- evaluate to a constructor application, such as literals, functions and
 -- primitives that are values (e.g. @unpackCString#@), are left in WHNF. Gives
 -- the machine with the result, which may mention the bindings the machine
--- allocated (see 'bindAllocated'). See 'Clash.Core.Evaluator.Types.nfData'.
+-- allocated (see 'bindAllocated').
 --
 -- Primitives are forced, like for the subject of a case-expression.
 nfData
@@ -199,8 +243,9 @@ nfData env m0 k = go m0 (mTerm m0) (\m e -> k (m {mTerm = e}))
   sinkArgs :: DExt x l => [Either (Term x) (Type x)] -> [Either (Term l) (Type l)]
   sinkArgs = map (either (Left . sink) (Right . sink))
 
--- | Pop all frames, rebuilding the term. See
--- 'Clash.Core.Evaluator.Types.unwindStack'.
+-- | Completely unwind the stack to get back the complete term: pop all
+-- frames, rebuilding the term, and writing it back to the local heap for a
+-- local update frame.
 unwindStack :: HasCallStack => Machine o n -> Machine o n
 unwindStack m = case mStack m of
   [] -> m
@@ -253,8 +298,9 @@ heapLookupLocal x m = lookupNameMap x (mHeapLocal m)
 {-# INLINE heapLookupLocal #-}
 
 -- | Let-bind a term on the local heap, unless it is a variable that is bound
--- there already. The continuation gets the machine in the extended scope.
--- See 'Clash.GHC.Evaluator.newLetBinding'.
+-- there already, e.g. to push an 'Apply' frame for an argument. The binder
+-- has a fresh name (see 'xName') and the type of the term. The continuation
+-- gets the machine in the extended scope, and the variable.
 newLetBinding
   :: forall o n r
    . Distinct n
@@ -280,7 +326,9 @@ newLetBinding env m e k
 xName :: C.Name C.Term
 xName = C.mkUnsafeSystemName "x" 0
 
--- | Allocate let-bindings on the heap. See 'Clash.GHC.Evaluator.allocate'.
+-- | Allocate let-bindings on the heap, and continue with the body. The
+-- binders are opened in the scope of the machine, so they get names that are
+-- fresh for both the heap and the variables in scope.
 allocate :: forall o n l. Distinct n => Machine o n -> Bind n l -> Term l -> Next o n
 allocate m bs0 e0 = openBind (mScope m) bs0 e0 go
  where
@@ -303,8 +351,8 @@ allocate m bs0 e0 = openBind (mScope m) bs0 e0 go
 
 -- * Steps
 
--- | A step of the machine. 'Nothing' if the term can't be reduced, and the
--- stack can't be unwound. See 'Clash.GHC.Evaluator.ghcStep'.
+-- | A step of the machine: the small-step operational semantics. 'Nothing' if
+-- the term can't be reduced, and the stack can't be unwound.
 step :: forall o n. Distinct n => Env -> Machine o n -> Maybe (Next o n)
 step env m = case mTerm m of
   Var occ _ x -> stepVar occ x
@@ -327,8 +375,7 @@ step env m = case mTerm m of
   Tick t x -> Just (stay m {mStack = Tickish t : mStack m, mTerm = x})
  where
   -- Remove the binding while it is evaluated, so we don't get stuck on
-  -- expressions such as "let x = x in x". No deshadowing: see the module
-  -- header.
+  -- expressions such as "let x = x in x".
   stepVar occ x = case heapLookupLocal x m of
     Just e -> Just $ stay m
       { mHeapLocal = deleteNameMap x (mHeapLocal m)
@@ -342,8 +389,7 @@ step env m = case mTerm m of
     | Just e <- lookupGlobalEnv g (mHeapGlobalOverlay m) = force e
     | Just b <- lookupGlobalEnv g (mHeapGlobalBase m) =
         -- Globals are closed, so they move into the machine's scope for free.
-        -- Unlike the machine of Clash Core, which deshadows a global here,
-        -- this doesn't copy the term: its binders are opened when the machine
+        -- The term isn't copied: its binders are opened when the machine
         -- goes under them.
         force (sinkClosed (bindingTerm b))
     | otherwise = Nothing
@@ -355,8 +401,8 @@ step env m = case mTerm m of
       , mTerm = Tick (nameModTick (globalIdName g)) e
       }
 
--- | The tick that names the result of evaluating a variable after it. See
--- 'Clash.GHC.Evaluator.stepVar'.
+-- | The tick that names the result of evaluating a variable after it: its
+-- unqualified name followed by an underscore, as a t'NameMod' prefix.
 nameModTick :: C.Name a -> TickInfo n
 nameModTick occ = NameMod PrefixName (LitTy (SymTy (toStr occ)))
  where
@@ -386,7 +432,18 @@ stepApp env x y m = case collectArgsTicks (App x y) of
     EQ -> case Either.lefts args of
       -- We make boolean conjunction and disjunction extra lazy by deferring
       -- the evaluation of the arguments during the evaluation of the primop
-      -- rule. See 'Clash.GHC.Evaluator.stepApp'.
+      -- rule.
+      --
+      -- This allows us to implement:
+      --
+      -- x && True  --> x
+      -- x && False --> False
+      -- x || True  --> True
+      -- x || False --> x
+      --
+      -- even when that 'x' is _|_. This makes the evaluation rule lazier
+      -- than the actual Haskell implementations, which are strict in the
+      -- first argument and lazy in the second.
       [a0, a1] | primName p `elem` [andName, orName] ->
         newLetBinding env m a0 $ \m0 i ->
           newLetBinding env m0 (sink a1) $ \m1 j ->
@@ -434,7 +491,8 @@ stepTyApp env x ty m = case collectArgsTicks (TyApp x ty) of
   _ -> Just (stay m {mStack = Instantiate ty : mStack m, mTerm = x})
 
 -- | Eta-expand a partially applied data constructor or primitive, and step
--- the resulting abstraction. See 'Clash.GHC.Evaluator.newBinder'.
+-- the resulting abstraction: a lambda or type lambda for every remaining
+-- argument of its type, with fresh binders (see 'xName').
 newBinder :: Distinct n => Env -> Machine o n -> Term n -> Maybe (Next o n)
 newBinder env m e0 =
   step env m {mTerm = go (mScope m) e0 (inferCoreTypeOf (envTypeEnv env) (mScope m) e0)}
@@ -455,7 +513,8 @@ orName = showt '(GHC.Classes.||)
 
 -- * Unwinding
 
--- | Unwind the stack by one frame. See 'Clash.GHC.Evaluator.ghcUnwind'.
+-- | Unwind the stack by one frame: pop it, and continue with the value
+-- according to it. 'Nothing' if the stack is empty.
 unwind :: Distinct n => Env -> Value n -> Machine o n -> Maybe (Next o n)
 unwind env v m = case mStack m of
   [] -> Nothing
@@ -477,7 +536,9 @@ unwind env v m = case mStack m of
       Scrutinise ty alts -> Just (stay m' {mTerm = scrutinise (mScope m') v ty alts})
       Tickish _ -> Just (stay m' {mTerm = valToTerm v})
 
--- | Apply a value to a heap variable. See 'Clash.GHC.Evaluator.apply'.
+-- | Apply a value to a heap variable: substitute the variable for the binder
+-- of a lambda. An undefined primitive value applied to an argument is an
+-- undefined value of the result type, see 'instantiate'.
 apply :: Distinct n => Env -> Value n -> HeapVar n -> Machine o n -> Machine o n
 apply env v hv@(HeapVar _ hvTy _) m = case v of
   Lambda b e -> m {mTerm = substTm (extendTmSubst (idSubst sc) b (heapVarTerm hv)) e}
@@ -492,13 +553,27 @@ apply env v hv@(HeapVar _ hvTy _) m = case v of
     piResultTys te sc (primInfoType p)
       (tys ++ map (inferCoreTypeOf te sc . valToTerm) vs ++ [hvTy])
 
--- | Instantiate a type abstraction. See 'Clash.GHC.Evaluator.instantiate'.
+-- | Instantiate a type abstraction
 instantiate :: Distinct n => Env -> Value n -> Type n -> Machine o n -> Machine o n
 instantiate env v ty m = case v of
   TyLambda b e -> m {mTerm = substTm (extendTySubst (idSubst sc) b ty) e}
   -- The evaluator is set up in such a way that under normal conditions
-  -- anything of type 'forall a . ty' must be a ty-lambda. However, sometimes
-  -- we evaluate to an error /value/, see 'Clash.GHC.Evaluator.instantiate'.
+  -- anything of type 'forall a . ty' must be a ty-lambda.
+  --
+  -- However, sometimes we evaluate to an error /value/. When this happens,
+  -- instead of doing a regular type substitution we:
+  --
+  -- 1. Calculate the 'forall a . ty' type of the error value
+  -- 2. Substitute the 'a' by the applied type.
+  -- 3. Create a new error value of the shape: 'undefined @substituted_type'
+  --    Where this particular 'undefined' has type 'forall a . a'. We
+  --    distinguish between error values throwing X exceptions and other
+  --    error values, and create appropriate error values that we return. We
+  --    make this distinction in order to enable conversion of X-exception
+  --    throwing code to undefined bitvectors.
+  --
+  -- 'resTy' combines steps 1 and 2: it is the type of
+  -- prim @ty0 .. @tyN e0 .. eN @ty
   PrimVal p tys es
     | isUndefinedXPrimVal v -> m {mTerm = TyApp (Prim NP.undefinedX) (resTy p tys es)}
     | isUndefinedPrimVal v -> m {mTerm = TyApp (Prim NP.undefined) (resTy p tys es)}
@@ -510,13 +585,16 @@ instantiate env v ty m = case v of
     piResultTys te sc (primInfoType p)
       (tys ++ map (inferCoreTypeOf te sc . valToTerm) es ++ [ty])
 
--- | Select the alternative of a case-expression. See
--- 'Clash.GHC.Evaluator.scrutinise'.
+-- | Evaluate a case-expression: select the alternative that matches the
+-- value, and substitute the fields of the value for the binders of its
+-- pattern. A literal of 'Integer' or 'Natural' also matches the pattern of the
+-- constructor that represents it, see 'litConField'. A number of a sized type
+-- (a @fromInteger#@ primitive value) matches on its literal. An undefined
+-- primitive value gives an undefined value of the type of the alternatives.
 scrutinise
   :: (HasCallStack, Distinct n) => Scope n -> Value n -> Type n -> [Alt n] -> Term n
 -- An empty case-expression indicates that 'whnf' was called in the context of
--- a case-expression, see [Note: empty case expressions] in
--- "Clash.GHC.Evaluator".
+-- a case-expression, see [Note: empty case expressions].
 scrutinise _ v _ [] = valToTerm v
 scrutinise sc (Lit l) _ alts = case alts of
   Alt DefaultPat e : alts1 -> go e alts1
@@ -561,7 +639,10 @@ scrutinise _ v@(PrimVal p _ vs) altTy alts
 scrutinise _ v _ _ = error ($(curLoc) ++ "scrutinise: " ++ show v)
 
 -- | The field of the constructor of 'Integer' or 'Natural' with the given
--- tag, for a literal. See 'Clash.GHC.Evaluator.scrutinise'.
+-- tag, for a literal: an @Int#@ or @Word#@ literal for a small number (tag 1),
+-- and a byte array for a big positive one (tag 2) or, for 'Integer', a big
+-- negative one (tag 3). 'Nothing' if the constructor doesn't represent the
+-- literal.
 litConField :: Int -> Literal -> Maybe Literal
 litConField tag = \case
   IntegerLiteral l1 -> case tag of
@@ -605,8 +686,13 @@ primStep env isSubj p tys vs m =
   prims = envPrims env
   ctx = PrimContext env isSubj p tys vs m
 
--- | Unwind a primitive argument frame. See
--- 'Clash.GHC.Evaluator.Primitive.ghcPrimUnwind'.
+-- | Unwind a primitive argument frame: continue with the evaluation of the
+-- next argument, or, after the last one, reduce the primitive with
+-- 'primStep'. Some primitives are values rather than operations
+-- ('valuePrims'); the @fromInteger#@ primitives of the sized types are values
+-- too, of which the literal is wrapped to the size of the type. An undefined
+-- argument makes the result undefined, except for the last argument of a lazy
+-- primitive, see Note [Lazy primitives].
 primUnwind
   :: Distinct n
   => Env -> PrimInfo -> [Type n] -> [Value n] -> Value n -> [Term n] -> Machine o n
@@ -637,8 +723,7 @@ primUnwind env p tys vs v [] m
  where
   nm = primName p
   internalError = error ($(curLoc) ++ "Internal error" ++ show (vs, v))
--- Note [Lazy primitives] in "Clash.GHC.Evaluator.Primitive": some primitives
--- are lazy in their last argument
+-- See Note [Lazy primitives]: some primitives are lazy in their last argument
 primUnwind env p tys vs v [e] m
   | primName p `elem` lazyPrims
   = if isUndefinedPrimVal v
@@ -676,8 +761,18 @@ valuePrims =
   , primName NP.undefinedX
   ]
 
+{- Note [Lazy primitives]
+Primitives are usually considered undefined when one of their arguments is
+(unless they're unused). /Some/ primitives can still yield a result even
+though one of their arguments is undefined. It turns out that all primitives
+exhibiting this property happen to be "lazy" in their last argument. Thus,
+all the cases can be covered by a match on the last argument and their names
+('lazyPrims'): 'primUnwind' doesn't evaluate the last argument of such a
+primitive, but let-binds it, and passes it as a 'Suspend' value.
+-}
+
 -- | Primitives that are lazy in their last argument, see Note [Lazy
--- primitives] in "Clash.GHC.Evaluator.Primitive"
+-- primitives]
 lazyPrims :: [Text]
 lazyPrims =
   [ showt 'Clash.Sized.Vector.lazyV
@@ -712,8 +807,10 @@ primResultType env sc p tys =
 
 -- | Continue with a term in the given machine, an extension of the one of the
 -- primitive. If evaluating the term to WHNF throws an 'XException', continue
--- with an undefined value instead. See
--- @Clash.GHC.Evaluator.Primitive.Util.reduceWith@.
+-- with an undefined value of the result type of the primitive instead, and
+-- warn. Reductions use this machine rather than the one of the primitive
+-- when the term refers to bindings they allocated, e.g. with
+-- 'newLetBinding'.
 reduceIn
   :: forall o n l. (Distinct n, DExt n l)
   => PrimContext o n -> Machine o l -> Term l -> Maybe (Next o n)
@@ -734,8 +831,7 @@ reduce :: Distinct n => PrimContext o n -> Term n -> Maybe (Next o n)
 reduce pc = reduceIn pc (pcMachine pc)
 
 -- | Evaluate a term to WHNF with a nested machine, and continue with the
--- result, with the original stack. See
--- @Clash.GHC.Evaluator.Primitive.Util.reduceWHNF@.
+-- result, with the original stack
 reduceWHNF :: Distinct n => PrimContext o n -> Term n -> Maybe (Next o n)
 reduceWHNF pc e =
   let m = pcMachine pc
@@ -761,11 +857,13 @@ naturalLiteral = \case
     | dcTag dc == 2 -> Just (IP ba)
   _ -> Nothing
 
--- | See @Clash.GHC.Evaluator.Primitive.Util.wrapUnsigned@
+-- | Wrap an integer to the range of an unsigned number of the given number of
+-- bits: @[0, 2^n)@
 wrapUnsigned :: Integer -> Integer -> Integer
 wrapUnsigned n i = i `mod` (2 ^ n)
 
--- | See @Clash.GHC.Evaluator.Primitive.Util.wrapSigned@
+-- | Wrap an integer to the range of a signed (two's complement) number of the
+-- given number of bits: @[-2^(n-1), 2^(n-1))@. Zero bits only hold @0@.
 wrapSigned :: Integer -> Integer -> Integer
 wrapSigned n i = if n == 0 then 0 else res
  where

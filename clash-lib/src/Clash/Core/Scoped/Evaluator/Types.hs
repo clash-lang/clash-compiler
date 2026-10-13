@@ -4,19 +4,18 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   The types of the whnf evaluator of scoped Clash Core: values, stack frames,
-  heaps and the machine. Ports of "Clash.Core.Evaluator.Types". The machine
-  itself is "Clash.Core.Scoped.Evaluator".
+  heaps and the machine. The machine itself is "Clash.Core.Scoped.Evaluator".
 
   = The scope of the machine
 
-  The machine of "Clash.GHC.Evaluator" is /flat/: the term under evaluation,
-  every heap binding and every stack frame live in one scope, the machine's
-  in-scope set, which only grows. Allocating a let-binding renames its binder
-  to a name that is fresh for the whole machine; applying a lambda
-  substitutes the heap variable of the argument for its binder. No part of
-  the machine is ever under a binder that another part isn't.
+  The machine is /flat/: the term under evaluation, every heap binding and
+  every stack frame live in one scope, which only grows. Allocating a
+  let-binding gives its binder a name that is fresh for the whole machine;
+  applying a lambda substitutes the heap variable of the argument for its
+  binder. No part of the machine is ever under a binder that another part
+  isn't.
 
-  So the scoped machine has a single scope for all of them: a
+  So the machine has a single scope for all of them: a
   @'Machine' o n@ holds a term, heaps and a stack in scope @n@. The other
   index, @o@, is the scope of the /caller/, e.g. that of the rewrite context.
   The machine records the binders it allocated, which extend @o@ to @n@, in
@@ -31,8 +30,9 @@
 
   = Heaps
 
-  As in "Clash.Core.Evaluator.Types", there are three heaps: one of the
-  primitives (byte arrays), one of global bindings, and one of local ones.
+  There are three heaps: one of the primitives, to store the IO values of
+  primitives (like byte arrays), one of global bindings, the top-level
+  bindings in scope, and one of local ones, the local bindings in scope.
   The local heap is keyed by the local names of the machine's scope
   ('TmName'), the global one by 'GlobalId' (decision D5 of the port), so the
   heap of one can't be consulted for the other. As the names of a
@@ -104,8 +104,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 -- * Values
 
--- | A value: the result of evaluating a term to WHNF. See
--- 'Clash.Core.Evaluator.Types.Value'.
+-- | A value: the result of evaluating a term to WHNF
 data Value (n :: S) where
   -- | Function
   Lambda :: !(IdBinder n l) -> !(Term l) -> Value n
@@ -186,21 +185,28 @@ idBinderHeapVar b = HeapVar (idBinderOcc b) (sink (idBinderType b)) (tmNameOf b)
 
 -- * Stack
 
--- | A frame of the stack. See 'Clash.Core.Evaluator.Types.StackFrame'. Every
--- frame lives in the scope of the machine: unlike in an environment machine,
--- frames are never under binders of their own.
+-- | A frame of the stack: what to do with the value of the term under
+-- evaluation. Every frame lives in the scope of the machine: unlike in an
+-- environment machine, frames are never under binders of their own.
 data StackFrame (n :: S)
   = UpdateLocal !(TmName n)
   -- ^ Update the local heap binding of the variable with the value
   | UpdateGlobal !GlobalId
   -- ^ Update the global heap binding of the variable with the value
   | Apply !(HeapVar n)
+  -- ^ Apply the value, a function, to the variable
   | Instantiate !(Type n)
+  -- ^ Apply the value, a type abstraction, to the type
   | PrimApply !PrimInfo [Type n] [Value n] [Term n]
+  -- ^ The value is an argument of the primitive: its type arguments, the
+  -- values of the arguments before it, and the arguments after it
   | Scrutinise (Type n) [Alt n]
-  -- ^ The type of the alternatives is lazy: 'Clash.Core.Scoped.Evaluator.whnf'
-  -- pushes a frame without alternatives, whose type is never used
+  -- ^ The value is the subject of a case-expression with the type and
+  -- alternatives. The type of the alternatives is lazy:
+  -- 'Clash.Core.Scoped.Evaluator.whnf' pushes a frame without alternatives,
+  -- whose type is never used
   | Tickish !(TickInfo n)
+  -- ^ The value is under the tick
   deriving (Show)
 type role StackFrame nominal
 
@@ -255,8 +261,8 @@ allocLength = go 0
 
 -- * The machine
 
--- | The state of the machine, see the module header and
--- 'Clash.Core.Evaluator.Types.Machine'
+-- | The current state of the abstract machine used to evaluate terms: a term
+-- under evaluation, a stack, and three heaps. See the module header.
 data Machine (o :: S) (n :: S) = Machine
   { mScope :: !(Scope n)
   -- ^ The scope of the machine, to allocate fresh binders in
@@ -265,7 +271,8 @@ data Machine (o :: S) (n :: S) = Machine
   , mHeapPrim :: !PrimHeap
   , mHeapGlobalBase :: GlobalEnv (Binding (Term 'VoidS))
   -- ^ The global bindings, closed, moved into the machine's scope when they
-  -- are looked up
+  -- are looked up. Immutable: the map given to 'initMachine', so that
+  -- starting a machine doesn't copy it.
   , mHeapGlobalOverlay :: !(GlobalEnv (Term n))
   -- ^ Global bindings added or updated during evaluation; shadows
   -- 'mHeapGlobalBase'
@@ -329,15 +336,25 @@ sinkMachine sc alloc m = Machine
   }
 {-# INLINE sinkMachine #-}
 
--- | Whether special primitives must be forced: when the term is the subject
--- of a case-expression, or an argument of a primitive. See
--- 'Clash.Core.Evaluator.Types.forcePrims'.
+-- | Whether we are in a context where special primitives must be forced: when
+-- the term is the subject of a case-expression, or an argument of a
+-- primitive. See [Note: forcing special primitives] in
+-- "Clash.Core.Scoped.Evaluator".
 forcePrims :: Machine o n -> Bool
 forcePrims = go . mStack
  where
+  -- When do we need to force the compile-time evaluation of a primitive?
+  --
+  -- 1. When it is the subject of a case-expression
   go (Scrutinise {} : _) = True
+  -- 2. When it is in the argument position of another primitive: primitives
+  --    are assumed to be strict in their arguments
   go (PrimApply {} : _) = True
+  -- We look through ticks
   go (Tickish {} : xs) = go xs
+  -- We are in a context where we dereferenced a heap binding, hence the
+  -- update frame on the stack. So now we need to check whether that variable
+  -- reference was in a position where the result must be evaluated to WHNF
   go (UpdateLocal {} : xs) = go xs
   go (UpdateGlobal {} : xs) = go xs
   go _ = False
@@ -381,8 +398,9 @@ data PrimReductions = PrimReductions
 newtype PrimReduction = PrimReduction
   { runPrimReduction :: forall o n. Distinct n => PrimContext o n -> Maybe (Next o n) }
 
--- | The arguments of a primitive reduction. See
--- @Clash.GHC.Evaluator.Primitive.Util.PrimStepContext@.
+-- | The arguments of a primitive reduction, those of
+-- 'Clash.Core.Scoped.Evaluator.primStep'. Reductions see them through
+-- 'Clash.Core.Scoped.Evaluator.Primitives.Util.PrimStepContext'.
 data PrimContext (o :: S) (n :: S) = PrimContext
   { pcEnv :: Env
   , pcIsSubj :: Bool

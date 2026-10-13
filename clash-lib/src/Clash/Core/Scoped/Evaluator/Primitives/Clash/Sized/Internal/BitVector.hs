@@ -7,9 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of "Clash.Sized.Internal.BitVector" in the
-  scoped evaluator: ports of
-  @Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.BitVector@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  scoped evaluator. See "Clash.Core.Scoped.Evaluator.Primitives" for how to
+  write them.
 -}
 
 {-# LANGUAGE GADTs #-}

@@ -7,9 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of "Clash.Sized.Internal.Signed" in the scoped
-  evaluator: ports of
-  @Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Signed@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  evaluator. See "Clash.Core.Scoped.Evaluator.Primitives" for how to write
+  them.
 -}
 
 {-# LANGUAGE LambdaCase #-}

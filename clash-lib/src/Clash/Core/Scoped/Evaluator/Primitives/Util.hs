@@ -7,18 +7,13 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Shared helpers of the reductions of primitives of the scoped evaluator
-  ("Clash.Core.Scoped.Evaluator"): ports of those of
-  @Clash.GHC.Evaluator.Primitive.Util@. See
+  ("Clash.Core.Scoped.Evaluator"). See
   "Clash.Core.Scoped.Evaluator.Primitives" for how reductions are registered,
-  and how to port one.
-
-  Names and argument orders are those of @Clash.GHC.Evaluator.Primitive.Util@,
-  so that a reduction ports with as few changes as possible. The differences:
+  and how to write one. The helpers work on scoped Clash Core:
 
   * __Types are scoped.__ The type arguments of a primitive ('tys') and its
     type ('ty') live in the scope of the machine ('sc'). Helpers that look at
-    types take the t'TypeEnv' ('te') and, if they need it, the scope, where
-    the current ones take a 'Clash.Core.TyCon.TyConMap' (@tcm@).
+    types take the t'TypeEnv' ('te') and, if they need it, the scope.
 
   * __Results are scoped terms__, in any scope: helpers that build literals
     and values are polymorphic in their scope.
@@ -315,10 +310,10 @@ import Clash.Core.Scoped.Util (appendToVec, mkRTree, mkVec)
 
 -- * Entries
 
--- | The arguments of a reduction, and helpers that use them. See
--- @Clash.GHC.Evaluator.Primitive.Util.PrimStepContext@, of which this has the
--- fields, except that @tcm@ is 'te' and 'sc'. Reductions match on it with
--- @RecordWildCards@.
+-- | The arguments of a reduction, and shared helpers that use them.
+-- 'primStepEntry' constructs it from the 'PrimContext' of the machine, keeping
+-- the calling convention of the evaluator out of each individual entry.
+-- Reductions match on it with @RecordWildCards@.
 data PrimStepContext o n = PrimStepContext
   { te :: TypeEnv
   , sc :: Scope n
@@ -436,8 +431,9 @@ mkPrimStepContext pc = PrimStepContext{..}
   catchDivByZero = makeUndefinedIf (== DivideByZero)
   catchErrorCall = makeUndefinedIf (const True :: ErrorCall -> Bool)
 
--- | Associate the name of a primitive with its reduction. See
--- @Clash.GHC.Evaluator.Primitive.Util.primStepEntry@.
+-- | Associate the name of a primitive with its reduction. The adapter from the
+-- calling convention of the evaluator to 'PrimStepContext' lives here, so
+-- individual reductions do not have to repeat it.
 primStepEntry
   :: Text
   -> (forall o n. Distinct n => PrimStepContext o n -> Maybe (Next o n))
@@ -768,15 +764,7 @@ boolToBoolLiteral tenv primTy b = case resultTyConName primTy of
   _ -> error ($(curLoc) ++ "the result type is not Bool: " ++ showPpr primTy)
 
 -- | A constructor of 'Ordering', the result type of the given type of a
--- primitive, like 'boolToBoolLiteral'. Replaces
---
--- @
--- let (_, tyView -> TyConApp ordTcNm []) = splitFunForallTy ty
---     (Just ordTc) = UniqMap.lookup ordTcNm tcm
---     [ltDc, eqDc, gtDc] = tyConDataCons ordTc
--- @
---
--- of the reductions of Clash Core.
+-- primitive, like 'boolToBoolLiteral'
 orderingToOrderingLiteral :: HasCallStack => TypeEnv -> Type m -> Ordering -> Term n
 orderingToOrderingLiteral tenv primTy o = case resultTyConName primTy of
   Just ordTcNm
@@ -856,8 +844,8 @@ mkSomeNat tenv lit resTy = case tyView resTy of
     ConstTy c -> ConstTy c
     t -> error ($(curLoc) ++ "not a type constructor: " ++ showPpr t)
 
--- | A literal of a sized type, see
--- @Clash.GHC.Evaluator.Primitive.Util.mkSizedLit@
+-- | A constant term of a sized type: its @fromInteger#@ primitive applied to
+-- the size and the value
 mkSizedLit
   :: HasCallStack
   => (TyConName -> Term n)
@@ -976,17 +964,9 @@ resultDataCon tenv scope primTy tyArgs =
 
 -- | The only data constructor of the result type of a primitive, e.g. that of
 -- an unboxed tuple, applied to the type arguments of the result type and the
--- given fields. Replaces
---
--- @
--- let (_, tyView -> TyConApp tupTcNm tyArgs) = splitFunForallTy ty
---     (Just tupTc) = UniqMap.lookup tupTcNm tcm
---     [tupDc] = tyConDataCons tupTc
--- in mkApps (Data tupDc) (map Right tyArgs ++ map Left fields)
--- @
---
--- of the reductions of Clash Core, which give type arguments that mention the
--- type variables of the type of a polymorphic primitive.
+-- given fields. The type arguments are those of the result type instantiated
+-- with the type arguments of the primitive, so they don't mention the type
+-- variables of the type of a polymorphic primitive.
 mkResultCon
   :: (HasCallStack, Distinct n)
   => TypeEnv -> Scope n -> Type n -> [Type n] -> [Term n] -> Term n
@@ -1026,8 +1006,7 @@ resultTyCon primTy = case resultTyConName primTy of
   Nothing -> error ($(curLoc) ++ "the result type is not a type constructor: " ++ showPpr primTy)
 
 -- | The result type of the type of a primitive, applied to its type
--- arguments, after its arguments. See
--- @Clash.GHC.Evaluator.Primitive.Util.getResultTy@.
+-- arguments, after its arguments
 getResultTy :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> [Type n] -> Type n
 getResultTy tenv scope primTy tyArgs = dropFuns (piResultTys tenv scope primTy tyArgs)
  where
@@ -1444,8 +1423,27 @@ liftW64RI f vals = case word64Literals' vals of
     in Just (Literal (IntLiteral (toInteger (I# (f a b)))))
   _ -> Nothing
 
--- | The reduction shared by every worker of GHC's @powImpl@, see
--- @Clash.GHC.Evaluator.Primitive.Util.powImplWorker@
+-- | The reduction shared by every worker of GHC's @powImpl@, i.e. the
+-- internal function behind '(^)'.
+--
+-- GHC's @powImpl@ workers come in five flavors and get renumbered across
+-- versions: the (numeric-suffix -> signature) mapping changes between 9.10,
+-- 9.12 and 9.14, and may shift again. Rather than hard-code a fragile
+-- name->signature table, we register this single reduction under every
+-- worker name and dispatch by argument shape: the worker name is known, but
+-- which specialization it implements is inferred from the argument literals.
+--
+-- Shapes:
+--
+-- > [Int#, Integer]       -> Integer  (small-exponent path, IS exp#)
+-- > [Int#, Int#]          -> Int#     (Int -> Int -> Int spec, $w$*)
+-- > [Integer, Int#]       -> Integer  (Integer -> Int -> Integer spec, $w$*)
+-- > [ByteArray#, Integer] -> Integer  (large-exponent path, IP/IN)
+--
+-- For the @ByteArray#@ variant we reconstruct the exponent as a positive
+-- bignum (@IP ba@). The negative-bignum (@IN@) arm is in practice dead: '(^)'
+-- errors on negative exponents before recursing, so reducing @IN@ positively
+-- only affects DCE-able code.
 powImplWorker :: PrimStepContext o n -> Maybe (Next o n)
 powImplWorker PrimStepContext{..}
   | [intLiteral -> Just j, integerLiteral -> Just i] <- args
@@ -1698,8 +1696,8 @@ vecTailTy vecNm =
       (tyConAppB vecNm [varTyB 0, varTyB 1])
 
 -- | The name of the type constructor of boxed tuples of the given arity, as
--- "Clash.GHC.GHC2Core" names it. See
--- @Clash.GHC.Evaluator.Primitive.Util.ghcTyconToTyConName@.
+-- "Clash.GHC.GHC2Core" names it: qualified by its module, with the unique of
+-- GHC's type constructor.
 tupleTyConName :: Int -> TyConName
 tupleTyConName arity =
   C.Name C.User qualName (fromGhcUnique (GhcTyCon.tyConUnique tc)) (getSrcSpan nm)

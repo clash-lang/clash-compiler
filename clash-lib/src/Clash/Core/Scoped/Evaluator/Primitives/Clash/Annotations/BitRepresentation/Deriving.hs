@@ -7,10 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of
-  "Clash.Annotations.BitRepresentation.Deriving" in the scoped evaluator:
-  ports of
-  @Clash.GHC.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving@.
-  See "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  "Clash.Annotations.BitRepresentation.Deriving" in the scoped evaluator. See
+  "Clash.Core.Scoped.Evaluator.Primitives" for how to write them.
 -}
 
 {-# LANGUAGE LambdaCase #-}

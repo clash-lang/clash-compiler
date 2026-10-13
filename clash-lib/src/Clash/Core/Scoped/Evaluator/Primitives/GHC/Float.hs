@@ -6,9 +6,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Reductions of the primitives of "GHC.Float" in the scoped evaluator: ports
-  of @Clash.GHC.Evaluator.Primitives.GHC.Float@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  Reductions of the primitives of "GHC.Float" in the scoped evaluator. See
+  "Clash.Core.Scoped.Evaluator.Primitives" for how to write them.
 -}
 
 {-# LANGUAGE LambdaCase #-}
@@ -114,8 +113,8 @@ primitives =
         , [sty@(tyView -> TyConApp signedTcNm [nTy@(LitTy (NumTy kn))])] <- tys
         , nameOcc signedTcNm == showt ''Signed
         -- The type arguments of the tuple are those of the result type of the
-        -- instantiated type of the primitive. The reduction of Clash Core takes
-        -- them from the type of the primitive itself, which leaves @b@ free in
+        -- instantiated type of the primitive. Taking them from the type of the
+        -- primitive itself would leave @b@ free in
         -- @forall b. Integral b => Double# -> (# b, Double #)@.
         , (tupDc, tyArgs@(_:_)) <- resultDataCon te sc ty tys
         -> let (sn, d1) = reifyNat kn (\p -> first toInteger (op p (castWord64ToDouble d)))
