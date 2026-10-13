@@ -303,8 +303,6 @@ Library
 
                       Clash.Edalize.Edam
 
-                      Clash.Netlist
-                      Clash.Netlist.BlackBox
                       Clash.Netlist.BlackBox.Parser
                       Clash.Netlist.BlackBox.Types
                       Clash.Netlist.BlackBox.Util
@@ -542,6 +540,7 @@ test-suite unittests
                  Clash.Tests.Netlist.Id
                  Clash.Tests.Netlist.Scoped
                  Clash.Tests.Netlist.Scoped.BlackBox
+                 Clash.Tests.Netlist.Scoped.Util
                  Clash.Tests.Netlist.Util
                  Clash.Tests.Primitives
                  Clash.Tests.Util.Interpolate

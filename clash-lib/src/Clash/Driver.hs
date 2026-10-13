@@ -105,8 +105,7 @@ import           Clash.Driver.Manifest
   (Manifest(..), readFreshManifest, UnexpectedModification, pprintUnexpectedModifications,
    mkManifest, writeManifest, manifestFilename)
 import           Clash.Edalize.Edam
-import           Clash.Netlist                    (genTopNames, topEntityEnv)
-import           Clash.Netlist.Scoped             (genNetlist)
+import           Clash.Netlist.Scoped             (genNetlist, genTopNames, topEntityEnv)
 import           Clash.Netlist.BlackBox.Parser    (runParse)
 import           Clash.Netlist.BlackBox.Types     (BlackBoxTemplate)
 import           Clash.Netlist.Scoped.Types       (SomeBlackBoxFunction (..))

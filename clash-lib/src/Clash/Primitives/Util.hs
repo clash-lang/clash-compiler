@@ -20,7 +20,6 @@ module Clash.Primitives.Util
   , constantArgs
   , decodeOrErrJson
   , decodeOrErrYaml
-  , getFunctionPlurality
   , getFunctionPluralityWith
   ) where
 
@@ -46,8 +45,6 @@ import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
   , PrimitiveWarning(WarnNonSynthesizable)
   , extractPrim, extractWarnings)
-import           Clash.Core.Term        (Term)
-import           Clash.Core.Type        (Type)
 import qualified Data.List.NonEmpty     as NE
 
 import           Clash.Primitives.Types
@@ -57,7 +54,7 @@ import           Clash.Primitives.Types
   , CompiledPrimMap, GuardedResolvedPrimitive)
 import           Clash.Netlist.Types    (BlackBox(..), NetlistMonad)
 import           Clash.Netlist.Scoped.Types  (SomeBlackBoxFunction)
-import           Clash.Netlist.Util     (preserveState, unsupportedBlackBoxFunction)
+import           Clash.Netlist.Util     (preserveState)
 import           Clash.Netlist.BlackBox.Util
   (walkElement)
 import           Clash.Netlist.BlackBox.Types
@@ -248,34 +245,15 @@ constantArgs nm (BlackBoxHaskell{}) = Set.fromList fromIntForce
     | otherwise = []
 constantArgs _ _ = Set.empty
 
--- | Helper function of 'getFunctionPlurality'
+-- | Helper function of 'Clash.Primitives.Scoped.Util.getFunctionPlurality'
 getFunctionPlurality' :: [(Int, Int)] -> Int -> Int
 getFunctionPlurality' functionPlurality n =
   fromMaybe 1 (snd <$> (find ((== n) . fst) functionPlurality))
 
--- | Looks up the plurality of a function's function argument. See
--- 'functionPlurality' for more information. If not set, the returned plurality
--- will default to /1/.
-getFunctionPlurality
-  :: HasCallStack
-  => CompiledPrimitive
-  -> [Either Term Type]
-  -- ^ Arguments passed to blackbox
-  -> [Type]
-  -- ^ Result types
-  -> Int
-  -- ^ Argument number holding the function of interest
-  -> NetlistMonad Int
-  -- ^ Plurality of function. Defaults to 1. Does not err if argument isn't
-  -- a function in the first place. State of monad will not be modified.
-getFunctionPlurality p args resTys =
-  getFunctionPluralityWith
-    (\f nm -> unsupportedBlackBoxFunction f False nm args resTys) p
-
 -- | Looks up the plurality of a function's function argument, like
--- 'getFunctionPlurality', given a way to call the blackbox function of a
--- primitive: on the name of the primitive, with the arguments and result types
--- passed to the blackbox.
+-- 'Clash.Primitives.Scoped.Util.getFunctionPlurality', given a way to call
+-- the blackbox function of a primitive: on the name of the primitive, with the
+-- arguments and result types passed to the blackbox.
 getFunctionPluralityWith
   :: HasCallStack
   => (SomeBlackBoxFunction -> TS.Text -> NetlistMonad (Either String (BlackBoxMeta, BlackBox)))

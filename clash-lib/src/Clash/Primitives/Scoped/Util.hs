@@ -3,8 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Utility functions for primitives, on scoped Clash Core: ports of those of
-  "Clash.Primitives.Util" that look at Clash Core.
+  Utility functions for primitives that look at scoped Clash Core
 -}
 
 module Clash.Primitives.Scoped.Util
@@ -19,9 +18,9 @@ import           Clash.Netlist.Types        (NetlistMonad)
 import           Clash.Primitives.Types     (CompiledPrimitive)
 import           Clash.Primitives.Util      (getFunctionPluralityWith)
 
--- | Looks up the plurality of a function's function argument, see
--- 'Clash.Primitives.Util.getFunctionPlurality'. If not set, the returned
--- plurality will default to /1/.
+-- | Looks up the plurality of a function's function argument. See
+-- 'Clash.Primitives.Types.functionPlurality' for more information. If not
+-- set, the returned plurality will default to /1/.
 getFunctionPlurality
   :: (HasCallStack, Distinct n)
   => BlackBoxEnv n

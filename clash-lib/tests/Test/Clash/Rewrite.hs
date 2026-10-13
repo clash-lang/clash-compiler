@@ -39,7 +39,7 @@ import Clash.Driver.Types
 import Clash.Annotations.Primitive (HDL (VHDL))
 import Clash.Backend (initBackend)
 import Clash.Backend.VHDL (VHDLState)
-import Clash.Netlist (runNetlistMonad)
+import Clash.Netlist.Scoped (runNetlistMonad)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
   ( FilteredHWType (..), HWType (Signed), HWTypeTranslator (..), NetlistMonad

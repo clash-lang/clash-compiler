@@ -47,12 +47,14 @@ module Clash.Netlist.Scoped.BlackBox
   ( mkBlackBoxContext
   , mkPrimitive
   , extractPrimWarnOrFail
+  , prepareBlackBox
   ) where
 
 import           Control.Applicative           ((<|>))
 import           Control.Exception             (throw)
+import           Control.Lens                  ((%=))
 import qualified Control.Lens                  as Lens
-import           Control.Monad                 (replicateM, zipWithM)
+import           Control.Monad                 (replicateM, unless, zipWithM)
 import           Control.Monad.Extra           (concatMapM)
 import           Data.Bifunctor                (first, second)
 import           Data.Either                   (lefts, partitionEithers)
@@ -71,10 +73,11 @@ import           Data.Text.Extra               (showt)
 import           GHC.Num.Integer               (Integer (..))
 import           GHC.Num.Natural               (Natural (..))
 import qualified GHC.Prim
-import           GHC.Stack                     (HasCallStack)
+import           GHC.Stack                     (HasCallStack, callStack, prettyCallStack)
 
 import Clash.Core.Basic (ConstTy (..), IsMultiPrim (..), WorkInfo (..))
-import           Clash.Annotations.Primitive   (extractPrim)
+import           Clash.Annotations.Primitive
+  (HDL (VHDL), PrimitiveGuard (..), PrimitiveWarning (..), extractPrim)
 import qualified Clash.Backend                 as Backend
 import           Clash.Core.DataCon            (dcTag)
 import           Clash.Core.Literal            (Literal (IntLiteral))
@@ -84,15 +87,14 @@ import           Clash.Core.Scoped.Pretty      ()
 import           Clash.Core.TyCon              (tyConDataCons)
 import           Clash.Core.Scoped.TysPrim (undefinedTy)
 import qualified Clash.Data.UniqMap            as UniqMap
-import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail, prepareBlackBox)
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxMeta (..), BlackBoxTemplate, Element (Text), RenderVoid (..),
    TemplateKind (..))
 import           Clash.Netlist.BlackBox.Util
-  (extractLiterals, onBlackBox, prettyBlackBox, setSym)
+  (extractLiterals, onBlackBox, prettyBlackBox, setSym, verifyBlackBoxContext)
 import qualified Clash.Netlist.Id              as Id
 import           Clash.Netlist.Types           as N
-  hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
+  hiding (Literal)
 import qualified Clash.Netlist.Types           as N (Expr (Literal))
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, declareUse, flattenFiltered, isVoid, mkInit,
@@ -104,6 +106,11 @@ import           Clash.Primitives.Scoped.Util  (getFunctionPlurality)
 import           Clash.Signal.Internal         (ActiveEdge (..))
 import           Clash.Util                    (ClashException (..), curLoc, indexNote)
 import qualified Clash.Util.Interpolate        as I
+import qualified Clash.Warning                 as W
+import           Clash.Debug                   (debugIsOn)
+import           Clash.Driver.Warning          (warnAboutM)
+import           Data.Foldable                 (for_)
+import qualified Data.Set                      as Set
 
 import           Clash.Core.Scoped.FreeVars    (tmNameOccursIn)
 import           Clash.Core.Scoped.HasType     (inferCoreTypeOf)
@@ -1580,3 +1587,142 @@ mkUniqueLets ctx binds res k = do
   stripAnnTypes = \case
     AnnType _ ty -> stripAnnTypes ty
     ty -> ty
+
+prepareBlackBox
+  :: TextS.Text
+  -> BlackBox
+  -> BlackBoxContext
+  -> NetlistMonad (BlackBox,[Declaration])
+prepareBlackBox _pNm templ bbCtx =
+  case verifyBlackBoxContext bbCtx templ of
+    Nothing -> do
+      (t2,decls) <-
+        onBlackBox
+          (fmap (first BBTemplate) . setSym bbCtx)
+          (\bbName bbHash bbFunc -> pure (BBFunction bbName bbHash bbFunc, []))
+          templ
+      for_ decls goDecl
+      return (t2,decls)
+    Just err0 -> do
+      (_,sp) <- Lens.use curCompNm
+      let err1 = concat [ "Couldn't instantiate blackbox for "
+                        , TextS.unpack (bbName bbCtx), ". Verification "
+                        , "procedure reported:\n\n" ++ err0 ]
+      throw (ClashException sp ($(curLoc) ++ err1) Nothing)
+ where
+  -- Right now we assume that (1) a blackbox doesn't assign to a signal
+  -- declared outside the black box template and (2) all uses of a signal
+  -- within a blackbox are correct for the targeted HDL (i.e. we don't try
+  -- to generate new signals when a signal is used incorrectly).
+  goDecl = \case
+    Assignment i u _ ->
+      declareUse u i
+
+    CondAssignment i _ _ _ _ -> do
+      -- Currently, all CondAssignment get rendered as `always @*` blocks in
+      -- (System)Verilog. This means when we target these HDL, this is _really_
+      -- a blocking procedural assignment.
+      SomeBackend b <- Lens.use backend
+      let use = case Backend.hdlKind b of { VHDL -> Cont ; _ -> Proc Blocking }
+      declareUse use i
+
+    Seq seqs -> for_ seqs goSeq
+
+    _ -> pure ()
+
+  goSeq = \case
+    AlwaysClocked _ _ seqs ->
+      for_ seqs goSeq
+
+    Initial seqs ->
+      for_ seqs goSeq
+
+    AlwaysComb seqs ->
+      for_ seqs goSeq
+
+    SeqDecl conc ->
+      goDecl conc
+
+    Branch _ _ alts ->
+      let seqs = concatMap snd alts
+       in for_ seqs goSeq
+
+-- | Extract a compiled primitive from a guarded primitive. Emit a warning if
+-- the guard wants to, or fail entirely.
+extractPrimWarnOrFail
+  :: HasCallStack
+  => String
+  -- ^ Extra context to add to warnings, e.g. the id the primitive's result
+  -- is assigned to
+  -> TextS.Text
+  -- ^ Name of primitive
+  -> NetlistMonad P.CompiledPrimitive
+extractPrimWarnOrFail context nm = do
+  prim <- HashMap.lookup nm <$> Lens.view primitives
+  case prim of
+    Just (HasBlackBox warnings compiledPrim) ->
+      -- See if we need to warn the user
+      if null warnings then return compiledPrim else go warnings compiledPrim
+    Just DontTranslate -> do
+      -- We need to error because we encountered a primitive the user
+      -- explicitly requested not to translate
+      (_,sp) <- Lens.use curCompNm
+      let msg = $(curLoc) ++ "Clash was forced to translate '" ++ unpack nm
+             ++ "', but this value was marked with DontTranslate. Did you forget"
+             ++ " to include a blackbox for one of the constructs using this?"
+             ++ (if debugIsOn then "\n\n" ++ prettyCallStack callStack ++ "\n\n" else [])
+      throw (ClashException sp msg Nothing)
+    Nothing -> do
+      -- Blackbox requested, but no blackbox found at all!
+      (_,sp) <- Lens.use curCompNm
+      let msg = $(curLoc) ++ "No blackbox found for: " ++ unpack nm
+             ++ ". Did you forget to include directories containing "
+             ++ "primitives? You can use '-i/my/prim/dir' to achieve this."
+             ++ (if debugIsOn then "\n\n" ++ prettyCallStack callStack ++ "\n\n" else [])
+      throw (ClashException sp msg Nothing)
+ where
+  go
+    :: [PrimitiveWarning]
+    -> P.CompiledPrimitive
+    -> NetlistMonad P.CompiledPrimitive
+
+  -- The key a primitive is remembered under, see 'go [] cp' below. Note it
+  -- includes the current component: the warning mentions component specific
+  -- context, which would get lost if the primitive were only warned about once
+  -- per compilation. A single run therefore reveals all offending sites rather
+  -- than only the first.
+  seenKey = do
+    (curCompId,_) <- Lens.use curCompNm
+    pure (Id.toText curCompId <> ":" <> nm)
+
+  go ((WarnAlways warning):ws) cp = do
+    warnPrimitive W.WarnDubiousPrimitive warning
+    go ws cp
+
+  go ((WarnNonSynthesizable warning):ws) cp = do
+    isTB <- Lens.use isTestBench
+    unless isTB (warnPrimitive W.WarnNonSynthesizable warning)
+    go ws cp
+
+  -- Only mark the primitive as seen once the whole list of warnings has been
+  -- emitted. A primitive can carry several 'WarnAlways' annotations, and all of
+  -- them should be reported, see 'tests/shouldwork/PrimitiveGuards/MultipleGuards'.
+  go [] cp = do
+    key <- seenKey
+    seenPrimitives %= Set.insert key
+    return cp
+
+  warnPrimitive :: W.ClashWarning -> String -> NetlistMonad ()
+  warnPrimitive w warning = do
+    seen <- Set.member <$> seenKey <*> Lens.use seenPrimitives
+    (curCompId,sp) <- Lens.use curCompNm
+
+    unless seen
+      $ warnAboutM w sp
+      $ "Dubious primitive instantiation in "
+     ++ unpack (Id.toText curCompId)
+     ++ (if null context then "" else " (" ++ context ++ ")")
+     ++ " for "
+     ++ unpack nm
+     ++ ": "
+     ++ warning

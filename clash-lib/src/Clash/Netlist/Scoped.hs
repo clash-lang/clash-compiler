@@ -33,6 +33,10 @@ module Clash.Netlist.Scoped
     genNetlist
   , genComponent
   , genComponentT
+  , runNetlistMonad
+  , genNames
+  , topEntityEnv
+  , genTopNames
     -- * Handlers
   , mkDeclarations
   , mkDeclarations'
@@ -45,6 +49,11 @@ module Clash.Netlist.Scoped
   ) where
 
 import           Control.Exception                (throw)
+import           Control.Monad.Reader             (runReaderT)
+import           Control.Monad.State.Strict       (runState, runStateT)
+import           Data.Foldable                    (foldlM)
+import qualified Data.Map.Ordered                 as OMap
+import qualified Data.Set                         as Set
 import           Control.Lens                     ((.=), (<~))
 import qualified Control.Lens                     as Lens
 import           Control.Monad                    (zipWithM)
@@ -62,11 +71,12 @@ import           Data.Text.Extra                  (showt)
 import           GHC.Num.Integer                  (Integer (..))
 import           GHC.Num.Natural                  (Natural (..))
 import           GHC.Stack                        (HasCallStack)
-import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
+import           GHC.Types.SrcLoc                 (isGoodSrcSpan, noSrcSpan)
 import qualified GHC.Types.SrcLoc                 as GHC (SrcSpan)
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
 
 import Clash.Core.Basic (ConstTy (..), IsMultiPrim (..), LitTy (..))
+import           Clash.Annotations.Primitive      (HDL)
 import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr' (..), CustomReprs, DataRepr' (..), Type' (..), getConstrRepr, getDataRepr)
 import           Clash.Core.DataCon               (DataCon (..))
@@ -75,13 +85,13 @@ import           Clash.Core.Pretty                (showPpr)
 import qualified Clash.Core.Name                  as C (nameLoc, nameOcc)
 import           Clash.Driver.Types
   (Binding (..), ClashEnv (..), ClashOpts (..), GlobalBindings)
-import           Clash.Netlist                    (genNames, runNetlistMonad)
 import qualified Clash.Netlist.Id                 as Id
 import qualified Clash.Netlist.Types              as HW (Expr (Literal), Literal)
 import           Clash.Netlist.Types              as HW
-  hiding (Literal, NetlistId (..), netlistId1, netlistTypes, netlistTypes1)
+  hiding (Literal)
 import           Clash.Netlist.Util
   (affixName, condAssign, contAssign, dcToLiteral, declareInstUses, expandTopEntityOrErrM,
+   genComponentName, genTopName,
    isVoid, isVoidMaybe, mkInit, mkLiteral, mkTopUnWrapper, preserveVarEnv,
    procAssign, stripFiltered)
 import           Clash.Primitives.Types           (Primitive (BlackBox, multiResult, resultInits))
@@ -93,11 +103,13 @@ import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
 import           Clash.Core.Scoped.Type
   (SplitCoreFunForall (..), TypeView (..), coreView, splitCoreFunForallTy, tyView)
 import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
-import           Clash.Core.Scoped.TypeEnv        (TypeEnv)
+import           Clash.Core.Scoped.TypeEnv        (TypeEnv, mkTypeEnv)
 import           Clash.Core.Scoped.Subst          (closeType, openTyBinder)
 import           Clash.Core.Scoped.Util           (splitShouldSplit)
 import           Clash.Core.Scoped.Pretty         ()
-import           Clash.Core.Scoped.NameMap        (GlobalEnv, lookupGlobalEnv)
+import           Clash.Core.Scoped.NameMap
+  (GlobalEnv, emptyGlobalEnv, globalEnvFromList, globalEnvKeys, insertGlobalEnv,
+   lookupGlobalEnv)
 import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNameBinders)
 import           Clash.Core.Scoped.Subst
   (openAlt, openBind, patVars, teleIdBinderTypes, teleIdVars)
@@ -107,14 +119,120 @@ import           Clash.Core.Scoped.TermInfo
 import           Clash.Core.Scoped.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 
-import           Clash.Netlist.BlackBox           (prepareBlackBox)
 import           Clash.Netlist.Scoped.BlackBox
-  (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive)
+  (extractPrimWarnOrFail, mkBlackBoxContext, mkPrimitive, prepareBlackBox)
 import           Clash.Netlist.Scoped.Types
 import           Clash.Netlist.Scoped.Util
   (UniqueNormalized (..), coreTypeToHWTypeM', globalIdentifier, localIdText, mkUniqueNormalized, primWarnContext,
    splitNormalized,
    unsafeCoreTypeToHWTypeM, unsafeCoreTypeToHWTypeM', withTicks)
+
+-- | Run a NetlistMonad action in a given environment
+runNetlistMonad
+  :: ClashEnv
+  -> Bool
+  -- ^ Whether this we're compiling a testbench (suppresses certain warnings)
+  -> GlobalBindings
+  -- ^ Global binders
+  -> GlobalEnv TopEntityT
+  -- ^ TopEntity annotations
+  -> HWTypeTranslator
+  -- ^ Hardcode Type -> HWType translator
+  -> Bool
+  -- ^ Whether the backend supports ifThenElse expressions
+  -> SomeBackend
+  -- ^ The current HDL backend
+  -> IdentifierSet
+  -- ^ Seen components
+  -> FilePath
+  -- ^ HDL dir
+  -> GlobalEnv Identifier
+  -- ^ Seen components
+  -> NetlistMonad a
+  -- ^ Action to run
+  -> IO (a, NetlistState)
+runNetlistMonad env isTb s tops typeTrans ite be seenIds_ dir componentNames_ act =
+  flip runReaderT (NetlistEnv env "" "" Nothing [] tenv)
+    . flip runStateT s'
+    $ runNetlist act
+  where
+    tenv = mkTypeEnv (envTyConMap env)
+    s' =
+      NetlistState
+        { _bindings=s
+        , _components=OMap.empty
+        , _typeTranslator=typeTrans
+        , _curCompNm=(error "genComponent should have set _curCompNm", noSrcSpan)
+        , _seenIds=seenIds_
+        , _seenComps=seenIds_
+        , _seenPrimitives=Set.empty
+        , _componentNames=componentNames_
+        , _topEntityAnns=tops
+        , _hdlDir=dir
+        , _curBBlvl=0
+        , _isTestBench=isTb
+        , _backEndITE=ite
+        , _backend=be
+        , _htyCache=mempty
+        , _usages=mempty
+        }
+
+-- | Generate names for all binders in "BindingMap", except for the ones already
+-- present in given identifier varenv.
+genNames
+  :: Bool
+  -- ^ New inline strategy enabled?
+  -> Maybe StrictText.Text
+  -- ^ Prefix
+  -> IdentifierSet
+  -- ^ Identifier set to extend
+  -> GlobalEnv Identifier
+  -- ^ Pre-generated names
+  -> GlobalBindings
+  -> (GlobalEnv Identifier, IdentifierSet)
+genNames newInlineStrat prefixM is env bndrs =
+  runState (foldlM go env (globalEnvKeys bndrs)) is
+ where
+  go env_ g =
+    case lookupGlobalEnv g env_ of
+      Just _ -> pure env_
+      Nothing -> do
+        nm <- Id.makeBasic (genComponentName newInlineStrat prefixM g)
+        pure (insertGlobalEnv g nm env_)
+
+-- | The top entities, by their 'Clash.Core.Scoped.Syntax.GlobalId'
+topEntityEnv :: [TopEntityT] -> GlobalEnv TopEntityT
+topEntityEnv tops = globalEnvFromList [ (topId t, t) | t <- tops ]
+
+-- | Generate names for top entities. Should be executed at the very start of
+-- the synthesis process and shared between all passes.
+genTopNames
+  :: ClashOpts
+  -> HDL
+  -- ^ HDL to generate identifiers for
+  -> [TopEntityT]
+  -> (GlobalEnv Identifier, IdentifierSet)
+genTopNames opts hdl tops =
+  -- TODO: Report error if fixed top entities have conflicting names
+  flip runState (Id.emptyIdentifierSet esc lw hdl) $ do
+    env0 <- foldlM goFixed emptyGlobalEnv fixedTops
+    env1 <- foldlM goNonFixed env0 nonFixedTops
+    pure env1
+ where
+  prefixM = opt_componentPrefix opts
+  esc = opt_escapedIds opts
+  lw = opt_lowerCaseBasicIds opts
+
+  fixedTops = [(topId, ann) | TopEntityT{topId, topAnnotation=Just ann} <- tops]
+  nonFixedTops = [topId | TopEntityT{topId, topAnnotation=Nothing} <- tops]
+
+  goFixed env (topId, ann) = do
+    topNm <- genTopName prefixM ann
+    pure (insertGlobalEnv topId topNm env)
+
+  goNonFixed env id_ = do
+    topNm <- Id.makeBasic (genComponentName True prefixM id_)
+    pure (insertGlobalEnv id_ topNm env)
 
 -- | Generate a hierarchical netlist out of a set of global binders with
 -- @topEntity@ at the top.

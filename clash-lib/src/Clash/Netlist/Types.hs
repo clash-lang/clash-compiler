@@ -69,13 +69,10 @@ import Clash.Annotations.BitRepresentation  (FieldAnn)
 import Clash.Annotations.Primitive          (HDL(..))
 import Clash.Annotations.TopEntity          (TopEntity)
 import Clash.Backend                        (Backend, HasUsageMap (..))
-import Clash.Core.HasType
 import Clash.Core.Scoped.Alpha              (AlphaType)
 import Clash.Core.Scoped.Syntax             (Distinct, GlobalId, Scope)
 import qualified Clash.Core.Scoped.Syntax   as S (Type)
 import Clash.Core.Scoped.TypeEnv            (TypeEnv)
-import Clash.Core.Type                      (Type)
-import Clash.Core.Var                       (Id)
 import Clash.Core.TyCon                     (TyConMap)
 import Clash.Core.Scoped.NameMap            (GlobalEnv)
 import Clash.Driver.Types
@@ -939,52 +936,6 @@ instance Binary TemplateFunction where
   put (TemplateFunction is _ _ ) = put is
   get = (\is -> TemplateFunction is err err) <$> get
     where err = const $ error "TemplateFunction functions can't be preserved by serialisation"
-
--- | Netlist-level identifier
-data NetlistId
-  = NetlistId Identifier Type
-  -- ^ Identifier generated in the NetlistMonad, always derived from another
-  -- 'NetlistId'
-  | CoreId Id
-  -- ^ An original Core identifier
-  | MultiId [Id]
-  -- ^ A split identifier (into several sub-identifiers), needed to assign
-  -- expressions of types that have to be split apart (e.g. tuples of Files)
-  deriving (Eq, Show)
-
--- | Eliminator for 'NetlistId', fails on 'MultiId'
-netlistId1
-  :: HasCallStack
-  => (Identifier -> r)
-  -- ^ Eliminator for Identifiers generated in the NetlistMonad
-  -> (Id -> r)
-  -- ^ Eliminator for original Core Identifiers
-  -> NetlistId
-  -> r
-netlistId1 f g = \case
-  NetlistId i _ -> f i
-  CoreId i -> g i
-  m -> error ("netlistId1 MultiId: " ++ show m)
-
--- | Return the type(s) of a 'NetListId', returns multiple types when given a
--- 'MultiId'
-netlistTypes
-  :: NetlistId
-  -> [Type]
-netlistTypes = \case
-  NetlistId _ t -> [t]
-  CoreId i -> [coreTypeOf i]
-  MultiId is -> map coreTypeOf is
-
--- | Return the type of a 'NetlistId', fails on 'MultiId'
-netlistTypes1
-  :: HasCallStack
-  => NetlistId
-  -> Type
-netlistTypes1 = \case
-  NetlistId _ t -> t
-  CoreId i -> coreTypeOf i
-  m -> error ("netlistTypes1 MultiId: " ++ show m)
 
 -- | Type of declaration, concurrent or sequential
 data DeclarationType
