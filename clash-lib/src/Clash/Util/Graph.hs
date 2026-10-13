@@ -34,7 +34,7 @@ import qualified Data.IntSet           as IntSet
 import           Clash.Core.Scoped.NameMap (globalEnvKeys, lookupGlobalEnv)
 import           Clash.Core.Scoped.Syntax (GlobalId, S (VoidS), Term)
 import           Clash.Driver.Types (Binding (bindingTerm), GlobalBindings)
-import           Clash.Normalize.Scoped.Util (callGraph)
+import           Clash.Normalize.Util (callGraph)
 import           Clash.Unique (Unique)
 
 #ifdef UNIQUE_IS_WORD64

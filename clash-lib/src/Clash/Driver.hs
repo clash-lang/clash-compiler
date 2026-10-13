@@ -123,7 +123,7 @@ import qualified Clash.Core.Scoped.Syntax         as S
 import qualified Clash.Core.Scoped.Type           as S
 import           Clash.Core.Scoped.TypeEnv        (TypeEnv, mkTypeEnv)
 import qualified Clash.Core.Scoped.Util           as S (SplitInfo (..), shouldSplit)
-import           Clash.Normalize.Scoped.Util      (callGraph, tvSubstWithTyEq)
+import           Clash.Normalize.Util      (callGraph, tvSubstWithTyEq)
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
 import qualified Clash.Primitives.Sized.Vector    as P

@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Util": regression tests, and tests of its
+  Tests for "Clash.Normalize.Util": regression tests, and tests of its
   results. The tests of functions on terms and types run in the scope of the
   free variables of their input, and in a scope that the binders of the input
   clash with.
@@ -37,7 +37,7 @@ import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TermInfo (isClosed)
 import Clash.Core.Scoped.Util (mkLets)
-import qualified Clash.Normalize.Scoped.Util as Scoped
+import qualified Clash.Normalize.Util as Scoped
 import qualified Clash.Rewrite.Scoped.Combinators as Scoped (bottomupR)
 
 import Test.Clash.Rewrite

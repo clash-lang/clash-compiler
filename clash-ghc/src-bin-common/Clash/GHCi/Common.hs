@@ -27,7 +27,7 @@ import qualified GHC
 import           Clash.Core.Name        (nameOcc)
 import           Clash.Core.Scoped.NameMap (memberGlobalSet)
 import           Clash.Core.Scoped.Syntax (globalIdName)
-import           Clash.Normalize.Scoped.Util (callGraph, callGraphGlobals)
+import           Clash.Normalize.Util (callGraph, callGraphGlobals)
 import qualified Clash.Util.Interpolate as I
 import           Clash.Util             (ClashException(..), noSrcSpan)
 import           Control.Exception      (throw)
