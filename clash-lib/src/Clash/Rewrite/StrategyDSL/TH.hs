@@ -44,7 +44,7 @@ import Clash.Rewrite.StrategyDSL
 import qualified Clash.Core.Scoped.Syntax as S
 import qualified Clash.Rewrite.Scoped.Apply as SApply
 import qualified Clash.Rewrite.Scoped.Combinators as SComb
-import qualified Clash.Rewrite.Scoped.Types as S
+import qualified Clash.Rewrite.Types as S
 import qualified Control.Monad as Monad
 import qualified Control.Monad.Writer as Writer
 import qualified Data.Monoid as Monoid
@@ -765,7 +765,7 @@ dispatchQFor target step = do
 
 -- | Compile a strategy of transformations of scoped Core into its fused
 -- dispatch code. The result is an expression of type
--- @'Clash.Rewrite.Scoped.Types.Rewrite' extra@, with @extra@ fixed by
+-- @'Clash.Rewrite.Types.Rewrite' extra@, with @extra@ fixed by
 -- the workers the spec references.
 compileStrategy :: Strat -> Q Exp
 compileStrategy = compileStrategyFor coreTarget
@@ -783,7 +783,7 @@ dispatchQ :: Step -> Q Exp
 dispatchQ = dispatchQFor coreTarget
 
 -- | A transformation as a plain uninstrumented rewrite, an expression of type
--- @'Clash.Rewrite.Scoped.Types.Rewrite' extra@: match the term against
+-- @'Clash.Rewrite.Types.Rewrite' extra@: match the term against
 -- the worker table, run the worker on a match, return the term untouched
 -- otherwise. Splice this where a transformation is invoked from inside
 -- another transformation (any instrumentation is the caller's).

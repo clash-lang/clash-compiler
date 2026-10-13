@@ -19,7 +19,7 @@ module Clash.Normalize.Strategy
 
 import Clash.Normalize.Strategy.Spec
 import Clash.Normalize.Types (NormalizeState)
-import Clash.Rewrite.Scoped.Types (Rewrite)
+import Clash.Rewrite.Types (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (compileStrategy)
 
 constantPropagation :: Rewrite NormalizeState

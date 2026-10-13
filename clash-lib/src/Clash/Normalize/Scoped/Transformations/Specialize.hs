@@ -94,7 +94,7 @@ import           Clash.Normalize.Types
 import           Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode, toTransformation)
 import           Clash.Rewrite.Types
-  (censor, curFun, debugOpts, extra, typeEnv, specializationLimit)
+  (censor, curFun, debugOpts, extra, typeEnv, specializationLimit, Transform (..), TransformContext, mkDerivedName, tfScope)
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
@@ -119,8 +119,6 @@ import           Clash.Normalize.Scoped.Util (ConstantSpecInfo (..), constantSpe
 import           Clash.Rewrite.Scoped.Combinators (topdownR)
 import           Clash.Rewrite.Scoped.Globals
   (findAlphaEqBinding, isTopEntity, isWorkFreeTerm, lookupBinding, mkFunction)
-import           Clash.Rewrite.Scoped.Types
-  (Transform (..), TransformContext, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Util
   ( abstractOver, changed, dependencySortTyVars, isUntranslatableType, mkTmBinderFor
   , normalizeTermTypes, setChanged )

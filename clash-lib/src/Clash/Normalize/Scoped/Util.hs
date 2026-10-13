@@ -79,7 +79,7 @@ import           Clash.Normalize.Scoped.Primitives  (removedArg)
 import           Clash.Normalize.Types
 import           Clash.Normalize.Util        (isConstantArg)
 import           Clash.Rewrite.Types
-  (curFun, debugOpts, extra, bindings, typeEnv)
+  (curFun, debugOpts, extra, bindings, typeEnv, FrameKind (..), Rewrite, TransformContext, ctxFrames, mkDerivedName, tfScope)
 import           Clash.Unique                (fromGhcUnique)
 
 import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
@@ -93,8 +93,6 @@ import           Clash.Core.Scoped.TermInfo  (isClosed)
 import           Clash.Core.Scoped.Type
   (PiTele (..), TypeView (..), isClockOrReset, mkFunTy, piTeleNameBinders, tyView)
 import           Clash.Rewrite.Scoped.Apply  (runRewrite)
-import           Clash.Rewrite.Scoped.Types
-  (FrameKind (..), Rewrite, TransformContext, ctxFrames, mkDerivedName, tfScope)
 import           Clash.Rewrite.Scoped.Globals (freshGlobalId)
 
 -- * Constant arguments of primitives

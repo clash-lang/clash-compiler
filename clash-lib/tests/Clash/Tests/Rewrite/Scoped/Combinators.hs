@@ -4,7 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Rewrite.Scoped.Combinators" and the context of
-  "Clash.Rewrite.Scoped.Types"
+  "Clash.Rewrite.Types"
 -}
 
 {-# LANGUAGE GADTs #-}

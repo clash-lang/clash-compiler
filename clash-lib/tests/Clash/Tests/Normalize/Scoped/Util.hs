@@ -29,7 +29,8 @@ import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (Wo
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Types (NormalizeState (..), TermClassification (..))
 import qualified Clash.Rewrite.Scoped as Scoped (changed)
-import Clash.Rewrite.Types (RewriteState (..))
+import Clash.Rewrite.Types
+  (RewriteState (..), Frame (..), Rewrite, Transform (..), pushFrame, rootContext)
 
 import Clash.Core.Scoped.Alpha (aeqTy)
 import Clash.Core.Scoped.NameMap
@@ -37,8 +38,6 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TermInfo (isClosed)
 import Clash.Core.Scoped.Util (mkLets)
 import qualified Clash.Normalize.Scoped.Util as Scoped
-import Clash.Rewrite.Scoped.Types
-  (Frame (..), Rewrite, Transform (..), pushFrame, rootContext)
 import qualified Clash.Rewrite.Scoped.Combinators as Scoped (bottomupR)
 
 import Test.Clash.Rewrite

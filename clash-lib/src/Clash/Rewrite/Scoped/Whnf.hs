@@ -27,14 +27,13 @@ module Clash.Rewrite.Scoped.Whnf
 import qualified Control.Lens as Lens
 import GHC.Stack (HasCallStack)
 
-import Clash.Rewrite.Types (RewriteMonad, globalHeap, bindings, typeEnv)
 
 import Clash.Core.Scoped.Evaluator (allocatedBind, whnf)
 import Clash.Core.Scoped.Evaluator.Primitives (primReductionMap)
 import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
-import Clash.Rewrite.Scoped.Types
+import Clash.Rewrite.Types
 import Clash.Rewrite.Scoped.Util (bindPureHeap)
 
 -- | The environment of the scoped evaluator: the primitive reductions of
