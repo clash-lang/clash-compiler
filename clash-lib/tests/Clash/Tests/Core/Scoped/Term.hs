@@ -3,12 +3,14 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Term", against "Clash.Core.Term"
+  Tests for "Clash.Core.Scoped.Term". The expected results are those of the
+  functions of "Clash.Core.Term" that these replace.
 -}
 
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 
 module Clash.Tests.Core.Scoped.Term (tests) where
 
@@ -16,186 +18,151 @@ import GHC.Types.SrcLoc (noSrcSpan)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
+import qualified Clash.Core.Term as C (NameMod (PrefixName))
 
-import qualified Clash.Core.Literal as C
-import qualified Clash.Core.Subst as C
-import qualified Clash.Core.VarEnv as C
-
-import Clash.Core.Scoped.Convert
+import Clash.Core.Scoped.Builder
+  ( TmB, appB, deDupTickB, nameModTickB, noDeDupTickB, primB, srcSpanTickB, tickB, tyAppB)
 import Clash.Core.Scoped.NameMap (emptyGlobalEnv, insertGlobalEnv)
 import Clash.Core.Scoped.Subst (substGlobals)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term
 
-import Test.Clash.Rewrite
-  (assertAlphaEq, globalId, intId, intTy, localId, parseToTermQQ, tyVar)
 import Test.Clash.Scoped
-  (assertAgreesTm, assertScopedAlphaEq, extendSunk, sunkVar, withFreeVarsOf)
 
 -- | A primitive @p :: forall a. a -> a -> a@
-primP :: C.Term
-primP = C.Prim (C.PrimInfo "p" ty C.WorkNever C.SingleResult C.NoUnfolding)
- where
-  a = tyVar C.User "a" 900
-  ty = C.ForAllTy a (C.mkFunTy (C.VarTy a) (C.mkFunTy (C.VarTy a) (C.VarTy a)))
+primP :: TmB
+primP = primB (testPrim "p" "forall a. a -> a -> a")
 
--- | @p \@Int (tick x) y@, with ticks in between the applications
-appTerm :: C.Term
+-- | @p \@Int@, with a tick around it
+pInt :: TmB
+pInt = tickB deDupTickB (tyAppB primP (testTypeB "Int"))
+
+-- | Build a term with the builders in the scope of @x, y :: Int@
+withXY :: (forall n. Distinct n => TestScope n -> Assertion) -> Assertion
+withXY = withTestScope [varD "x" "Int", varD "y" "Int"]
+
+-- | @p \@Int (tick x) y@, with ticks in between the applications, see 'withXY'
+appTerm :: TmB
 appTerm =
-  C.Tick (C.SrcSpan noSrcSpan)
-    (C.mkApps (C.Tick C.DeDup (C.TyApp primP intTy))
-      [Left (C.Tick C.NoDeDup (C.Var x)), Left (C.Var y)])
- where
-  x = intId C.User "x" 1
-  y = intId C.User "y" 2
+  tickB (srcSpanTickB noSrcSpan)
+    (appB (appB pInt (tickB noDeDupTickB (testTermB "x"))) (testTermB "y"))
 
 -- | A term with lambdas and type lambdas at its head
-absTerm :: C.Term
-absTerm = C.TyLam a (C.Lam x (C.TyLam b (C.Lam y (C.Var x))))
- where
-  a = tyVar C.User "a" 1
-  b = tyVar C.User "b" 2
-  x = localId C.User "x" 3 (C.VarTy a)
-  y = localId C.User "y" 4 (C.VarTy b)
+absTerm :: TestTerm
+absTerm = "\\(a :: Type) (x :: a) (b :: Type) (y :: b) -> x"
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Term"
-  [ testCase "substGlobals agrees with substituting globals in Clash Core" $ do
+  [ testCase "substGlobals" $ do
       -- @\(x :: Int) -> f x (let (y :: Int) = g in \(x :: Int) -> y)@, with
       -- @f := \(x :: Int) (y :: Int) -> x@ and @g := 7@: their binders have
       -- the names of the binders they end up under
-      let x = intId C.User "x" 1
-          y = intId C.User "y" 2
-          intFun = C.mkFunTy intTy intTy
-          f = globalId C.User "f" 10 (C.mkFunTy intTy intFun)
-          g = globalId C.User "g" 11 intTy
-          tm = C.Lam x (C.mkApps (C.Var f)
-                 [ Left (C.Var x)
-                 , Left (C.Let (C.NonRec y (C.Var g)) (C.Lam x (C.Var y))) ])
-          fBody = C.Lam x (C.Lam y (C.Var x))
-          gBody = C.Literal (C.IntLiteral 7)
-          substC = C.substTm "test" (C.extendGblSubstList (C.mkSubst C.emptyInScopeSet) [(f, fBody), (g, gBody)])
-          genv = insertGlobalEnv (mkGlobalIdFromClash f) (fromClashTermClosed fBody)
-                   (insertGlobalEnv (mkGlobalIdFromClash g) (fromClashTermClosed gBody) emptyGlobalEnv)
-      assertAgreesTm substC (const (substGlobals genv)) tm
+      let f = testGlobalId "f_G10" "Int -> Int -> Int"
+          g = testGlobalId "g_G11" "Int"
+          tm = closedTerm
+            "\\(x :: Int) -> f_G10 x (let { !(y :: Int) = g_G11 } in \\(x :: Int) -> y)"
+          genv = insertGlobalEnv f (closedTerm "\\(x :: Int) (y :: Int) -> x")
+                   (insertGlobalEnv g (closedTerm "7") emptyGlobalEnv)
+          res = substGlobals genv tm
+      assertTermIs emptyTestScope
+        "\\(x :: Int) -> (\\(x :: Int) (y :: Int) -> x) x (let { !(y :: Int) = 7 } in \\(x :: Int) -> y)"
+        res
+      assertLintClean emptyTestScope res
 
-  , testCase "collectArgs and mkApps" $
-      assertAgreesTm
-        (\tm -> uncurry C.mkApps (C.collectArgs tm))
-        (\_ tm -> uncurry mkApps (collectArgs tm))
-        appTerm
+  , testCase "collectArgs and mkApps" $ withXY $ \ts -> do
+      let tm = termIn ts (builtTerm appTerm)
+      -- The ticks around the head of the application, and around it, are
+      -- dropped
+      assertTermAlphaEq
+        (termIn ts (builtTerm (appB (appB (tyAppB primP (testTypeB "Int")) (tickB noDeDupTickB (testTermB "x"))) (testTermB "y"))))
+        (uncurry mkApps (collectArgs tm))
 
-  , testCase "collectArgs agrees" $
-      withFreeVarsOf [appTerm] $ \env -> do
-        let (fun, args) = collectArgs (fromClashTerm env appTerm)
-            (funC, argsC) = C.collectArgs appTerm
-        assertScopedAlphaEq funC fun
-        length args @?= length argsC
-        sequence_
-          [ case (a, aC) of
-              (Left e, Left eC) -> assertScopedAlphaEq eC e
-              (Right t, Right tC) -> assertAlphaEq tC (toClashType t)
-              _ -> assertFailure "term versus type argument"
-          | (a, aC) <- zip args argsC ]
+  , testCase "collectArgs" $ withXY $ \ts -> do
+      let (fun, args) = collectArgs (termIn ts (builtTerm appTerm))
+      assertTermAlphaEq (termIn ts (builtTerm primP)) fun
+      length args @?= 3
+      case args of
+        [Right t, Left e1, Left e2] -> do
+          assertTypeIs ts "Int" t
+          assertTermAlphaEq (termIn ts (builtTerm (tickB noDeDupTickB (testTermB "x")))) e1
+          assertTermIs ts "y" e2
+        _ -> assertFailure "unexpected arguments"
 
-  , testCase "collectArgsTicks agrees" $
-      withFreeVarsOf [appTerm] $ \env -> do
-        let (_, _, ticks) = collectArgsTicks (fromClashTerm env appTerm)
-            (_, _, ticksC) = C.collectArgsTicks appTerm
-        length ticks @?= length ticksC
+  , testCase "collectArgsTicks" $ withXY $ \ts -> do
+      let (_, _, ticks) = collectArgsTicks (termIn ts (builtTerm appTerm))
+      -- The tick around the head, and the one around the application
+      length ticks @?= 2
 
-  , testCase "primArg agrees" $
-      withFreeVarsOf [appTerm] $ \env ->
-        primArg (fromClashTerm env appTerm) @?= C.primArg appTerm
+  , testCase "primArg" $ withXY $ \ts ->
+      primArg (termIn ts (builtTerm appTerm)) @?= Just ("p", 1, 2)
 
-  , testCase "mkTmApps and mkTyApps agree" $
-      assertAgreesTm
-        (\tm -> C.mkTmApps (C.mkTyApps tm [intTy]) [tm])
-        (\sc tm -> mkTmApps (mkTyApps tm [fromClashTypeClosed sc intTy]) [tm])
-        [parseToTermQQ| \(x :: Int) -> x |]
+  , testCase "mkTmApps and mkTyApps" $ do
+      let tm = closedTerm "\\(x :: Int) -> x"
+      assertTermIs emptyTestScope "(\\(x :: Int) -> x) @Int (\\(x :: Int) -> x)"
+        (mkTmApps (mkTyApps tm [closedType "Int"]) [tm])
 
-  , testCase "stripTicks agrees" $
-      assertAgreesTm C.stripTicks (const stripTicks) appTerm
+  , testCase "stripTicks" $ withXY $ \ts ->
+      assertTermAlphaEq
+        (termIn ts (builtTerm (appB (appB pInt (tickB noDeDupTickB (testTermB "x"))) (testTermB "y"))))
+        (stripTicks (termIn ts (builtTerm appTerm)))
 
-  , testCase "stripAllTicks agrees" $
-      assertAgreesTm C.stripAllTicks (const stripAllTicks) appTerm
+  , testCase "stripAllTicks" $ withXY $ \ts ->
+      assertTermIs ts "p_G0 @Int x y" (globalP (stripAllTicks (termIn ts (builtTerm appTerm))))
 
-  , testCase "collectTicks and mkTicks" $
-      assertAgreesTm
-        (\tm -> uncurry C.mkTicks (C.collectTicks tm))
-        (\_ tm -> uncurry mkTicks (collectTicks tm))
-        (C.Tick C.DeDup (C.Tick C.DeDup appTerm))
+  , testCase "collectTicks and mkTicks" $ withXY $ \ts -> do
+      let tm = termIn ts (builtTerm (tickB deDupTickB (tickB deDupTickB appTerm)))
+      -- The duplicate tick is removed
+      assertTermAlphaEq
+        (termIn ts (builtTerm (tickB deDupTickB appTerm)))
+        (uncurry mkTicks (collectTicks tm))
 
-  , testCase "mkTicks removes duplicates up to alpha-equivalence" $ do
+  , testCase "mkTicks removes duplicates up to alpha-equivalence" $ withXY $ \ts -> do
       -- Two @NameMod@ ticks with alpha-equivalent types
-      let a = tyVar C.User "a" 1
-          b = tyVar C.User "b" 2
-          ty1 = C.ForAllTy a (C.VarTy a)
-          ty2 = C.ForAllTy b (C.VarTy b)
-          tm = C.Tick (C.NameMod C.PrefixName ty1)
-                 (C.Tick (C.NameMod C.PrefixName ty2) (C.Var (intId C.User "x" 3)))
-      assertAgreesTm
-        (\t -> uncurry C.mkTicks (C.collectTicks t))
-        (\_ t -> uncurry mkTicks (collectTicks t))
-        tm
-      withFreeVarsOf [tm] $ \env ->
-        length (snd (collectTicks (uncurry mkTicks (collectTicks (fromClashTerm env tm))))) @?= 1
+      let nameMod t = tickB (nameModTickB C.PrefixName (testTypeB t))
+          tm = termIn ts (builtTerm (nameMod "forall a. a" (nameMod "forall b. b" (testTermB "x"))))
+          res = uncurry mkTicks (collectTicks tm)
+      assertTermAlphaEq (termIn ts (builtTerm (nameMod "forall a. a" (testTermB "x")))) res
+      length (snd (collectTicks res)) @?= 1
 
-  , testCase "partitionTicks agrees" $
-      withFreeVarsOf [appTerm] $ \env -> do
-        let (_, _, ticks) = collectArgsTicks (fromClashTerm env appTerm)
-            (_, _, ticksC) = C.collectArgsTicks appTerm
-            (src, other) = partitionTicks ticks
-            (srcC, otherC) = C.partitionTicks ticksC
-        (length src, length other) @?= (length srcC, length otherC)
+  , testCase "partitionTicks" $ withXY $ \ts -> do
+      let (_, _, ticks) = collectArgsTicks (termIn ts (builtTerm appTerm))
+          (src, other) = partitionTicks ticks
+      (length src, length other) @?= (1, 1)
 
   , testCase "collectBndrs and mkAbstraction" $
-      assertAgreesTm id (\_ tm -> collectBndrs tm mkAbsFlipped) absTerm
+      withTerm absTerm $ \_ tm -> assertTermAlphaEq tm (collectBndrs tm mkAbsFlipped)
 
   , testCase "openBndrs and mkAbstraction" $
-      assertAgreesTm id (\sc tm -> openBndrs sc tm (const mkAbsFlipped)) absTerm
+      withTerm absTerm $ \ts tm ->
+        assertTermAlphaEq tm (openBndrs (testScope ts) tm (const mkAbsFlipped))
 
-  , testCase "collectBndrs collects as many binders as Clash" $
-      withFreeVarsOf [absTerm] $ \env ->
-        collectBndrs (fromClashTerm env absTerm) (\bs _ -> teleLength bs)
-          @?= length (fst (C.collectBndrs absTerm))
+  , testCase "collectBndrs collects all binders at the head" $
+      withTerm absTerm $ \_ tm -> collectBndrs tm (\bs _ -> teleLength bs) @?= 4
 
     -- The binders of the term clash with the sunk variable
   , testCase "openBndrs renames binders that clash with the scope" $
-      withFreeVarsOf [absTerm] $ \env ->
-        extendSunk env [] [] $ \env1 ->
-          openBndrs (convScope env1) (sink (fromClashTerm env absTerm)) $ \_ bs body -> do
-            assertBool "binders are above the sunk variable"
-              (all (> fromIntegral (C.varUniq sunkVar)) (teleRaws bs))
-            assertScopedAlphaEq absTerm (mkAbstraction body bs)
+      withTerm absTerm $ \ts0 tm0 -> withClashing ts0 [sunkD] tm0 $ \ts tm ->
+        openBndrs (testScope ts) tm $ \_ bs body -> do
+          assertBool "binders are above the sunk variable" (all (> 1000000) (teleRaws bs))
+          assertTermAlphaEq tm (mkAbstraction body bs)
 
-  , testCase "mkLams and mkTyLams" $ do
-      let a = tyVar C.User "a" 1
-          x = localId C.User "x" 2 (C.VarTy a)
-      assertAgreesTm id
-        (\_ tm -> case tm of
-           TyLam ab (Lam xb e) -> mkTyLams (mkLams e (TCons xb TNil)) (TCons ab TNil)
-           _ -> error "unexpected shape")
-        (C.TyLam a (C.Lam x (C.Var x)))
+  , testCase "mkLams and mkTyLams" $
+      withTerm "\\(a :: Type) (x :: a) -> x" $ \_ tm -> case tm of
+        TyLam ab (Lam xb e) ->
+          assertTermAlphaEq tm (mkTyLams (mkLams e (TCons xb TNil)) (TCons ab TNil))
+        _ -> assertFailure "unexpected shape"
 
   , testCase "appendTele and splitTele" $
-      assertAgreesTm id
-        (\_ tm -> collectBndrs tm $ \bs body ->
-           splitTele 2 bs $ \pre post -> mkAbstraction body (appendTele pre post))
-        absTerm
+      withTerm absTerm $ \_ tm ->
+        assertTermAlphaEq tm
+          (collectBndrs tm $ \bs body ->
+             splitTele 2 bs $ \pre post -> mkAbstraction body (appendTele pre post))
 
-  , testCase "walkTerm agrees" $
-      withFreeVarsOf [appTerm, absTerm] $ \env -> do
-        let count :: Term x -> Maybe ()
-            count _ = Just ()
-        length (walkTerm count (fromClashTerm env appTerm))
-          @?= length (C.walkTerm (const (Just ())) appTerm)
-        length (walkTerm count (fromClashTerm env absTerm))
-          @?= length (C.walkTerm (const (Just ())) absTerm)
+  , testCase "walkTerm" $ withXY $ \ts -> do
+      let count :: Term x -> Maybe ()
+          count _ = Just ()
+      length (walkTerm count (termIn ts (builtTerm appTerm))) @?= 9
+      withTerm absTerm $ \_ tm -> length (walkTerm count tm) @?= 5
   ]
  where
   mkAbsFlipped :: Tele AbsBinder n l -> Term l -> Term n
@@ -205,3 +172,12 @@ tests = testGroup "Clash.Tests.Core.Scoped.Term"
   teleRaws TNil = []
   teleRaws (TCons (AbsId b) bs) = tmNameRaw (tmNameOf b) : teleRaws bs
   teleRaws (TCons (AbsTy b) bs) = tyNameRaw (tyNameOf b) : teleRaws bs
+
+  -- Replace the primitive @p@ by a global with the same name, which the
+  -- parser can express
+  globalP :: Term n -> Term n
+  globalP = \case
+    App e1 e2 -> App (globalP e1) e2
+    TyApp e ty -> TyApp (globalP e) ty
+    Prim p | primName p == "p" -> GlobalVar (testGlobalId "p_G0" "forall a. a -> a -> a")
+    e -> e
