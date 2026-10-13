@@ -191,6 +191,15 @@ nextName (Supply a) = do
   pure k
 {-# INLINE nextName #-}
 
+-- | Build types in the same scope, each with the names of the supply from
+-- where it is now: the binders of one type are not in scope in the others,
+-- so they can share names. That numbers them like
+-- 'Clash.Core.Scoped.Convert.fromClashType' numbers each type it converts.
+typesInScope :: Distinct n => BEnv s n -> ST s (TyB -> ST s (Type n))
+typesInScope env@(BEnv _ _ _ (Supply a)) = do
+  start <- readByteArray a 0
+  pure (\t -> writeByteArray a 0 (start :: Int) >> runTyB t env)
+
 -- | Bind a type variable, with the next name of the supply. Like
 -- 'Clash.Core.Scoped.Convert.fromClashTerm', the caller builds the kind
 -- before calling this, so the binders in the kind come first.
@@ -271,8 +280,9 @@ runIn sc tys tms f = runST $ do
 
 -- | Build the signature of a data constructor (see "Clash.Core.Scoped.Sig"):
 -- the keys, names and kinds of its universally quantified type variables, of
--- its existentially quantified ones, and the types of its fields. Errors on
--- type variables that are not in scope.
+-- its existentially quantified ones, and the types of its fields. The binders
+-- of each type of a field are numbered from the names of the type variables,
+-- see 'typesInScope'. Errors on type variables that are not in scope.
 runDataConSig
   :: HasCallStack
   => [(Key, C.Name C.Type, TyB)]
@@ -282,7 +292,7 @@ runDataConSig
 runDataConSig univ ext args = runClosed $ \env0 ->
   withTyBinders env0 univ $ \env1 univ' ->
     withTyBinders env1 ext $ \env2 ext' ->
-      DataConSig univ' ext' <$> mapM (`runTyB` env2) args
+      typesInScope env2 >>= \build -> DataConSig univ' ext' <$> mapM build args
 
 -- | Build the signature of a newtype (see "Clash.Core.Scoped.Sig"): the keys,
 -- names and kinds of its type variables, and its eta-reduced representation
@@ -293,12 +303,14 @@ runNewTyConSig tvs rhs = runClosed $ \env0 ->
 
 -- | Build an equation of a type family (see "Clash.Core.Scoped.Sig"): the
 -- keys, names and kinds of its pattern variables, the patterns of its
--- left-hand side, and its right-hand side. Errors on type variables that are
--- not in scope.
+-- left-hand side, and its right-hand side. The binders of each of these types
+-- are numbered from the names of the pattern variables, see
+-- 'typesInScope'. Errors on type variables that are not in scope.
 runTyFamEqn :: HasCallStack => [(Key, C.Name C.Type, TyB)] -> [TyB] -> TyB -> TyFamEqn
 runTyFamEqn tvs lhs rhs = runClosed $ \env0 ->
-  withTyBinders env0 tvs $ \env1 tvs' ->
-    TyFamEqn tvs' <$> mapM (`runTyB` env1) lhs <*> runTyB rhs env1
+  withTyBinders env0 tvs $ \env1 tvs' -> do
+    build <- typesInScope env1
+    TyFamEqn tvs' <$> mapM build lhs <*> build rhs
 
 -- | Bind type variables, in order: the kind of each may mention the ones
 -- before it
