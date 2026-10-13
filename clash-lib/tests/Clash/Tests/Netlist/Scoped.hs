@@ -17,50 +17,44 @@ import Control.Lens ((.=))
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Var as C (Id)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
   ( Declaration (Assignment, InstDecl), DeclarationType (Concurrent), EntityOrComponent (Entity)
   , Expr (Identifier), Identifier, NetlistMonad, PortDirection (..), PortMap (NamedPortMap)
   , componentNames )
 
-import Clash.Core.Scoped.Convert (fromClashTypeClosed)
 import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
-import Clash.Core.Scoped.Subst (withFreshIdBinder)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Netlist.Scoped (mkFunApp)
-import Clash.Netlist.Scoped.Types (CompCtx, LocalId, binderLocalId, compCtxFromList, localIdVar)
+import Clash.Netlist.Scoped.Types (CompCtx, LocalId (..), localIdVar)
 
-import Test.Clash.Rewrite (globalId, intFunTy, intId, intTy, mkBindingMap, runNetlistTest)
-import Test.Clash.Scoped (testTypeEnv)
+import Test.Clash.Rewrite (runScopedNetlistTest)
+import Test.Clash.Scoped
+  (TestTerm, atRaw, mkGlobalBindings, termIn, testCompCtx, testGlobalId, varD, withTestScope)
 
 -- | Run a Netlist action on a local variable @y@ of type @Int@, with HDL
 -- identifier @y@, in a design with the given global bindings and component
--- names
+-- names. The raw name of @y@ is 60, the unique of the globals of the tests.
 withLocal
-  :: [(C.Id, C.Term)]
-  -> [(C.Id, Identifier)]
+  :: [(GlobalId, TestTerm)]
+  -> [(GlobalId, Identifier)]
   -> (forall n. Distinct n => CompCtx n -> LocalId n -> NetlistMonad a)
   -> IO a
 withLocal bs compNames act =
-  runNetlistTest (mkBindingMap bs) $ do
-    componentNames .= mconcat [ singletonGlobalEnv (mkGlobalIdFromClash g) i | (g, i) <- compNames ]
-    withFreshIdBinder emptyScope (C.mkUnsafeSystemName "y" 0)
-      (fromClashTypeClosed emptyScope intTy) $ \sc b ->
-        let y = binderLocalId b
-            ctx = compCtxFromList sc testTypeEnv [(y, Id.unsafeMake "y")]
-        in act ctx y
+  withTestScope [atRaw 60 (varD "y" "Int")] $ \ts -> case termIn ts "y" of
+    Var o ty n ->
+      runScopedNetlistTest (mkGlobalBindings bs) $ do
+        componentNames .= mconcat [ singletonGlobalEnv g i | (g, i) <- compNames ]
+        act (testCompCtx ts) (LocalId o ty n)
+    _ -> error "withLocal: not a variable"
 
 -- | A local variable can't be mistaken for a global binder (#1087), even one
--- with the same name: applying it without arguments assigns it.
+-- whose unique is the raw name of the local: applying it without arguments
+-- assigns it.
 mkFunAppLocal :: Assertion
 mkFunAppLocal = do
-  let yGlobal = globalId C.User "y" 60 (intFunTy 1)
-      a = intId C.User "a" 61
-  decls <- withLocal [(yGlobal, C.Lam a (C.Var a))] [] $ \ctx y ->
+  let yGlobal = testGlobalId "y_G60" "Int -> Int"
+  decls <- withLocal [(yGlobal, "\\(a :: Int) -> a")] [] $ \ctx y ->
     mkFunApp ctx Concurrent (Id.unsafeMake "result") (Left y) [] []
   case decls of
     [Assignment lhs _ (Identifier rhs Nothing)] -> do
@@ -74,12 +68,10 @@ mkFunAppLocal = do
 -- connected to its input port.
 mkFunAppGlobal :: Assertion
 mkFunAppGlobal = do
-  let f = globalId C.User "f" 60 (intFunTy 1)
-      a = intId C.User "a" 61
-      r = intId C.User "r" 62
-  decls <- withLocal [(f, C.Lam a (C.Letrec [(r, C.Var a)] (C.Var r)))] [(f, Id.unsafeMake "f")] $
+  let f = testGlobalId "f_G60" "Int -> Int"
+  decls <- withLocal [(f, "\\(a :: Int) -> let { (r :: Int) = a } in r")] [(f, Id.unsafeMake "f")] $
     \ctx y ->
-      mkFunApp ctx Concurrent (Id.unsafeMake "result") (Right (mkGlobalIdFromClash f)) [localIdVar y] []
+      mkFunApp ctx Concurrent (Id.unsafeMake "result") (Right f) [localIdVar y] []
   case decls of
     [InstDecl Entity Nothing [] compName _ [] (NamedPortMap ports)] -> do
       assertEqual "Component" "f" (Id.toText compName)
