@@ -73,6 +73,10 @@ module Clash.Core.Scoped.TysPrim
   , naturalPrimTyConName
   , byteArrayPrimTyConName
   , eqPrimTyConName
+    -- * Type families on naturals
+  , typeNatAdd
+  , typeNatMul
+  , typeNatSub
   ) where
 
 import Data.Text.Extra (showt)
@@ -81,10 +85,11 @@ import GHC.Base (ByteArray#, Char#, Double#, Float#, Int#, Int8#, Int16#, Int32#
 import GHC.Builtin.Names
 import GHC.Num.Integer (Integer (..))
 import GHC.Num.Natural (Natural (..))
+import GHC.Types.SrcLoc (wiredInSrcSpan)
 
 import Clash.Core.Basic (ConstTy (..))
 import Clash.Core.DataCon (DataCon, DcName, DcStrictness (..))
-import Clash.Core.Name (mkUnsafeSystemName)
+import Clash.Core.Name (Name (..), NameSort (User), mkUnsafeSystemName)
 -- Through the boot file: the constructors derive the types of Clash Core from
 -- the scoped ones, and Clash Core's builtin types are made from the names here
 import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkAlgTyCon, mkDataCon, mkPrimTyCon)
@@ -133,6 +138,13 @@ byteArrayPrimTyConName = mkUnsafeSystemName (showt ''ByteArray#)
                           (fromGhcUnique byteArrayPrimTyConKey)
 
 eqPrimTyConName = mkUnsafeSystemName "GHC.Prim.~#" (fromGhcUnique eqPrimTyConKey)
+
+-- | GHC's @+@, @*@ and @-@ on type-level naturals, which Clash recognizes by
+-- their uniques
+typeNatAdd, typeNatMul, typeNatSub :: TyConName
+typeNatAdd = Name User "GHC.TypeNats.+" (fromGhcUnique typeNatAddTyFamNameKey) wiredInSrcSpan
+typeNatMul = Name User "GHC.TypeNats.*" (fromGhcUnique typeNatMulTyFamNameKey) wiredInSrcSpan
+typeNatSub = Name User "GHC.TypeNats.-" (fromGhcUnique typeNatSubTyFamNameKey) wiredInSrcSpan
 
 
 int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, word8PrimTyConName,

@@ -21,15 +21,13 @@
 
   = Scoped Core
 
-  The same DSL describes strategies of transformations of Clash Core and of
-  scoped Clash Core ("Clash.Rewrite.Scoped"). A transformation says which Core
-  its workers are written for ('WorkerCore'): declare one with
-  'toTransformation' or 'toScopedTransformation', and a whole-term pass with
-  'pass' or 'scopedPass'. 'Clash.Rewrite.StrategyDSL.TH.compileStrategy'
-  compiles a strategy of transformations of Clash Core, and
-  'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy' one of transformations
-  of scoped Core. The normalizer runs scoped Core; the transformations of Clash
-  Core remain until Phase 7 of the port, to compare the ports with.
+  The transformations are those of scoped Clash Core ("Clash.Rewrite.Scoped"):
+  declare one with 'toScopedTransformation', and a whole-term pass with
+  'scopedPass'. 'Clash.Rewrite.StrategyDSL.TH.compileScopedStrategy' compiles
+  a strategy. Workers take a 'Clash.Rewrite.Scoped.Types.TransformContext'
+  and terms of any scope. A 'FieldWorker' of 'CVar' is not supported, as
+  scoped Core has separate constructors for local and global variables: use a
+  'Worker', which fires at both.
 -}
 
 {-# LANGUAGE DisambiguateRecordFields #-}
@@ -42,11 +40,8 @@ module Clash.Rewrite.StrategyDSL
   ( -- * Transformation metadata
     Constructor (..)
   , TransformationWorker (..)
-  , WorkerCore (..)
   , Transformation (..)
-  , toTransformation
   , toScopedTransformation
-  , anyConstructor
   , scopedAnyConstructor
   , named
     -- ** Worker builders: workers receiving the constructor's fields
@@ -81,7 +76,6 @@ module Clash.Rewrite.StrategyDSL
   , topdownFix
   , topdownSuc
   , innerMost
-  , pass
   , scopedPass
   , callStrategy
   , repeatR
@@ -93,7 +87,7 @@ module Clash.Rewrite.StrategyDSL
 
 import Language.Haskell.TH.Syntax (Name)
 
--- | One 'Clash.Core.Term.Term' constructor.
+-- | One 'Clash.Core.Scoped.Syntax.Term' constructor.
 data Constructor
   = CVar | CData | CLiteral | CPrim | CLam | CTyLam
   | CApp | CTyApp | CLet | CCase | CCast | CTick
@@ -112,34 +106,21 @@ data Constructor
 -- the next member as long as no change was signaled.
 data TransformationWorker
   = FieldWorker !Constructor !Name
-  -- ^ @worker :: TransformContext -> Term -> \<fields of the constructor\>
-  -- -> RewriteMonad extra Term@. The worker receives the matched node (to
+  -- ^ @worker :: TransformContext n -> Term n -> \<fields of the constructor\>
+  -- -> RewriteMonad extra (Term n)@. The worker receives the matched node (to
   -- return on the unchanged path with sharing intact) followed by the
   -- constructor's fields.
   | Worker !Constructor !Name
-  -- ^ @worker :: Rewrite extra@. A worker that fires only at the given
+  -- ^ @worker :: TransformContext n -> Term n -> RewriteMonad extra (Term n)@. A worker that fires only at the given
   -- constructor, like the per-constructor worker above, but receives the
   -- whole node instead of its deconstructed fields. For transformations that
   -- decompose the node themselves, e.g. by collecting the entire application
   -- spine rather than one @App@ layer.
   | AnyWorker !Name
-  -- ^ @worker :: Rewrite extra@, applied at all constructors. For a
+  -- ^ @worker :: TransformContext n -> Term n -> RewriteMonad extra (Term n)@, applied at all constructors. For a
   -- transformation whose firing condition lives in the
-  -- 'Clash.Rewrite.Types.TransformContext' rather than the constructor
+  -- 'Clash.Rewrite.Scoped.Types.TransformContext' rather than the constructor
   -- (@topLet@).
-  deriving (Eq, Show)
-
--- | The Core that the workers of a transformation are written for
-data WorkerCore
-  = CurrentCore
-  -- ^ Clash Core ("Clash.Core.Term"): workers take a
-  -- 'Clash.Rewrite.Types.TransformContext' and 'Clash.Core.Term.Term's
-  | ScopedCore
-  -- ^ Scoped Clash Core ("Clash.Core.Scoped.Syntax"): workers take a
-  -- 'Clash.Rewrite.Scoped.Types.TransformContext' and terms of any scope,
-  -- see "Clash.Rewrite.Scoped". A 'FieldWorker' of 'CVar' is not supported,
-  -- as scoped Core has separate constructors for local and global variables:
-  -- use a 'Worker', which fires at both.
   deriving (Eq, Show)
 
 -- | Single, named transformation. Can consist of multiple workers (see
@@ -149,27 +130,17 @@ data Transformation = Transformation
   -- ^ Canonical name, used for debug tracing, transformation counters, and
   -- the rewrite history.
   , workers :: ![TransformationWorker]
-  , core :: !WorkerCore
-  -- ^ The Core the workers are written for
   } deriving (Eq, Show)
 
 -- | Declare a transformation's workers: at most one per constructor, and
 -- either an 'AnyWorker' or per-constructor workers, never both. Checked when
 -- the transformation is compiled.
-toTransformation :: String -> [TransformationWorker] -> Transformation
-toTransformation name workers = Transformation name workers CurrentCore
-
--- | Like 'toTransformation', for workers on scoped Core. See 'ScopedCore'.
 toScopedTransformation :: String -> [TransformationWorker] -> Transformation
-toScopedTransformation name workers = Transformation name workers ScopedCore
+toScopedTransformation = Transformation
 
 -- | Declare a transformation that fires at any constructor. See 'AnyWorker'.
-anyConstructor :: String -> Name -> Transformation
-anyConstructor name worker = Transformation name [AnyWorker worker] CurrentCore
-
--- | Like 'anyConstructor', for a worker on scoped Core
 scopedAnyConstructor :: String -> Name -> Transformation
-scopedAnyConstructor name worker = Transformation name [AnyWorker worker] ScopedCore
+scopedAnyConstructor name worker = Transformation name [AnyWorker worker]
 
 -- | Give a transformation a different name; used for deliberate debug
 -- aliases of a transformation that runs at several strategy positions (the
@@ -223,24 +194,23 @@ data Step
 -- | A complete rewriting strategy.
 data Strat
   = TopDown Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.topdownR': repeat the step at each
+  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.topdownR': repeat the step at each
   -- node until it no longer fires, then descend.
   | BottomUp Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.bottomupR': descend first, run the
+  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.bottomupR': descend first, run the
   -- step once on the rebuilt node.
   | TopDownFix Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.topdownFixR'. Mind its soundness
-  -- precondition (Note [topdownFixR] in "Clash.Rewrite.Combinators").
+  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.topdownFixR'. Mind its soundness
+  -- precondition (Note [topdownFixR] in "Clash.Rewrite.Scoped.Combinators").
   | TopDownSuc Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.topdownSucR': stop at the first
+  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.topdownSucR': stop at the first
   -- success, neither repeating nor descending below it.
   | InnerMost Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.innerMost': bottom-up; when the step
+  -- ^ Fused 'Clash.Rewrite.Scoped.Combinators.innerMost': bottom-up; when the step
   -- fires, re-traverse the result until the innermost fixpoint is reached.
-  | Pass WorkerCore String Name
+  | Pass String Name
   -- ^ A whole-term pass: @apply \<name\> \<rewrite\>@, for transformations
-  -- that traverse the term themselves (@makeANF@, @etaExpansionTL@, …). The
-  -- rewrite is written for the given Core.
+  -- that traverse the term themselves (@makeANF@, @etaExpansionTL@, …)
   | CallStrategy Name
   -- ^ Reference to another compiled strategy binding.
   | Seq Strat Strat            -- ^ '>->'
@@ -281,15 +251,11 @@ topdownFix = TopDownFix . toStep
 topdownSuc = TopDownSuc . toStep
 innerMost  = InnerMost . toStep
 
--- | A whole-term pass, run as @apply \<name\> \<rewrite\>@.
-pass :: String -> Name -> Strat
-pass = Pass CurrentCore
-
 -- | A whole-term pass of a rewrite of scoped Core, i.e. a function of type
 -- @forall n. Distinct n => TransformContext n -> Term n -> RewriteMonad extra
 -- (Term n)@, see "Clash.Rewrite.Scoped".
 scopedPass :: String -> Name -> Strat
-scopedPass = Pass ScopedCore
+scopedPass = Pass
 
 -- | Reference another compiled strategy by the name of its binding.
 callStrategy :: Name -> Strat
@@ -304,7 +270,7 @@ infixr 5 !->
 infixr 5 >-!
 
 -- | The combinators shared by both DSL layers. Fixities match
--- "Clash.Rewrite.Combinators"; a strategy spec module should import only
+-- "Clash.Rewrite.Scoped.Combinators"; a strategy spec module should import only
 -- this module, so the names are unambiguous there.
 class Strategic a where
   -- | Apply two strategies in succession.
