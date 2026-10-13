@@ -72,7 +72,6 @@ import qualified Clash.Core.Scoped.Syntax as ST (S (VoidS), Term)
 import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
-import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
 import Clash.Util.Supply (Supply, freshId, newSupply)
@@ -213,8 +212,8 @@ instance Default NormalizeState where
     , _inlineHistory=emptyVarEnv
     , _primitiveArgs=Map.empty
     , _recursiveComponents=emptyVarEnv
-    , _normalizationStrategy=viaFoil "normalization" normalization
-    , _constantPropagationStrategy=viaFoil "constantPropagation" constantPropagation
+    , _normalizationStrategy=error "_normalizationStrategy: Clash Core is not normalized"
+    , _constantPropagationStrategy=error "_constantPropagationStrategy: Clash Core is not normalized"
     , _scopedNormalizationStrategy=normalization
     , _scopedConstantPropagationStrategy=constantPropagation
     , _workFreeAppCache=HashMap.empty

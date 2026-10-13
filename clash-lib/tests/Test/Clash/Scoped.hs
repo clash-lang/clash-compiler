@@ -170,34 +170,17 @@ module Test.Clash.Scoped
   , testCompCtx
   , testPrim
     -- * Converting
-  , withFreeVarsOf
-  , withFreeVars
-  , extendFreeVars
-  , abstractFreeVars
   , closeFreeVars
   , sinkInto
   , atScope
-  , roundTrip
-  , extendSunk
-  , sunkVar
-  , withFreeTyVarsOf
-  , withTypeScopes
-  , withTermScopes
-  , mkScopedBindingMap
   , testTypeEnv
     -- * Assertions
-  , assertScopedAlphaEq
-  , assertAgreesTm
-  , assertAgreesTy
-  , assertScopedTyAlphaEq
-  , assertScopedMaybeTyAlphaEq
   , nameSetRaws
     -- * Beta reduction
   , betaTm
   , betaTy
     -- * Invariants
   , LintScope
-  , lintScopeOf
   , lintTerm
   , lowBinders
   , bindersNot
@@ -205,31 +188,16 @@ module Test.Clash.Scoped
   , reopenTerm
   , scrambleBinders
   , forAllScrambled
-    -- * Comparing Clash Core
-  , aeqTermTyped
-  , stripCoercionTypes
     -- * Properties
   , withTests
     -- * Running scoped transformations
   , runScopedClosed
-  , runScopedOpen
-  , runViaFoil
-  , runScopedOn
-  , assertLetHandlerAgrees
-  , assertRewritesAgree
-  , assertNewBindingsAgree
   , Step (..)
   , atPath
-  , somePrim
-    -- * Evaluating
-  , scopedWhnf
-    -- * Netlist generation
-  , withCompCtxOf
     -- * Tests
   , testScopeTests
   ) where
 
-import qualified Control.Lens as Lens
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT, evalStateT, state)
 import Control.Monad.Trans.Writer.Strict (Writer, runWriter, tell)
@@ -242,8 +210,6 @@ import qualified Data.Hashable as Hashable
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.List as List
 import qualified Data.Maybe as Maybe
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
@@ -252,14 +218,11 @@ import Test.Tasty.HUnit (Assertion, assertBool, assertEqual, assertFailure, test
 import Test.Tasty.QuickCheck
   (Gen, Property, QuickCheckTests (..), Testable, choose, forAllShow, frequency)
 
-import qualified Clash.Core.FreeVars as C
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
-import qualified Clash.Core.Var as C
-import Clash.Core.VarEnv (mkVarSet, unionInScope)
-import Clash.Unique (Unique)
+import Clash.Core.VarEnv (mkVarSet)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
 import Clash.Core.Scoped.Builder
@@ -284,25 +247,21 @@ import Clash.Rewrite.Scoped
   ( ScopedRewrite, ScopedTransform (..), Frame (LetBinding), pushFrame, rootContext
   , underAlt, underLam, underLet, underLetRec, underTyLam)
 import qualified Clash.Rewrite.Scoped as Scoped
-import Test.Clash.Scoped.ViaFoil (viaFoil, withGlobalBindings)
-import Clash.Rewrite.Types
-  (Rewrite, RewriteEnv, RewriteMonad, RewriteState (..), TransformContext)
+import Clash.Rewrite.Types (RewriteEnv, RewriteMonad, RewriteState (..))
 import qualified Clash.Rewrite.Util as Util (changed)
 import qualified Clash.Rewrite.Types as C
 
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Data.UniqMap as UniqMap
 
 import Test.Clash.Rewrite
-  ( DeclVar (..), ScopeDecl (..), TestTerm (..), TestType (..), assertAlphaEq
-  , assertErrorContains, atRaw, builtTerm, builtType, freeVarType, globalsByName, inScopeOf, intId, kindedTyVarD
-  , justDataCon, mkBinding, mkGlobalBinding, nothingDataCon, parseTestTerm, parseToTerm, parseTestType, runRewriteTest, showPprU
-  , termQQ, testGlobalId, testTyConMap, tyVarD, typeQQ, varD, vecTcNm, consDc, withCurFun)
+  ( DeclVar (..), ScopeDecl (..), TestTerm (..), TestType (..),
+    assertErrorContains, atRaw, builtTerm, builtType, freeVarType, kindedTyVarD,
+    justDataCon, mkGlobalBinding, nothingDataCon, parseTestTerm, parseToTerm,
+    parseTestType, runRewriteTest, showPprU, termQQ, testGlobalId, testTyConMap,
+    tyVarD, typeQQ, varD, vecTcNm, consDc, withCurFun )
 import Test.Clash.Rewrite (ghcName)
 import Clash.Core.Scoped.Evaluator.Types (Env (..), PrimReductions (..))
 import Test.Clash.Scoped.Evaluator (whnfIn)
-import Test.Clash.Scoped.Evaluator.Differential (scopedWhnf)
-import Test.Clash.Scoped.Gen.Clash (FreeVars (..), showTerm)
 import Test.Clash.Scoped.Print (globalIdent, showTestTerm)
 
 -- * Test scopes
@@ -869,67 +828,9 @@ mkGlobalBindings bs = globalEnvFromList [(g, mkGlobalBinding g (closedTerm t)) |
 
 -- * Converting
 
--- | A conversion environment with the free variables of the given Clash terms
--- (both type and term variables), which keep their uniques. The type
--- variables come after the type variables in their kinds.
-withFreeVarsOf :: [C.Term] -> (forall n. Distinct n => ConvEnv n -> r) -> r
-withFreeVarsOf tms = withConvEnv tvs ids
- where
-  tvs = C.dependencySortTyVars (List.nubBy sameUniq (concatMap (Lens.toListOf C.termFreeTyVars) tms))
-  ids = List.nubBy sameUniq (concatMap (Lens.toListOf C.freeLocalIds) tms)
-
-  sameUniq :: C.Var a -> C.Var a -> Bool
-  sameUniq v1 v2 = C.varUniq v1 == C.varUniq v2
-
--- | A conversion environment with the free type variables of the given Clash
--- types, which keep their uniques
-withFreeTyVarsOf :: [C.Type] -> (forall n. Distinct n => ConvEnv n -> r) -> r
-withFreeTyVarsOf tys = withConvEnv tvs []
- where
-  tvs = List.nubBy sameUniq (concatMap (Lens.toListOf C.typeFreeVars) tys)
-
-  sameUniq :: C.TyVar -> C.TyVar -> Bool
-  sameUniq v1 v2 = C.varUniq v1 == C.varUniq v2
-
--- | Run an assertion on a Clash type converted to scoped Core, twice: in the
--- scope of its free type variables, and sunk into a larger scope (see
--- 'extendSunk'), where all of its binders clash with the scope. So a function
--- that goes under the binders of the type must rename them in the second run.
-withTypeScopes
-  :: C.Type
-  -> (forall n. Distinct n => Scope n -> Type n -> Assertion)
-  -> Assertion
-withTypeScopes ty k = withFreeTyVarsOf [ty] $ \env -> do
-  let ty' = fromClashType env ty
-  k (convScope env) ty'
-  extendSunk env [] [] $ \env' -> k (convScope env') (sink ty')
-
--- | 'withTypeScopes' for terms: run an assertion on a Clash term converted to
--- scoped Core, in the scope of its free variables, and sunk into a larger
--- scope where all of its binders clash with the scope
-withTermScopes
-  :: C.Term
-  -> (forall n. Distinct n => Scope n -> Term n -> Assertion)
-  -> Assertion
-withTermScopes tm k = withFreeVarsOf [tm] $ \env -> do
-  let tm' = fromClashTerm env tm
-  k (convScope env) tm'
-  extendSunk env [] [] $ \env' -> k (convScope env') (sink tm')
-
--- | Convert a Clash term to scoped Core and back, in the scope of its free
--- variables
-roundTrip :: HasCallStack => C.Term -> C.Term
-roundTrip tm = withFreeVarsOf [tm] $ \env -> toClashTerm (fromClashTerm env tm)
-
 -- | The environment of the types of 'testTyConMap'
 testTypeEnv :: TypeEnv
 testTypeEnv = mkTypeEnv testTyConMap
-
--- | Abstract a term over free variables: type lambdas for the type variables,
--- and lambdas for the term variables inside those. So the result has no free
--- variables if the term only has the given ones.
-abstractFreeVars :: FreeVars -> C.Term -> C.Term
-abstractFreeVars (FreeVars tvs ids) tm = foldr C.TyLam (foldr C.Lam tm ids) tvs
 
 -- | Abstract a term over its free variables: type lambdas for the type
 -- variables, in the order of their raw names, and lambdas for the term
@@ -943,73 +844,6 @@ closeFreeVars tm =
  where
   (tys0, tms) = freeVarOccs tm
   tys = List.sortOn (\case VarTy _ _ n -> tyNameRaw n; _ -> 0) tys0
-
--- | Global bindings of the given closed terms, converted to scoped Core. See
--- 'Test.Clash.Rewrite.mkBindingMap'.
-mkScopedBindingMap :: HasCallStack => [(C.Id, C.Term)] -> GlobalEnv (Binding (Term 'VoidS))
-mkScopedBindingMap bs =
-  globalEnvFromList [(mkGlobalIdFromClash i, fromClashTermClosed <$> mkBinding i t) | (i, t) <- bs]
-
--- | A variable whose unique is above the names conversion gives the binders of
--- the inputs of the tests, see 'extendSunk'
-sunkVar :: C.Id
-sunkVar = intId C.System "sunk" 1000000
-
--- | Extend a conversion environment with 'sunkVar' and the given variables.
--- A value converted in the original environment can be 'sink'ed into the
--- extended one, where all of its binders may clash with the scope: those of the
--- extended scope are at most the unique of 'sunkVar'.
-extendSunk
-  :: Distinct n
-  => ConvEnv n
-  -> [C.TyVar]
-  -> [C.Id]
-  -> (forall l. DExt n l => ConvEnv l -> r)
-  -> r
-extendSunk env tvs ids = extendConvEnv env tvs (sunkVar : ids)
-
--- | Assert that a scoped term, converted to Clash, is alpha-equivalent to a
--- Clash term
-assertScopedAlphaEq :: HasCallStack => C.Term -> Term n -> Assertion
-assertScopedAlphaEq expected actual = assertAlphaEq expected (toClashTerm actual)
-
--- | Assert that a function on scoped terms agrees with one on Clash terms:
--- applied to a Clash term converted to scoped Core, in the scope of its free
--- variables, and converted back, it gives a term alpha-equivalent to the one
--- the function on Clash terms gives.
-assertAgreesTm
-  :: HasCallStack
-  => (C.Term -> C.Term)
-  -> (forall n. Distinct n => Scope n -> Term n -> Term n)
-  -> C.Term
-  -> Assertion
-assertAgreesTm f g tm =
-  withFreeVarsOf [tm] $ \env ->
-    assertScopedAlphaEq (f tm) (g (convScope env) (fromClashTerm env tm))
-
--- | The type version of 'assertAgreesTm'
-assertAgreesTy
-  :: HasCallStack
-  => (C.Type -> C.Type)
-  -> (forall n. Distinct n => Scope n -> Type n -> Type n)
-  -> C.Type
-  -> Assertion
-assertAgreesTy f g ty =
-  withFreeTyVarsOf [ty] $ \env ->
-    assertScopedTyAlphaEq (f ty) (g (convScope env) (fromClashType env ty))
-
--- | Assert that a scoped type, converted to Clash, is alpha-equivalent to a
--- Clash type
-assertScopedTyAlphaEq :: HasCallStack => C.Type -> Type n -> Assertion
-assertScopedTyAlphaEq expected actual = assertAlphaEq expected (toClashType actual)
-
--- | 'assertScopedTyAlphaEq' for optional types
-assertScopedMaybeTyAlphaEq :: HasCallStack => Maybe C.Type -> Maybe (Type n) -> Assertion
-assertScopedMaybeTyAlphaEq expected actual = case (expected, actual) of
-  (Just e, Just a) -> assertScopedTyAlphaEq e a
-  (Nothing, Nothing) -> pure ()
-  (Just e, Nothing) -> assertFailure ("expected Just " <> show e <> ", got Nothing")
-  (Nothing, Just a) -> assertFailure ("expected Nothing, got Just " <> show (toClashType a))
 
 -- | The raw names in a set, in ascending order
 nameSetRaws :: ScopedName k => NameSet k n -> [Int]
@@ -1029,21 +863,6 @@ betaTy sc = \case
 
 -- * Generated free variables
 
--- | A conversion environment with generated free variables, which keep their
--- uniques: these are all different
-withFreeVars :: FreeVars -> (forall n. Distinct n => ConvEnv n -> r) -> r
-withFreeVars (FreeVars tvs ids) = withConvEnv tvs ids
-
--- | Extend a conversion environment with more generated free variables, see
--- 'Test.Clash.Scoped.Gen.Clash.genMoreFreeVars'
-extendFreeVars
-  :: Distinct n
-  => ConvEnv n
-  -> FreeVars
-  -> (forall l. DExt n l => ConvEnv l -> r)
-  -> r
-extendFreeVars env (FreeVars tvs ids) = extendConvEnv env tvs ids
-
 -- | 'sink' into the given scope
 sinkInto :: (Sinkable e, DExt n l) => Scope l -> e n -> e l
 sinkInto _ = sink
@@ -1058,14 +877,6 @@ atScope _ e = e
 -- | The raw names of the type and of the term variables in scope, for
 -- 'lintTerm'
 data LintScope = LintScope !IntSet !IntSet
-
--- | The names of the variables of a conversion environment, given its free
--- variables
-lintScopeOf :: Distinct n => ConvEnv n -> FreeVars -> LintScope
-lintScopeOf env (FreeVars tvs ids) =
-  LintScope
-    (IntSet.fromList [tyNameRaw n | VarTy _ _ n <- map (fromClashType env . C.VarTy) tvs])
-    (IntSet.fromList [tmNameRaw n | Var _ _ n <- map (fromClashTerm env . C.Var) ids])
 
 bindLintTy :: Int -> LintScope -> LintScope
 bindLintTy k (LintScope tys tms) = LintScope (IntSet.insert k tys) (IntSet.delete k tms)
@@ -1480,110 +1291,6 @@ forAllScrambled sc tm =
 -- | 'scrambleBinders' with a supply of fresh names
 type Scramble = StateT Int Gen
 
--- * Comparing Clash Core
-
--- | Drop the type argument of coercions: scoped Core applies @_CO_@ to its
--- type, where Clash Core keeps it in the 'C.PrimInfo', see
--- 'Test.Clash.Differential.coercionForm'. 'aeqTermTyped' doesn't compare the
--- types of primitives, so it compares coercions after this.
-stripCoercionTypes :: C.Term -> C.Term
-stripCoercionTypes = \case
-  C.TyApp e@(C.Prim p) _ | C.primName p == "_CO_" -> e
-  C.Lam v e -> C.Lam v (stripCoercionTypes e)
-  C.TyLam v e -> C.TyLam v (stripCoercionTypes e)
-  C.App e1 e2 -> C.App (stripCoercionTypes e1) (stripCoercionTypes e2)
-  C.TyApp e ty -> C.TyApp (stripCoercionTypes e) ty
-  C.Let bind e -> C.Let (stripCoercionTypes <$> bind) (stripCoercionTypes e)
-  C.Case e ty alts -> C.Case (stripCoercionTypes e) ty [(p, stripCoercionTypes a) | (p, a) <- alts]
-  C.Cast e t1 t2 -> C.Cast (stripCoercionTypes e) t1 t2
-  C.Tick t e -> C.Tick t (stripCoercionTypes e)
-  e -> e
-
--- | Levels of the binders on both sides, see 'aeqTermTyped'
-data Levels = Levels !Int !(Map Unique Int) !(Map Unique Int) !(Map Unique Int) !(Map Unique Int)
-
--- | Alpha-equivalence of Clash terms that, unlike 'Clash.Core.Subst.aeqTerm',
--- also compares the types of variable occurrences, the types of the binders of
--- non-recursive let-bindings and of patterns, and the result types of
--- case-expressions, and the kinds of type variable occurrences.
-aeqTermTyped :: C.Term -> C.Term -> Bool
-aeqTermTyped = goTm (Levels 0 Map.empty Map.empty Map.empty Map.empty)
- where
-  occ :: Map Unique Int -> Map Unique Int -> C.Var a -> C.Var a -> Bool
-  occ envL envR v1 v2 = case (Map.lookup (C.varUniq v1) envL, Map.lookup (C.varUniq v2) envR) of
-    (Just l1, Just l2) -> l1 == l2
-    (Nothing, Nothing) -> C.varUniq v1 == C.varUniq v2
-    _ -> False
-
-  underTy, underTm :: C.Var a -> C.Var b -> Levels -> Levels
-  underTy v1 v2 (Levels l tmL tmR tyL tyR) =
-    Levels (l + 1) tmL tmR (Map.insert (C.varUniq v1) l tyL) (Map.insert (C.varUniq v2) l tyR)
-  underTm v1 v2 (Levels l tmL tmR tyL tyR) =
-    Levels (l + 1) (Map.insert (C.varUniq v1) l tmL) (Map.insert (C.varUniq v2) l tmR) tyL tyR
-
-  goTy :: Levels -> C.Type -> C.Type -> Bool
-  goTy lv@(Levels _ _ _ tyL tyR) t1 t2 = case (t1, t2) of
-    (C.VarTy a1, C.VarTy a2) -> occ tyL tyR a1 a2 && goTy lv (C.varType a1) (C.varType a2)
-    (C.ConstTy c1, C.ConstTy c2) -> c1 == c2
-    (C.ForAllTy a1 s1, C.ForAllTy a2 s2) ->
-      goTy lv (C.varType a1) (C.varType a2) && goTy (underTy a1 a2 lv) s1 s2
-    (C.AppTy f1 x1, C.AppTy f2 x2) -> goTy lv f1 f2 && goTy lv x1 x2
-    (C.LitTy l1, C.LitTy l2) -> l1 == l2
-    (C.AnnType a1 s1, C.AnnType a2 s2) -> a1 == a2 && goTy lv s1 s2
-    _ -> False
-
-  goVarTy :: Levels -> C.Var a -> C.Var b -> Bool
-  goVarTy lv v1 v2 = goTy lv (C.varType v1) (C.varType v2)
-
-  goTm :: Levels -> C.Term -> C.Term -> Bool
-  goTm lv@(Levels _ tmL tmR _ _) e1 e2 = case (e1, e2) of
-    (C.Var v1, C.Var v2)
-      | C.isGlobalId v1 || C.isGlobalId v2 -> C.varKey v1 == C.varKey v2
-      | otherwise -> occ tmL tmR v1 v2 && goVarTy lv v1 v2
-    (C.Data dc1, C.Data dc2) -> dc1 == dc2
-    (C.Literal l1, C.Literal l2) -> l1 == l2
-    (C.Prim p1, C.Prim p2) -> C.primName p1 == C.primName p2
-    (C.Lam v1 b1, C.Lam v2 b2) -> goVarTy lv v1 v2 && goTm (underTm v1 v2 lv) b1 b2
-    (C.TyLam v1 b1, C.TyLam v2 b2) -> goVarTy lv v1 v2 && goTm (underTy v1 v2 lv) b1 b2
-    (C.App f1 x1, C.App f2 x2) -> goTm lv f1 f2 && goTm lv x1 x2
-    (C.TyApp f1 t1, C.TyApp f2 t2) -> goTm lv f1 f2 && goTy lv t1 t2
-    (C.Let (C.NonRec v1 x1) b1, C.Let (C.NonRec v2 x2) b2) ->
-      goVarTy lv v1 v2 && goTm lv x1 x2 && goTm (underTm v1 v2 lv) b1 b2
-    (C.Let (C.Rec bs1) b1, C.Let (C.Rec bs2) b2) ->
-      length bs1 == length bs2 &&
-        and (zipWith (goVarTy lv) (map fst bs1) (map fst bs2)) &&
-        let lv' = List.foldl' (\acc (v1, v2) -> underTm v1 v2 acc) lv (zip (map fst bs1) (map fst bs2))
-        in  and (zipWith (goTm lv') (b1 : map snd bs1) (b2 : map snd bs2))
-    (C.Case s1 t1 as1, C.Case s2 t2 as2) ->
-      length as1 == length as2 && goTm lv s1 s2 && goTy lv t1 t2 &&
-        and (zipWith (goAlt lv) as1 as2)
-    (C.Cast x1 f1 t1, C.Cast x2 f2 t2) -> goTm lv x1 x2 && goTy lv f1 f2 && goTy lv t1 t2
-    (C.Tick t1 x1, C.Tick t2 x2) -> goTick lv t1 t2 && goTm lv x1 x2
-    _ -> False
-
-  goAlt :: Levels -> C.Alt -> C.Alt -> Bool
-  goAlt lv (p1, e1) (p2, e2) = case (p1, p2) of
-    (C.DataPat dc1 tvs1 ids1, C.DataPat dc2 tvs2 ids2) ->
-      dc1 == dc2 && length tvs1 == length tvs2 && length ids1 == length ids2 &&
-        goTele underTy lv (zip tvs1 tvs2) (\lv1 ->
-          goTele underTm lv1 (zip ids1 ids2) (\lv2 -> goTm lv2 e1 e2))
-    (C.LitPat l1, C.LitPat l2) -> l1 == l2 && goTm lv e1 e2
-    (C.DefaultPat, C.DefaultPat) -> goTm lv e1 e2
-    _ -> False
-
-  goTele :: (C.Var a -> C.Var a -> Levels -> Levels) -> Levels -> [(C.Var a, C.Var a)] -> (Levels -> Bool) -> Bool
-  goTele _ lv [] k = k lv
-  goTele under lv ((v1, v2) : vs) k = goVarTy lv v1 v2 && goTele under (under v1 v2 lv) vs k
-
-  goTick :: Levels -> C.TickInfo -> C.TickInfo -> Bool
-  goTick lv t1 t2 = case (t1, t2) of
-    (C.SrcSpan s1, C.SrcSpan s2) -> s1 == s2
-    (C.NameMod m1 ty1, C.NameMod m2 ty2) -> m1 == m2 && goTy lv ty1 ty2
-    (C.DeDup, C.DeDup) -> True
-    (C.NoDeDup, C.NoDeDup) -> True
-    (C.Attributes ty1 x1, C.Attributes ty2 x2) -> goTy lv ty1 ty2 && goTm lv x1 x2
-    _ -> False
-
 -- * Properties
 
 -- | Run the QuickCheck properties of a test tree with the given number of
@@ -1602,133 +1309,6 @@ runScopedClosed :: ScopedRewrite () -> Term 'VoidS -> IO (Term 'VoidS, Word, Boo
 runScopedClosed t e = do
   (e', st, changed) <- runRewriteTest def def (runScopedTransform t (rootContext emptyScope) e)
   pure (e', _transformCounter st, changed)
-
--- | Run a scoped transformation on a Clash term converted to scoped Core, in
--- the root context of the scope of its free variables. Gives the result,
--- converted back (its free variables keep their uniques), the final state,
--- and whether a change was signaled.
-runScopedOpen
-  :: RewriteEnv
-  -> RewriteState extra
-  -> ScopedRewrite extra
-  -> C.Term
-  -> IO (C.Term, RewriteState extra, Bool)
-runScopedOpen env st t e =
-  runScopedOn env st e (\sc e' -> toClashTerm <$> runScopedTransform t (rootContext sc) e')
-
--- | Run a scoped transformation on a Clash term through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil', in the given context. Gives the
--- result, the final state, and whether a change was signaled.
-runViaFoil
-  :: RewriteEnv
-  -> RewriteState extra
-  -> TransformContext
-  -> ScopedRewrite extra
-  -> C.Term
-  -> IO (C.Term, RewriteState extra, Bool)
-runViaFoil env st ctx t e = runRewriteTest env st (viaFoil "test" t ctx e)
-
--- | A primitive @somePrim :: T@, with no special meaning
-somePrim :: C.PrimInfo
-somePrim = C.PrimInfo
-  { C.primName = "somePrim"
-  , C.primType = C.ConstTy (C.TyCon (C.mkUnsafeSystemName "T" 0))
-  , C.primWorkInfo = C.WorkConstant
-  , C.primMultiResult = C.SingleResult
-  , C.primUnfolding = C.NoUnfolding
-  }
-
--- | Run an action on a Clash term converted to scoped Core, in the scope of
--- its free variables. Gives the result, the final state, and whether a change
--- was signaled.
-runScopedOn
-  :: RewriteEnv
-  -> RewriteState extra
-  -> C.Term
-  -> (forall n. Distinct n => Scope n -> Term n -> RewriteMonad extra a)
-  -> IO (a, RewriteState extra, Bool)
-runScopedOn env st tm k =
-  runRewriteTest env st $ withGlobalBindings $
-    withFreeVarsOf [tm] (\cenv -> k (convScope cenv) (fromClashTerm cenv tm))
-
--- | Assert that a scoped 'Clash.Rewrite.StrategyDSL.onLet' handler agrees
--- with one of Clash Core on a let-expression, run in the root context of the
--- scope of its free variables: the results are alpha-equivalent (comparing
--- types too, see 'aeqTermTyped'), and both signal a change or neither does.
-assertLetHandlerAgrees
-  :: HasCallStack
-  => RewriteEnv
-  -> RewriteState extra
-  -> (C.TransformContext -> C.Term -> C.Bind C.Term -> C.Term -> RewriteMonad extra C.Term)
-  -- ^ The handler of Clash Core
-  -> (forall n l. Distinct n => Scoped.TransformContext n -> Term n -> Bind n l -> Term l -> RewriteMonad extra (Term n))
-  -- ^ The scoped handler
-  -> C.Term
-  -- ^ A let-expression
-  -> Assertion
-assertLetHandlerAgrees env st old new tm = case tm of
-  C.Let bind body -> do
-    let is = inScopeOf (Lens.toListOf C.freeLocalIds tm) `unionInScope` inScopeOf (Lens.toListOf C.termFreeTyVars tm)
-    (expected, st1, changed1) <-
-      runRewriteTest env st (old (C.TransformContext is []) tm bind body)
-    (actual, st2, changed2) <- runScopedOn env st tm $ \sc -> \case
-      e@(Let bind' body') -> toClashTerm <$> new (rootContext sc) e bind' body'
-      _ -> error "assertLetHandlerAgrees: not a let-expression"
-    assertBool
-      ("Clash Core:\n" <> showTerm expected <> "\nscoped:\n" <> showTerm actual)
-      (aeqTermTyped (globalsByName expected) (globalsByName actual))
-    assertBool ("change signaled: Clash Core " <> show changed1 <> ", scoped " <> show changed2)
-      (changed1 == changed2)
-    assertNewBindingsAgree st st1 st2
-  _ -> assertFailure "assertLetHandlerAgrees: not a let-expression"
-
--- | Assert that a rewrite of Clash Core and its port agree on a term, in the
--- given context: the results are alpha-equivalent (comparing types too, see
--- 'aeqTermTyped'), both signal a change or neither does, and they add the same
--- global bindings (see 'assertNewBindingsAgree'). Give the port as the
--- normalizer runs it: e.g. a scoped transformation compiled with
--- 'Clash.Rewrite.StrategyDSL.TH.asRewriteQ', which runs it through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil'.
-assertRewritesAgree
-  :: HasCallStack
-  => RewriteEnv
-  -> RewriteState extra
-  -> TransformContext
-  -> Rewrite extra
-  -- ^ The rewrite of Clash Core
-  -> Rewrite extra
-  -- ^ Its port
-  -> C.Term
-  -> Assertion
-assertRewritesAgree env st ctx old new tm = do
-  (expected, st1, changed1) <- runRewriteTest env st (old ctx tm)
-  (actual, st2, changed2) <- runRewriteTest env st (new ctx tm)
-  assertBool
-    ("Clash Core:\n" <> showTerm expected <> "\nport:\n" <> showTerm actual)
-    (aeqTermTyped (globalsByName expected) (globalsByName actual))
-  assertBool ("change signaled: Clash Core " <> show changed1 <> ", port " <> show changed2)
-    (changed1 == changed2)
-  assertNewBindingsAgree st st1 st2
-
--- | Assert that two runs from the first state added global bindings with the
--- same names, whose bodies are alpha-equivalent, up to the uniques of the
--- globals they refer to (see 'globalsByName')
-assertNewBindingsAgree
-  :: HasCallStack => RewriteState extra -> RewriteState extra -> RewriteState extra -> Assertion
-assertNewBindingsAgree st0 st1 st2 = do
-  let new st = Map.fromList
-        [ (C.nameOcc (globalIdName (bindingId b)), bindingTerm b)
-        | b <- UniqMap.elems (_bindings st)
-        , not (UniqMap.elem (globalIdUniq (bindingId b)) (_bindings st0)) ]
-      new1 = new st1
-      new2 = new st2
-  assertBool ("new global bindings: Clash Core " <> show (Map.keys new1) <> ", scoped " <> show (Map.keys new2))
-    (Map.keys new1 == Map.keys new2)
-  sequence_
-    [ assertBool
-        ("global binding " <> show nm <> ", Clash Core:\n" <> showTerm b1 <> "\nscoped:\n" <> showTerm b2)
-        (aeqTermTyped (globalsByName b1) (globalsByName b2))
-    | (nm, (b1, b2)) <- Map.toList (Map.intersectionWith (,) new1 new2) ]
 
 -- | A step down a term, to one of its subterms, see 'atPath'
 data Step
@@ -1777,26 +1357,7 @@ atPath (st : sts) ctx e k = case (st, e) of
     underAlt ctx (alts !! i) $ \ctx' _ e' -> atPath sts ctx' e' k
   (AppFunStep, App f _) -> atPath sts (pushFrame Scoped.AppFun ctx) f k
   (AppArgStep, App f a) -> atPath sts (pushFrame (Scoped.appArgFrame f) ctx) a k
-  _ -> error ("atPath: " <> show st <> " doesn't fit the term:\n" <> showTerm (toClashTerm e))
-
--- * Netlist generation
-
--- | The context of a component whose local variables are the free variables
--- of the given Clash terms, with their occurrence names as their HDL
--- identifiers, and the terms in its scope. The context has the type
--- environment 'testTypeEnv', like 'Test.Clash.Rewrite.runNetlistTest'.
-withCompCtxOf
-  :: [C.Term]
-  -> (forall n. Distinct n => CompCtx n -> [Term n] -> IO r)
-  -> IO r
-withCompCtxOf tms k =
-  withFreeVarsOf tms $ \cenv ->
-    let ids = List.nubBy (\a b -> C.varUniq a == C.varUniq b)
-                (concatMap (Lens.toListOf C.freeLocalIds) tms)
-        idNames = [ (LocalId o ty n, Id.unsafeFromCoreId v)
-                  | v <- ids, Var o ty n <- [fromClashTerm cenv (C.Var v)] ]
-        ctx = compCtxFromList (convScope cenv) testTypeEnv idNames
-    in k ctx (map (fromClashTerm cenv) tms)
+  _ -> error ("atPath: " <> show st <> " doesn't fit the term:\n" <> showTermT e)
 
 -- * Tests of the test scopes
 
