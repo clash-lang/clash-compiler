@@ -50,10 +50,10 @@ import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Basic (WorkInfo (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (WorkInfo (..))
 import Clash.Core.TyCon (TyCon (..), tyConDataCons)
 import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
 import Clash.Normalize.Scoped.Primitives (removedArg)

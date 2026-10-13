@@ -50,6 +50,7 @@ import qualified Data.Text.Extra as Text
 
 import           GHC.Builtin.Names       (eqTyConKey)
 
+import Clash.Core.Basic (LitTy (..))
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars
   (globalIds, globalIdOccursIn)
@@ -62,8 +63,7 @@ import           Clash.Core.Subst
    substId, extendIdSubst)
 import           Clash.Core.Term
 import           Clash.Core.Type
-  (Type(ForAllTy,LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView,
-   splitTyConAppM, mkPolyFunTy)
+  (Type(ForAllTy,LitTy, VarTy), TypeView (..), tyView, splitTyConAppM, mkPolyFunTy)
 import           Clash.Core.Util
   (isClockOrReset)
 import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId, isLocalId, mkGlobalId)

@@ -56,8 +56,8 @@ module Clash.Core.Scoped.Util
   , primCo
   , primUCo
   , primAtType
-  , C.undefinedPrims
-  , C.undefinedXPrims
+  , undefinedPrims
+  , undefinedXPrims
     -- * Types
   , SplitInfo (..)
   , shouldSplit
@@ -77,13 +77,13 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Basic
+  (IsMultiPrim (..), LitTy (..), WorkInfo (..), undefinedPrims, undefinedXPrims)
 import Clash.Core.DataCon (DataCon)
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
 import qualified Clash.Core.TyCon as C
-import qualified Clash.Core.Type as C
-import qualified Clash.Core.Util as C
 import Clash.Util (curLoc, indexNote)
 
 import Clash.Core.Scoped.Convert (mkPrimInfo)
@@ -370,7 +370,7 @@ stableSccs deps = go initial readyInit
 
 -- | A natural number as a type
 numTy :: Integer -> Type n
-numTy = LitTy . C.NumTy
+numTy = LitTy . NumTy
 
 -- | The first field type of a data constructor instantiated at the given
 -- types: the type of its coercion, for the constructors of @Vec@ and @RTree@
@@ -715,7 +715,7 @@ primCo = TyApp (Prim coPrimInfo)
 
 -- | The primitive of 'primCo'
 coPrimInfo :: PrimInfo
-coPrimInfo = mkPrimInfo "_CO_" undefinedTy C.WorkNever C.SingleResult NoUnfolding
+coPrimInfo = mkPrimInfo "_CO_" undefinedTy WorkNever SingleResult NoUnfolding
 {-# NOINLINE coPrimInfo #-}
 
 -- | A primitive whose type is that of a term it replaces, e.g. @errorX@ for a
@@ -738,7 +738,7 @@ primUCo = Prim uCoPrimInfo
 -- | The primitive of 'primUCo'
 uCoPrimInfo :: PrimInfo
 uCoPrimInfo =
-  mkPrimInfo "GHC.Prim.unsafeCoerce#" unsafeCoerceTy C.WorkNever C.SingleResult NoUnfolding
+  mkPrimInfo "GHC.Prim.unsafeCoerce#" unsafeCoerceTy WorkNever SingleResult NoUnfolding
 {-# NOINLINE uCoPrimInfo #-}
 
 -- * Types

@@ -69,11 +69,11 @@ import           GHC.Builtin.Names           (eqTyConKey)
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.SrcLoc            (SrcSpan)
 
+import Clash.Core.Basic (LitTy (..), NameMod (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C (TyConName)
-import qualified Clash.Core.Type             as C
 import           Clash.Debug                 (traceIf)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (FinalTerm), hasTransformationInfo)
@@ -143,7 +143,7 @@ addNewInline f cf =
 -- | A tick to prefix an inlined expression with the name of the global it
 -- came from, see 'Clash.Normalize.Util.mkInlineTick'
 mkInlineTick :: GlobalId -> TickInfo n
-mkInlineTick n = NameMod C.PrefixName (LitTy (C.SymTy (toStr n)))
+mkInlineTick n = NameMod PrefixName (LitTy (SymTy (toStr n)))
  where
   toStr = Text.unpack . snd . Text.breakOnEnd "." . C.nameOcc . globalIdName
 

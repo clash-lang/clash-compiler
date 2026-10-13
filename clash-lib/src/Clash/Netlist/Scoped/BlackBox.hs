@@ -73,6 +73,7 @@ import           GHC.Num.Natural               (Natural (..))
 import qualified GHC.Prim
 import           GHC.Stack                     (HasCallStack)
 
+import Clash.Core.Basic (ConstTy (..), IsMultiPrim (..), WorkInfo (..))
 import           Clash.Annotations.Primitive   (extractPrim)
 import qualified Clash.Backend                 as Backend
 import           Clash.Core.DataCon            (dcTag)
@@ -80,9 +81,7 @@ import           Clash.Core.Literal            (Literal (IntLiteral))
 import qualified Clash.Core.Name               as C
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.Scoped.Pretty      ()
-import qualified Clash.Core.Term               as C
 import           Clash.Core.TyCon              (tyConDataCons)
-import qualified Clash.Core.Type               as C (ConstTy (..))
 import           Clash.Core.Scoped.TysPrim (undefinedTy)
 import qualified Clash.Data.UniqMap            as UniqMap
 import           Clash.Netlist.BlackBox        (extractPrimWarnOrFail, prepareBlackBox)
@@ -449,7 +448,7 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
           | pNm == showt 'GHC.Prim.tagToEnum# -> do
               hwTy <- unsafeCoreTypeToHWTypeM' $(curLoc) (compScope ctx) ty
               case args of
-                [Right (ConstTy (C.TyCon tcN)), Left (Literal (IntLiteral i))] -> do
+                [Right (ConstTy (TyCon tcN)), Left (Literal (IntLiteral i))] -> do
                   tcm <- Lens.view tcCache
                   let dcs = tyConDataCons (UniqMap.find tcN tcm)
                       dc  = dcs !! fromInteger i
@@ -1409,8 +1408,8 @@ unSimIO ctx arg =
                        "Clash.Explicit.SimIO.unSimIO#"
                        -- primAtType sets the type
                        undefinedTy
-                       C.WorkNever
-                       C.SingleResult
+                       WorkNever
+                       SingleResult
                        NoUnfolding)
                     (mkFunTy argTy tcArg))
                  [Left arg]

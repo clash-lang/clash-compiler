@@ -82,13 +82,13 @@ import GHC.Builtin.Names
 import GHC.Num.Integer (Integer (..))
 import GHC.Num.Natural (Natural (..))
 
+import Clash.Core.Basic (ConstTy (..))
 import Clash.Core.DataCon (DataCon, DcName, DcStrictness (..))
 import Clash.Core.Name (mkUnsafeSystemName)
 -- Through the boot file: the constructors derive the types of Clash Core from
 -- the scoped ones, and Clash Core's builtin types are made from the names here
 import {-# SOURCE #-} Clash.Core.Scoped.Convert (mkAlgTyCon, mkDataCon, mkPrimTyCon)
 import Clash.Core.TyCon (AlgTyConRhs (..), TyCon, TyConMap, TyConName)
-import qualified Clash.Core.Type as C
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (fromGhcUnique)
 
@@ -152,7 +152,7 @@ word32PrimTyConName = mkUnsafeSystemName (showt ''Word32#)
 
 -- | A builtin type that is a single type constructor, in any scope
 tyConTy :: TyConName -> Type n
-tyConTy tc = ConstTy (C.TyCon tc)
+tyConTy tc = ConstTy (TyCon tc)
 
 -- * Kinds
 
@@ -211,7 +211,7 @@ unsafeCoerceTy =
 
 -- | A function type
 funTy :: Type n -> Type n -> Type n
-funTy t1 = AppTy (AppTy (ConstTy C.Arrow) t1)
+funTy t1 = AppTy (AppTy (ConstTy Arrow) t1)
 
 -- * Type constructors
 

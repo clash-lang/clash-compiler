@@ -83,6 +83,7 @@ import qualified Data.Text.Extra as Text
 import GHC.BasicTypes.Extra (isNoInline)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Basic (WorkInfo (..))
 import qualified Clash.Explicit.SimIO as SimIO
 import qualified Clash.Sized.Internal.BitVector as BV (Bit (Bit), BitVector (BV), xToBV)
 
@@ -90,7 +91,6 @@ import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (PrettyOptions (..), showPpr, showPpr')
-import qualified Clash.Core.Term as C
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
 import Clash.Primitives.Types (CompiledPrimMap, Primitive (..), TemplateKind (..))
@@ -553,7 +553,7 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
 
   getIdentity :: PrimInfo -> [Term x] -> MaybeT NormalizeSession (Term x)
   getIdentity primInfo termArgs = do
-    C.WorkIdentity idIdx noopIdxs <- return (primWorkInfo primInfo)
+    WorkIdentity idIdx noopIdxs <- return (primWorkInfo primInfo)
     mapM_ (getTermArg termArgs >=> isNoop >=> Monad.guard) noopIdxs
     getTermArg termArgs idIdx
 
@@ -571,7 +571,7 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
       isRecursive <- lift (isRecursiveBndr g)
       Monad.guard (not isRecursive)
       isNoop (bindingTerm binding)
-    Prim PrimInfo {primWorkInfo = C.WorkIdentity _ []} -> return True
+    Prim PrimInfo {primWorkInfo = WorkIdentity _ []} -> return True
     Lam x e -> isNoopApp (tmNameOf x) (collectArgs e)
     _ -> return False
 
@@ -588,7 +588,7 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
   isNoopApp :: TmName x -> (Term x, [Either (Term x) (Type x)]) -> MaybeT NormalizeSession Bool
   isNoopApp x = \case
     (Var _ _ y, []) -> return (tmNameRaw x == tmNameRaw y)
-    (Prim PrimInfo {primWorkInfo = C.WorkIdentity i []}, args) -> do
+    (Prim PrimInfo {primWorkInfo = WorkIdentity i []}, args) -> do
       arg <- getTermArg (lefts args) i
       isNoopApp x (collectArgs arg)
     (Prim PrimInfo {primName}, args)

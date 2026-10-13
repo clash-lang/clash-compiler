@@ -55,12 +55,11 @@ import GHC.Types (IO (..))
 import GHC.Word
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
+import Clash.Core.Basic (ConstTy (..), WorkInfo (..))
 import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Pretty (showPpr)
-import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (tyConDataCons)
-import qualified Clash.Core.Type as C
 import Clash.Core.Scoped.TysPrim (intPrimTyConName)
 
 import Clash.Util (curLoc, textNameLit)
@@ -1819,7 +1818,7 @@ primitives =
 -------
   , primStepEntry $(textNameLit 'GHC.Prim.tagToEnum#) $ \case
       PrimStepContext{..}
-        | [ConstTy (C.TyCon tcN)] <- tys
+        | [ConstTy (TyCon tcN)] <- tys
         , [Lit (IntLiteral i)]  <- args
         -> let dc = do { tc <- lookupTyCon te tcN
                        ; let dcs = tyConDataCons tc
@@ -1860,6 +1859,6 @@ mutableByteArray mbaTy p = case tyView mbaTy of
   TyConApp mbaTcNm [sTy] ->
     let primTy =
           forAllTypeB 0 "s" (funTyB [tyConB intPrimTyConName] (tyConAppB mbaTcNm [varTyB 0]))
-        mbaPrim = closedPrim (showt ''MutableByteArray#) C.WorkNever primTy
+        mbaPrim = closedPrim (showt ''MutableByteArray#) WorkNever primTy
     in mkApps mbaPrim [Right sTy, Left (Literal (IntLiteral (toInteger p)))]
   _ -> error ($(curLoc) ++ "not a MutableByteArray#: " ++ showPpr mbaTy)

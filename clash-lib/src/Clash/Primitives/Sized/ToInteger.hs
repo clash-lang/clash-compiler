@@ -30,9 +30,9 @@ import GHC.Utils.Outputable
 import qualified GHC.Utils.Outputable as Outputable
 import GHC.Types.SrcLoc (isGoodSrcSpan)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Annotations.Primitive (HDL (Verilog,VHDL))
 import Clash.Core.Scoped.Syntax (Type (LitTy))
-import Clash.Core.Type (LitTy (NumTy))
 import Clash.Driver.Warning (warnAboutM)
 import Clash.Netlist.BlackBox.Parser (runParse)
 import Clash.Netlist.BlackBox.Types

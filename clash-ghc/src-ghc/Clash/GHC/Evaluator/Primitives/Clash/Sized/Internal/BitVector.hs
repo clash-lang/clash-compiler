@@ -34,7 +34,8 @@ import           Clash.Core.Literal  (Literal (..))
 import Clash.Core.Term (PrimInfo (..), Term (..), mkApps, collectArgs)
 import Clash.Core.Type (TypeView (..), splitFunForallTy, tyView)
 import Clash.Core.TyCon (tyConDataCons)
-import Clash.Core.Util (tyNatSize, undefinedXPrims)
+import Clash.Core.Basic (undefinedXPrims)
+import Clash.Core.Util (tyNatSize)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Util (textNameLit)
 

@@ -64,14 +64,13 @@ import GHC.Stack (HasCallStack)
 
 import GHC.Builtin.Names (boolTyConKey)
 
+import Clash.Core.Basic (IsMultiPrim (..), LitTy (..), WorkInfo (..))
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (nameOcc)
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (IsMultiPrim (..), WorkInfo (..))
 import Clash.Core.TyCon (TyConName, tyConDataCons, tyConName)
-import qualified Clash.Core.Type as C
 import Clash.Core.Scoped.TysPrim (integerPrimTyConName, typeNatKindTyConName)
 
 import qualified Clash.Data.UniqMap as UniqMap
@@ -105,7 +104,7 @@ import Clash.Rewrite.Scoped
 
 -- | A natural number as a type
 numTy :: Integer -> Type n
-numTy = LitTy . C.NumTy
+numTy = LitTy . NumTy
 
 -- | The scope and type environment of a reduction
 scopeAndTypeEnv :: TransformContext n -> NormalizeSession (Scope n, TypeEnv)

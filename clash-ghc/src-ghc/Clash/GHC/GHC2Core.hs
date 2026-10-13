@@ -155,6 +155,8 @@ import GHC.Types.Var.Env (lookupVarEnv, mkVarEnv)
 import GHC.Types.Var.Set (elemVarSet, emptyVarSet, extendVarSet, isEmptyVarSet)
 
 -- Local imports
+import Clash.Core.Basic
+  (ConstTy (..), IsMultiPrim (..), LitTy (..), NameMod (..), WorkInfo (..), undefinedXPrims)
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Annotations.SynthesisAttributes (Annotate, Attr(..))
 import qualified Clash.Core.DataCon          as C
@@ -164,7 +166,7 @@ import qualified Clash.Core.Pretty           as C
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
 import qualified Clash.Core.Type             as C
-import qualified Clash.Core.Util             as C (undefinedTy, undefinedXPrims)
+import qualified Clash.Core.Util             as C (undefinedTy)
 import qualified Clash.Core.Var              as C
 import qualified Clash.Core.Scoped.Convert   as C
   (mkAlgTyCon, mkAlgTyConFromClash, mkDataConFromClash, mkFunTyCon,
@@ -693,22 +695,22 @@ coreToTerm primMap unlocs = term
           = term f
         go "Clash.Magic.prefixName" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.PrefixName <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod PrefixName <$> coreToType nmTy) <*> term f
         go "Clash.Magic.suffixName" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod SuffixName <$> coreToType nmTy) <*> term f
         go "Clash.Magic.suffixNameFromNat" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixName <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod SuffixName <$> coreToType nmTy) <*> term f
         go "Clash.Magic.suffixNameP" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod SuffixNameP <$> coreToType nmTy) <*> term f
         go "Clash.Magic.suffixNameFromNatP" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SuffixNameP <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod SuffixNameP <$> coreToType nmTy) <*> term f
         go "Clash.Magic.setName" args
           | [Type nmTy,_aTy,f] <- args
-          = C.Tick <$> (C.NameMod C.SetName <$> coreToType nmTy) <*> term f
+          = C.Tick <$> (C.NameMod SetName <$> coreToType nmTy) <*> term f
         go "Clash.Magic.deDup" args
           | [_aTy,f] <- args
           = C.Tick C.DeDup <$> term f
@@ -747,8 +749,8 @@ coreToTerm primMap unlocs = term
       ty <- coreToType (literalType l)
       return (C.Prim (C.PrimInfo (pack "_RUBBISH_")
                                  ty
-                                 C.WorkNever
-                                 C.SingleResult
+                                 WorkNever
+                                 SingleResult
                                  C.NoUnfolding))
     term' (Lit l)                 = return $ C.Literal (coreToLiteral l)
     term' (App eFun (Type tyArg)) = C.TyApp <$> term eFun <*> coreToType tyArg
@@ -781,7 +783,7 @@ coreToTerm primMap unlocs = term
       s'  <- term' s
       ty' <- coreToType ty
       case C.collectArgs s' of
-        (C.Prim p, _) | C.primName p `elem` C.undefinedXPrims ->
+        (C.Prim p, _) | C.primName p `elem` undefinedXPrims ->
           -- GHC translates things like:
           --
           --   xToBV (Index.pack# (errorX @TY "QQ"))
@@ -832,10 +834,10 @@ coreToTerm primMap unlocs = term
              addUsefull (RealSrcSpan rsp GHC.Nothing) (term e)
     term' (Tick _ e) = term e
     term' (Type t) =
-      C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
+      C.TyApp (C.Prim (C.PrimInfo (pack "_TY_") C.undefinedTy WorkNever SingleResult C.NoUnfolding))
         <$> coreToType t
     term' (Coercion co) =
-      C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding))
+      C.TyApp (C.Prim (C.PrimInfo (pack "_CO_") C.undefinedTy WorkNever SingleResult C.NoUnfolding))
         <$> coreToType (coercionType co)
 
 
@@ -855,7 +857,7 @@ coreToTerm primMap unlocs = term
             Just p  ->
               -- Primitive will be marked MultiResult in Transformations if it
               -- is a multi result primitive.
-              return $ C.Prim (C.PrimInfo xNameS xType (maybe C.WorkVariable workInfo p) C.SingleResult C.NoUnfolding)
+              return $ C.Prim (C.PrimInfo xNameS xType (maybe WorkVariable workInfo p) SingleResult C.NoUnfolding)
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -889,39 +891,39 @@ coreToTerm primMap unlocs = term
               | f == showt 'GHC.Magic.runRW#              -> return (runRWTerm xType)
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> return (checkUnpackUndefTerm xType)
               | f == "Clash.Magic.prefixName"
-              -> return (nameModTerm C.PrefixName xType)
+              -> return (nameModTerm PrefixName xType)
               | f == "Clash.Magic.postfixName"
-              -> return (nameModTerm C.SuffixName xType)
+              -> return (nameModTerm SuffixName xType)
               | f == "Clash.Magic.setName"
-              -> return (nameModTerm C.SetName xType)
+              -> return (nameModTerm SetName xType)
               | f == "Clash.XException.xToErrorCtx"
               -> return (xToErrorCtxTerm xType)
               | f == "Clash.Annotations.SynthesisAttributes.annotateReg"
               -> return (annotateRegTerm xType)
               | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult C.NoUnfolding))
+              -> return (C.Prim (C.PrimInfo xNameS xType wi SingleResult C.NoUnfolding))
               | otherwise
               -> do bndr <- coreToId x
-                    return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult (C.Unfolding bndr)))
+                    return (C.Prim (C.PrimInfo xNameS xType wi SingleResult (C.Unfolding bndr)))
             Just (Just (BlackBox {workInfo = wi}))
               | x `elem` unlocs
-              -> return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult C.NoUnfolding)
+              -> return $ C.Prim (C.PrimInfo xNameS xType wi SingleResult C.NoUnfolding)
               | otherwise
               -> do bndr <- coreToId x
-                    return (C.Prim (C.PrimInfo xNameS xType wi C.SingleResult (C.Unfolding bndr)))
+                    return (C.Prim (C.PrimInfo xNameS xType wi SingleResult (C.Unfolding bndr)))
             Just (Just (BlackBoxHaskell {workInfo = wi}))
               | x `elem` unlocs
-              -> return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult C.NoUnfolding)
+              -> return $ C.Prim (C.PrimInfo xNameS xType wi SingleResult C.NoUnfolding)
               | otherwise
               -> do bndr <- coreToId x
-                    return $ C.Prim (C.PrimInfo xNameS xType wi C.SingleResult (C.Unfolding bndr))
+                    return $ C.Prim (C.PrimInfo xNameS xType wi SingleResult (C.Unfolding bndr))
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding)
+              return $ C.Prim (C.PrimInfo xNameS xType WorkVariable SingleResult C.NoUnfolding)
             Nothing
               | x `elem` unlocs
-              -> return (C.Prim (C.PrimInfo xNameS xType C.WorkVariable C.SingleResult C.NoUnfolding))
+              -> return (C.Prim (C.PrimInfo xNameS xType WorkVariable SingleResult C.NoUnfolding))
               | otherwise
               -> C.Var <$> coreToId x
 
@@ -1388,7 +1390,7 @@ coreToTypeB' (TyConApp tc args)
                       _ -> do
                         tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
                         tyConMap %= C.insertIfAbsent tcName tc
-                        foldl appTyB (constTyB (C.TyCon tcName)) <$> mapM coreToTypeB args
+                        foldl appTyB (constTyB (TyCon tcName)) <$> mapM coreToTypeB args
 coreToTypeB' (ForAllTy (Bndr tv _) ty) = do
   (key, nm, k) <- coreToTyVarB tv
   forAllTyB key nm k <$> coreToTypeB ty
@@ -1454,9 +1456,9 @@ coreToTyVarB tv = do
 
 coreToTyLit :: TyLit
             -> C.LitTy
-coreToTyLit (NumTyLit i) = C.NumTy (fromInteger i)
-coreToTyLit (StrTyLit s) = C.SymTy (unpackFS s)
-coreToTyLit (CharTyLit c) = C.CharTy c
+coreToTyLit (NumTyLit i) = NumTy (fromInteger i)
+coreToTyLit (StrTyLit s) = SymTy (unpackFS s)
+coreToTyLit (CharTyLit c) = CharTy c
 
 coreToTyVar :: TyVar
             -> C2C C.TyVar
@@ -1867,7 +1869,7 @@ runRWTerm (C.ForAllTy rTV (C.ForAllTy oTV funTy))
       C.TyLam oTV (
       C.Lam   fId (
       (C.App (C.Var fId)
-             (C.Prim (C.PrimInfo rwNm rwTy C.WorkNever C.SingleResult C.NoUnfolding))))))
+             (C.Prim (C.PrimInfo rwNm rwTy WorkNever SingleResult C.NoUnfolding))))))
 
 runRWTerm ty = error $ $(curLoc) ++ show ty
 

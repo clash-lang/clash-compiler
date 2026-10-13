@@ -101,10 +101,10 @@ import GHC.Types.Var.Set (VarSet, elemVarSet, isEmptyVarSet)
 import GHC.Utils.Outputable (showPprUnsafe)
 
 -- Local imports
+import Clash.Core.Basic (IsMultiPrim (..), NameMod (..), WorkInfo (..), undefinedXPrims)
 import           Clash.Annotations.Primitive (extractPrim)
 import qualified Clash.Core.Name             as C
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Util             as C (undefinedXPrims)
 import           Clash.Core.Scoped.Convert (mkPrimInfo)
 import qualified Clash.Core.Scoped.Syntax    as S
 import           Clash.Core.Scoped.TysPrim   (undefinedTy)
@@ -196,22 +196,22 @@ coreToTermB primMap unlocs recLocals = term
           = term f
         go "Clash.Magic.prefixName" args
           | [Type nmTy,_aTy,f] <- args
-          = nameMod C.PrefixName nmTy f
+          = nameMod PrefixName nmTy f
         go "Clash.Magic.suffixName" args
           | [Type nmTy,_aTy,f] <- args
-          = nameMod C.SuffixName nmTy f
+          = nameMod SuffixName nmTy f
         go "Clash.Magic.suffixNameFromNat" args
           | [Type nmTy,_aTy,f] <- args
-          = nameMod C.SuffixName nmTy f
+          = nameMod SuffixName nmTy f
         go "Clash.Magic.suffixNameP" args
           | [Type nmTy,_aTy,f] <- args
-          = nameMod C.SuffixNameP nmTy f
+          = nameMod SuffixNameP nmTy f
         go "Clash.Magic.suffixNameFromNatP" args
           | [Type nmTy,_aTy,f] <- args
-          = nameMod C.SuffixNameP nmTy f
+          = nameMod SuffixNameP nmTy f
         go "Clash.Magic.setName" args
           | [Type nmTy,_aTy,f] <- args
-          = nameMod C.SetName nmTy f
+          = nameMod SetName nmTy f
         go "Clash.Magic.deDup" args
           | [_aTy,f] <- args
           = tickB deDupTickB <$> term f
@@ -249,7 +249,7 @@ coreToTermB primMap unlocs recLocals = term
 
     term' (Var x)                 = var x
     term' (Lit l@LitRubbish{}) = do
-      let rubbish ty = mkPrimInfo (pack "_RUBBISH_") ty C.WorkNever C.SingleResult S.NoUnfolding
+      let rubbish ty = mkPrimInfo (pack "_RUBBISH_") ty WorkNever SingleResult S.NoUnfolding
       envs <- view famInstEnvs
       ty <- coreToTypeB (literalType l)
       -- The shape of 'Clash.Core.Scoped.Util.primAtType', see the module header
@@ -289,7 +289,7 @@ coreToTermB primMap unlocs recLocals = term
       s'  <- term' s
       ty' <- coreToTypeB ty
       case tmbHead s' of
-        Just p | S.primName p `elem` C.undefinedXPrims ->
+        Just p | S.primName p `elem` undefinedXPrims ->
           -- See 'Clash.GHC.GHC2Core.coreToTerm'
           return (tyAppB (primB NP.undefinedX) ty')
         _ ->
@@ -339,7 +339,7 @@ coreToTermB primMap unlocs recLocals = term
         let xNameS = C.nameOcc xPrim
             -- The builder terms split the GHC type
             xTy = varType x
-            prim wi unf = primB (mkPrimInfo xNameS xType wi C.SingleResult unf)
+            prim wi unf = primB (mkPrimInfo xNameS xType wi SingleResult unf)
             primVar wi =
               if x `elem` unlocs
                 then return (prim wi S.NoUnfolding)
@@ -349,7 +349,7 @@ coreToTermB primMap unlocs recLocals = term
             Just p  ->
               -- Primitive will be marked MultiResult in Transformations if it
               -- is a multi result primitive.
-              return $ prim (maybe C.WorkVariable workInfo p) S.NoUnfolding
+              return $ prim (maybe WorkVariable workInfo p) S.NoUnfolding
             Nothing -> if isDataConWrapId x && not (isNewTyCon (dataConTyCon dc))
               then let xInfo = idInfo x
                        unfolding = unfoldingInfo xInfo
@@ -380,11 +380,11 @@ coreToTermB primMap unlocs recLocals = term
               | f == showt 'GHC.Magic.runRW#              -> runRWB xTy
               | f == "Clash.Sized.Internal.BitVector.checkUnpackUndef" -> checkUnpackUndefB xTy
               | f == "Clash.Magic.prefixName"
-              -> nameModB C.PrefixName xTy
+              -> nameModB PrefixName xTy
               | f == "Clash.Magic.postfixName"
-              -> nameModB C.SuffixName xTy
+              -> nameModB SuffixName xTy
               | f == "Clash.Magic.setName"
-              -> nameModB C.SetName xTy
+              -> nameModB SetName xTy
               | f == "Clash.XException.xToErrorCtx"
               -> xToErrorCtxB xTy
               | f == "Clash.Annotations.SynthesisAttributes.annotateReg"
@@ -398,10 +398,10 @@ coreToTermB primMap unlocs recLocals = term
             Just Nothing ->
               -- Was guarded by "DontTranslate". We don't know yet if Clash will
               -- actually use it later on, so we don't err here.
-              return $ prim C.WorkVariable S.NoUnfolding
+              return $ prim WorkVariable S.NoUnfolding
             Nothing
               | x `elem` unlocs ->
-                  return (prim C.WorkVariable S.NoUnfolding)
+                  return (prim WorkVariable S.NoUnfolding)
               | isGlobalId x, not (x `elemVarSet` recLocals)
               -> globalB <$> coreToGlobalIdB x
               | otherwise
@@ -426,8 +426,8 @@ coreToIdB i = (,) <$> coreToTypeB (varType i) <*> coreToVar i
 -- | The primitives that stand in for a type and a coercion, see the module
 -- header
 tyPrim, coPrim :: S.PrimInfo
-tyPrim = mkPrimInfo (pack "_TY_") undefinedTy C.WorkNever C.SingleResult S.NoUnfolding
-coPrim = mkPrimInfo (pack "_CO_") undefinedTy C.WorkNever C.SingleResult S.NoUnfolding
+tyPrim = mkPrimInfo (pack "_TY_") undefinedTy WorkNever SingleResult S.NoUnfolding
+coPrim = mkPrimInfo (pack "_CO_") undefinedTy WorkNever SingleResult S.NoUnfolding
 
 -- * Builder terms
 --
@@ -627,7 +627,7 @@ runRWB ty
     fTyB <- coreToTypeB fTy
     rwTyB <- coreToTypeB rwTy
     let realWorld = mkPrimInfo (showt 'GHC.Prim.realWorld#) (runClosedType rwTyB)
-                      C.WorkNever C.SingleResult S.NoUnfolding
+                      WorkNever SingleResult S.NoUnfolding
     tyLamsB [rTV, oTV] $
       lamB 0 (C.mkUnsafeSystemName "f" 0) fTyB $
       appB (varB 0) (primB realWorld)
@@ -653,7 +653,7 @@ checkUnpackUndefB ty
 checkUnpackUndefB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
 -- | See 'Clash.GHC.GHC2Core.nameModTerm'
-nameModB :: C.NameMod -> Type -> C2C TmB
+nameModB :: NameMod -> Type -> C2C TmB
 nameModB sa ty
   | Just (nmTV, ty1) <- forAllView ty
   , Just (aTV, funTy) <- forAllView ty1

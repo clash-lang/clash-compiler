@@ -23,9 +23,9 @@ module Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeNats
 
 import Data.Text (Text)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.TyCon (TyConName, tyConDataCons)
-import qualified Clash.Core.Type as C
 import Clash.Util (textNameLit)
 
 import qualified GHC.TypeNats
@@ -58,7 +58,7 @@ primitives =
         , Just snatTcNm <- snatTyConName ty
         , Just snatTc <- lookupTyCon te snatTcNm
         , [snatDc] <- tyConDataCons snatTc
-        -> let nTy = LitTy (C.NumTy n)
+        -> let nTy = LitTy (NumTy n)
                snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
                ret = mkApps (valToTerm fun) [Right nTy, Left snat]
             in reduce ret

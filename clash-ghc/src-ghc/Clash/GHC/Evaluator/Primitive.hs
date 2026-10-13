@@ -27,7 +27,7 @@ import           Clash.Core.Evaluator.Types
 import Clash.Core.HasType (applyTypeToArgs)
 import           Clash.Core.Literal  (Literal (..))
 import Clash.Core.Term (PrimInfo (..), Term (..))
-import Clash.Core.Util (undefinedPrims, undefinedXPrims)
+import Clash.Core.Basic (undefinedPrims, undefinedXPrims)
 import Clash.Util (curLoc)
 
 import qualified Clash.Normalize.Primitives as NP

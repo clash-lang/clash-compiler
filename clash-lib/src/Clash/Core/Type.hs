@@ -62,7 +62,6 @@ where
 import           Control.DeepSeq        as DS
 import           Data.Binary            (Binary)
 import           Data.Coerce            (coerce)
-import           Data.Hashable          (Hashable)
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List              (foldl')
 #endif
@@ -92,6 +91,7 @@ import           GHC.Types.SrcLoc       (wiredInSrcSpan)
 
 -- Local imports
 import           Clash.Annotations.SynthesisAttributes
+import           Clash.Core.Basic       (ConstTy (..), LitTy (..))
 import           Clash.Core.DataCon
 import           Clash.Core.Name
 import {-# SOURCE #-} Clash.Core.Subst
@@ -127,19 +127,6 @@ data TypeView
   | TyConApp !TyConName [Type] -- ^ Applied TyCon
   | OtherType !Type            -- ^ Neither of the above
   deriving Show
-
--- | Type Constants
-data ConstTy
-  = TyCon !TyConName -- ^ TyCon type
-  | Arrow            -- ^ Function type
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
-
--- | Literal Types
-data LitTy
-  = NumTy !Integer
-  | SymTy !String
-  | CharTy !Char
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
 
 -- | The level above types
 type Kind       = Type

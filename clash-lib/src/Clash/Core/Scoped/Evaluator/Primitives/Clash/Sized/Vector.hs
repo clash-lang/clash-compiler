@@ -33,11 +33,10 @@ import qualified Data.Either as Either
 import Data.Text (Text)
 import Data.Text.Extra (showt)
 
+import Clash.Core.Basic (LitTy (..), WorkInfo (..))
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as CT
-import qualified Clash.Core.Type as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.PrimitiveReductions
@@ -511,7 +510,7 @@ primitives =
                      (mkApps (Prim pInfo)
                                           [Right aTy
                                           ,Right bTy
-                                          ,Right (LitTy (C.NumTy (n' - 1)))
+                                          ,Right (LitTy (NumTy (n' - 1)))
                                           ,Left (valToTerm (args !! 0))
                                           ,Left (Either.lefts vArgs !! 2)])
       _ -> Nothing
@@ -527,7 +526,7 @@ primitives =
         , Just indexTcNm <- tyConNameOf indexTy
         , Right n <- runExcept (tyNatSize te sc nTy)
         -> reduceWHNF $
-           mkApps (closedPrim "Clash.Sized.Vector.imap_go" CT.WorkNever (vecImapGoTy vecTcNm indexTcNm))
+           mkApps (closedPrim "Clash.Sized.Vector.imap_go" WorkNever (vecImapGoTy vecTcNm indexTcNm))
              [ Right nTy
              , Right nTy
              , Right aTy
@@ -556,7 +555,7 @@ primitives =
                          bTy1 = sink bTy
                          f1 = sink (valToTerm f)
                          indexAdd =
-                           closedPrim (showt '(Clash.Sized.Internal.Index.+#)) CT.WorkVariable
+                           closedPrim (showt '(Clash.Sized.Internal.Index.+#)) WorkVariable
                              (indexAddTy indexTcNm)
                      in Just $ Next mach1
                           { mTerm =
@@ -673,7 +672,7 @@ primitives =
                       mVecTy = mkTyConApp vecTcNm [numTy m, aTy]
                       n1VecTy = mkTyConApp vecTcNm [numTy n1, aTy]
                       splitAtCall =
-                        mkApps (closedPrim "Clash.Sized.Vector.fold_split" CT.WorkNever
+                        mkApps (closedPrim "Clash.Sized.Vector.fold_split" WorkNever
                                   (foldSplitAtTy vecTcNm))
                           [ Right (numTy m), Right (numTy n1), Right aTy
                           , Left (natLit m), Left (valToTerm vs) ]

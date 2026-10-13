@@ -75,6 +75,7 @@ import           GHC.Num.Natural             (Natural (NS))
 import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.Basic             (InlineSpec (..))
 
+import Clash.Core.Basic (IsMultiPrim (..), LitTy (..), WorkInfo (..))
 import qualified Clash.Sized.Internal.BitVector as BV (BitVector, fromInteger#)
 import qualified Clash.Sized.Internal.Index  as I (Index, fromInteger#)
 import qualified Clash.Sized.Internal.Signed as S (Signed, fromInteger#)
@@ -86,7 +87,6 @@ import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C
-import qualified Clash.Core.Type             as C
 import           Clash.Core.Scoped.TysPrim   (integerPrimTyConName, naturalPrimTyConName, typeNatKindTyConName)
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
@@ -719,22 +719,22 @@ zeroWidthTypeElemIn te sc enclosing ty = do
   (tcNm, args) <- splitTyConAppM ty
 
   if | C.nameOcc tcNm == Text.showt ''BV.BitVector
-     , [LitTy (C.NumTy 0)] <- args
+     , [LitTy (NumTy 0)] <- args
      -> return (zeroWidthNum (bitVectorFromIntegerPrim tcNm) args
                   [NaturalLiteral 0, NaturalLiteral 0, IntegerLiteral 0])
 
      | C.nameOcc tcNm == Text.showt ''I.Index
-     , [LitTy (C.NumTy 1)] <- args
+     , [LitTy (NumTy 1)] <- args
      -> return (zeroWidthNum (sizedNumFromIntegerPrim tcNm (Text.showt 'I.fromInteger#)) args
                   [NaturalLiteral 1, IntegerLiteral 0])
 
      | C.nameOcc tcNm == Text.showt ''S.Signed
-     , [LitTy (C.NumTy 0)] <- args
+     , [LitTy (NumTy 0)] <- args
      -> return (zeroWidthNum (sizedNumFromIntegerPrim tcNm (Text.showt 'S.fromInteger#)) args
                   [NaturalLiteral 0, IntegerLiteral 0])
 
      | C.nameOcc tcNm == Text.showt ''U.Unsigned
-     , [LitTy (C.NumTy 0)] <- args
+     , [LitTy (NumTy 0)] <- args
      -> return (zeroWidthNum (sizedNumFromIntegerPrim tcNm (Text.showt 'U.fromInteger#)) args
                   [NaturalLiteral 0, IntegerLiteral 0])
 
@@ -777,7 +777,7 @@ sizedNumFromIntegerPrim tcNm nm =
 -- T n@, given @T@ and the argument types
 zeroWidthPrim :: Text.Text -> C.TyConName -> [TyB] -> PrimInfo
 zeroWidthPrim nm tcNm args =
-  mkPrimInfo nm (runClosedType prTy) C.WorkNever C.SingleResult NoUnfolding
+  mkPrimInfo nm (runClosedType prTy) WorkNever SingleResult NoUnfolding
  where
   prTy =
     forAllTyB 0 (C.mkUnsafeSystemName "n" 0) (tyConAppB typeNatKindTyConName [])

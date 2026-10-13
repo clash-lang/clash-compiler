@@ -23,7 +23,7 @@ module Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.Exp
 
 import Data.Text (Text)
 
-import Clash.Core.Type (LitTy (..))
+import Clash.Core.Basic (LitTy (..))
 import Clash.Util (textNameLit)
 
 import qualified Clash.Class.Exp

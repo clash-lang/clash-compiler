@@ -24,8 +24,8 @@ import Control.Monad.Trans.Except (runExcept)
 import Data.Bits
 import Data.Text (Text)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Core.Literal (Literal (..))
-import Clash.Core.Type (LitTy (..))
 import Clash.Core.TyCon (tyConDataCons)
 import Clash.Util (clogBase, curLoc, flogBase, textNameLit)
 

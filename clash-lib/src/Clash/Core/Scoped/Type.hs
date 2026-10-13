@@ -121,12 +121,12 @@ import GHC.Builtin.Names
   , typeUnconsSymbolTyFamNameKey )
 import GHC.Types.SrcLoc (wiredInSrcSpan)
 
+import Clash.Core.Basic (ConstTy (..), LitTy (..))
 import Clash.Annotations.SynthesisAttributes (Attr)
 import Clash.Core.DataCon (DataCon (dcName))
 import Clash.Core.Name (Name (..), NameSort (User))
 import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon (TyCon (..), TyConName, tyConDataCons)
-import qualified Clash.Core.Type as C
 import Clash.Debug (traceIf)
 import Clash.Unique (fromGhcUnique)
 import Clash.Util (clogBase, curLoc)
@@ -159,20 +159,20 @@ tyView :: Type n -> TypeView n
 -- Manually unrolled, like 'C.tyView', because it is called so often
 tyView tOrig = case tOrig of
   ConstTy c -> case c of
-    C.TyCon tc -> TyConApp tc []
+    TyCon tc -> TyConApp tc []
     _ -> OtherType tOrig
   AppTy l0 res -> case l0 of
-    ConstTy (C.TyCon tc) -> TyConApp tc [res]
+    ConstTy (TyCon tc) -> TyConApp tc [res]
     AppTy l1 arg -> case l1 of
-      ConstTy C.Arrow -> FunTy arg res
-      ConstTy (C.TyCon tc) -> TyConApp tc [arg, res]
+      ConstTy Arrow -> FunTy arg res
+      ConstTy (TyCon tc) -> TyConApp tc [arg, res]
       AppTy l2 resK -> case l2 of
-        ConstTy (C.TyCon tc) -> TyConApp tc [resK, arg, res]
+        ConstTy (TyCon tc) -> TyConApp tc [resK, arg, res]
         AppTy l3 argK -> case l3 of
-          ConstTy (C.TyCon tc) -> TyConApp tc [argK, resK, arg, res]
-          ConstTy C.Arrow -> FunTy arg res -- See Note [Arrow arguments]
+          ConstTy (TyCon tc) -> TyConApp tc [argK, resK, arg, res]
+          ConstTy Arrow -> FunTy arg res -- See Note [Arrow arguments]
           _ -> case go [argK, resK, arg, res] l3 of
-            (ConstTy (C.TyCon tc), args) -> TyConApp tc args
+            (ConstTy (TyCon tc), args) -> TyConApp tc args
             _ -> OtherType tOrig
         _ -> OtherType tOrig
       _ -> OtherType tOrig
@@ -255,11 +255,11 @@ normalizeType tenv = go
 
 -- | Make a type out of a type constructor
 mkTyConTy :: TyConName -> Type n
-mkTyConTy tc = ConstTy (C.TyCon tc)
+mkTyConTy tc = ConstTy (TyCon tc)
 
 -- | Make a function type of an argument and result type
 mkFunTy :: Type n -> Type n -> Type n
-mkFunTy t1 = AppTy (AppTy (ConstTy C.Arrow) t1)
+mkFunTy t1 = AppTy (AppTy (ConstTy Arrow) t1)
 
 -- | Make a type constructor application out of a type constructor and a list
 -- of argument types
@@ -448,17 +448,17 @@ reduceTyConApp
 reduceTyConApp tenv sc tc tys
   | nameUniq tc == fromGhcUnique typeNatAddTyFamNameKey
   = case mapMaybe (litView tenv sc) tys of
-      [i1, i2] -> Just (LitTy (C.NumTy (i1 + i2)))
+      [i1, i2] -> Just (LitTy (NumTy (i1 + i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatMulTyFamNameKey
   = case mapMaybe (litView tenv sc) tys of
-      [i1, i2] -> Just (LitTy (C.NumTy (i1 * i2)))
+      [i1, i2] -> Just (LitTy (NumTy (i1 * i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatExpTyFamNameKey
   = case mapMaybe (litView tenv sc) tys of
-      [i1, i2] -> Just (LitTy (C.NumTy (i1 ^ i2)))
+      [i1, i2] -> Just (LitTy (NumTy (i1 ^ i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatSubTyFamNameKey
@@ -466,7 +466,7 @@ reduceTyConApp tenv sc tc tys
       [i1, i2]
         | let z = i1 - i2
         , z >= 0
-        -> Just (LitTy (C.NumTy z))
+        -> Just (LitTy (NumTy z))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatCmpTyFamNameKey -- "GHC.TypeNats.CmpNat"
@@ -488,7 +488,7 @@ reduceTyConApp tenv sc tc tys
   , [c0, s0] <- tys
   , Just c1 <- charLitView tenv sc c0
   , Just s1 <- symLitView tenv sc s0
-  = Just (LitTy (C.SymTy (c1:s1)))
+  = Just (LitTy (SymTy (c1:s1)))
 
   | nameUniq tc == fromGhcUnique typeUnconsSymbolTyFamNameKey -- UnconsSymbol
   , [s1] <- mapMaybe (symLitView tenv sc) tys
@@ -506,20 +506,20 @@ reduceTyConApp tenv sc tc tys
           pure (Just (mkTyConApp nothingTc [tupTcApp]))
         (c:cs) ->
           let tup = mkTyConApp tupDc
-                      [charTy, symbolTy, LitTy (C.CharTy c), LitTy (C.SymTy cs)]
+                      [charTy, symbolTy, LitTy (CharTy c), LitTy (SymTy cs)]
            in pure (Just (mkTyConApp justTc [tupTcApp, tup]))
 
   | nameUniq tc == fromGhcUnique typeCharToNatTyFamNameKey -- CharToNat
   , [c1] <- mapMaybe (charLitView tenv sc) tys
-  = Just (LitTy (C.NumTy (fromIntegral (ord c1))))
+  = Just (LitTy (NumTy (fromIntegral (ord c1))))
 
   | nameUniq tc == fromGhcUnique typeNatToCharTyFamNameKey -- NatToChar
   , [n1] <- mapMaybe (litView tenv sc) tys
-  = Just (LitTy (C.CharTy (chr (fromInteger n1))))
+  = Just (LitTy (CharTy (chr (fromInteger n1))))
 
   | nameUniq tc == fromGhcUnique typeSymbolAppendFamNameKey -- "GHC.TypeLits.AppendSymbol"
   = case mapMaybe (symLitView tenv sc) tys of
-      [s1, s2] -> Just (LitTy (C.SymTy (s1 ++ s2)))
+      [s1, s2] -> Just (LitTy (SymTy (s1 ++ s2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.FLog", "GHC.TypeNats.FLog"]
@@ -527,14 +527,14 @@ reduceTyConApp tenv sc tc tys
       [i1, i2]
         | i1 > 1
         , i2 > 0
-        -> Just (LitTy (C.NumTy (smallInteger (integerLogBase# i1 i2))))
+        -> Just (LitTy (NumTy (smallInteger (integerLogBase# i1 i2))))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.CLog", "GHC.TypeNats.CLog"]
   = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | Just k <- clogBase i1 i2
-        -> Just (LitTy (C.NumTy (toInteger k)))
+        -> Just (LitTy (NumTy (toInteger k)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Log", "GHC.TypeNats.Log"]
@@ -543,50 +543,50 @@ reduceTyConApp tenv sc tc tys
         | i1 > 1
         , i2 > 0
         -> if i2 == 1
-           then Just (LitTy (C.NumTy 0))
+           then Just (LitTy (NumTy 0))
            else let z1 = integerLogBase# i1 i2
                     z2 = integerLogBase# i1 (i2-1)
                 in  if isTrue# (z1 ==# z2)
                         then Nothing
-                        else Just (LitTy (C.NumTy (smallInteger z1)))
+                        else Just (LitTy (NumTy (smallInteger z1)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.GCD", "GHC.TypeNats.GCD"]
   = case mapMaybe (litView tenv sc) tys of
-      [i1, i2] -> Just (LitTy (C.NumTy (i1 `gcd` i2)))
+      [i1, i2] -> Just (LitTy (NumTy (i1 `gcd` i2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.LCM", "GHC.TypeNats.LCM"]
   = case mapMaybe (litView tenv sc) tys of
-      [i1, i2] -> Just (LitTy (C.NumTy (i1 `lcm` i2)))
+      [i1, i2] -> Just (LitTy (NumTy (i1 `lcm` i2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Div"]
   = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
-        -> Just (LitTy (C.NumTy (i1 `div` i2)))
+        -> Just (LitTy (NumTy (i1 `div` i2)))
       _ -> Nothing
 
   | nameOcc tc `elem` ["GHC.TypeLits.Extra.Mod"]
   = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
-        -> Just (LitTy (C.NumTy (i1 `mod` i2)))
+        -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatDivTyFamNameKey
   = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
-        -> Just (LitTy (C.NumTy (i1 `div` i2)))
+        -> Just (LitTy (NumTy (i1 `div` i2)))
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeNatModTyFamNameKey
   = case mapMaybe (litView tenv sc) tys of
       [i1, i2]
         | i2 > 0
-        -> Just (LitTy (C.NumTy (i1 `mod` i2)))
+        -> Just (LitTy (NumTy (i1 `mod` i2)))
       _ -> Nothing
 
   | Just eqns <- tyFamEqnsOf tenv tc
@@ -599,7 +599,7 @@ reduceTyConApp tenv sc tc tys
 
 -- | A promoted constructor of 'Ordering'
 orderingTy :: Ordering -> Type n
-orderingTy o = ConstTy $ C.TyCon $ case o of
+orderingTy o = ConstTy $ TyCon $ case o of
   LT -> Name User (showt 'LT) (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
   EQ -> Name User (showt 'EQ) (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
   GT -> Name User (showt 'GT) (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
@@ -712,19 +712,19 @@ argView tenv sc t = case reduceTypeFamily tenv sc t of
 
 -- | The number of a type that reduces to a type-level number
 litView :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe Integer
-litView _ _ (LitTy (C.NumTy i)) = Just i
+litView _ _ (LitTy (NumTy i)) = Just i
 litView tenv sc (reduceTypeFamily tenv sc -> Just ty') = litView tenv sc ty'
 litView _ _ _ = Nothing
 
 -- | The string of a type that reduces to a type-level symbol
 symLitView :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe String
-symLitView _ _ (LitTy (C.SymTy s)) = Just s
+symLitView _ _ (LitTy (SymTy s)) = Just s
 symLitView tenv sc (reduceTypeFamily tenv sc -> Just ty') = symLitView tenv sc ty'
 symLitView _ _ _ = Nothing
 
 -- | The character of a type that reduces to a type-level character
 charLitView :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe Char
-charLitView _ _ (LitTy (C.CharTy c)) = Just c
+charLitView _ _ (LitTy (CharTy c)) = Just c
 charLitView tenv sc (reduceTypeFamily tenv sc -> Just ty') = charLitView tenv sc ty'
 charLitView _ _ _ = Nothing
 
@@ -732,15 +732,15 @@ charLitView _ _ _ = Nothing
 -- 'Clash.Core.Util.tyNatSize'.
 tyNatSize :: Distinct n => TypeEnv -> Scope n -> Type n -> Except String Integer
 tyNatSize tenv sc (coreView1 tenv sc -> Just ty) = tyNatSize tenv sc ty
-tyNatSize _ _ (LitTy (C.NumTy i)) = return i
+tyNatSize _ _ (LitTy (NumTy i)) = return i
 tyNatSize _ _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showPpr ty
 
 -- | The string representation of the symbol or number a type reduces to under
 -- 'coreView1'. See 'Clash.Core.Util.tyLitShow'.
 tyLitShow :: Distinct n => TypeEnv -> Scope n -> Type n -> Except String String
 tyLitShow tenv sc (coreView1 tenv sc -> Just ty) = tyLitShow tenv sc ty
-tyLitShow _ _ (LitTy (C.SymTy s)) = return s
-tyLitShow _ _ (LitTy (C.NumTy s)) = return (show s)
+tyLitShow _ _ (LitTy (SymTy s)) = return s
+tyLitShow _ _ (LitTy (NumTy s)) = return (show s)
 tyLitShow _ _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showPpr ty
 
 -- * Predicates
@@ -755,7 +755,7 @@ isClassTy _ _ = False
 
 -- | Is the type @Integer@? See 'C.isIntegerTy'.
 isIntegerTy :: Type n -> Bool
-isIntegerTy (ConstTy (C.TyCon nm)) = nameUniq nm == fromGhcUnique integerTyConKey
+isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == fromGhcUnique integerTyConKey
 isIntegerTy _ = False
 
 -- | Determine whether a type is isomorphic to "Clash.Signal.Internal.Signal",

@@ -207,6 +207,7 @@ Library
                       Clash.Backend.Verilog.Time
                       Clash.Backend.VHDL
 
+                      Clash.Core.Basic
                       Clash.Core.DataCon
                       Clash.Core.EqSolver
                       Clash.Core.Evaluator.Types

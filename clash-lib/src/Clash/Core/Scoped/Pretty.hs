@@ -43,6 +43,7 @@ import Prettyprinter
 import Data.Text.Prettyprint.Doc
 #endif
 
+import Clash.Core.Basic (ConstTy (..), NameMod (..))
 import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty
@@ -51,10 +52,10 @@ import Clash.Core.Pretty
 import Clash.Core.Scoped.Sig (TyFamEqn (..))
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (primArg)
-import qualified Clash.Core.Term as C (NameMod (..), Term)
+import qualified Clash.Core.Term as C (Term)
 import Clash.Core.TyCon
   (AlgTyConRhs (..), TyCon (..), TyConName, isTupleTyConLike)
-import qualified Clash.Core.Type as C (ConstTy (..), Type)
+import qualified Clash.Core.Type as C (Type)
 import Clash.Pretty (ClashPretty (..))
 
 -- * Instances
@@ -262,10 +263,10 @@ pprTick env prec = \case
   Attributes _ attrs -> "<attributes>" <> pprTerm env prec attrs
  where
   nameMod = \case
-    C.PrefixName -> "<prefixName>"
-    C.SuffixName -> "<suffixName>"
-    C.SuffixNameP -> "<suffixNameP>"
-    C.SetName -> "<setName>"
+    PrefixName -> "<prefixName>"
+    SuffixName -> "<suffixName>"
+    SuffixNameP -> "<suffixNameP>"
+    SetName -> "<setName>"
 
 -- * Types
 
@@ -282,13 +283,13 @@ pprType' env p ty = case ty of
   VarTy occ _ n -> ppr (tyVarName env occ n)
   LitTy l -> ppr l
   ForAllTy {} -> maybeParen p FunPrec (pprForAllType env ty)
-  ConstTy (C.TyCon tc) -> pprTcApp env p tc []
+  ConstTy (TyCon tc) -> pprTcApp env p tc []
   AnnType _ t -> pprType' env p t
   _ | TyConAppView tc args <- tyView ty -> pprTcApp env p tc args
     | FunTyView arg res <- tyView ty -> pprFunTy env p arg res
   AppTy t1 t2 ->
     maybeParen p TyConPrec (pprType env t1 <+> pprType' env TyConPrec t2)
-  ConstTy C.Arrow -> parens rarrow
+  ConstTy Arrow -> parens rarrow
 
 -- | A chain of function types
 pprFunTy :: Env -> TypePrec -> Type n -> Type n -> ClashDoc
@@ -342,8 +343,8 @@ tyView :: Type n -> TypeView n
 tyView = go []
  where
   go args = \case
-    ConstTy (C.TyCon tc) -> TyConAppView tc args
-    ConstTy C.Arrow -> case args of
+    ConstTy (TyCon tc) -> TyConAppView tc args
+    ConstTy Arrow -> case args of
       [arg, res] -> FunTyView arg res
       -- With the kinds of the argument and the result, see Note [Arrow
       -- arguments] in "Clash.Core.Type"

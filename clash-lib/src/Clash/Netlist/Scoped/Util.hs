@@ -67,12 +67,12 @@ import           Data.Maybe                  (catMaybes, isNothing)
 import           Data.Text                   (Text)
 import           GHC.Stack                   (HasCallStack)
 
+import Clash.Core.Basic (IsMultiPrim (..), LitTy (..))
 import           Clash.Annotations.TopEntity (TopEntity)
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Scoped.Pretty    ()
 import qualified Clash.Core.Term             as C
-import qualified Clash.Core.Type             as C (LitTy (..))
 import           Clash.Core.Scoped.TermInfo  (MultiPrimInfo (..), multiPrimInfo')
 import           Clash.Util                  (ClashException (..), curLoc)
 
@@ -499,8 +499,8 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
     case k of
       Prim p ->
         case primMultiResult p of
-          C.SingleResult -> extractPrimWarnOrFail context (primName p) >>= goSingle p
-          C.MultiResult -> extractPrimWarnOrFail context (primName p) >>= goMulti p
+          SingleResult -> extractPrimWarnOrFail context (primName p) >>= goSingle p
+          MultiResult -> extractPrimWarnOrFail context (primName p) >>= goMulti p
       _ -> pure []
  where
   context = primWarnContext binds (localIdText ctx i) args
@@ -641,7 +641,7 @@ withTicks ctx ticks0 k = go [] (reverse (List.nubBy eqTick ticks0))
     -- is evaluated as far as it is data ('nfData') first: it might not be
     -- beta-reduced, e.g. `(/\b.Nil 0 b (0~0)) Bool`.
     case coreView te sc ty of
-      LitTy (C.NumTy n)
+      LitTy (NumTy n)
         | Just (SomeNat (Proxy :: Proxy n)) <- someNatVal n
         -> case closeTerm attrs0 of
             Just attrsC -> do
