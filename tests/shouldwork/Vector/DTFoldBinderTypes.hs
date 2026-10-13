@@ -1,4 +1,7 @@
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- | The evaluator reduces @dtfold@ to an application of its combining function
@@ -6,6 +9,11 @@
 -- case-expressions on @splitAt@. It used to give the binders of the patterns
 -- of these case-expressions the type @2^(k-1)@, a number, instead of
 -- @Vec (2^(k-1)) a@.
+--
+-- This test evaluates the subject of the case-expression in @topEntity@ with
+-- the scoped evaluator ("Clash.Core.Scoped.Evaluator"), in the environment
+-- Clash uses, and checks the types of the binders of the patterns in the
+-- result, which must have some.
 module DTFoldBinderTypes where
 
 import Clash.Prelude
@@ -16,22 +24,25 @@ import Data.Proxy (Proxy (..))
 import Data.Singletons (Apply, TyFun, type (@@))
 
 import Clash.Backend
-import Clash.Core.DataCon (DataCon (..), dcExtTyVars)
-import Clash.Core.Evaluator.Types (whnf')
-import Clash.Core.HasType (inferCoreTypeOf)
 import Clash.Core.Name (nameOcc)
-import Clash.Core.Scoped.Syntax (globalIdName)
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term (Pat (..), Term (..), collectBndrs, walkTerm)
-import Clash.Core.Type (TypeView (..), coreView, tyView)
-import Clash.Core.Subst (aeqType)
-import Clash.Core.Util (substArgTys)
-import Clash.Core.Var (Var (..))
-import Clash.Core.VarEnv (eltsVarEnv, mkInScopeSet, mkVarSet)
+import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Scoped.DataCon (dataConInstArgTys)
+import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
+import Clash.Core.Scoped.Evaluator.Types (Machine (..), initMachine)
+import Clash.Core.Scoped.HasType (inferCoreTypeOf)
+import Clash.Core.Scoped.NameMap (emptyNameMap, foldrWithGlobalEnv)
+import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Scoped.Subst (openAlt, openBind, openIdBinder, openTyBinder, teleIdBinderTypes)
+import Clash.Core.Scoped.Syntax (Distinct, Scope)
+import qualified Clash.Core.Scoped.Syntax as S
+import Clash.Core.DataCon (dcName)
+import Clash.Core.Scoped.Term (stripTicks)
+import Clash.Core.Scoped.Type (TypeView (..), coreView, tyView)
+import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
 import Clash.Driver.Types
-import Clash.GHC.Evaluator (evaluator)
-import Clash.Rewrite.Scoped.Globals (toClashBindings)
-import Clash.Util.Supply (newSupply, splitSupply)
+import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
+import qualified Data.IntMap.Strict as IntMap
 
 import Test.Tasty.Clash
 import Test.Tasty.Clash.CoreTest
@@ -57,37 +68,64 @@ mainCommon
   -> IO ()
 mainCommon hdl = do
   (env, design, _) <- runToCoreStage hdl id testPath
-  (convSupply, supply) <- splitSupply <$> newSupply
-  let tcm = envTyConMap env
-      -- The evaluator of Clash Core, on Clash Core
-      bm = toClashBindings convSupply (designBindings design)
-  te <- case List.find ((== "DTFoldBinderTypes.topEntity") . nameOcc . globalIdName . bindingId) (eltsVarEnv bm) of
-    Just b -> pure (bindingTerm b)
-    Nothing -> error "Could not find topEntity"
-  let (bndrs, body) = collectBndrs te
-      is = mkInScopeSet (mkVarSet [v | Left v <- bndrs])
-  subj <- case body of
-    Case scrut _ _ -> pure scrut
-    _ -> error ("Expected a case-expression:\n" <> showPpr body)
-  let (_, heap, res) = whnf' evaluator bm mempty tcm (mempty, 0) supply is True subj
-      tms = res : eltsVarEnv heap
-      -- The binders of a pattern of a constructor without existential type
-      -- variables, whose types differ from those of the fields
-      badBinders tm =
-        [ (dc, bndr)
-        | Case scrut _ alts <- walkTerm Just tm
-        , (DataPat dc [] bndrs, _) <- alts
-        , List.null (dcExtTyVars dc)
-        , TyConApp _ tyArgs <- [tyView (coreView tcm (inferCoreTypeOf tcm scrut))]
-        , (bndr, fieldTy) <- List.zip bndrs (substArgTys dc tyArgs)
-        , not (aeqType (coreView tcm (varType bndr)) (coreView tcm fieldTy))
-        ]
-  case List.concatMap badBinders tms of
-    [] -> pure ()
-    bad -> error $ List.unlines $
-      "Pattern binders with types that differ from the fields of their constructor:" :
-      [ showPpr bndr <> " in a pattern of " <> showPpr (dcName dc) | (dc, bndr) <- bad ] <>
-      ["in the result of evaluating:", showPpr subj]
+  let te = mkTypeEnv (envTyConMap env)
+      bm = designBindings design
+      isTop b = nameOcc (S.globalIdName (bindingId b)) == "DTFoldBinderTypes.topEntity"
+  top <- case foldrWithGlobalEnv (\_ b bs -> [b | isTop b] <> bs) [] bm of
+    [b] -> pure (bindingTerm b)
+    _ -> error "Could not find topEntity"
+  -- Evaluate the subject of the case-expression in the body of topEntity, in
+  -- the scope of its arguments, with the environment Clash uses
+  openLams S.emptyScope top $ \sc body -> case stripTicks body of
+    S.Case subj _ _ ->
+      whnf (evaluatorEnv te) True (initMachine sc emptyNameMap bm (IntMap.empty, 0) subj) $ \m ->
+        -- The result, bound by the bindings the machine allocated, which
+        -- holds the heap
+        let res = bindAllocated m (mTerm m)
+            binders = patBinders te sc res
+            bad = [b | (False, b) <- binders]
+            failure msg = error $ List.unlines $
+              msg <> ["in the result of evaluating:", showPpr subj, "which is:", showPpr res]
+        in if List.null binders then failure ["No pattern binders"]
+           else if List.null bad then pure ()
+           else failure ("Pattern binders with types that differ from the fields of their constructor:" : bad)
+    e -> error ("Expected a case-expression:\n" <> showPpr e)
+
+-- | Go under the lambdas of a term
+openLams
+  :: Distinct n => Scope n -> S.Term n -> (forall l. Distinct l => Scope l -> S.Term l -> r) -> r
+openLams sc e k = case stripTicks e of
+  S.Lam b body -> openIdBinder sc b body $ \sc' _ body' -> openLams sc' body' k
+  _ -> k sc e
+
+-- | The binders of the patterns of constructors without existential type
+-- variables, and whether their types are those of the fields of the
+-- constructor at the type of the subject
+patBinders :: Distinct n => TypeEnv -> Scope n -> S.Term n -> [(Bool, String)]
+patBinders te sc = \case
+  S.Lam b e -> openIdBinder sc b e $ \sc' _ e' -> patBinders te sc' e'
+  S.TyLam b e -> openTyBinder sc b e $ \sc' _ e' -> patBinders te sc' e'
+  S.App e1 e2 -> patBinders te sc e1 <> patBinders te sc e2
+  S.TyApp e _ -> patBinders te sc e
+  S.Let bs0 e0 -> openBind sc bs0 e0 $ \sc' bs e -> case bs of
+    S.NonRec _ x -> patBinders te sc x <> patBinders te sc' e
+    S.Rec _ xs -> List.concatMap (patBinders te sc') xs <> patBinders te sc' e
+  S.Case subj _ alts ->
+    patBinders te sc subj <> List.concatMap (alt (inferCoreTypeOf te sc subj)) alts
+  S.Cast e _ _ -> patBinders te sc e
+  S.Tick _ e -> patBinders te sc e
+  _ -> []
+ where
+  alt subjTy a = openAlt sc a $ \sc' p e ->
+    let bad = case p of
+          S.DataPat dc S.TNil ids
+            | TyConApp _ tyArgs <- tyView (coreView te sc subjTy)
+            , Just fieldTys <- dataConInstArgTys te sc dc tyArgs
+            -> [ ( aeqTy (coreView te sc bndrTy) (coreView te sc fieldTy)
+                 , showPpr bndrTy <> " in a pattern of " <> showPpr (dcName dc) )
+               | (bndrTy, fieldTy) <- List.zip (teleIdBinderTypes ids) fieldTys ]
+          _ -> []
+    in bad <> patBinders te sc' e
 
 mainVHDL :: IO ()
 mainVHDL = mainCommon SVHDL
