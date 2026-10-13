@@ -573,9 +573,8 @@ the other one lazily, by conversion: @mk*@ take the scoped side, and
 is gone, so are the legacy parts, and the constructors only take the scoped
 side.
 
-The 'Data.Binary.Binary' instances of 'DataCon' and 'TyCon' decode the side of
-Clash Core, and reach the @mk*FromClash@ constructors through the boot file of
-this module.
+The 'Data.Binary.Binary' instances of "Clash.Core.Scoped.Binary" decode the
+scoped side, and make the values with the @mk*@ constructors.
 -}
 
 -- | A global variable with the given name and closed type

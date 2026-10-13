@@ -5,25 +5,20 @@ module Main (main) where
 import           Clash.Backend
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Core.Name
-import           Clash.Core.Var
+import           Clash.Core.Scoped.Syntax     (globalIdName)
 import           Clash.Driver.Types
 import           Clash.Netlist
 import           Clash.Netlist.Scoped (genNetlist)
 import           Clash.Netlist.Types          hiding (backend, hdlDir)
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
-import           Clash.Rewrite.Scoped.Globals (fromClashBindings)
 
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import           Control.DeepSeq              (deepseq)
-import           Data.Binary                  (decode)
 import           Data.List                    (partition)
 import           Data.Maybe                   (fromMaybe)
 import qualified Data.Text                    as Text
 import           System.Environment           (getArgs)
 import           System.FilePath              ((</>))
-
-import qualified Data.ByteString.Lazy as B
 
 import           RestorePrimitives            (restorePrimMap)
 import           SerialiseInstances
@@ -55,7 +50,7 @@ benchFile idirs src = do
                    , envDomains = domains
                    }
 
-      topEntityS = Text.unpack (nameOcc (varName topEntity))
+      topEntityS = Text.unpack (nameOcc (globalIdName topEntity))
       modName    = takeWhile (/= '.') topEntityS
       hdlState'  = setModName (Text.pack modName) (initBackend @VHDLState (envOpts env))
       (compNames, seen) = genTopNames (envOpts env) hdl topEntities
@@ -66,10 +61,9 @@ benchFile idirs src = do
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS
   (netlist,_,_) <-
-    -- The bindings are serialized as bindings of Clash Core
-    genNetlist env False (fromClashBindings transformedBindings) topEntityMap compNames
+    genNetlist env False transformedBindings topEntityMap compNames
                (ghcTypeToHWType (opt_intWidth (envOpts env)))
-               ite (SomeBackend hdlState') seen hdlDir prefixM (mkGlobalIdFromClash topEntity)
+               ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
   netlist `deepseq` putStrLn ".. done\n"
 
 setupEnv
@@ -78,4 +72,4 @@ setupEnv
 setupEnv src = do
   let bin = src ++ ".net.bin"
   putStrLn $ "Reading from: " ++ bin
-  decode <$> B.readFile bin
+  readInputs bin

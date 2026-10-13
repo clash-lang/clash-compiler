@@ -4,14 +4,11 @@
 import           Clash.Driver
 import           Clash.Rewrite.Capture        (takeCaptureLog)
 import           Clash.Driver.Types           (ClashEnv(..), ClashOpts(opt_intWidth), GlobalBindings)
-import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
-import           Clash.Rewrite.Scoped.Globals (fromClashBindings, toClashBindings)
 import qualified Clash.Util.Supply            as Supply
 
 import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
 import           Control.DeepSeq              (deepseq)
-import           Data.Binary                  (decode, encode)
 import           Data.List                    (partition)
 import           System.Directory             (createDirectoryIfMissing)
 import           System.Environment           (getArgs, lookupEnv)
@@ -22,8 +19,6 @@ import           GHC.RTS.Flags                (getGCFlags, minAllocAreaSize)
 import           System.IO                    (hClose, hPutStrLn, stderr)
 import           System.Process
   (StdStream (CreatePipe), createProcess, proc, std_in, waitForProcess)
-
-import qualified Data.ByteString.Lazy as B
 
 import           SerialiseInstances
 import           BenchmarkCommon
@@ -54,25 +49,22 @@ benchFile idirs src = do
                    , envDomains = domains
                    }
 
-  -- The bindings are serialized as bindings of Clash Core
-  res <- normalizeEntity clashEnv (fromClashBindings bindingsMap)
+  res <- normalizeEntity clashEnv bindingsMap
                    (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
-                   (map mkGlobalIdFromClash topEntityNames) supplyN (mkGlobalIdFromClash topEntity)
+                   topEntityNames supplyN topEntity
   res `deepseq` putStrLn ".. done\n"
   writeNormalized src res
   writeCorpus src inputs
 
 -- | Write the normalized bindings, if CLASH_NORMALIZED_OUT is set: to
--- @<dir>/<design>.norm.bin@, for @clash-differential normalized@. They are
--- written as bindings of Clash Core.
+-- @<dir>/<design>.norm.bin@, for @clash-differential normalized@
 writeNormalized :: FilePath -> GlobalBindings -> IO ()
 writeNormalized src res =
   lookupEnv "CLASH_NORMALIZED_OUT" >>= \case
     Just dir@(_:_) -> do
       createDirectoryIfMissing True dir
-      supply <- Supply.newSupply
       let out = dir </> takeFileName src ++ ".norm.bin"
-      B.writeFile out (encode (toClashBindings supply res))
+      writeInputs out res
       putStrLn ("Wrote the normalized bindings to " ++ out)
     _ -> pure ()
 
@@ -108,4 +100,4 @@ setupEnv :: FilePath -> IO NormalizationInputs
 setupEnv src = do
   let bin = src ++ ".bin"
   putStrLn $ "Reading from: " ++ bin
-  decode <$> B.readFile bin
+  readInputs bin

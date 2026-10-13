@@ -98,7 +98,7 @@ data Term
                                             -- alternatives, list of alternatives
   | Cast    !Term !Type !Type               -- ^ Cast a term from one type to another
   | Tick    !TickInfo !Term                 -- ^ Annotated term
-  deriving (Show, Generic, NFData, Binary)
+  deriving (Show, Generic, NFData)
 
 -- TODO When it is possible, remove this pattern.
 pattern Letrec :: [LetBinding] -> Term -> Term
@@ -124,7 +124,7 @@ data TickInfo
   | Attributes Type Term
   -- ^ Synthesis attributes brough into scope by
   -- 'Clash.Annotations.SynthesisAttributes.annotateReg'
-  deriving (Eq, Show, Generic, NFData, Binary)
+  deriving (Eq, Show, Generic, NFData)
 
 instance Ord TickInfo where
   compare = acmpTickInfo
@@ -207,7 +207,7 @@ data Pat
   -- ^ Literal pattern
   | DefaultPat
   -- ^ Default pattern
-  deriving (Eq, Ord, Show, Generic, NFData, Binary)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 type Alt = (Pat,Term)
 
@@ -273,7 +273,7 @@ data CoreContext
   -- ^ Body of a Cast
   | TickC TickInfo
   -- ^ Body of a Tick
-  deriving (Show, Generic, NFData, Binary)
+  deriving (Show, Generic, NFData)
 
 -- | A list of @CoreContext@ describes the complete navigation path from the
 -- top-level to a specific sub-expression.

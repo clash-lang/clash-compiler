@@ -19,9 +19,9 @@
 
   The pipeline converts no bindings: GHC2Core produces scoped Clash Core, and
   Netlist generation consumes it. 'fromClashBindings' and 'toClashBindings'
-  convert bindings of Clash Core, e.g. the serialized inputs of the profiling
-  and differential tools, and those of tests. TODO(Phase 7): remove, with
-  Clash Core.
+  convert bindings of Clash Core, e.g. for the comparisons of
+  @clash-differential@, and those of tests. TODO(Phase 7): remove, with Clash
+  Core.
 -}
 
 {-# LANGUAGE DataKinds #-}

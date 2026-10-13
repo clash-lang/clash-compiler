@@ -70,10 +70,10 @@ module WhnfReplay (ReplayOptions (..), whnfReplay) where
 
 import Control.DeepSeq (NFData (..), force)
 import Control.Exception (SomeException, evaluate, try)
-import Control.Monad (forM, forM_, when)
+import Control.Monad (forM, forM_, replicateM, when)
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (runState)
-import Data.Binary (decode)
+import Data.Binary (Get, get)
 import Data.Binary.Get (getInt64be, runGetOrFail)
 import qualified Data.ByteString.Lazy as B
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -119,6 +119,8 @@ import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
 import Clash.Rewrite.Scoped.Types (TransformContext, rootContext, tfHeap, tfScope, underLetRec)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
+import Legacy (getLegacyTerm)
+
 import Test.Clash.Scoped.Evaluator (canonicalCoercions, readback, termSize)
 import qualified Test.Clash.Scoped.Evaluator as P
 
@@ -131,6 +133,15 @@ data Call = Call
   , callTerm :: C.Term
   }
 
+-- | A call, in the encoding of the terms of Clash Core of the spike
+getCall :: Get (Bool, [[C.LetBinding]], C.Term)
+getCall = (,,) <$> get <*> getList (getList ((,) <$> get <*> getLegacyTerm)) <*> getLegacyTerm
+ where
+  getList :: Get a -> Get [a]
+  getList g = do
+    n <- get :: Get Int
+    replicateM n g
+
 readCalls :: FilePath -> IO [Call]
 readCalls file = go <$> B.readFile file
  where
@@ -140,7 +151,9 @@ readCalls file = go <$> B.readFile file
         Left (_, _, err) -> error err
         Right (rest, _, len) ->
           let (rec, rest') = B.splitAt (fromIntegral (len :: Int64)) rest
-              (s, c, t) = decode rec
+              (s, c, t) = case runGetOrFail getCall rec of
+                Right (_, _, r) -> r
+                Left (_, _, err) -> error err
           in Call s c t : go rest'
 
 -- | The context of a call, as nested recursive let-expressions around its
