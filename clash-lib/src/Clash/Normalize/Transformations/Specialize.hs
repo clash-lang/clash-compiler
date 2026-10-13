@@ -96,7 +96,7 @@ import Clash.Rewrite.StrategyDSL
   , toTransformation
   )
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, censor, curFun, extra, tcCache
+  ( TransformContext(..), bindings, censor, curFunLegacy, extra, tcCache
   , workFreeBinders, debugOpts, topEntities, specializationLimit)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
@@ -530,7 +530,7 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
   existing <- UniqMap.filter ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case UniqMap.elems existing of
-    [] -> do (cf,sp) <- Lens.use curFun
+    [] -> do (cf,sp) <- Lens.use curFunLegacy
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInlinePrag newBody
     (b:_) -> return (globalIdLegacy (bindingId b))
   -- Create specialized argument

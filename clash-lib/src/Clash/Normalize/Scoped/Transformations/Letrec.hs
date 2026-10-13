@@ -80,7 +80,6 @@ import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (tyConDataCons)
-import qualified Clash.Core.Var as C (Id)
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
 import Clash.Normalize.Scoped.Primitives (removedArg)
@@ -506,9 +505,9 @@ recToLetRec ctx e
   --
   -- Since 'aeqTm' looks at ticks when determining equality, all ticks are
   -- removed with 'stripAllTicks'.
-  eqApp :: Distinct l => TypeEnv -> Scope l -> C.Id -> [Term l] -> Term l -> Bool
+  eqApp :: Distinct l => TypeEnv -> Scope l -> GlobalId -> [Term l] -> Term l -> Bool
   eqApp te sc fn args (collectArgs . stripAllTicks -> (GlobalVar g, args'))
-    | globalIdLegacy g == fn
+    | g == fn
     , let args2 = Either.lefts args'
     , length args == length args2
     = and (zipWith (eqArg te sc) args args2)

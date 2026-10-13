@@ -39,7 +39,6 @@ import           Clash.Core.HasType          (inferCoreTypeOf)
 import           Clash.Core.Pretty           (showPpr)
 import           Clash.Core.Subst            (aeqType)
 import           Clash.Core.Type             (normalizeType)
-import           Clash.Core.Var              (Var (..))
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (DebugOpts (..), TransformationInfo (..), hasDebugInfo, isDebugging)
@@ -100,7 +99,7 @@ applyWith = \s _ctx expr0 action -> do
       $ encode RewriteStep
           { t_ctx    = []
           , t_name   = s
-          , t_bndrS  = showPpr (varName curBndr)
+          , t_bndrS  = showPpr (globalIdName curBndr)
           , t_before = toClashTerm expr0
           , t_after  = toClashTerm expr1
           }

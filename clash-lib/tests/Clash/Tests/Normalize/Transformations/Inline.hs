@@ -47,6 +47,7 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, assertNoFreeLocals, assertStructurallyEqual, globalId
   , inScopeOf, intFunTy, intId, intLit, intTy, localId, mkBinding, mkBindingMap
   , pairDataCon, pairTy, runSingleTransformation )
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- | The implementations of the transformations that the tests run
 data InlineRewrites = InlineRewrites
@@ -164,7 +165,7 @@ runCollapseRHSNoops collapseRHSNoopsR f =
   topBinding = (mkBinding top (intLit 0)) { bindingSpec = Opaque NoSourceText }
   x = intId User "x" 8
   st = def
-    { _curFun = (top, noSrcSpan)
+    { _curFun = (mkGlobalIdFromClash top, noSrcSpan)
     , _bindings = mkVarEnv
         [ (top, topBinding)
         , (fGlobal, mkBinding fGlobal (Lam x (Var x))) ]

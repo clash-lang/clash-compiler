@@ -39,7 +39,7 @@ import Clash.Util.Supply (newSupply)
 
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert
-  (convScope, fromClashTerm, fromClashType, toClashTerm, toClashType, withConvEnv)
+  (convScope, fromClashTerm, fromClashType, toClashTerm, toClashType, withConvEnv, mkGlobalIdFromClash)
 import Clash.Core.Scoped.Internal.Scope (scopeWatermark)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (AbsBinder (..))
@@ -63,7 +63,7 @@ import Test.Clash.Scoped
 liftState :: IO (RewriteState NormalizeState)
 liftState = do
   supply <- newSupply
-  pure def{_curFun = (globalId User "top" 42 (intFunTy 1), noSrcSpan), _uniqSupply = supply}
+  pure def{_curFun = (mkGlobalIdFromClash (globalId User "top" 42 (intFunTy 1)), noSrcSpan), _uniqSupply = supply}
 
 -- | Lift the first binding of a recursive let-expression with
 -- 'liftBinding'. Gives the term that replaces the binder, and the body of the
@@ -241,7 +241,7 @@ vs = intId User "s" 8
 
 -- | The state for transformations that lift bindings, see 'liftState'
 liftStateFixed :: RewriteState NormalizeState
-liftStateFixed = def{_curFun = (globalId User "top" 42 (intFunTy 1), noSrcSpan)}
+liftStateFixed = def{_curFun = (mkGlobalIdFromClash (globalId User "top" 42 (intFunTy 1)), noSrcSpan)}
 
 app :: Id -> [C.Term] -> C.Term
 app h = C.mkApps (C.Var h) . map Left

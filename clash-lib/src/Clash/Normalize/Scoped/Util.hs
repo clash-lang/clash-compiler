@@ -74,7 +74,6 @@ import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.TyCon            as C (TyConName)
 import qualified Clash.Core.Type             as C
-import qualified Clash.Core.Var              as C
 import           Clash.Debug                 (traceIf)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (FinalTerm), hasTransformationInfo)
@@ -249,7 +248,7 @@ constantSpecInfoIn mkNm sc e = do
       (var@(GlobalVar f), args, ticks) -> do
         (curF, _) <- Lens.use curFun
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
-        if isNonRecGlobVar && globalIdUniq f /= C.varUniq curF then
+        if isNonRecGlobVar && f /= curF then
           mergeCsrs mkNm sc ticks e var args >>= \case
             csr@(ConstantSpecInfo _ TNil _ _) -> pure csr
             _ -> bindCsr mkNm sc e
@@ -511,7 +510,7 @@ rewriteExpr
   -- ^ Renew current function being rewritten
   -> NormalizeSession (Term 'VoidS)
 rewriteExpr (nrwS, nrw) (bndrS, expr) (nm, sp) = do
-  curFun .= (globalIdLegacy nm, sp)
+  curFun .= (nm, sp)
   opts <- Lens.view debugOpts
   let traceFinal = hasTransformationInfo FinalTerm opts
       expr' = traceIf traceFinal

@@ -36,6 +36,7 @@ import Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..))
 
 import Clash.Core.Scoped.Syntax (Term (Prim))
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.Term (collectArgs)
 import Clash.Rewrite.Scoped (ScopedTransform (..))
 import Test.Clash.Scoped.ViaFoil (viaFoil)
@@ -67,7 +68,7 @@ env = envVec {_evaluator = heapLookupEvaluator}
 st :: RewriteState NormalizeState
 st = def
   { _globalHeap = (IntMap.empty, 0)
-  , _curFun = (globalId User "top" 100 intTy, noSrcSpan) }
+  , _curFun = (mkGlobalIdFromClash (globalId User "top" 100 intTy), noSrcSpan) }
 
 -- | Run a reduction of Clash Core and the scoped one on the saturated
 -- application of a primitive with free variables, and assert that they agree:

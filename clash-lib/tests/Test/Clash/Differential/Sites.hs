@@ -60,6 +60,7 @@ module Test.Clash.Differential.Sites
 import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import qualified Control.Lens as Lens
+import Data.Bifunctor (first)
 import qualified Control.Monad.Writer as Writer
 import qualified Data.HashMap.Strict as HashMap
 import Data.IntMap.Strict (IntMap)
@@ -94,7 +95,7 @@ import Clash.Unique (Unique)
 import Clash.Util.Supply (newSupply, reserveUniques, resumeSupply, supplyRange)
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Convert (convScope, fromClashTerm, withConvEnv)
+import Clash.Core.Scoped.Convert (convScope, fromClashTerm, withConvEnv, mkGlobalIdFromClash)
 import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 import Test.Clash.Scoped.ViaFoil (viaFoil)
 
@@ -180,7 +181,7 @@ runAtSite c cap m = do
         , _scopedBindings = fromClashBindings bm
         , _transformCounter = capTransformCounter cap
         , _uniqSupply = sup
-        , _curFun = capCurFun cap
+        , _curFun = first mkGlobalIdFromClash (capCurFun cap)
         , _nameCounter = capNameCounter cap
         , _globalHeap = capGlobalHeap cap
         }

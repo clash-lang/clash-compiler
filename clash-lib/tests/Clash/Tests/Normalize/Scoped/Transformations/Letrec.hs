@@ -44,6 +44,7 @@ import Test.Clash.Rewrite
 import Test.Clash.Scoped
   ( TestScope, assertClashes, assertLintClean, assertRewritesAgree, assertTermAlphaEq
   , assertTermIs, runScopedIn, termQQ, varD, withClashing, withTerm )
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- * Running the transformations
 
@@ -360,7 +361,7 @@ recApp = app "rec" 300
 
 -- | A state in which the function being normalized is @rec@, see 'recApp'
 recState :: C.Type -> RewriteState NormalizeState
-recState ty = def { _curFun = (globalId User "rec" 300 ty, noSrcSpan) }
+recState ty = def { _curFun = (mkGlobalIdFromClash (globalId User "rec" 300 ty), noSrcSpan) }
 
 recToLetRecC, recToLetRecS :: NormRewrite
 recToLetRecC = apply "recToLetRec" Current.recToLetRec

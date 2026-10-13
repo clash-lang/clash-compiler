@@ -142,7 +142,7 @@ import           Clash.Data.UniqMap       (UniqMap)
 import qualified Clash.Data.UniqMap       as UniqMap
 import           Clash.Driver.Types       (BindingMap, ClashOpts (..))
 import           Clash.Rewrite.Types
-  (RewriteState (..), TransformContext (..))
+  (RewriteState (..), TransformContext (..), curFunLegacy)
 import           Clash.Unique             (Unique)
 import           Clash.Util               (SrcSpan)
 import           Clash.Util.Supply        (supplyRange)
@@ -396,7 +396,7 @@ mkCapture nm n (TransformContext is frames) fbs epoch e0 e1 st = Capture
   { capName = nm
   , capFiring = n
   , capTransformCounter = _transformCounter st
-  , capCurFun = _curFun st
+  , capCurFun = st Lens.^. curFunLegacy
   , capInScope = restrictInScopeSet keep is
   , capContext = frames1
   , capInput = e0

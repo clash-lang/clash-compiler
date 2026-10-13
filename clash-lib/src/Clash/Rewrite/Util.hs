@@ -207,7 +207,7 @@ applyWithCapture = \capture s ctx expr0 action -> do
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
   let rewriteHistFile = dbg_historyFile opts
   Monad.when (isJust rewriteHistFile && hasChanged) $ do
-    (curBndr, _) <- Lens.use curFun
+    (curBndr, _) <- Lens.use curFunLegacy
     liftIO
       $ BS.appendFile (fromJust rewriteHistFile)
       $ BL.toStrict
@@ -351,7 +351,7 @@ lintRewrite (TransformContext is ctx) name exprOld exprNew = do
   -- The binder currently being normalized need not be in the binding map
   errs1 <- if any isUnknownGlobal errs0
     then do
-      (cf, _) <- Lens.use curFun
+      (cf, _) <- Lens.use curFunLegacy
       pure (filter (not . isCurFun cf) errs0)
     else pure errs0
   Monad.unless (null errs1) $
@@ -378,7 +378,7 @@ lintInput
   -> RewriteMonad extra ()
 lintInput strategy bndr expr = do
   bndrs <- Lens.use bindings
-  (cf, _) <- Lens.use curFun
+  (cf, _) <- Lens.use curFunLegacy
   checks <- lintChecks
   let env = mkLintEnv checks (`UniqMap.elem` bndrs) emptyInScopeSet []
       errs = filter (not . isCurFun cf) (lintTerm env expr)
@@ -705,7 +705,7 @@ liftAndSubsituteBinders inScope toLift toKeep body = do
                                                 (substTmEnv subst) }
         subst2 = extendIdSubst subst1 x e2
     if x `elemFreeVars` e2 then do
-      (_,sp) <- Lens.use curFun
+      (_,sp) <- Lens.use curFunLegacy
       throw (ClashException sp [I.i|
         Internal error: inlineOrLiftBInders failed on:
 
@@ -790,7 +790,7 @@ liftBinding (var@Id {varName = idName} ,e) = do
   -- Make a new global ID
   tcm       <- Lens.view tcCache
   let newBodyTy = inferCoreTypeOf tcm $ mkTyLams (mkLams e boundFVs) boundFTVs
-  (cf,sp)   <- Lens.use curFun
+  (cf,sp)   <- Lens.use curFunLegacy
   binders <- Lens.use bindings
   newBodyNm <-
     cloneNameWithBindingMap

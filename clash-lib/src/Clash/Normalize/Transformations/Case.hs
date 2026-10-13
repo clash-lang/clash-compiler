@@ -87,7 +87,7 @@ import qualified Clash.Normalize.Primitives as NP (undefined, undefinedX)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toTransformation)
 import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, customReprs, debugOpts, scopedTypeEnv, tcCache
+  ( TransformContext(..), bindings, curFunLegacy, customReprs, debugOpts, scopedTypeEnv, tcCache
   , typeTranslator, workFreeBinders)
 import Clash.Rewrite.Util
   (changed, isFromInt, isUntranslatableType, runWithHWTypeCache, whnfRW)
@@ -355,7 +355,7 @@ caseCon' ctx@(TransformContext is0 _) e subj ty alts = do
             -> caseConOn ctx1 (Literal (IntegerLiteral 0)) ty alts
           _ -> do
             opts <- Lens.view debugOpts
-            (curFunId,sp) <- Lens.use curFun
+            (curFunId,sp) <- Lens.use curFunLegacy
             -- When invariants are being checked, report missing evaluation
             -- rules for the primitive evaluator.
             when (dbg_invariants opts && isConstant subj)

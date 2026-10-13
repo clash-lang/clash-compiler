@@ -55,6 +55,7 @@ import Test.Clash.Rewrite
   , localId, nilDc, runRewriteTest, runSingleTransformation, showPprU
   , testTyConMap, tyVar, vecTy, withTyConMap )
 import Test.Clash.Scoped (aeqTermTyped, stripCoercionTypes)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- | The default rewrite environment, extended with @Vec@ and the other type
 -- constructors of 'testTyConMap'
@@ -215,7 +216,7 @@ reduceFoldNextUnique impl = do
         [Right (LitTy (NumTy 1)), Right aTy, Left (Var f), Left (Var v)]
     -- Some transformations of 'constantPropagation' look at the function being
     -- normalized
-    st0 = def{_uniqSupply = supply, _curFun = (globalId User "top" 3 intTy, noSrcSpan)}
+    st0 = def{_uniqSupply = supply, _curFun = (mkGlobalIdFromClash (globalId User "top" 3 intTy), noSrcSpan)}
   (res, st, _) <-
     runRewriteTest envVec st0 (runRewrite "reduceFold" is0 (impl (ReduceFold 2)) foldApp)
   pure (res, fst (freshId (_uniqSupply st)))

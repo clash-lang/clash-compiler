@@ -51,6 +51,7 @@ import Test.Clash.Rewrite
   , pairTy, parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
   , showPprU, testTyConMap, tyVar, withTyConMap )
 import Clash.Core.Scoped.Syntax (globalIdLegacy)
+import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 -- | The 'appProp' of Clash Core
 appPropR :: NormRewrite
@@ -85,7 +86,7 @@ bindConstantVarThenAppProp appPropRw inScope term = do
     _ -> assertFailure ("Unexpected result of bindConstantVar: " <> showPprU inlined)
  where
   -- 'bindConstantVar' looks at the function being normalized
-  st = def { _curFun = (globalId User "top" 200 intTy, noSrcSpan) }
+  st = def { _curFun = (mkGlobalIdFromClash (globalId User "top" 200 intTy), noSrcSpan) }
 
 -- * appProp (#492, #1040, #1035, #3479)
 --

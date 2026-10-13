@@ -37,7 +37,7 @@ import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onCast, onLet, toTransformation)
 import Clash.Rewrite.Types
-  (TransformContext(..), bindings, curFun, tcCache, workFreeBinders)
+  (TransformContext(..), bindings, curFunLegacy, tcCache, workFreeBinders)
 import Clash.Rewrite.Util (changed, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isWorkFree)
 import Clash.Util (ClashException(..), curLoc)
@@ -83,7 +83,7 @@ argCastSpecWorker ctx node f (stripTicks -> Cast e' _ _)
  where
   specializeNode = specialize ctx node
   warn = do
-    (_,sp) <- Lens.use curFun
+    (_,sp) <- Lens.use curFunLegacy
     warnAboutM WarnCastSpecialization sp $ unwords
       [ $(curLoc) ++ "specializing a function on a non work-free"
       , "cast. Generated HDL implementation might contain duplicate work."
@@ -131,7 +131,7 @@ elimCastCastWorker _ctx node (stripTicks -> Cast e tyA tyB) tyB' tyC = do
                                    else throwError
  where
   throwError = do
-    (nm,sp) <- Lens.use curFun
+    (nm,sp) <- Lens.use curFunLegacy
     throw (ClashException sp ($(curLoc) ++ showPpr nm
             ++ ": Found 2 nested casts whose types don't line up:\n"
             ++ showPpr node)
