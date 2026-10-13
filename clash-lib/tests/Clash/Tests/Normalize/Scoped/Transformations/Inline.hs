@@ -3,13 +3,13 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Inline": the regression
-  tests of "Clash.Normalize.Transformations.Inline", run on the ports through
-  'Test.Clash.Scoped.ViaFoil.viaFoil', and tests of the ports that have
-  no captured sites in the differential corpus.
+  Tests for "Clash.Normalize.Scoped.Transformations.Inline".
+
+  The regression tests are those of "Clash.Normalize.Transformations.Inline".
+  'assertRewritesTo' runs every test in the scope of the free variables of
+  its input, and in a scope that the binders of the input clash with.
 -}
 
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
@@ -24,248 +24,261 @@ import GHC.Types.SourceText (SourceText (NoSourceText))
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User), mkUnsafeName, noSrcSpan)
-import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import Clash.Core.Util (primUCo)
-import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (mkVarEnv)
+import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkIdentity))
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Transformations.Inline as S
-import Clash.Normalize.Types (NormRewrite)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Rewrite.Scoped (ScopedRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
-import Clash.Rewrite.Types (RewriteState (..))
+import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
-import Clash.Core.Scoped.Convert (convScope, fromClashTerm, mkGlobalIdFromClash)
+import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences)
-import Clash.Core.Scoped.NameMap (emptyNameMap, nameMapFromList)
+import Clash.Core.Scoped.NameMap (GlobalEnv, emptyNameMap, globalEnvFromList, nameMapFromList)
 import Clash.Core.Scoped.Syntax
 import Clash.Rewrite.Scoped.Util (LetBinding (..), keepBindings, openLetBindings)
 
-import Clash.Tests.Normalize.Transformations.Inline (InlineRewrites (..), inlineTests)
 import Test.Clash.Rewrite
-  ( assertAlphaEq, globalId, inScopeOf, intFunTy, intId, intLit, intTy, localId, mkBinding
-  , parseToTermQQ, runSingleTransformation, testTyConMap, withTyConMap )
-import Test.Clash.Scoped (assertScopedAlphaEq, withFreeVarsOf)
-import Test.Clash.Scoped.ViaFoil (viaFoil)
+  ( TestDefs (..), TestTerm, mkGlobalBinding, parseTestTermWith
+  , strQQ, testGlobalId, testTyConMap, withTyConMap )
+import Test.Clash.Scoped
+  ( ScopeDecl, TestScope (..), assertNoRewrite, assertRewritesTo, assertTermIs, closedTerm
+  , closedType, mkGlobalBindings, varD, withBinderClashes, withCurFun, withTerm )
 
--- | The ports, through 'Test.Clash.Scoped.ViaFoil.viaFoil'
-scopedRewrites :: InlineRewrites
-scopedRewrites = InlineRewrites
-  { irInlineCleanup = (viaFoil "inlineCleanup" $(asScopedRewriteQ S.inlineCleanup))
-  , irInlineSmall = (viaFoil "inlineSmall" $(asScopedRewriteQ S.inlineSmall))
-  , irInlineWorkFree = (viaFoil "inlineWorkFree" $(asScopedRewriteQ S.inlineWorkFree))
-  , irCollapseRHSNoops = (viaFoil "collapseRHSNoops" $(asScopedRewriteQ S.collapseRHSNoops))
-  }
+-- * Definitions
+
+-- | The function being normalized, a global with a binding, and the other
+-- global functions of the tests
+top, g, fun, act, both :: GlobalId
+top = testGlobalId "top_G10" "Int"
+g = testGlobalId "g_G11" "Int"
+fun = testGlobalId "fun_G12" "Int -> Int"
+act = testGlobalId "act_G13" "Int -> Clash.Explicit.SimIO.SimIO_300 Int"
+both = testGlobalId "both_G14"
+  "Clash.Explicit.SimIO.SimIO_300 Int -> Clash.Explicit.SimIO.SimIO_300 Int -> Clash.Explicit.SimIO.SimIO_300 Int"
+
+-- | The global @f :: Int -> Int@ of the regression tests
+fGlobal :: GlobalId
+fGlobal = testGlobalId "f_G7" "Int -> Int"
+
+-- | A primitive like @map :: (Int -> Int) -> Int -> Int@: the identity on its
+-- second argument, if its first argument is a no-op
+mapPrim :: PrimInfo
+mapPrim = mkPrimInfo "mapPrim" (closedType "(Int -> Int) -> Int -> Int") (C.WorkIdentity 1 [0]) C.SingleResult NoUnfolding
+
+-- | A primitive that is the identity on its argument
+idPrim :: PrimInfo
+idPrim = mkPrimInfo "idPrim" (closedType "Int -> Int") (C.WorkIdentity 0 []) C.SingleResult NoUnfolding
+
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [] [mapPrim, idPrim] [top, g, fun, act, both, fGlobal])
+
+env :: RewriteEnv
+env = withTyConMap testTyConMap def
+
+-- | A state in which 'top' is being normalized, with the given bindings, and
+-- a binding of 'g'
+topState :: GlobalEnv (Binding (Term 'VoidS)) -> RewriteState NormalizeState
+topState bs = withCurFun top def
+  { _scopedBindings = bs <> mkGlobalBindings [(g, "1")] }
+
+-- | The binding of 'top', as an OPAQUE function. 'collapseRHSNoops' only runs
+-- in NOINLINE and OPAQUE functions.
+topOpaque :: GlobalEnv (Binding (Term 'VoidS))
+topOpaque = globalEnvFromList
+  [(top, (mkGlobalBinding top (closedTerm "0")) {bindingSpec = Opaque NoSourceText})]
+
+-- | Assert that a transformation, in a state set up with 'topState', rewrites
+-- a term to the expected one
+rewritesInTop
+  :: GlobalEnv (Binding (Term 'VoidS)) -> ScopedRewrite NormalizeState -> [ScopeDecl]
+  -> TestTerm -> TestTerm -> Assertion
+rewritesInTop bs = assertRewritesTo env (topState bs)
+
+-- | Assert that a transformation, in a state set up with 'topState', leaves a
+-- term as it is
+keepsInTop
+  :: GlobalEnv (Binding (Term 'VoidS)) -> ScopedRewrite NormalizeState -> [ScopeDecl]
+  -> TestTerm -> Assertion
+keepsInTop bs = assertNoRewrite env (topState bs)
 
 -- * inlineBndrsCleanup
 
 -- | Run the scoped 'S.inlineBndrsCleanup' on a let-expression, keeping its
 -- first binding and inlining the others, like the #1337 tests in
--- "Clash.Tests.Normalize.Transformations" do for Clash Core. Gives the
--- let-expression with the bindings it keeps.
-inlineBndrsCleanup1337 :: C.Term -> C.Term -> Assertion
-inlineBndrsCleanup1337 expected tm =
-  withFreeVarsOf [tm] $ \env -> go (convScope env) (fromClashTerm env tm)
+-- "Clash.Tests.Normalize.Transformations" do for Clash Core. Asserts that it
+-- gives the let-expression with the expected bindings, also in a scope that
+-- its binders clash with.
+inlineBndrsCleanup1337 :: TestTerm -> TestTerm -> Assertion
+inlineBndrsCleanup1337 expected input =
+  withTerm input $ \ts e -> do
+    go ts e
+    withBinderClashes ts e go
  where
-  go :: Distinct n => Scope n -> Term n -> Assertion
-  go sc (Let bind body) = openLetBindings sc bind body $ \scL bs lbs body1 ->
+  go :: Distinct n => TestScope n -> Term n -> Assertion
+  go ts (Let bind body) = openLetBindings (testScope ts) bind body $ \scL bs lbs body1 ->
     case [(lb, freeTmVarOccurrences (lbRhs lb)) | lb <- lbs] of
       keep0 : inlines ->
         let keep1 = S.inlineBndrsCleanup scL
                       (nameMapFromList [(lbName lb, i) | i@(lb, _) <- inlines])
                       emptyNameMap
                       [keep0]
-        in  case keepBindings sc bs keep1 body1 of
-              Just e -> assertScopedAlphaEq expected e
+        in  case keepBindings (testScope ts) bs keep1 body1 of
+              Just e -> assertTermIs ts expected e
               Nothing -> assertFailure "an inlined binder remains"
       [] -> assertFailure "no bindings"
   go _ _ = assertFailure "not a let-expression"
 
--- | See @t1337a@ in "Clash.Tests.Normalize.Transformations"
-t1337a :: Assertion
-t1337a = inlineBndrsCleanup1337
-  [parseToTermQQ|
-    let
-      result_1, b_3 :: Int
-      result_1 = b_3
-      b_3 = b_3 b_3
-    in
-      result_1
-  |]
-  [parseToTermQQ|
-    let
-      -- Types don't mean anything for this example
-      result_1, a_2, b_3, c_4 :: Int
-
-      result_1 = a_2
-
-      a_2 = b_3
-      b_3 = c_4
-      c_4 = a_2 b_3
-    in
-      result_1
-  |]
-
--- | See @t1337b@ in "Clash.Tests.Normalize.Transformations"
-t1337b :: Assertion
-t1337b = inlineBndrsCleanup1337
-  [parseToTermQQ|
-    let
-      result_1, c_4 :: Int
-      result_1 = c_4
-      c_4 = c_4 c_4 c_4
-    in
-      result_1
-  |]
-  [parseToTermQQ|
-    let
-      -- Types don't mean anything for this example
-      result_1, a_2, b_3, c_4, d_5 :: Int
-
-      result_1 = a_2
-
-      a_2 = b_3
-      b_3 = c_4
-      c_4 = d_5
-      d_5 = a_2 b_3 c_4
-    in
-      result_1
-  |]
-
--- | See @t1337c@ in "Clash.Tests.Normalize.Transformations": a free variable
--- of the let-expression is no let-binding to inline
-t1337c :: Assertion
-t1337c = inlineBndrsCleanup1337
-  [parseToTermQQ|
-    let
-      result_1, b_3 :: Int
-      result_1 = b_3
-      b_3 = b_3 b_3 (freevar_5 :: Int)
-    in
-      result_1
-  |]
-  [parseToTermQQ|
-    let
-      result_1, a_2, b_3, c_4 :: Int
-
-      result_1 = a_2
-
-      a_2 = b_3
-      b_3 = c_4
-      c_4 = a_2 b_3 (freevar_5 :: Int)
-    in
-      result_1
-  |]
-
--- * The function being normalized
-
--- | The function being normalized, and a global with a binding
-top, g :: Id
-top = globalId User "top" 10 intTy
-g = globalId User "g" 11 intTy
-
--- | A state in which 'top' is being normalized, with the given bindings
-topState :: [(Id, Binding C.Term)] -> RewriteState extra -> RewriteState extra
-topState bs st = st
-  { _curFun = (mkGlobalIdFromClash top, noSrcSpan)
-  , _bindings = mkVarEnv ((g, mkBinding g (intLit 1)) : bs)
-  }
-
--- | Run a rewrite on a term in which @x@ is free, in a state set up with
--- 'topState'
-runInTop :: [(Id, Binding C.Term)] -> NormRewrite -> C.Term -> IO C.Term
-runInTop bs rw =
-  runSingleTransformation (withTyConMap testTyConMap def) (topState bs def) (inScopeOf [x]) rw
-
-x, y :: Id
-x = intId User "x" 20
-y = intId User "y" 21
-
--- | The implementation of a transformation of let-bindings, by the name of
--- the test. The tests of the transformations of Clash Core are in
--- "Clash.Tests.Normalize.Transformations.Inline".
-bothImpls :: NormRewrite -> [(String, NormRewrite)]
-bothImpls scoped = [("scoped", scoped)]
-
 tests :: TestTree
 tests =
   testGroup "Clash.Tests.Normalize.Scoped.Transformations.Inline"
-    [ testGroup "regression tests of Clash Core, through viaFoil"
-        (inlineTests scopedRewrites)
+    [ testGroup "regression tests" regressionTests
     , testGroup "inlineBndrsCleanup (#1337)"
-        [ testCase "t1337a" t1337a
-        , testCase "t1337b" t1337b
-        , testCase "t1337c" t1337c
+        [ -- See @t1337a@ in "Clash.Tests.Normalize.Transformations"
+          testCase "t1337a" $
+            inlineBndrsCleanup1337
+              "let { (res :: Int) = b; (b :: Int) = b b } in res"
+              [strQQ|
+                let
+                  -- Types don't mean anything for this example
+                  { (res :: Int) = a
+                  ; (a :: Int) = b
+                  ; (b :: Int) = c
+                  ; (c :: Int) = a b
+                  } in res
+              |]
+          -- See @t1337b@ in "Clash.Tests.Normalize.Transformations"
+        , testCase "t1337b" $
+            inlineBndrsCleanup1337
+              "let { (res :: Int) = c; (c :: Int) = c c c } in res"
+              [strQQ|
+                let
+                  { (res :: Int) = a
+                  ; (a :: Int) = b
+                  ; (b :: Int) = c
+                  ; (c :: Int) = d
+                  ; (d :: Int) = a b c
+                  } in res
+              |]
+          -- See @t1337c@ in "Clash.Tests.Normalize.Transformations": a free
+          -- variable of the let-expression is no let-binding to inline
+        , testCase "t1337c" $
+            inlineBndrsCleanup1337
+              "let { (res :: Int) = b; (b :: Int) = b b (freevar_5 :: Int) } in res"
+              [strQQ|
+                let
+                  { (res :: Int) = a
+                  ; (a :: Int) = b
+                  ; (b :: Int) = c
+                  ; (c :: Int) = a b (freevar_5 :: Int)
+                  } in res
+              |]
         ]
-    , testGroup "bindConstantVar" $ concat
-        [ [ testCase ("doesn't inline the function being normalized (#2839), " <> nm) $
-              runInTop [] rw (C.Let (C.NonRec y (C.Var top)) (C.Var y))
-                >>= assertAlphaEq (C.Let (C.NonRec y (C.Var top)) (C.Var y))
-          , testCase ("doesn't inline another global, which isn't work-free-ish, " <> nm) $
-              runInTop [] rw (C.Let (C.NonRec y (C.Var g)) (C.Var y))
-                >>= assertAlphaEq (C.Let (C.NonRec y (C.Var g)) (C.Var y))
-          , testCase ("inlines a constant, " <> nm) $
-              runInTop [] rw (C.Let (C.NonRec y (intLit 3)) (C.Var y))
-                >>= assertAlphaEq (intLit 3)
-          , testCase ("inlines a local variable, " <> nm) $
-              runInTop [] rw (C.Let (C.NonRec y (C.Var x)) (C.Var y))
-                >>= assertAlphaEq (C.Var x)
-          ]
-        | (nm, rw) <- bothImpls
-            (viaFoil "bindConstantVar" $(asScopedRewriteQ S.bindConstantVar))
+    , testGroup "bindConstantVar"
+        [ testCase "doesn't inline the function being normalized (#2839)" $
+            keepsInTop mempty bindConstantVarS [] (tm "let { !(y :: Int) = top_G10 } in y")
+        , testCase "doesn't inline another global, which isn't work-free-ish" $
+            keepsInTop mempty bindConstantVarS [] (tm "let { !(y :: Int) = g_G11 } in y")
+        , testCase "inlines a constant" $
+            rewritesInTop mempty bindConstantVarS [] (tm "let { !(y :: Int) = 3 } in y") (tm "3")
+        , testCase "inlines a local variable" $
+            rewritesInTop mempty bindConstantVarS [varD "x_20" "Int"]
+              (tm "let { !(y :: Int) = x_20 } in y") (tm "x_20")
         ]
-    , testGroup "inlineCast" $ concat
-        [ [ testCase ("inlines a cast of a variable, " <> nm) $ do
-              let e = C.Cast (C.Var x) intTy intTy
-              runInTop [] rw (C.Let (C.NonRec y e) (C.App (C.Var fun) (C.Var y)))
-                >>= assertAlphaEq (C.App (C.Var fun) e)
-          , testCase ("inlines a cast of a global, " <> nm) $ do
-              let e = C.Cast (C.Var g) intTy intTy
-              runInTop [] rw (C.Let (C.NonRec y e) (C.App (C.Var fun) (C.Var y)))
-                >>= assertAlphaEq (C.App (C.Var fun) e)
-          , testCase ("doesn't inline a cast of an application, " <> nm) $ do
-              let e = C.Let (C.NonRec y (C.Cast (C.App (C.Var fun) (C.Var x)) intTy intTy))
-                        (C.Var y)
-              runInTop [] rw e >>= assertAlphaEq e
-          ]
-        | (nm, rw) <- bothImpls
-            (viaFoil "inlineCast" $(asScopedRewriteQ S.inlineCast))
+    , testGroup "inlineCast"
+        [ testCase "inlines a cast of a variable" $
+            rewritesInTop mempty inlineCastS [varD "x_20" "Int"]
+              (tm "let { !(y :: Int) = Core.cast @Int @Int x_20 } in fun_G12 y")
+              (tm "fun_G12 (Core.cast @Int @Int x_20)")
+        , testCase "inlines a cast of a global" $
+            rewritesInTop mempty inlineCastS []
+              (tm "let { !(y :: Int) = Core.cast @Int @Int g_G11 } in fun_G12 y")
+              (tm "fun_G12 (Core.cast @Int @Int g_G11)")
+        , testCase "doesn't inline a cast of an application" $
+            keepsInTop mempty inlineCastS [varD "x_20" "Int"]
+              (tm "let { !(y :: Int) = Core.cast @Int @Int (fun_G12 x_20) } in y")
         ]
-    , testGroup "inlineSimIO" $ concat
-        [ [ testCase ("doesn't inline a binding of another type, " <> nm) $ do
-              let e = C.Let (C.NonRec y (C.App (C.Var fun) (C.Var x))) (C.Var y)
-              runInTop [] rw e >>= assertAlphaEq e
-          , testCase ("inlines a SimIO action at every occurrence, " <> nm) $ do
-              let act = C.App (C.Var simIOFun) (C.Var x)
-              runInTop [] rw
-                (C.Let (C.NonRec io act) (C.mkApps (C.Var bindIO) [Left (C.Var io), Left (C.Var io)]))
-                >>= assertAlphaEq (C.mkApps (C.Var bindIO) [Left act, Left act])
-          ]
-        | (nm, rw) <- bothImpls
-            (viaFoil "inlineSimIO" $(asScopedRewriteQ S.inlineSimIO))
+    , testGroup "inlineSimIO"
+        [ testCase "doesn't inline a binding of another type" $
+            keepsInTop mempty inlineSimIOS [varD "x_20" "Int"]
+              (tm "let { !(y :: Int) = fun_G12 x_20 } in y")
+        , testCase "inlines a SimIO action at every occurrence" $
+            rewritesInTop mempty inlineSimIOS [varD "x_20" "Int"]
+              (tm "let { !(io :: Clash.Explicit.SimIO.SimIO_300 Int) = act_G13 x_20 } in both_G14 io io")
+              (tm "both_G14 (act_G13 x_20) (act_G13 x_20)")
         ]
-    , testGroup "collapseRHSNoops" $ concat
-        [ [ testCase ("doesn't fire in a function without a binding, " <> nm) $ do
-              -- E.g. the fake global of 'normalizeWorkFreeApp'
-              let e = C.Let (C.NonRec y (C.mkApps idPrim [Left (C.Var x)])) (C.Var y)
-              runInTop [] rw e >>= assertAlphaEq e
-          , testCase ("collapses an identity primitive in an OPAQUE function, " <> nm) $ do
-              let e = C.Let (C.NonRec y (C.mkApps idPrim [Left (C.Var x)])) (C.Var y)
-                  topB = (mkBinding top (intLit 0)) {bindingSpec = Opaque NoSourceText}
-              runInTop [(top, topB)] rw e >>= assertAlphaEq
-                (C.Let (C.NonRec y (C.mkApps primUCo [Right intTy, Right intTy, Left (C.Var x)]))
-                       (C.Var y))
-          ]
-        | (nm, rw) <- bothImpls
-            (viaFoil "collapseRHSNoops" $(asScopedRewriteQ S.collapseRHSNoops))
+    , testGroup "collapseRHSNoops"
+        [ -- E.g. the fake global of 'normalizeWorkFreeApp'
+          testCase "doesn't fire in a function without a binding" $
+            keepsInTop mempty collapseRHSNoopsS [varD "x_20" "Int"]
+              (tm "let { !(y :: Int) = Prim.idPrim x_20 } in y")
+        , testCase "collapses an identity primitive in an OPAQUE function" $
+            rewritesInTop topOpaque collapseRHSNoopsS [varD "x_20" "Int"]
+              (tm "let { !(y :: Int) = Prim.idPrim x_20 } in y")
+              (tm "let { !(y :: Int) = GHC.Prim.unsafeCoerce# @Int @Int x_20 } in y")
         ]
     ]
  where
-  fun = globalId User "fun" 12 (intFunTy 1)
-  -- @SimIO Int@, and functions producing and combining actions
-  simIOTy = C.AppTy (C.ConstTy (C.TyCon (mkUnsafeName User "Clash.Explicit.SimIO.SimIO" 300))) intTy
-  simIOFun = globalId User "act" 13 (C.mkFunTy intTy simIOTy)
-  bindIO = globalId User "both" 14 (C.mkFunTy simIOTy (C.mkFunTy simIOTy simIOTy))
-  io = localId User "io" 22 simIOTy
-  idPrim = C.Prim (C.PrimInfo "idPrim" (intFunTy 1) (C.WorkIdentity 0 []) C.SingleResult C.NoUnfolding)
+  bindConstantVarS = $(asScopedRewriteQ S.bindConstantVar)
+  inlineCastS = $(asScopedRewriteQ S.inlineCast)
+  inlineSimIOS = $(asScopedRewriteQ S.inlineSimIO)
+  collapseRHSNoopsS = $(asScopedRewriteQ S.collapseRHSNoops)
+
+-- | The regression tests of "Clash.Normalize.Transformations.Inline"
+regressionTests :: [TestTree]
+regressionTests =
+  [ -- 'inlineCleanup' on a let-expression in which the binders that it wants
+    -- to inline (data constructor applications bound to system names) form
+    -- two nested cycles: @w -> y -> x -> w@ and @x <-> y@. Starting from @k@,
+    -- it visits @w@, @y@ and @x@ in that order. So @x@ refers to two
+    -- let-bindings that are still being processed. It used to inline @x@
+    -- anyway, and only mark @y@ as recursive. Then it inlined @w@ into @k@ and
+    -- dropped it, while the copy of @x@ in @k@ still referred to it.
+    testCase "inlineCleanup keeps binders that inlined binders refer to" $
+      assertRewritesTo env def $(asScopedRewriteQ S.inlineCleanup) []
+        (tm [strQQ|
+          let
+            { (w_S :: Pair) = MkPair y_S y_S
+            ; (y_S :: Pair) = MkPair x_S x_S
+            ; (x_S :: Pair) = MkPair w_S y_S
+            ; (k :: Pair) = MkPair w_S x_S
+            } in k
+        |])
+        (tm [strQQ|
+          let
+            { (k :: Pair) = MkPair (MkPair (MkPair x_S x_S) (MkPair x_S x_S)) x_S
+            ; (x_S :: Pair) = MkPair (MkPair (MkPair x_S x_S) (MkPair x_S x_S)) (MkPair x_S x_S)
+            } in k
+        |])
+
+    -- A reference to a local variable which has the same unique as a global
+    -- binder. Before #405, the inlining transformations didn't check whether
+    -- the variable was local, and inlined the global binder instead.
+    -- https://github.com/clash-lang/clash-compiler/pull/405
+    -- https://github.com/clash-lang/clash-compiler/commit/16e65951c40b36ce64861819ff14e1a5b6cc0486
+  , testCase "inlineSmall does not inline a local variable (#405)" $
+      assertNoRewrite env fState $(asScopedRewriteQ S.inlineSmall) [varD "f_7" "Int"] (tm "f_7")
+  , testCase "inlineWorkFree does not inline a local variable (#405)" $
+      assertNoRewrite env fState $(asScopedRewriteQ S.inlineWorkFree) [varD "f_7" "Int"] (tm "f_7")
+
+    -- 'collapseRHSNoops' on @let r = mapPrim f xs in r@, in a function in
+    -- which the global no-op @f = \\x -> x@ is defined
+  , testCase "collapseRHSNoops collapses a global no-op" $
+      rewritesInTop (topOpaque <> fIdentity) collapseRHSNoopsS [varD "xs_11" "Int"]
+        (tm "let { !(r :: Int) = Prim.mapPrim f_G7 xs_11 } in r")
+        (tm "let { !(r :: Int) = GHC.Prim.unsafeCoerce# @Int @Int xs_11 } in r")
+
+    -- A local variable @f@ with the same unique as the global no-op @f@ is
+    -- not a no-op. 'collapseRHSNoops' used to look up @f@ in the global
+    -- binders, and turned the let-binding into @r = unsafeCoerce# xs@.
+  , testCase "collapseRHSNoops does not treat a local variable as a no-op" $
+      keepsInTop (topOpaque <> fIdentity) collapseRHSNoopsS [varD "f_7" "Int -> Int", varD "xs_11" "Int"]
+        (tm "let { !(r :: Int) = Prim.mapPrim f_7 xs_11 } in r")
+  ]
+ where
+  collapseRHSNoopsS = $(asScopedRewriteQ S.collapseRHSNoops)
+  -- A state with the binding @f = 42@ of the global @f :: Int@, with the same
+  -- unique as the local variable @f@
+  fState = def {_scopedBindings = mkGlobalBindings [(testGlobalId "f_G7" "Int", "42")]}
+  -- The binding of the global no-op @f = \\x -> x@
+  fIdentity = mkGlobalBindings [(fGlobal, "\\(x :: Int) -> x")]
