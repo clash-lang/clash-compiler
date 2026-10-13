@@ -77,11 +77,10 @@ import           Clash.Driver.Warning    (warnAbout, warnAboutM)
 import           Clash.GHC.GHC2Core
   (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToGlobalIdB, coreToName,
    makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
-   srcSpan)
+   srcSpan, coreToTermB, coreToTypeB, varKey)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Core.Scoped.Builder
   (TmB, letrecB, runClosedTerm, varB)
-import           Clash.GHC.Scoped.GHC2Core (coreToTermB, coreToTypeB, varKey)
 import           Clash.Netlist.BlackBox.Util (getUsedArguments)
 import           Clash.Netlist.Types     (TopEntityT(..))
 import           Clash.Primitives.Types
@@ -297,7 +296,7 @@ parRunC2C env ms = parListChunk chunkSize forceResult (map runC2C ms)
   runC2C m = case RWS.runRWS m env emptyGHC2CoreState of
     (a, s, _w) -> (a, s)
   -- Force the converted result to normal form (this is the expensive
-  -- 'Clash.GHC.Scoped.GHC2Core.coreToTermB' work we want to parallelize). The
+  -- 'Clash.GHC.GHC2Core.coreToTermB' work we want to parallelize). The
   -- state is left to be forced lazily when its 'TyCon' map is merged; its
   -- entries are cheap GHC 'TyCon' references (the heavy 'makeAllTyCons'
   -- conversion happens later).
@@ -343,7 +342,7 @@ will be rewritten (and inserted into the map of global bindings) as
                  in g[LocalId]
 
 In scoped Core, the local binders of the group are a 'Rec' telescope of
-fresh local variables, which 'Clash.GHC.Scoped.GHC2Core.coreToTermB' refers
+fresh local variables, which 'Clash.GHC.GHC2Core.coreToTermB' refers
 to instead of the global binders of the group.
 
 Recursive groups with only a single binding (i.e. global self-recursive

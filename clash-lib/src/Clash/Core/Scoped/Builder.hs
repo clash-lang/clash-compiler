@@ -6,11 +6,11 @@
   Builders of closed terms and types of scoped Clash Core
   ("Clash.Core.Scoped.Syntax"). They build scoped Core from a representation
   that refers to variables by name, such as GHC Core
-  ("Clash.GHC.Scoped.GHC2Core"), and add nothing to the trusted core.
+  ("Clash.GHC.GHC2Core"), and add nothing to the trusted core.
 
   = Two phases
 
-  E.g. "Clash.GHC.Scoped.GHC2Core" converts GHC Core in two phases:
+  E.g. "Clash.GHC.GHC2Core" converts GHC Core in two phases:
 
   1. In the 'Clash.GHC.GHC2Core.C2C' monad, it converts a GHC term into a
      builder ('TmB'), and a GHC type into a 'TyB'. This phase does all the
@@ -44,7 +44,7 @@
   environment of phase 2 maps the keys of the variables in scope to their
   occurrences, where an inner binder shadows an outer one with the same key,
   as in GHC Core. So the keys of different variables need only differ where
-  one is in the scope of the other. The builders of "Clash.GHC.Scoped.GHC2Core"
+  one is in the scope of the other. The builders of "Clash.GHC.GHC2Core"
   that don't come from GHC Core, such as those of the signal primitives, are
   closed: their bodies only refer to their own binders, so any keys work for
   them.

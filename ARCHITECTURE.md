@@ -109,7 +109,7 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
       Load modules from either their interface file (`*.hi`) or their source (`*.hs`). Modules and their dependencies are loaded as GHC core, which is parsed, typechecked and simplified by GHC. In addition, loading modules also finds annotation on loaded definitions, such as `Synthesize` annotations on top entitiies and test benches.
 
-    * `Clash.GHC.Scoped.GHC2Core.coreToTermB`
+    * `Clash.GHC.GHC2Core.coreToTermB`
 
       This translates between GHC core and Clash core. This translation discards information in the GHC core which is not useful to Clash, such as coercions and call stack types. Additionally, this conversion removes most functions on `Signal`, which is treated as transparent in Clash.
 
