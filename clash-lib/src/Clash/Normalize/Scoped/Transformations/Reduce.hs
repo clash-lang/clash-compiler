@@ -58,7 +58,7 @@ import qualified Clash.Normalize.Scoped.PrimitiveReductions as PR
 import Clash.Normalize.Scoped.Primitives (removedArg)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
-import Clash.Rewrite.Types (normalizeUltra, scopedTypeEnv)
+import Clash.Rewrite.Types (normalizeUltra, typeEnv)
 import qualified Clash.Sized.Internal.BitVector
 import qualified Clash.Sized.RTree
 import qualified Clash.Sized.Vector
@@ -219,7 +219,7 @@ reducePrimWorker ctx e _appFunction _appArgument = case ctxFrames ctx of
   -- type-correct at the root, where no more arguments follow.
   KAppFun : _ -> return e
   _ | (Prim p, args, ticks) <- collectArgsTicks e -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       let handlerM = HashMap.lookup (primName p) reducePrimImpls
           sc = tfScope ctx
       -- Every primitive whose result type is @Vec 0 a@ reduces to @Nil@, not
@@ -262,7 +262,7 @@ reducePrimWorker ctx e _appFunction _appArgument = case ctxFrames ctx of
                         , primInfo = p
                         , primArguments = args
                         , primTicks = ticks
-                        , typeEnv = te
+                        , rpcTypeEnv = te
                         , ultra = ultraArg
                         , termType = eTy
                         , resultType = resTy
@@ -320,7 +320,7 @@ data ReducePrimContext n = ReducePrimContext
   , primInfo :: PrimInfo
   , primArguments :: [Either (Term n) (Type n)]
   , primTicks :: [TickInfo n]
-  , typeEnv :: TypeEnv
+  , rpcTypeEnv :: TypeEnv
   , ultra :: Bool
     -- ^ Whether @-fclash-ultra@ is enabled
   , termType :: Type n
@@ -374,12 +374,12 @@ reducePrimImpls = HashMap.fromList
 
 -- | 'tyNatSize' in the scope of the primitive application
 natSize :: Distinct n => ReducePrimContext n -> Type n -> Either String Integer
-natSize rpc = runExcept . tyNatSize (typeEnv rpc) (rpcScope rpc)
+natSize rpc = runExcept . tyNatSize (rpcTypeEnv rpc) (rpcScope rpc)
 
 -- | Whether to unroll a primitive with this argument or result type, see
 -- Note [Unroll shouldSplit types]
 isSplit :: Distinct n => ReducePrimContext n -> Type n -> Bool
-isSplit rpc = Maybe.isJust . shouldSplit (typeEnv rpc) (rpcScope rpc)
+isSplit rpc = Maybe.isJust . shouldSplit (rpcTypeEnv rpc) (rpcScope rpc)
 
 -- | The leading argument types of the primitive, instantiated with the given
 -- type arguments: the types of its term arguments up to the first remaining
@@ -389,7 +389,7 @@ primArgTys rpc tys =
   case splitFunForallTy (piResultTys te sc (primInfoType (primInfo rpc)) tys) of
     SplitFunForall tele _ -> leadingArgs tele
  where
-  te = typeEnv rpc
+  te = rpcTypeEnv rpc
   sc = rpcScope rpc
 
   leadingArgs :: PiTele n l -> [Type n]
@@ -803,7 +803,7 @@ reduceSplitHandler rpc@ReducePrimContext{..}
               _ -> error "reducePrim: split# arity"
        where
         tupDc = fromMaybe (error "reducePrim: faield to create tup DC") $ do
-                tupTc <- lookupTyCon typeEnv tupTcNm
+                tupTc <- lookupTyCon rpcTypeEnv tupTcNm
                 listToMaybe (tyConDataCons tupTc)
       _ -> return originalTerm
   | length primArguments >= 3
@@ -818,7 +818,7 @@ reduceEqHandler rpc@ReducePrimContext{..}
   , TyConApp boolTcNm [] <- resultTypeView
   = abstractOverMissingArgs 3 primTicks tmArgs termType transformContext $ \_ctx _args ->
       let trueDc = fromMaybe (error "reducePrim: failed to create True DC") $ do
-            boolTc <- lookupTyCon typeEnv boolTcNm
+            boolTc <- lookupTyCon rpcTypeEnv boolTcNm
             [_falseDc,dc] <- pure (tyConDataCons boolTc)
             return dc
       in changed (Data trueDc)
@@ -960,7 +960,7 @@ runPrimReduction
   -- ^ Term arguments
   -> NormalizeSession (Term n)
 runPrimReduction ctx red p tys tms = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   let
     -- The type of the saturated application
     resTy = inferCoreTypeOf te (tfScope ctx) (mkApps (Prim p) (map Right tys <> map Left tms))

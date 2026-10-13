@@ -46,7 +46,7 @@ import Clash.Netlist.Types (BlackBox (..))
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
-import Clash.Rewrite.Types (aggressiveXOpt, primitives, scopedTypeEnv)
+import Clash.Rewrite.Types (aggressiveXOpt, primitives, typeEnv)
 import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.HasType (inferCoreTypeOf)
@@ -133,7 +133,7 @@ xOptimizeSingle
 xOptimizeSingle sc subj ty alt = case alt of
   Alt (DataPat _ (TCons _ _) _) _ -> changed (Case subj ty [alt])
   Alt (DataPat dc TNil ids) expr -> do
-    te <- Lens.view scopedTypeEnv
+    te <- Lens.view typeEnv
     let fieldTys = teleIdBinderTypes ids
     -- letrec subj' = subj; x1 = case subj' of dc f1 .. fk -> f1; ... in expr
     changed $

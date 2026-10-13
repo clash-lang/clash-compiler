@@ -52,7 +52,7 @@ import Clash.Driver.Warning (warnAboutM)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onCast, onLet, toScopedTransformation)
-import Clash.Rewrite.Types (curFun, scopedTypeEnv)
+import Clash.Rewrite.Types (curFun, typeEnv)
 import Clash.Util (ClashException (..), curLoc)
 import Clash.Warning (ClashWarning (WarnCastSpecialization))
 
@@ -166,7 +166,7 @@ elimCastCastWorker
   -> NormalizeSession (Term n)
 elimCastCastWorker ctx node body tyB' tyC = case stripTicks body of
   Cast e tyA tyB -> do
-    te <- Lens.view scopedTypeEnv
+    te <- Lens.view typeEnv
     let norm = normalizeType te (tfScope ctx)
     if aeqTy (norm tyB) (norm tyB') && aeqTy (norm tyA) (norm tyC)
       then changed e
@@ -223,7 +223,7 @@ splitCastWorkWorker
   -> Term l
   -> NormalizeSession (Term n)
 splitCastWorkWorker ctx node bind body = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   case bind of
     NonRec b (castWork -> Just (e0, _, _)) ->
       mkTmBinderFor te sc (derivedName (idBinderOcc b)) e0 $ \_ b' ->

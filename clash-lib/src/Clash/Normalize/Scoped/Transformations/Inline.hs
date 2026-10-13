@@ -96,7 +96,7 @@ import Clash.Rewrite.StrategyDSL
   , toScopedTransformation )
 import Clash.Rewrite.Types
   ( curFun, inlineConstantLimit, inlineFunctionLimit, inlineLimit
-  , inlineWFCacheLimit, primitives, scopedTypeEnv )
+  , inlineWFCacheLimit, primitives, typeEnv )
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
@@ -155,7 +155,7 @@ bindConstantVarWorker = inlineBinders test
       case e of
         GlobalVar g | g == cf -> return False
         _ -> do
-          te <- Lens.view scopedTypeEnv
+          te <- Lens.view typeEnv
           -- Don't inline things that perform work, it increases the circuit
           -- size.
           case isWorkFreeIsh te sc e of
@@ -546,7 +546,7 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
   collapseNoop scX bTy term = do
     (Prim info, args) <- return (collectArgs term)
     identity <- getIdentity info (lefts args)
-    te <- Lens.view scopedTypeEnv
+    te <- Lens.view typeEnv
     let aTy = inferCoreTypeOf te scX identity
     return (primUCo `TyApp` aTy `TyApp` bTy `App` identity)
 
@@ -650,7 +650,7 @@ inlineNonRepWorker ctx e = case e of
       cf <- curFunGlobal
       isInlined <- zoomExtra (alreadyInlined f cf)
       limit <- Lens.view inlineLimit
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       let
         scrutTy = inferCoreTypeOf te (tfScope ctx) scrut
 
@@ -799,7 +799,7 @@ inlineWorkFreeWorker ctx e
       else do
         lookupBinding f >>= \case
           Just b -> do
-            te <- Lens.view scopedTypeEnv
+            te <- Lens.view typeEnv
             let eTy = inferCoreTypeOf te sc e
             if isSignalType te sc eTy
               then return e
@@ -828,7 +828,7 @@ inlineWorkFreeWorker ctx e
   | (GlobalVar f, ticks) <- collectTicks e
   = do
       topEnt <- isTopEntity f
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       let fTy = sinkClosed (globalIdType f)
           closed = not (isPolyFunCoreTy te sc fTy)
       if topEnt || not closed || isSignalType te sc fTy
@@ -869,6 +869,6 @@ inlineWorkFreeWorker ctx e
     if not (isClosed e')
       then return True
       else do
-        te <- Lens.view scopedTypeEnv
+        te <- Lens.view typeEnv
         return (isSignalType te sc (inferCoreTypeOf te sc e'))
 {-# SCC inlineWorkFreeWorker #-}

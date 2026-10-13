@@ -126,7 +126,7 @@ import Clash.Rewrite.Scoped
 import Clash.Rewrite.Scoped.Util (isUntranslatable, mkTmBinderFor, substVars)
 import Clash.Rewrite.Scoped.WorkFree (isConstant, isConstantNotClockReset)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toScopedTransformation)
-import Clash.Rewrite.Types (scopedTypeEnv)
+import Clash.Rewrite.Types (typeEnv)
 
 {- Note [ANF in Clash]
 ANF suitable for use in Clash can be described with the given types:
@@ -599,7 +599,7 @@ collectApp env rg e = case e of
     | (conVarPrim, _) <- collectArgs e
     , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
     -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       let sc = rgScope rg
       untranslatable <- isUntranslatable False sc arg
       let localVar = isLocalVar arg
@@ -626,7 +626,7 @@ collectLet
   -- ^ The body
   -> NormalizeSession (Grown r q Term)
 collectLet rg binds body = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   let sc = rgScope rg
       isSimIO = isSimIOTy te sc (inferCoreTypeOf te sc body)
   untranslatable <- isUntranslatable False sc body
@@ -653,7 +653,7 @@ collectCase
   -> [AltRes q]
   -> NormalizeSession (Grown r q Term)
 collectCase env rg subj ty alts = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   let sc = rgScope rg
       isSimIOAlt = isSimIOTy te sc ty
   if isLocalVar subj || isConstant subj

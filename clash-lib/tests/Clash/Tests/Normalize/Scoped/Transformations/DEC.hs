@@ -112,7 +112,7 @@ env = withTupleTyCons 3 (withTyConMap tcm def)
 -- | A state with the bindings of the global functions @f@
 st :: RewriteState NormalizeState
 st = def
-  { _scopedBindings = mkGlobalBindings [(f, "\\(a :: Int) -> a") | f <- [fReg, fAgr]]
+  { _bindings = mkGlobalBindings [(f, "\\(a :: Int) -> a") | f <- [fReg, fAgr]]
   , _globalHeap = (mempty, 0) }
 
 -- | Assert that DEC rewrites a term to the expected one, see

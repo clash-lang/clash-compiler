@@ -95,7 +95,7 @@ bindings = globalEnvFromList
 
 -- | A state with 'bindings', in which a function @top@ is being normalized
 st :: RewriteState NormalizeState
-st = withCurFun (testGlobalId "top_G42" "Int -> Int") def {_scopedBindings = bindings}
+st = withCurFun (testGlobalId "top_G42" "Int -> Int") def {_bindings = bindings}
 
 -- | The environment of the test types, including the zero-width types (see
 -- 'zeroWidthTyConMap')
@@ -524,7 +524,7 @@ fBinding = globalEnvFromList [(f, mkGlobalBinding f (closedTerm "\\(a :: Int) ->
 
 -- | A state with the given bindings
 stWith :: GlobalEnv (Binding (Term 'VoidS)) -> RewriteState NormalizeState
-stWith bs = def {_scopedBindings = bs}
+stWith bs = def {_bindings = bs}
 
 -- | Assert that 'specialize' specializes @f@ on @g x y@, in a state with the
 -- given bindings
@@ -644,7 +644,7 @@ specializeTests =
         (_, st1, _) <- runScopedIn def st0 ts specializeS (termIn ts (tm "f_G10 (g_G11 x_12 y_13)"))
         assertEqual "new global bindings" 1 (length (newBindings st0 st1))
         sequence_
-          [ case lookupGlobalEnv v (_scopedBindings st1) of
+          [ case lookupGlobalEnv v (_bindings st1) of
               Just b | bindingId b == v -> assertTermAlphaEq t (bindingTerm b)
               _ -> assertFailure ("Binder " <> showTestTerm (GlobalVar @'VoidS v) <> " was overwritten")
           | (v, t) <- victims ]

@@ -72,8 +72,8 @@ import           Clash.Normalize.Scoped.Util
   (isCheapFunction, normalizeTopLvlBndr, rewriteExpr, tvSubstWithTyEq)
 import           Clash.Rewrite.StrategyDSL.TH     (compileScopedStrategy)
 import           Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), debugOpts, extra, scopedBindings,
-   topEntities, newInlineStrategy, scopedTypeEnv)
+  (RewriteEnv (..), RewriteState (..), debugOpts, extra, bindings,
+   topEntities, newInlineStrategy, typeEnv)
 import           Clash.Rewrite.Util               (runRewriteSession)
 import           Clash.Rewrite.Scoped.Util        (isUntranslatableType)
 import           Clash.Util
@@ -130,8 +130,8 @@ runNormalization env supply globals typeTrans rcsMap topEnts m =
                   , _curFun = (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
                   , _nameCounter = 0
                   , _globalHeap = (IntMap.empty, 0)
-                  , _scopedBindings = globals
-                  , _scopedWorkFreeBinders = emptyGlobalEnv
+                  , _bindings = globals
+                  , _workFreeBinders = emptyGlobalEnv
                   , _hwTypeCache = Map.empty
                   , _extra = normState
                   }
@@ -179,11 +179,11 @@ normalize'
   :: GlobalId
   -> NormalizeSession ([GlobalId], (GlobalId, Binding (Term 'VoidS)))
 normalize' nm = do
-  exprM <- lookupGlobalEnv nm <$> Lens.use scopedBindings
+  exprM <- lookupGlobalEnv nm <$> Lens.use bindings
   let nmS = showPpr (globalIdName nm)
   case exprM of
     Just (Binding nmG sp inl pr tm r) -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       topEnts <- Lens.view topEntities
       let isTop = nm `memberGlobalSet` topEnts
           ty0 = globalIdType nmG

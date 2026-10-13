@@ -113,7 +113,7 @@ import Clash.Normalize.Types (NormalizeSession)
 import Clash.Rewrite.StrategyDSL (Transformation, onCase, toScopedTransformation)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types
-  (globalHeap, scopedBindings, scopedTypeEnv, tupleTcCache)
+  (globalHeap, bindings, typeEnv, tupleTcCache)
 import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
@@ -292,9 +292,9 @@ data DecEnv = DecEnv
 
 decEnv :: NormalizeSession DecEnv
 decEnv = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   tupTcs <- Lens.view tupleTcCache
-  bm <- Lens.use scopedBindings
+  bm <- Lens.use bindings
   ph <- Lens.use globalHeap
   pure (DecEnv te tupTcs (evaluatorEnv te) bm ph)
 

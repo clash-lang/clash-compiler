@@ -78,7 +78,7 @@ env = withTyConMap testTyConMap def
 -- a binding of 'g'
 topState :: GlobalEnv (Binding (Term 'VoidS)) -> RewriteState NormalizeState
 topState bs = withCurFun top def
-  { _scopedBindings = bs <> mkGlobalBindings [(g, "1")] }
+  { _bindings = bs <> mkGlobalBindings [(g, "1")] }
 
 -- | The binding of 'top', as an OPAQUE function. 'collapseRHSNoops' only runs
 -- in NOINLINE and OPAQUE functions.
@@ -278,6 +278,6 @@ regressionTests =
   collapseRHSNoopsS = $(asScopedRewriteQ S.collapseRHSNoops)
   -- A state with the binding @f = 42@ of the global @f :: Int@, with the same
   -- unique as the local variable @f@
-  fState = def {_scopedBindings = mkGlobalBindings [(testGlobalId "f_G7" "Int", "42")]}
+  fState = def {_bindings = mkGlobalBindings [(testGlobalId "f_G7" "Int", "42")]}
   -- The binding of the global no-op @f = \\x -> x@
   fIdentity = mkGlobalBindings [(fGlobal, "\\(x :: Int) -> x")]

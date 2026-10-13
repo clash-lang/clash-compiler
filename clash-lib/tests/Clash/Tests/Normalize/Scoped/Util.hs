@@ -155,7 +155,7 @@ gGlobal :: GlobalId
 gGlobal = testGlobalId "g_G7" "Int -> Int"
 
 recState :: RewriteState NormalizeState
-recState = def {_scopedBindings = mkGlobalBindings [(gGlobal, tmG "\\(x :: Int) -> g_G7 x")]}
+recState = def {_bindings = mkGlobalBindings [(gGlobal, tmG "\\(x :: Int) -> g_G7 x")]}
  where
   tmG = parseTestTermWith (TestDefs [] [] [gGlobal])
 
@@ -322,7 +322,7 @@ normState bs = st
   { _extra = (_extra st) { _scopedNormalizationStrategy = incLitsScoped } }
  where
   st = withCurFun curF def
-    {_scopedBindings = globalEnvFromList [(g, mkGlobalBinding g t) | (g, t) <- bs]}
+    {_bindings = globalEnvFromList [(g, mkGlobalBinding g t) | (g, t) <- bs]}
   curF = case bs of
     (i, _) : _ -> i
     [] -> error "normState: no bindings"

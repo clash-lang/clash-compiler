@@ -84,7 +84,7 @@ import Clash.Primitives.Types (Primitive (..), UsedArguments (..))
 import Clash.Rewrite.StrategyDSL
   ( Transformation, onAppNode, onCase, onLet, onLetNode, onPrimNode, onTickNode
   , onTyAppNode, scopedAnyConstructor, toScopedTransformation )
-import Clash.Rewrite.Types (curFun, primitives, scopedTypeEnv)
+import Clash.Rewrite.Types (curFun, primitives, typeEnv)
 
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
 import Clash.Core.Scoped.FreeVars
@@ -192,7 +192,7 @@ removeUnusedExprSpine ctx e = case ctxFrames ctx of
     -- application of the Cons constructor, by the Nil constructor.
     (Data dc, [_, Right aTy, Right nTy, _, Left a, Left nil], ticks)
       | C.nameOcc (dcName dc) == Text.showt 'Vec.Cons -> do
-          te <- Lens.view scopedTypeEnv
+          te <- Lens.view typeEnv
           case runExcept (tyNatSize te sc nTy) of
             Right 0
               | (con, _) <- collectArgs nil
@@ -248,7 +248,7 @@ removeUnusedPrimArgs sc e p pInfo args ticks = do
     Nothing ->
       return e
     Just usedArgs1 -> do
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       (args1, Monoid.getAny -> hasChanged) <- listen (go te 0 usedArgs1 args)
       if hasChanged then
         return (mkApps (mkTicks p ticks) args1)
@@ -457,7 +457,7 @@ recToLetRec ctx e
   | not (null (ctxFrames ctx)) = return e
   | otherwise = do
       (fn, _) <- Lens.use curFun
-      te <- Lens.view scopedTypeEnv
+      te <- Lens.view typeEnv
       openBndrs (tfScope ctx) e $ \scA absBs body0 -> case idTele absBs of
         -- Not in normal form: type arguments
         Nothing -> return e
@@ -682,7 +682,7 @@ topLetWorker ctx e
             if untranslatable
               then return e
               else do
-                te <- Lens.view scopedTypeEnv
+                te <- Lens.view typeEnv
                 -- The new binder joins the bindings in a recursive group,
                 -- which needs the right-hand side of a 'NonRec' binding to
                 -- be moved into the scope of its binder: opening it renamed
@@ -706,7 +706,7 @@ topLetWorker ctx e
         if untranslatable
           then return e
           else do
-            te <- Lens.view scopedTypeEnv
+            te <- Lens.view typeEnv
             mkTmBinderFor te sc (C.mkUnsafeSystemName "result" 0) e $ \_ b ->
               changed (Let (NonRec b e) (idBinderVar b))
   | otherwise = return e

@@ -116,16 +116,16 @@ instance Default RewriteEnv where
         }
     , _typeTranslator=testTypeTranslator
     , _topEntities=emptyGlobalSet
-    , _scopedTypeEnv=mkTypeEnv UniqMap.empty
+    , _typeEnv=mkTypeEnv UniqMap.empty
     }
 
 -- | A 'RewriteEnv' with the given type constructors, in both 'envTyConMap' and
--- '_scopedTypeEnv'. Use this rather than setting 'envTyConMap', which would
--- leave '_scopedTypeEnv' with the old ones.
+-- '_typeEnv'. Use this rather than setting 'envTyConMap', which would
+-- leave '_typeEnv' with the old ones.
 withTyConMap :: C.TyConMap -> RewriteEnv -> RewriteEnv
 withTyConMap tcm env = env
   { _clashEnv = (_clashEnv env) {envTyConMap = tcm}
-  , _scopedTypeEnv = mkTypeEnv tcm
+  , _typeEnv = mkTypeEnv tcm
   }
 
 -- | The type translator of the default 'RewriteEnv': function types are not
@@ -162,8 +162,8 @@ instance Default extra => Default (RewriteState extra) where
     , _uniqSupply=unsafePerformIO newSupply
     , _curFun=error "_curFun: NYI"
     , _nameCounter=2
-    , _scopedBindings=emptyGlobalEnv
-    , _scopedWorkFreeBinders=emptyGlobalEnv
+    , _bindings=emptyGlobalEnv
+    , _workFreeBinders=emptyGlobalEnv
     , _hwTypeCache=mempty
     , _globalHeap=error "_globalHeap: NYI"
     , _extra=def

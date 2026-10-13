@@ -37,7 +37,7 @@ import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (DebugOpts (..), TransformationInfo (..), hasDebugInfo, isDebugging)
 import           Clash.Rewrite.Types
-  (RewriteMonad, curFun, debugOpts, scopedTypeEnv,
+  (RewriteMonad, curFun, debugOpts, typeEnv,
    transformAppliedCounters, transformCounter, transformTriedCounters)
 import           Clash.Rewrite.Util          (bumpCounter)
 import           Clash.Util                  (curLoc)
@@ -154,7 +154,7 @@ applyDebug name exprOld hasChanged exprNew = do
     -- lint are enforced by the type checker, see the haddock of this
     -- function.
     Monad.when (dbg_invariants opts && hasChanged) $ do
-      tenv <- Lens.view scopedTypeEnv
+      tenv <- Lens.view typeEnv
       let (beforeTy, afterTy, sameTy) = compareTypes tenv exprOld exprNew
       -- A trace rather than an error
       Monad.when (hasDebugInfo AppliedTerm name opts && not sameTy) $

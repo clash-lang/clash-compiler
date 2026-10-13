@@ -94,7 +94,7 @@ import           Clash.Normalize.Types
 import           Clash.Rewrite.StrategyDSL
   (Transformation, onApp, onAppNode, onLam, onTyApp, onTyAppNode, toScopedTransformation)
 import           Clash.Rewrite.Types
-  (censor, curFun, debugOpts, extra, scopedTypeEnv, specializationLimit)
+  (censor, curFun, debugOpts, extra, typeEnv, specializationLimit)
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
@@ -197,7 +197,7 @@ appPropWorker ctx node = case node of
 
   go sc (Case scrut ty0 alts) args0@(_:_) ticks = do
     setChanged
-    te <- Lens.view scopedTypeEnv
+    te <- Lens.view typeEnv
     letBindCaseArgs te sc ty0 args0 $ \sc1 wrapLets ty1 args1 -> do
       alts1 <- mapM (goAlt sc1 args1) (map sink alts)
       pure (wrapLets (mkTicks (Case (sink scrut) ty1 alts1) (map sink ticks)))
@@ -362,7 +362,7 @@ specializeGlobal
   -> NormalizeSession (Term n)
 specializeGlobal sc e f args ticks specArgIn = do
   opts <- Lens.view debugOpts
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   topEnt <- isTopEntity f
   if topEnt then
     -- Don't specialize TopEntities
@@ -610,7 +610,7 @@ nonRepSpecWorker ctx e e1 e2
   , isVar hd
   , null (rights args)
   , nullNameSet (freeTyVars e2)
-  = do te <- Lens.view scopedTypeEnv
+  = do te <- Lens.view typeEnv
        nonRepE2 <- isUntranslatableType False (tfScope ctx) (inferCoreTypeOf te (tfScope ctx) e2)
        if nonRepE2 && not (isLocalVar e2)
          then do
@@ -676,7 +676,7 @@ zeroWidthSpecWorker
   -> Term l
   -> NormalizeSession (Term n)
 zeroWidthSpecWorker ctx e b body = do
-  te <- Lens.view scopedTypeEnv
+  te <- Lens.view typeEnv
   let sc = tfScope ctx
   case zeroWidthTypeElem te sc (normalizeType te sc (idBinderType b)) of
     Just tm ->

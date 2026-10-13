@@ -27,7 +27,7 @@ module Clash.Rewrite.Scoped.Whnf
 import qualified Control.Lens as Lens
 import GHC.Stack (HasCallStack)
 
-import Clash.Rewrite.Types (RewriteMonad, globalHeap, scopedBindings, scopedTypeEnv)
+import Clash.Rewrite.Types (RewriteMonad, globalHeap, bindings, typeEnv)
 
 import Clash.Core.Scoped.Evaluator (allocatedBind, whnf)
 import Clash.Core.Scoped.Evaluator.Primitives (scopedPrimReductions)
@@ -62,8 +62,8 @@ whnfRW
   -> (forall l. DExt n l => TransformContext l -> Term l -> RewriteMonad extra (Term l))
   -> RewriteMonad extra (Term n)
 whnfRW isSubj ctx e k = do
-  te <- Lens.view scopedTypeEnv
-  bm <- Lens.use scopedBindings
+  te <- Lens.view typeEnv
+  bm <- Lens.use bindings
   ph <- Lens.use globalHeap
   let sc = tfScope ctx
       m0 = initMachine sc (tfHeap ctx) bm ph e

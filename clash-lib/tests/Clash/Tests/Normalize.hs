@@ -39,7 +39,7 @@ cleanupGives :: [GlobalId] -> GlobalId -> [(GlobalId, String)] -> String -> Asse
 cleanupGives globals top bndrs expected = do
   let tm = parseTestTermWith (TestDefs [] [] globals)
       bm = mkGlobalBindings [(i, tm t) | (i, t) <- bndrs]
-  (bm1, _, _) <- runRewriteTest def def{_scopedBindings = bm} (cleanupGraph top bm)
+  (bm1, _, _) <- runRewriteTest def def{_bindings = bm} (cleanupGraph top bm)
   case lookupGlobalEnv top bm1 of
     Just b -> do
       assertLintClean emptyTestScope (bindingTerm b)

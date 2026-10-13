@@ -91,11 +91,11 @@ data RewriteState extra
   -- ^ Used for 'Fresh'
   , _globalHeap       :: PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _scopedBindings   :: GlobalEnv (Binding (S.Term 'S.VoidS))
+  , _bindings   :: GlobalEnv (Binding (S.Term 'S.VoidS))
   -- ^ Global binders, as closed terms of scoped Clash Core
-  , _scopedWorkFreeBinders :: GlobalEnv Bool
+  , _workFreeBinders :: GlobalEnv Bool
   -- ^ Map telling whether the definition of a global binder in
-  -- '_scopedBindings' is work-free
+  -- '_bindings' is work-free
   , _hwTypeCache      :: HWMap
   -- ^ Cache for the Core-type to HWType translation. The translation only
   -- depends on environment that is constant for the whole rewrite session
@@ -116,7 +116,7 @@ data RewriteEnv
   -- ^ Hardcode Type -> FilteredHWType translator
   , _topEntities    :: GlobalSet
   -- ^ Functions that are considered TopEntities
-  , _scopedTypeEnv  :: TypeEnv
+  , _typeEnv  :: TypeEnv
   -- ^ The type constructors of 'tcCache', and the globals of the bindings at
   -- the start of the session, for scoped Clash Core. It caches their
   -- signatures as scoped types, see "Clash.Core.Scoped.TypeEnv": make it once
