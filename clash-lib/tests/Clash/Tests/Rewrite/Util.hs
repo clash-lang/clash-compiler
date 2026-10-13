@@ -25,7 +25,8 @@ import Clash.Core.Term
 import Clash.Core.Type (Type (VarTy))
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet, lookupVarEnv)
-import Clash.Driver.Types (Binding (..))
+import Clash.Driver.Types
+  ( Binding (..), ClashEnv (..), ClashOpts (..), DebugOpts (..), debugNone )
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
 import Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), TransformContext (..))
@@ -83,6 +84,25 @@ replaceBy name inScope before new = do
  where
   rw :: NormRewrite
   rw _ctx _e = changed (Var new)
+
+-- | Run a transformation that signals a change, with the given number of
+-- transformations applied before it, under
+-- @-fclash-debug-transformations-from=10@ and
+-- @-fclash-debug-transformations-limit=5@.
+applyWithLimitFrom :: Word -> IO Term
+applyWithLimitFrom nApplied =
+  runSingleTransformation env st emptyInScopeSet rw (intLit 0)
+ where
+  rw :: NormRewrite
+  rw _ctx _e = changed (intLit 1)
+  st = def { _transformCounter = nApplied }
+  env = def { _clashEnv = clashEnv { envOpts = opts { opt_debug = debug } } }
+  clashEnv = _clashEnv def
+  opts = envOpts clashEnv
+  debug = debugNone
+    { dbg_transformationsFrom = Just 10
+    , dbg_transformationsLimit = Just 5
+    }
 
 -- * Join points
 
@@ -311,6 +331,21 @@ tests =
         , testCase "other transformations may not introduce variables bound in the context" $
             assertErrorContainsIO "It introduces free variables" $
               replaceBy "caseCase" [x, y] (Var x) y
+        ]
+
+    -- @-fclash-debug-transformations-limit@ counts from
+    -- @-fclash-debug-transformations-from@. 'Clash.Rewrite.Util.applyDebug'
+    -- used to subtract the latter from the number of applied transformations
+    -- as a 'Word', which wrapped around before reaching it, exceeding the
+    -- limit straight away.
+    , testGroup "applyDebug transformation limit counts from the first debugged transformation"
+        [ testCase "no limit before the first debugged transformation" $
+            applyWithLimitFrom 0 >>= assertAlphaEq (intLit 1)
+        , testCase "limit not yet exceeded" $
+            applyWithLimitFrom 14 >>= assertAlphaEq (intLit 1)
+        , testCase "limit exceeded" $
+            assertErrorContainsIO "-fclash-debug-transformations-limit exceeded" $
+              applyWithLimitFrom 15
         ]
     , testCase "liftBinding avoids capturing free type variables"
         liftBindingTyVarCapture
