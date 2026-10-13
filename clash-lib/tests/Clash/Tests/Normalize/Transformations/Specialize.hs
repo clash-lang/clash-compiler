@@ -28,9 +28,9 @@ import Test.Tasty.HUnit
 import Clash.Core.NameMap (GlobalEnv, globalEnvFromList, lookupGlobalEnv)
 import Clash.Core.Syntax
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Normalize.Transformations.Cast as Scoped
+import qualified Clash.Normalize.Transformations.Cast as T
 import qualified Clash.Normalize.Transformations.Inline as InlineS
-import qualified Clash.Normalize.Transformations.Specialize as Scoped
+import qualified Clash.Normalize.Transformations.Specialize as T
 import Clash.Normalize.Types (NormalizeState, specialisationCache)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -52,13 +52,13 @@ import Test.Clash.Core.Print (showTestTerm)
 
 appPropS, constantSpecS, nonRepSpecS, typeSpecS, zeroWidthSpecS, argCastSpecS
   , specializeS :: Rewrite NormalizeState
-appPropS = $(asRewriteQ Scoped.appProp)
-constantSpecS = $(asRewriteQ Scoped.constantSpec)
-nonRepSpecS = $(asRewriteQ Scoped.nonRepSpec)
-typeSpecS = $(asRewriteQ Scoped.typeSpec)
-zeroWidthSpecS = $(asRewriteQ Scoped.zeroWidthSpec)
-argCastSpecS = $(asRewriteQ Scoped.argCastSpec)
-specializeS = Transform Scoped.specialize
+appPropS = $(asRewriteQ T.appProp)
+constantSpecS = $(asRewriteQ T.constantSpec)
+nonRepSpecS = $(asRewriteQ T.nonRepSpec)
+typeSpecS = $(asRewriteQ T.typeSpec)
+zeroWidthSpecS = $(asRewriteQ T.zeroWidthSpec)
+argCastSpecS = $(asRewriteQ T.argCastSpec)
+specializeS = Transform T.specialize
 
 -- * Fixtures
 

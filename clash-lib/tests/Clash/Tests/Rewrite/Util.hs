@@ -41,7 +41,7 @@ import Clash.Core.Syntax
 import Clash.Core.Term (AbsBinder (..), collectArgs)
 import Clash.Rewrite (rootContext, whnfRW)
 import Clash.Rewrite.Apply (applyDebug)
-import qualified Clash.Rewrite as Scoped
+import qualified Clash.Rewrite as R
 import Clash.Rewrite.Util
 
 import Test.Clash.Rewrite
@@ -225,7 +225,7 @@ litOrVar = \case
 -- signaled a change, and the global bindings it added, rendered as text.
 runLetHandler
   :: RewriteState NormalizeState
-  -> (forall n l. Distinct n => Scoped.TransformContext n -> Term n -> Bind n l -> Term l -> NormalizeSession (Term n))
+  -> (forall n l. Distinct n => R.TransformContext n -> Term n -> Bind n l -> Term l -> NormalizeSession (Term n))
   -> TestTerm
   -> IO (String, Bool, [(String, String)])
 runLetHandler st h t = withTerm t $ \ts -> \case
@@ -353,7 +353,7 @@ bindPureHeapTests =
   -- The heap: { x = 1; y = f x; z = 2 }, and the value y
   heap = "let { (x :: Int) = 1; (y :: Int) = (f :: Int -> Int) x; (z :: Int) = 2 } in y"
   run
-    :: (forall l. Distinct l => Scoped.TransformContext l -> Term l -> NormalizeSession (Term l))
+    :: (forall l. Distinct l => R.TransformContext l -> Term l -> NormalizeSession (Term l))
     -> (forall n. Distinct n => TestScope n -> Term n -> Bool -> Assertion)
     -> Assertion
   run k check = withTerm heap $ \ts -> \case
@@ -444,7 +444,7 @@ tests =
     , testGroup "removeUnusedBinders"
         [ testCase (show i) $
             runLetHandler liftStateFixed
-              (\ctx e bind body -> maybe (pure e) changed (removeUnusedBinders (Scoped.tfScope ctx) bind body))
+              (\ctx e bind body -> maybe (pure e) changed (removeUnusedBinders (R.tfScope ctx) bind body))
               tm
               >>= (@?= expected)
         | (i, tm, expected) <- zip3 [0 :: Int ..] removeInputs expectedRemove ]

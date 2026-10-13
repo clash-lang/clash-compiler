@@ -29,7 +29,7 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..))
 import Clash.Netlist.BlackBox.Types (RenderVoid (NoRenderVoid), TemplateKind (TDecl))
 import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
-import qualified Clash.Normalize.Transformations.MultiPrim as Scoped
+import qualified Clash.Normalize.Transformations.MultiPrim as T
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Primitives.Types (Primitive (..))
 import Clash.Rewrite (Rewrite)
@@ -103,7 +103,7 @@ st :: RewriteState NormalizeState
 st = def
 
 setupS :: Rewrite NormalizeState
-setupS = $(asRewriteQ Scoped.setupMultiResultPrim)
+setupS = $(asRewriteQ T.setupMultiResultPrim)
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Transformations.MultiPrim"

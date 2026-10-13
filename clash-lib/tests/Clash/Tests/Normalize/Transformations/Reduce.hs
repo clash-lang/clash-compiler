@@ -4,8 +4,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Normalize.Transformations.Reduce":
-  'Scoped.reducePrim', which unrolls primitives; 'Scoped.reduceConst', which
-  evaluates with the let-bindings of its context; and 'Scoped.reduceBinders',
+  'T.reducePrim', which unrolls primitives; 'T.reduceConst', which
+  evaluates with the let-bindings of its context; and 'T.reduceBinders',
   which removes duplicate bindings. 'assertRewritesTo' runs every test in the
   scope of the free variables of its input, and in a scope that the binders
   of the input clash with.
@@ -33,7 +33,7 @@ import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
 
 import Clash.Core.NameMap (emptyNameMap, nameMapToList)
 import Clash.Core.Syntax
-import qualified Clash.Normalize.Transformations.Reduce as Scoped
+import qualified Clash.Normalize.Transformations.Reduce as T
 import Clash.Rewrite (Rewrite, Transform (..))
 import qualified Clash.Rewrite as S
 import Clash.Rewrite.Util (LetBinding (..), openLetBindings)
@@ -95,8 +95,8 @@ tm :: String -> TestTerm
 tm = parseTestTermWith (TestDefs [] prims [])
 
 reducePrimS, reduceConstS :: Rewrite NormalizeState
-reducePrimS = onAppS Scoped.reducePrimWorker
-reduceConstS = onAppS Scoped.reduceConstWorker
+reducePrimS = onAppS T.reducePrimWorker
+reduceConstS = onAppS T.reduceConstWorker
 
 -- | Assert that a transformation, at the given path, rewrites a term to the
 -- expected one
@@ -211,7 +211,7 @@ reduceConstTests = testGroup "reduceConst"
         |])
   ]
 
--- | Run 'Scoped.reduceBinders' on the bindings of a let-expression, in the
+-- | Run 'T.reduceBinders' on the bindings of a let-expression, in the
 -- order they have. Gives the names of the binders it substitutes for, with the
 -- names of the variables it substitutes, the names of the remaining bindings,
 -- and whether it signaled a change.
@@ -219,7 +219,7 @@ reduceBindersOn :: TestTerm -> IO ([(Text, Text)], [Text], Bool)
 reduceBindersOn input = withTerm input $ \ts tm0 -> do
   ((substituted, kept), _, ch) <- runRewriteTest env st $ case tm0 of
     Let bind body -> openLetBindings (testScope ts) bind body $ \sc' _ lbs _ -> do
-      (subst, kept) <- Scoped.reduceBinders sc' emptyNameMap [] lbs
+      (subst, kept) <- T.reduceBinders sc' emptyNameMap [] lbs
       let occOf nm = case [nameOcc (lbOcc lb) | lb <- lbs, lbName lb == nm] of
             o : _ -> o
             [] -> "?"

@@ -24,7 +24,7 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.DataCon as C
 import Clash.Core.Syntax (GlobalId, Term (App, Data, GlobalVar, Prim))
 import Clash.Driver.Types (Binding (..))
-import qualified Clash.Normalize.Transformations.ANF as Scoped
+import qualified Clash.Normalize.Transformations.ANF as T
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
@@ -74,15 +74,15 @@ st :: RewriteState NormalizeState
 st = def
 
 anfS, nonRepANFS :: Rewrite NormalizeState
-anfS = Transform Scoped.makeANF
-nonRepANFS = $(asRewriteQ Scoped.nonRepANF)
+anfS = Transform T.makeANF
+nonRepANFS = $(asRewriteQ T.nonRepANF)
 
--- | Assert that 'Scoped.makeANF' rewrites a closed term to the expected one,
+-- | Assert that 'T.makeANF' rewrites a closed term to the expected one,
 -- with the type constructors of 'Test.Clash.Rewrite.testTyConMap'
 anfTo :: String -> String -> Assertion
 anfTo input expected = assertRewritesTo rewriteEnvWithTyCons st anfS [] (tm input) (tm expected)
 
--- | Assert that 'Scoped.makeANF' leaves a closed term as it is
+-- | Assert that 'T.makeANF' leaves a closed term as it is
 anfKeeps :: TestTerm -> Assertion
 anfKeeps = assertNoRewrite rewriteEnvWithTyCons st anfS []
 
@@ -186,7 +186,7 @@ regressionTests =
         (tm "\\(e :: E) -> (case e of { MkE (m :: Type) (x :: m) (y :: Int) -> k_G33 (h_G50 y) y }) :: Int")
   ]
 
--- | Tests of the shape of the result of 'Scoped.makeANF'
+-- | Tests of the shape of the result of 'T.makeANF'
 makeANFTests :: [TestTree]
 makeANFTests =
   [ testCase "pattern variable used by a let-bound alternative" $

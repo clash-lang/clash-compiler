@@ -28,7 +28,7 @@ import Clash.Core.Syntax (mkPrimInfo)
 import Clash.Core.Syntax (PrimInfo, PrimUnfolding (NoUnfolding), Term (Prim))
 import Clash.Core.Term (collectArgs)
 import Clash.Normalize.Transformations.Reduce (PrimReduction (..))
-import qualified Clash.Normalize.Transformations.Reduce as Scoped
+import qualified Clash.Normalize.Transformations.Reduce as T
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite (Rewrite, Transform (..))
 import Clash.Rewrite.Types (RewriteEnv (..), RewriteState (..))
@@ -45,7 +45,7 @@ reductionS red = Transform $ \ctx e ->
   case collectArgs e of
     (Prim p, args) ->
       let (tms, tys) = Either.partitionEithers args
-      in Scoped.runPrimReduction ctx red p tys tms
+      in T.runPrimReduction ctx red p tys tms
     _ -> error "reductionS: not a primitive application"
 
 -- | The primitives of the tests, which do no work. Their type is @Int@, unless
