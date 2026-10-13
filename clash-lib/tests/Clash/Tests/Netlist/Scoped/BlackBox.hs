@@ -19,20 +19,27 @@ import qualified Data.List as List
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Name (NameSort (User))
-import qualified Clash.Core.Term as C
 import Clash.Netlist.Scoped.BlackBox (mkBlackBoxContext)
 import Clash.Netlist.Scoped.Types (LocalId (..))
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
   ( BlackBoxContext (..), Declaration (Assignment, InstDecl), DeclarationType (Concurrent)
   , Expr (Identifier), componentNames )
-import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
-import Clash.Core.Scoped.Syntax (Term (..), globalIdLegacy)
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
+import Clash.Core.Scoped.NameMap (emptyGlobalEnv, singletonGlobalEnv)
+import Clash.Core.Scoped.Syntax (GlobalId (..), Term (..))
 
-import Test.Clash.Rewrite (globalId, intFunTy, intId, localId, mkBindingMap, runNetlistTest)
-import Test.Clash.Scoped (testCompCtx, withCompCtxOf, withTerms)
+import Test.Clash.Rewrite (runScopedNetlistTest)
+import Test.Clash.Scoped
+  ( TestTerm, atRaw, mkGlobalBindings, termIn, testCompCtx, testGlobalId, varD, withTerms
+  , withTestScope )
+
+-- | A global function @f@ in normal form, which can become a component, and
+-- its component name
+fGlobal :: GlobalId
+fGlobal = testGlobalId "f_G60" "Int -> Int"
+
+fBody :: TestTerm
+fBody = "\\(a :: Int) -> let { (r :: Int) = a } in r"
 
 -- | The declarations of the first function argument of a blackbox context
 functionDecls :: BlackBoxContext -> [Declaration]
@@ -47,20 +54,14 @@ functionDecls bbCtx = case IntMap.lookup 0 (bbFunctions bbCtx) of
 -- turned into a component, so this is an error.
 mkFunInputLocalShadowingGlobal :: Assertion
 mkFunInputLocalShadowingGlobal = do
-  let fGlobal = globalId User "f" 60 (intFunTy 1)
-      fLocal = localId User "f" 60 (intFunTy 1)
-      a = intId User "a" 61
-      r = intId User "r" 63
-      res = intId User "res" 62
-      -- The global binder is in normal form, so it can become a component
-      bs = mkBindingMap [(fGlobal, C.Lam a (C.Letrec [(r, C.Var a)] (C.Var r)))]
-      compNames = singletonGlobalEnv (mkGlobalIdFromClash fGlobal) (Id.unsafeMake "f")
-  result <- try $ withCompCtxOf [C.Var fLocal, C.Var res] $ \ctx tms -> case tms of
-    [f, Var o ty n] ->
-      runNetlistTest bs $ do
-        componentNames .= compNames
-        mkBlackBoxContext ctx "prim" Concurrent [LocalId o ty n] [Left f]
-    _ -> error "unexpected terms"
+  -- The local f has the raw name of the unique of the global f
+  result <- try $ withTestScope [atRaw 60 (varD "f" "Int -> Int"), varD "res" "Int"] $ \ts ->
+    case termIn ts "res" of
+      Var o ty n ->
+        runScopedNetlistTest (mkGlobalBindings [(fGlobal, fBody)]) $ do
+          componentNames .= singletonGlobalEnv fGlobal (Id.unsafeMake "f")
+          mkBlackBoxContext (testCompCtx ts) "prim" Concurrent [LocalId o ty n] [Left (termIn ts "f")]
+      _ -> error "unexpected terms"
   case result of
     Left (ErrorCall msg)
       | "Cannot make function input" `List.isInfixOf` msg -> pure ()
@@ -70,24 +71,16 @@ mkFunInputLocalShadowingGlobal = do
 -- | A global function argument becomes an instance of its component
 mkFunInputGlobal :: Assertion
 mkFunInputGlobal = do
-  let fGlobal = globalId User "f" 60 (intFunTy 1)
-      a = intId User "a" 61
-      r = intId User "r" 63
-      res = intId User "res" 62
-      bs = mkBindingMap [(fGlobal, C.Lam a (C.Letrec [(r, C.Var a)] (C.Var r)))]
-      compNames = singletonGlobalEnv (mkGlobalIdFromClash fGlobal) (Id.unsafeMake "f")
-      g = mkGlobalIdFromClash fGlobal
-  bbCtx <- withCompCtxOf [C.Var res] $ \ctx tms -> case tms of
-    [Var o ty n] ->
-      fmap fst $ runNetlistTest bs $ do
-        componentNames .= compNames
-        mkBlackBoxContext ctx "prim" Concurrent [LocalId o ty n] [Left (GlobalVar g)]
+  bbCtx <- withTestScope [varD "res" "Int"] $ \ts -> case termIn ts "res" of
+    Var o ty n ->
+      fmap fst $ runScopedNetlistTest (mkGlobalBindings [(fGlobal, fBody)]) $ do
+        componentNames .= singletonGlobalEnv fGlobal (Id.unsafeMake "f")
+        mkBlackBoxContext (testCompCtx ts) "prim" Concurrent [LocalId o ty n] [Left (GlobalVar fGlobal)]
     _ -> error "unexpected terms"
   case functionDecls bbCtx of
     [InstDecl _ _ _ compName _ _ _] ->
       assertEqual "Instantiated component" "f" (Id.toText compName)
-    decls -> assertFailure ("Expected an instance of f, but got: " <> show decls
-                              <> " for " <> show (globalIdLegacy g))
+    decls -> assertFailure ("Expected an instance of f, but got: " <> show decls)
 
 -- | The variables of the lambdas of a function argument get the HDL
 -- identifiers of the arguments of the function in the template, and those of
@@ -97,7 +90,7 @@ mkFunInputLambda = do
   bbCtx <- withTerms ["\\(a :: Int) -> let { (r :: Int) = a } in r", "res :: Int"] $ \ts tms ->
     case tms of
       [f, Var o ty n] ->
-        fst <$> runNetlistTest (mkBindingMap [])
+        fst <$> runScopedNetlistTest emptyGlobalEnv
           (mkBlackBoxContext (testCompCtx ts) "prim" Concurrent [LocalId o ty n] [Left f])
       _ -> error "unexpected terms"
   case functionDecls bbCtx of
