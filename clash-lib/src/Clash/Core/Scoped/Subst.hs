@@ -28,7 +28,11 @@
   type changes or the binder is renamed, its occurrences are mapped to the
   updated variable. A binder that keeps its name and type is kept as it is,
   rather than rebuilt: so are all the binders of a pattern or a recursive
-  let-binding that keep theirs.
+  let-binding that keep theirs. Without type entries, substitution keeps the
+  subterms that it doesn't change as they are, so that it only rebuilds the
+  paths to the variables it substitutes for ('substTmShared'). Their binders
+  are not renamed then, even if they clash with the output scope: going under
+  them later does that.
 
   = Going under binders
 
@@ -72,6 +76,17 @@
     another type. A type or term without entries for it (no type entries for a
     type, no entries at all for a term) is kept as it is, as all its free
     variables are variables of @o@.
+
+  * __Keeping subterms__ (@coerceTm@ and 'unsafeCoerce' in 'substTmShared'):
+    without type entries, the types in a term are kept as they are, as they
+    only mention type variables. 'substTmShared' gives 'Nothing' for a subterm
+    in which no variable with an entry occurs free: the entries of the
+    substitution at the subterm, which has an entry for every binder on the
+    path to it that was renamed. So all the free variables of the subterm are
+    variables without an entry, which by the invariant are variables of the
+    output scope at the subterm, and the subterm is kept as it is. Its binders
+    may have names of that scope, as those of any value may: going under them
+    renames them then.
 
   * __Fresh binders__ ('UnsafeTyNameBinder', 'UnsafeTmNameBinder'): only
     applied to binders that 'withFresh' or 'withRefreshed' just created, see
@@ -232,6 +247,7 @@ import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 import qualified Data.Kind as K
 import qualified Data.List as List
+import Data.Maybe (fromMaybe, isJust)
 import GHC.Stack (HasCallStack)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -372,6 +388,9 @@ substTy s@(UnsafeSubst _ tys _ fr) ty0
 substTm :: Distinct o => Subst i o -> Term i -> Term o
 substTm s@(UnsafeSubst _ tys tms fr) tm0
   | not fr && IntMap.null tys && IntMap.null tms = coerceTm tm0
+  | not fr && IntMap.null tys = case substTmShared s tm0 of
+      Just tm1 -> tm1
+      Nothing -> coerceTm tm0
   | otherwise = go tm0
  where
   goTy = substTy s
@@ -395,6 +414,71 @@ substTm s@(UnsafeSubst _ tys tms fr) tm0
     Case e ty alts -> Case (go e) (goTy ty) (map (substAlt s) alts)
     Cast e t1 t2 -> Cast (go e) (goTy t1) (goTy t2)
     Tick t e -> Tick (substTickInfo s t) (go e)
+
+-- | Apply a substitution without type entries, that doesn't rename every
+-- binder ('freshen'), to a term: 'Nothing' if it changes nothing. Keeps the
+-- subterms that it doesn't change as they are, see the module header.
+substTmShared :: Distinct o => Subst i o -> Term i -> Maybe (Term o)
+substTmShared s@(UnsafeSubst _ _ tms _) tm = case tm of
+  Var _ _ n -> IntMap.lookup (tmNameRaw n) tms
+  GlobalVar {} -> Nothing
+  Data {} -> Nothing
+  Literal {} -> Nothing
+  Prim {} -> Nothing
+  Lam b e -> substIdBinder s b $ \s' b' -> Lam b' <$> under s' e
+  TyLam b e -> substTyBinder s b $ \s' b' -> TyLam b' <$> under s' e
+  App e1 e2 -> case (substTmShared s e1, substTmShared s e2) of
+    (Nothing, Nothing) -> Nothing
+    (m1, m2) -> Just (App (orTm e1 m1) (orTm e2 m2))
+  TyApp e ty -> (\e' -> TyApp e' (coerceTy ty)) <$> substTmShared s e
+  Let (NonRec b x) e ->
+    let mx = substTmShared s x in
+    substIdBinder s b $ \s' b' -> case (mx, under s' e) of
+      (Nothing, Nothing) -> Nothing
+      (_, me) -> Just (Let (NonRec b' (orTm x mx)) (orTm e me))
+  Let (Rec bs xs) e ->
+    substIdTele s bs $ \s' bs' -> case (sharedList (under s') xs, under s' e) of
+      (Nothing, Nothing) -> Nothing
+      (mxs, me) -> Just (Let (Rec bs' (orList orTm xs mxs)) (orTm e me))
+  Case e ty alts -> case (substTmShared s e, sharedList alt alts) of
+    (Nothing, Nothing) -> Nothing
+    (me, malts) -> Just (Case (orTm e me) (coerceTy ty) (orList orAlt alts malts))
+  Cast e t1 t2 -> (\e' -> Cast e' (coerceTy t1) (coerceTy t2)) <$> substTmShared s e
+  Tick t e -> case (tick t, substTmShared s e) of
+    (Nothing, Nothing) -> Nothing
+    (mt, me) -> Just (Tick (orTick t mt) (orTm e me))
+ where
+  -- Under binders, a renamed type variable gives the substitution a type
+  -- entry
+  under :: Distinct o' => Subst i' o' -> Term i' -> Maybe (Term o')
+  under s'@(UnsafeSubst _ tys' _ _) e
+    | IntMap.null tys' = substTmShared s' e
+    | otherwise = Just (substTm s' e)
+
+  alt (Alt p e) = substPat s p $ \s' p' -> Alt p' <$> under s' e
+
+  tick = \case
+    Attributes ty e -> (\e' -> Attributes (coerceTy ty) e') <$> substTmShared s e
+    _ -> Nothing
+
+  -- A subterm as it changed, or as it was. Trusted: see the module header
+  orTm :: Term x -> Maybe (Term y) -> Term y
+  orTm x = fromMaybe (coerceTm x)
+  orAlt :: Alt x -> Maybe (Alt y) -> Alt y
+  orAlt x = fromMaybe (unsafeCoerce x)
+  orTick :: TickInfo x -> Maybe (TickInfo y) -> TickInfo y
+  orTick x = fromMaybe (unsafeCoerce x)
+
+-- The results of a function on the elements of a list, as far as they change,
+-- see 'orList'. 'Nothing' if none of them changes.
+sharedList :: (a -> Maybe b) -> [a] -> Maybe [Maybe b]
+sharedList f xs = let ms = map f xs in if any isJust ms then Just ms else Nothing
+
+-- The elements of a list as they are, or as they changed, see 'sharedList'
+orList :: (a -> Maybe b -> b) -> [a] -> Maybe [Maybe b] -> [b]
+orList orX xs = \case
+  Nothing -> map (\x -> orX x Nothing) xs
+  Just ms -> zipWith orX xs ms
 
 -- | Apply a substitution to a case alternative
 substAlt :: Distinct o => Subst i o -> Alt i -> Alt o

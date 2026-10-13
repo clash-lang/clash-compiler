@@ -527,6 +527,21 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
               binderRaws tm2 === binderRaws tm .&&.
                 counterexample "aeqTm" (aeqTm (naiveSubst IntMap.empty (IntMap.singleton (tmNameRaw xn) lit) tm) tm2)
             _ -> discard
+
+        -- Substitution without type entries keeps the subterms in which no
+        -- variable with an entry occurs, with their binders, even ones that
+        -- clash with the scope
+      , testProperty "substitution for a variable that doesn't occur is alpha-equivalent" $
+          forAllShrink genSunk shrinkSunk $ \(Sunk _ ts1 tm) -> case IntMap.lookupMax (testVars ts1) of
+            -- A new variable of the scope, which doesn't occur in the term
+            Just (_, Var _ _ xn) -> do
+              let sc = testScope ts1
+              forAllScrambled sc (sink tm) $ \tm1 -> do
+                let tm2 = substTm (tmVarsSubst sc (singletonNameMap xn (Literal (IntLiteral 1)))) tm1
+                counterexample ("substituted:\n" <> showT tm2) $
+                  counterexample "aeqTm" (aeqTm tm1 tm2) .&&.
+                    lintTerm (testLintScope ts1) tm2 === []
+            _ -> counterexample "no new variable" False
       ]
   , testGroup "rebinding variables" rebindTests
   , testGroup "closing over variables" closeOverTests
