@@ -4,15 +4,12 @@
 module Data.List.Extra
   ( partitionM
   , mapAccumLM
-  , mapAccumRM
   , iterateNM
   , (<:>)
   , indexMaybe
-  , splitAtList
   , equalLength
   , countEq
   , zipEqual
-  , all2
 
   -- * From Control.Monad.Extra
   , anyM
@@ -42,19 +39,6 @@ mapAccumLM f acc (x:xs) = do
   (acc',y) <- f acc x
   (acc'',ys) <- mapAccumLM f acc' xs
   return (acc'',y:ys)
-
--- | Monadic version of 'Data.List.mapAccumR'
-mapAccumRM
-  :: Monad m
-  => (acc -> x -> m (acc,y))
-  -> acc
-  -> [x]
-  -> m (acc,[y])
-mapAccumRM _ acc [] = return (acc,[])
-mapAccumRM f acc (x:xs) = do
-  (acc1,ys) <- mapAccumRM f acc xs
-  (acc2,y) <- f acc1 x
-  return (acc2,y:ys)
 
 -- | Monadic version of 'iterate'. A carbon copy ('iterateM') would not
 -- terminate, hence the first argument.
@@ -87,24 +71,10 @@ indexMaybe [] _     = Nothing
 indexMaybe (x:_)  0 = Just x
 indexMaybe (_:xs) n = indexMaybe xs (n-1)
 
-splitAtList :: [b] -> [a] -> ([a], [a])
-splitAtList [] xs         = ([], xs)
-splitAtList _ xs@[]       = (xs, xs)
-splitAtList (_:xs) (y:ys) = (y:ys', ys'')
-    where
-      (ys', ys'') = splitAtList xs ys
-
 equalLength :: [a] -> [b] -> Bool
 equalLength [] [] = True
 equalLength (_:as) (_:bs) = equalLength as bs
 equalLength _ _ = False
-
--- | Like 'all', but the predicate operates over two lists. Asserts to 'False'
--- when the lists are of unequal length
-all2 :: (a -> b -> Bool) -> [a] -> [b] -> Bool
-all2 _ [] [] = True
-all2 p (a:as) (b:bs) = p a b && all2 p as bs
-all2 _ _ _ = False
 
 -- | Return number of occurrences of an item in a list
 countEq

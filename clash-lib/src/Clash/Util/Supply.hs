@@ -37,10 +37,6 @@ module Clash.Util.Supply
   , freshId#
   , splitSupply#
     -- * Replaying
-  , supplyRange
-  , resumeSupply
-  , supplyBound
-  , reserveUniques
   ) where
 
 import Data.Hashable
@@ -159,27 +155,3 @@ splitSupply# (Supply i k b) = case splitBlock# b of
       , z <- x + blockSize - 1 ->
         (# Supply x (y - 1) l, Supply y z r #)
 {-# INLINE splitSupply# #-}
-
--- | The range of uniques that a supply hands out before it moves on to a new
--- block: 'freshId' gives the first of them. Doesn't allocate a block.
-supplyRange :: Supply -> (Unique, Unique)
-supplyRange (Supply i j _) = (i, j)
-
--- | A supply that first hands out the uniques of the given range, as a supply
--- with that 'supplyRange' does, and then those of new blocks. It replays a
--- supply recorded with 'supplyRange', as long as it doesn't run out of that
--- range, nor splits it into ranges too small to split further.
-resumeSupply :: (Unique, Unique) -> IO Supply
-resumeSupply (i, j) = Supply i j <$> newBlock
-
--- | An upper bound on the uniques that supplies have handed out so far in this
--- process: the start of the next block
-supplyBound :: IO Unique
-supplyBound = readIORef blockCounter
-
--- | Make sure that new blocks only hand out uniques from the given one on, so
--- that they don't hand out the uniques that supplies of another process
--- handed out, see 'supplyBound'
-reserveUniques :: Unique -> IO ()
-reserveUniques u = atomicModifyIORef' blockCounter $ \i ->
-  (max i (blockSize * ((u + blockSize - 1) `div` blockSize)), ())

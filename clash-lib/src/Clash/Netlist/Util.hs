@@ -36,9 +36,6 @@ import           Control.Monad.Trans.Except (ExceptT (..), runExceptT, throwE)
 import           Data.Char               (ord)
 import           Data.Foldable           (Foldable(toList))
 import           Data.Functor            (($>))
-import           Data.Hashable           (Hashable)
-import           Data.HashMap.Strict     (HashMap)
-import qualified Data.HashMap.Strict     as HashMap
 import           Data.Primitive.ByteArray (ByteArray (..))
 import           Data.List               (unzip4, partition)
 import qualified Data.Map                as Map
@@ -89,9 +86,6 @@ import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types     as HW
 import           Clash.Util
 import qualified Clash.Util.Interpolate  as I
-
-hmFindWithDefault :: (Eq k, Hashable k) => v -> k -> HashMap k v -> v
-hmFindWithDefault = HashMap.findWithDefault
 
 -- | Generate a simple port_name expression. See:
 --
@@ -699,9 +693,6 @@ evalBlackBox (SomeBackend s) bbCtx bb
     toStrict (renderLazy (layoutPretty layout (State.evalState (func bbCtx) s)))
   | BBTemplate bbt <- bb =
     toStrict ((State.evalState (renderTemplate bbCtx bbt) s) 0)
-
-setRepName :: Text -> Name a -> Name a
-setRepName s (Name sort' _ i loc) = Name sort' s i loc
 
 -- | Preserve the complete state before running an action, and restore it
 -- afterwards.

@@ -227,7 +227,6 @@ module Clash.Core.Scoped.Evaluator.Primitives.Util
   , tupleTyConName
     -- * The machine
   , setTerm
-  , stackClear
     -- ** The primitive heap
   , primCount
   , primLookup
@@ -1711,10 +1710,6 @@ tupleTyConName arity =
 -- | Set the term of a machine
 setTerm :: Term n -> Machine o n -> Machine o n
 setTerm e m = m {mTerm = e}
-
--- | Clear the stack of a machine
-stackClear :: Machine o n -> Machine o n
-stackClear m = m {mStack = []}
 
 -- ** The primitive heap
 

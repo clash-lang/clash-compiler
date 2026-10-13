@@ -45,7 +45,6 @@ module Clash.Rewrite.StrategyDSL
   , scopedAnyConstructor
   , named
     -- ** Worker builders: workers receiving the constructor's fields
-  , onVar
   , onData
   , onLiteral
   , onPrim
@@ -148,9 +147,8 @@ scopedAnyConstructor name worker = Transformation name [AnyWorker worker]
 named :: String -> Transformation -> Transformation
 named alias transformation = transformation { name = alias }
 
-onVar, onData, onLiteral, onPrim, onLam, onTyLam, onApp, onTyApp, onLet,
-  onCase, onCast, onTick :: Name -> [TransformationWorker]
-onVar     = pure . FieldWorker CVar
+onData, onLiteral, onPrim, onLam, onTyLam, onApp, onTyApp, onLet, onCase,
+  onCast, onTick :: Name -> [TransformationWorker]
 onData    = pure . FieldWorker CData
 onLiteral = pure . FieldWorker CLiteral
 onPrim    = pure . FieldWorker CPrim

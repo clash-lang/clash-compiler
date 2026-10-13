@@ -93,8 +93,7 @@
   @
 
   The evaluator is that of scoped Clash Core ("Clash.Core.Scoped.Evaluator").
-  The let-bindings of the context are those of its frames, and those given to
-  'embeddedRootContext'.
+  The let-bindings of the context are those of its frames.
 
   = A worked example
 
