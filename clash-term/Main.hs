@@ -70,6 +70,8 @@ instance Diff Term where
 
   handleAnn :: ClashAnnotation -> Either Syntax CoreContext
   handleAnn (AnnContext c) = Right c
+  handleAnn (AnnSubterm _) =
+    error "clash-term: the printer of Clash Core marks no SubtermPos"
   handleAnn (AnnSyntax s)  = Left $ case s of
     Keyword   -> RW.Keyword
     LitS      -> RW.Literal

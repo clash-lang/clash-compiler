@@ -9,6 +9,8 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,6 +23,7 @@ module Clash.Core.Pretty
   , PrettyOptions (..)
   , ClashDoc
   , ClashAnnotation (..)
+  , SubtermPos (..)
   , SyntaxElement (..)
   , ppr, ppr'
   , showPpr, showPpr'
@@ -32,11 +35,14 @@ module Clash.Core.Pretty
   )
 where
 
+import Control.DeepSeq                  (NFData)
+import Data.Binary                      (Binary)
 import Data.Char                        (isSymbol, isUpper, ord)
 import Data.Default                     (Default(..))
 import Data.Text                        (Text)
 import Control.Monad.Identity
 import GHC.Float                        (castWord32ToFloat, castWord64ToDouble)
+import GHC.Generics                     (Generic)
 import Data.List.Extra                  ((<:>))
 import qualified Data.Text              as T
 import Data.Maybe                       (fromMaybe)
@@ -104,9 +110,46 @@ instance Default PrettyOptions where
 data ClashAnnotation
   = AnnContext CoreContext
   -- ^ marking navigation to a different context
+  | AnnSubterm SubtermPos
+  -- ^ marking navigation to a subterm, in the printed terms of scoped Core
+  -- (see "Clash.Core.Scoped.Pretty")
   | AnnSyntax  SyntaxElement
   -- ^ marking a specific sort of syntax
   deriving Eq
+
+-- | The position of a subterm in its parent term. It marks navigation to the
+-- subterm in the printed terms of scoped Core ("Clash.Core.Scoped.Pretty"),
+-- like 'CoreContext' does in those of Clash Core. Unlike 'CoreContext', it
+-- holds no binders, which are scoped: the subterm is identified by its
+-- position alone.
+data SubtermPos
+  = PosAppFun
+  -- ^ Function of an application
+  | PosAppArg !(Maybe (Text, Int, Int))
+  -- ^ Argument of an application. If the argument is an applied primitive:
+  -- the name of the primitive, and the numbers of type and term arguments it
+  -- is applied to, see 'Clash.Core.Term.primArg'.
+  | PosTyAppFun
+  -- ^ Function of a type application
+  | PosLetRhs !Int
+  -- ^ The right-hand side of a let-binding with the given index, counting
+  -- from 0. A non-recursive let-binding has one.
+  | PosLetBody
+  -- ^ Body of a let-expression
+  | PosLamBody
+  -- ^ Body of a lambda
+  | PosTyLamBody
+  -- ^ Body of a type lambda
+  | PosCaseScrut
+  -- ^ Subject of a case-expression
+  | PosCaseAlt !Int
+  -- ^ The right-hand side of the case alternative with the given index,
+  -- counting from 0
+  | PosCastBody
+  -- ^ Body of a cast
+  | PosTickBody
+  -- ^ Body of a tick
+  deriving (Eq, Show, Generic, NFData, Binary)
 
 -- | Specific places in the program syntax.
 data SyntaxElement = Keyword | LitS | Type | Unique | Qualifier | Ticky

@@ -23,6 +23,7 @@ import qualified Clash.Tests.Core.Scoped.Evaluator.Primitives.GHC.Prim
 import qualified Clash.Tests.Core.Scoped.FreeVars
 import qualified Clash.Tests.Core.Scoped.HasType
 import qualified Clash.Tests.Core.Scoped.NameMap
+import qualified Clash.Tests.Core.Scoped.Pretty
 import qualified Clash.Tests.Core.Scoped.Scope
 import qualified Clash.Tests.Core.Scoped.Subst
 import qualified Clash.Tests.Core.Scoped.Term
@@ -119,6 +120,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.Scoped.FreeVars.tests
   , Clash.Tests.Core.Scoped.HasType.tests
   , Clash.Tests.Core.Scoped.NameMap.tests
+  , Clash.Tests.Core.Scoped.Pretty.tests
   , Clash.Tests.Core.Scoped.Scope.tests
   , Clash.Tests.Core.Scoped.Subst.tests
   , Clash.Tests.Core.Scoped.Term.tests

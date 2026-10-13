@@ -598,14 +598,14 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
 
         return (argDecls ++ instDecls)
 
-      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr (globalIdLegacy fun)
+      | otherwise -> error $ $(curLoc) ++ "under-applied TopEntity: " ++ showPpr fun
     Nothing -> do
       normalized <- Lens.use bindings
       case lookupGlobalEnv fun normalized of
         Nothing -> error [I.i|
           Internal error: unknown normalized binder:
 
-            #{showPpr (globalIdLegacy fun)}
+            #{showPpr fun}
         |]
         Just (Binding{bindingTerm}) -> do
           (_, Component compName compInps co _) <- preserveVarEnv $ genComponent fun
@@ -644,7 +644,7 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
               in error [I.i|
               Under-applied normalized function at component #{compName}:
 
-              #{showPpr (globalIdLegacy fun)}
+              #{showPpr fun}
 
               Core:
 

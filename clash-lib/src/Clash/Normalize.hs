@@ -213,8 +213,6 @@ normalize' nm = do
   let nmS = showPpr (globalIdName nm)
   case exprM of
     Just (Binding nmG sp inl pr tm r) -> do
-      -- For the messages, which show its type
-      let nm' = globalIdLegacy nmG
       te <- Lens.view scopedTypeEnv
       topEnts <- Lens.view topEntities
       let isTop = globalIdLegacy nm `elemVarSet` topEnts
@@ -225,12 +223,12 @@ normalize' nm = do
       when (isPolyTy ty1) $
         let msg = $curLoc ++ [i|
               Clash can only normalize monomorphic functions, but this is polymorphic:
-              #{showPpr' def{displayUniques=False\} nm'}
+              #{showPpr' def{displayUniques=False\} nmG}
               |]
             msgExtra | aeqTy ty0 ty1 = Nothing
                      | otherwise = Just $ [i|
               Even after applying type equality constraints it remained polymorphic:
-              #{showPpr' def{displayUniques=False\} (globalIdLegacy (mkGlobalId (globalIdName nmG) ty1))}
+              #{showPpr' def{displayUniques=False\} (mkGlobalId (globalIdName nmG) ty1)}
                          |]
         in throw (ClashException sp msg msgExtra)
 
@@ -261,7 +259,7 @@ normalize' nm = do
             when (isTop || isFunction) $
               let msg = $(curLoc) ++ [i|
                     This bndr has a non-representable return type and can't be normalized:
-                    #{showPpr' def{displayUniques=False\} nm'}
+                    #{showPpr' def{displayUniques=False\} nmG}
                     |]
               in throw (ClashException sp msg Nothing)
 
@@ -337,7 +335,7 @@ checkNonRecursive
 checkNonRecursive norm = case filterGlobalEnv bindingRecursive norm of
   rcs | nullGlobalEnv rcs  -> norm
   rcs -> error $ $(curLoc) ++ "Callgraph after normalization contains following recursive components: "
-                   ++ show (vcat [ ppr (globalIdLegacy (bindingId b)) <> ppr (bindingTerm b)
+                   ++ show (vcat [ ppr (bindingId b) <> ppr (bindingTerm b)
                                  | b <- globalEnvElems rcs
                                  ])
 
