@@ -234,10 +234,10 @@ data GHC2CoreState
   = GHC2CoreState
   { _tyConMap :: C.UniqMap TyCon
   , _nameMap  :: HashMap Name Text
-  , _scopedTypeCache :: HashMap StructuralType TyB
+  , _convertedTypeCache :: HashMap StructuralType TyB
   -- ^ Cache for types converted to scoped Core, keyed on the GHC type. See
   -- 'coreToTypeB'.
-  , _scopedVarTypeMap :: HashMap Name (S.Type 'S.VoidS)
+  , _varTypeMap :: HashMap Name (S.Type 'S.VoidS)
   -- ^ Cache for the types of global variables, converted to scoped Core. See
   -- 'coreToVarTypeB'.
   , _dataConCache :: C.UniqMap C.DataCon
@@ -758,12 +758,12 @@ varKey = uniqueKey . fromGhcUnique . varUnique
 -- that it depends on the GHC type alone.
 coreToTypeB :: Type -> C2C TyB
 coreToTypeB ty = do
-  cache <- use scopedTypeCache
+  cache <- use convertedTypeCache
   case HashMap.lookup (StructuralType ty) cache of
     Just ty1 -> pure ty1
     Nothing -> do
       ty1 <- withoutSrcSpan convert
-      scopedTypeCache %= HashMap.insert (StructuralType ty) ty1
+      convertedTypeCache %= HashMap.insert (StructuralType ty) ty1
       pure ty1
   where
     convert = do
@@ -812,7 +812,7 @@ coreToTypeB' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPprUns
 -- between declarations and must not share cache entries.
 coreToVarTypeB :: Var -> C2C (S.Type 'S.VoidS)
 coreToVarTypeB v
-  | isGlobalId v = makeCached (varName v) scopedVarTypeMap convert
+  | isGlobalId v = makeCached (varName v) varTypeMap convert
   | otherwise = convert
  where
   convert = runClosedType <$> coreToTypeB (varType v)
