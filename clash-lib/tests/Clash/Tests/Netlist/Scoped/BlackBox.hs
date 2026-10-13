@@ -32,7 +32,7 @@ import Clash.Core.Scoped.Syntax (Term (..), globalIdLegacy)
 import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 
 import Test.Clash.Rewrite (globalId, intFunTy, intId, localId, mkBindingMap, runNetlistTest)
-import Test.Clash.Scoped (withCompCtxOf)
+import Test.Clash.Scoped (testCompCtx, withCompCtxOf, withTerms)
 
 -- | The declarations of the first function argument of a blackbox context
 functionDecls :: BlackBoxContext -> [Declaration]
@@ -94,15 +94,12 @@ mkFunInputGlobal = do
 -- its let-bindings unique ones
 mkFunInputLambda :: Assertion
 mkFunInputLambda = do
-  let a = intId User "a" 61
-      r = intId User "r" 63
-      res = intId User "res" 62
-      fun = C.Lam a (C.Letrec [(r, C.Var a)] (C.Var r))
-  bbCtx <- withCompCtxOf [fun, C.Var res] $ \ctx tms -> case tms of
-    [f, Var o ty n] ->
-      fst <$> runNetlistTest (mkBindingMap [])
-        (mkBlackBoxContext ctx "prim" Concurrent [LocalId o ty n] [Left f])
-    _ -> error "unexpected terms"
+  bbCtx <- withTerms ["\\(a :: Int) -> let { (r :: Int) = a } in r", "res :: Int"] $ \ts tms ->
+    case tms of
+      [f, Var o ty n] ->
+        fst <$> runNetlistTest (mkBindingMap [])
+          (mkBlackBoxContext (testCompCtx ts) "prim" Concurrent [LocalId o ty n] [Left f])
+      _ -> error "unexpected terms"
   case functionDecls bbCtx of
     Assignment res1 _ (Identifier r1 Nothing) : rest -> do
       assertEqual "Result" "~RESULT" (Id.toText res1)
