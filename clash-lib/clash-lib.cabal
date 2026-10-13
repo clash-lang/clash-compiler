@@ -208,14 +208,11 @@ Library
                       Clash.Backend.Verilog.Time
                       Clash.Backend.VHDL
 
-                      Clash.Core.Basic
-                      Clash.Core.DataCon
-                      Clash.Core.Literal
-                      Clash.Core.Name
-                      Clash.Core.Pretty
                       Clash.Core.Alpha
+                      Clash.Core.Basic
                       Clash.Core.Binary
                       Clash.Core.Builder
+                      Clash.Core.DataCon
                       Clash.Core.EqSolver
                       Clash.Core.Evaluator
                       Clash.Core.Evaluator.Primitives
@@ -255,7 +252,10 @@ Library
                       Clash.Core.HasType
                       Clash.Core.Internal.Names
                       Clash.Core.Internal.Scope
+                      Clash.Core.Literal
+                      Clash.Core.Name
                       Clash.Core.NameMap
+                      Clash.Core.Pretty
                       Clash.Core.Sig
                       Clash.Core.Subst
                       Clash.Core.Syntax
@@ -263,11 +263,11 @@ Library
                       Clash.Core.TermInfo
                       Clash.Core.TermLiteral
                       Clash.Core.TermLiteral.TH
-                      Clash.Core.Type
-                      Clash.Core.TysPrim
-                      Clash.Core.TypeEnv
-                      Clash.Core.Util
                       Clash.Core.TyCon
+                      Clash.Core.Type
+                      Clash.Core.TypeEnv
+                      Clash.Core.TysPrim
+                      Clash.Core.Util
 
                       Clash.Data.UniqMap
 
@@ -284,6 +284,8 @@ Library
 
                       Clash.Edalize.Edam
 
+                      Clash.Netlist
+                      Clash.Netlist.BlackBox
                       Clash.Netlist.BlackBox.Parser
                       Clash.Netlist.BlackBox.Types
                       Clash.Netlist.BlackBox.Util
@@ -294,14 +296,14 @@ Library
                       Clash.Netlist.Id.SystemVerilog
                       Clash.Netlist.Id.Verilog
                       Clash.Netlist.Id.VHDL
-                      Clash.Netlist
-                      Clash.Netlist.BlackBox
                       Clash.Netlist.Types
                       Clash.Netlist.Util
 
                       Clash.Normalize
-                      Clash.Normalize.Primitives
                       Clash.Normalize.PrimitiveReductions
+                      Clash.Normalize.Primitives
+                      Clash.Normalize.Strategy
+                      Clash.Normalize.Strategy.Spec
                       Clash.Normalize.Transformations
                       Clash.Normalize.Transformations.ANF
                       Clash.Normalize.Transformations.Case
@@ -315,8 +317,6 @@ Library
                       Clash.Normalize.Transformations.SeparateArgs
                       Clash.Normalize.Transformations.Specialize
                       Clash.Normalize.Transformations.XOptimize
-                      Clash.Normalize.Strategy
-                      Clash.Normalize.Strategy.Spec
                       Clash.Normalize.Types
                       Clash.Normalize.Util
 
@@ -341,12 +341,12 @@ Library
                       Clash.Rewrite.Combinators
                       Clash.Rewrite.Globals
                       Clash.Rewrite.History
-                      Clash.Rewrite.Whnf
-                      Clash.Rewrite.WorkFree
                       Clash.Rewrite.StrategyDSL
                       Clash.Rewrite.StrategyDSL.TH
                       Clash.Rewrite.Types
                       Clash.Rewrite.Util
+                      Clash.Rewrite.Whnf
+                      Clash.Rewrite.WorkFree
 
                       Clash.Unique
                       Clash.Util
@@ -504,19 +504,17 @@ test-suite unittests
                  Clash.Tests.Core.Term
                  Clash.Tests.Core.TermInfo
                  Clash.Tests.Core.TermLiteral
+                 Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Core.TyCon
                  Clash.Tests.Core.Type
                  Clash.Tests.Core.TypeEnv
                  Clash.Tests.Core.TysPrim
                  Clash.Tests.Core.Util
-                 Clash.Tests.Core.TermLiteral.Types
                  Clash.Tests.Driver.Manifest
-                 Clash.Tests.Netlist.Id
                  Clash.Tests.Netlist
                  Clash.Tests.Netlist.BlackBox
+                 Clash.Tests.Netlist.Id
                  Clash.Tests.Netlist.Util
-                 Clash.Tests.Primitives
-                 Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize
                  Clash.Tests.Normalize.PrimitiveReductions
                  Clash.Tests.Normalize.Transformations.ANF
@@ -532,6 +530,7 @@ test-suite unittests
                  Clash.Tests.Normalize.Transformations.Specialize
                  Clash.Tests.Normalize.Transformations.XOptimize
                  Clash.Tests.Normalize.Util
+                 Clash.Tests.Primitives
                  Clash.Tests.Rewrite.Combinators
                  Clash.Tests.Rewrite.History
                  Clash.Tests.Rewrite.StrategyDSL
@@ -540,13 +539,14 @@ test-suite unittests
                  Clash.Tests.Rewrite.Whnf
                  Clash.Tests.Rewrite.WhnfContext
                  Clash.Tests.Rewrite.WorkFree
+                 Clash.Tests.Util.Interpolate
                  Clash.Tests.Warning
 
-                 Test.Clash.Rewrite
                  Test.Clash.Core
                  Test.Clash.Core.Evaluator
                  Test.Clash.Core.Evaluator.Primitives
                  Test.Clash.Core.Gen
                  Test.Clash.Core.Print
                  Test.Clash.Core.PrintTests
+                 Test.Clash.Rewrite
                  Test.Clash.TermLiteral
