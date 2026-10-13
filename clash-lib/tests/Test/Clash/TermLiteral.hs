@@ -44,8 +44,7 @@ import Clash.Sized.Vector (Vec (Cons, Nil))
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
-import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
-import qualified Clash.Core.Type as C (LitTy (NumTy))
+import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), LitTy (NumTy), WorkInfo (WorkNever))
 
 import Clash.Core.Scoped.Builder (runDataConSig)
 import Clash.Core.Scoped.Convert (mkDataCon, mkPrimInfo)
