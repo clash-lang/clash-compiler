@@ -54,13 +54,13 @@ import           Text.Read (readMaybe)
 import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend (Backend (hdlType), Usage (External))
 import           Clash.Core.Name (nameOcc)
-import           Clash.Core.Scoped.Binary ()
-import           Clash.Core.Scoped.Syntax (GlobalId)
+import           Clash.Core.Binary ()
+import           Clash.Core.Syntax (GlobalId)
 import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
 import           Clash.Primitives.Types
 import           Clash.Warning (defWarningOpts)
-import           Clash.Core.Scoped.Syntax (globalIdName)
+import           Clash.Core.Syntax (globalIdName)
 import           Clash.Netlist.Types
   (TopEntityT, Component(..), HWType (Clock, ClockN), hwTypeDomain)
 import qualified Clash.Netlist.Types as Netlist

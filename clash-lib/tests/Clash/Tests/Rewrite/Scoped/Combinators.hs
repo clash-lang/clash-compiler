@@ -23,8 +23,8 @@ import Test.Tasty.HUnit
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.Syntax
 import Clash.Rewrite.Scoped
 
 import Test.Clash.Scoped
@@ -122,7 +122,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
   , testCase "the argument's context comes from the rewritten function" $ do
       -- The function becomes a primitive; the argument then sees the AppArg
       -- frame of that primitive, applied to no arguments (like
-      -- 'Clash.Core.Scoped.Term.primArg' of the function)
+      -- 'Clash.Core.Term.primArg' of the function)
       let tm = closedTerm "(f_G2 :: Int -> Int) 3"
           toPrim = Transform $ \ctx e -> case (ctxFrames ctx, e) of
             (KAppFun : _, GlobalVar _) -> pure (Prim (testPrim "somePrim" "Int -> Int"))

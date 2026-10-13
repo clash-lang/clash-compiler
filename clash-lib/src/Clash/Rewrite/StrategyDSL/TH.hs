@@ -41,7 +41,7 @@ import Clash.Rewrite.StrategyDSL
   , TransformationWorker (..)
   )
 
-import qualified Clash.Core.Scoped.Syntax as S
+import qualified Clash.Core.Syntax as S
 import qualified Clash.Rewrite.Scoped.Apply as SApply
 import qualified Clash.Rewrite.Scoped.Combinators as SComb
 import qualified Clash.Rewrite.Types as S

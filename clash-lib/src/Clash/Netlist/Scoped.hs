@@ -100,24 +100,24 @@ import           Clash.Primitives.Types           (Primitive (BlackBox, multiRes
 import           Clash.Util                       (ClashException (..), curLoc, indexNote, makeCachedO)
 import qualified Clash.Util.Interpolate           as I
 
-import           Clash.Core.Scoped.Alpha          (aeqTy)
-import           Clash.Core.Scoped.HasType        (inferCoreTypeOf)
-import           Clash.Core.Scoped.Type
+import           Clash.Core.Alpha          (aeqTy)
+import           Clash.Core.HasType        (inferCoreTypeOf)
+import           Clash.Core.Type
   (SplitCoreFunForall (..), TypeView (..), coreView, splitCoreFunForallTy, tyView)
-import           Clash.Core.Scoped.TysPrim        (integerPrimTy, naturalPrimTy)
-import           Clash.Core.Scoped.TypeEnv        (TypeEnv, mkTypeEnv)
-import           Clash.Core.Scoped.Subst          (closeType, openTyBinder)
-import           Clash.Core.Scoped.Util           (splitShouldSplit)
-import           Clash.Core.Scoped.NameMap
+import           Clash.Core.TysPrim        (integerPrimTy, naturalPrimTy)
+import           Clash.Core.TypeEnv        (TypeEnv, mkTypeEnv)
+import           Clash.Core.Subst          (closeType, openTyBinder)
+import           Clash.Core.Util           (splitShouldSplit)
+import           Clash.Core.NameMap
   (GlobalEnv, emptyGlobalEnv, globalEnvFromList, globalEnvKeys, insertGlobalEnv,
    lookupGlobalEnv)
-import           Clash.Core.Scoped.FreeVars       (anyBoundOccursInType, teleNameBinders)
-import           Clash.Core.Scoped.Subst
+import           Clash.Core.FreeVars       (anyBoundOccursInType, teleNameBinders)
+import           Clash.Core.Subst
   (openAlt, openBind, patVars, teleIdBinderTypes, teleIdVars)
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.TermInfo
+import           Clash.Core.Syntax
+import           Clash.Core.TermInfo
   (multiPrimInfo', splitMultiPrimArgs, withMultiPrimResultTypes)
-import           Clash.Core.Scoped.Term
+import           Clash.Core.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
 
 import           Clash.Netlist.Scoped.BlackBox
@@ -196,7 +196,7 @@ genNames newInlineStrat prefixM is env bndrs =
         nm <- Id.makeBasic (genComponentName newInlineStrat prefixM g)
         pure (insertGlobalEnv g nm env_)
 
--- | The top entities, by their 'Clash.Core.Scoped.Syntax.GlobalId'
+-- | The top entities, by their 'Clash.Core.Syntax.GlobalId'
 topEntityEnv :: [TopEntityT] -> GlobalEnv TopEntityT
 topEntityEnv tops = globalEnvFromList [ (topId t, t) | t <- tops ]
 

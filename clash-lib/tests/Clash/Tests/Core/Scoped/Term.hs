@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Term".
+  Tests for "Clash.Core.Term".
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -19,12 +19,12 @@ import Test.Tasty.HUnit
 
 import qualified Clash.Core.Basic as C (NameMod (PrefixName))
 
-import Clash.Core.Scoped.Builder
+import Clash.Core.Builder
   ( TmB, appB, deDupTickB, nameModTickB, noDeDupTickB, primB, srcSpanTickB, tickB, tyAppB)
-import Clash.Core.Scoped.NameMap (emptyGlobalEnv, insertGlobalEnv)
-import Clash.Core.Scoped.Subst (substGlobals)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term
+import Clash.Core.NameMap (emptyGlobalEnv, insertGlobalEnv)
+import Clash.Core.Subst (substGlobals)
+import Clash.Core.Syntax
+import Clash.Core.Term
 
 import Test.Clash.Scoped
 

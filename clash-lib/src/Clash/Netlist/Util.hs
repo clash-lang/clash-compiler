@@ -78,18 +78,18 @@ import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name (Name (..), nameOcc)
 import           Clash.Core.Pretty (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.TyCon (TyCon (FunTyCon), TyConName, tyConDataCons)
-import           Clash.Core.Scoped.NameMap (emptyNameMap, lookupGlobalEnv)
-import           Clash.Core.Scoped.Alpha (AlphaType (..), aeqTm, aeqTy)
+import           Clash.Core.NameMap (emptyNameMap, lookupGlobalEnv)
+import           Clash.Core.Alpha (AlphaType (..), aeqTm, aeqTy)
 import           Clash.Core.DataCon (dataConInstExtTyVars, openDataConSig)
-import qualified Clash.Core.Scoped.EqSolver as S (typeEq)
+import qualified Clash.Core.EqSolver as S (typeEq)
 import qualified Data.IntSet as IntSet
-import           Clash.Core.Scoped.Subst
+import           Clash.Core.Subst
   (closeTerm, closeType, openBind, openIdBinder, openTyBinder, teleIdVars, withFreshIdBinder)
-import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Core.Scoped.Type as S
+import qualified Clash.Core.Syntax as S
+import qualified Clash.Core.Type as S
   (TypeView (..), coreView1, normalizeType, splitTyConAppM, tyView)
-import qualified Clash.Core.Scoped.Util as S (splitShouldSplit)
-import           Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, lookupTyCon)
+import qualified Clash.Core.Util as S (splitShouldSplit)
+import           Clash.Core.TypeEnv (TypeEnv, findTyCon, lookupTyCon)
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Types     as HW
@@ -112,18 +112,18 @@ import           Control.Monad.State.Strict  (runState)
 import           Data.Maybe                  (isNothing)
 
 import qualified Clash.Core.Name             as C
-import           Clash.Core.Scoped.TermInfo  (MultiPrimInfo (..), multiPrimInfo')
+import           Clash.Core.TermInfo  (MultiPrimInfo (..), multiPrimInfo')
 
-import           Clash.Core.Scoped.Evaluator (nfData)
-import           Clash.Core.Scoped.Evaluator.Primitives (primReductionMap)
-import           Clash.Core.Scoped.Evaluator.Types
+import           Clash.Core.Evaluator (nfData)
+import           Clash.Core.Evaluator.Primitives (primReductionMap)
+import           Clash.Core.Evaluator.Types
   (Env (..), Machine (..), PrimReductions (..), initMachine)
-import           Clash.Core.Scoped.TermLiteral (termToDataError)
-import           Clash.Core.Scoped.Type      (coreView, tyLitShow)
-import           Clash.Core.Scoped.FreeVars  (tmNameOccursIn)
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
-import           Clash.Core.Scoped.Term      (collectArgsTicks, collectTicks, mkTicks, stripTicks)
+import           Clash.Core.TermLiteral (termToDataError)
+import           Clash.Core.Type      (coreView, tyLitShow)
+import           Clash.Core.FreeVars  (tmNameOccursIn)
+import           Clash.Core.Syntax
+import           Clash.Core.HasType   (inferCoreTypeOf)
+import           Clash.Core.Term      (collectArgsTicks, collectTicks, mkTicks, stripTicks)
 
 import           Clash.Netlist.BlackBox.Types (BlackBoxMeta (..))
 import {-# SOURCE #-} Clash.Netlist.Scoped.BlackBox (extractPrimWarnOrFail, mkBlackBoxContext)
@@ -2388,7 +2388,7 @@ withTicks ctx ticks0 k = go [] (reverse (List.nubBy eqTick ticks0))
       Right nm1 -> local (applyNameMod m (Text.pack nm1)) (go decls ticks)
       _ -> go decls ticks
 
-  -- See 'Clash.Core.Scoped.Term.eqTickInfo'
+  -- See 'Clash.Core.Term.eqTickInfo'
   eqTick :: TickInfo n -> TickInfo n -> Bool
   eqTick t1 t2 = case (t1, t2) of
     (SrcSpan sp1, SrcSpan sp2) -> sp1 == sp2

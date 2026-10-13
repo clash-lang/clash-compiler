@@ -25,8 +25,8 @@ import Clash.Annotations.Primitive (PrimitiveGuard (HasBlackBox))
 import qualified Clash.Core.DataCon as C
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
 import qualified Clash.Core.TyCon as C
-import Clash.Core.Scoped.Syntax (mkPrimInfo)
-import Clash.Core.Scoped.Syntax (GlobalId, PrimInfo, PrimUnfolding (NoUnfolding), Term (Case))
+import Clash.Core.Syntax (mkPrimInfo)
+import Clash.Core.Syntax (GlobalId, PrimInfo, PrimUnfolding (NoUnfolding), Term (Case))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..))
 import Clash.Netlist.BlackBox.Types
@@ -160,7 +160,7 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.XOptimize"
             (tm "(case x_33 of { 1 -> Prim.err; _ -> Prim.err }) :: Int")
             (tm "Clash.XException.errorX")
         -- The type of a primitive is closed, so @errorX@ is applied to the
-        -- open type @a@, see 'Clash.Core.Scoped.Util.primAtType'
+        -- open type @a@, see 'Clash.Core.Util.primAtType'
       , testCase "no defined alternatives, at an open type" $
           xOptTo [kindedTyVarD "a_50" "Type", varD "x_33" "Int"]
             (tm "(case x_33 of { _ -> Prim.err }) :: a_50")

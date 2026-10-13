@@ -23,10 +23,10 @@ import Clash.Core.DataCon
 import Clash.Core.TyCon
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Syntax hiding (Name)
-import Clash.Core.Scoped.Type
+import Clash.Core.Syntax hiding (Name)
+import Clash.Core.Type
   (SplitFunForall(..), mkTyConApp, piTeleTmArity, piTeleTyArity, splitFunForallTy)
-import Clash.Core.Scoped.TysPrim (liftedTypeKind, tysPrimMap)
+import Clash.Core.TysPrim (liftedTypeKind, tysPrimMap)
 
 import Clash.Hedgehog.Core.DataCon
 import Clash.Hedgehog.Core.Monad

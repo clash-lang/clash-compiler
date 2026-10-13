@@ -81,9 +81,9 @@ import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
 import Clash.Core.Name                  (Name (..))
 import qualified Clash.Core.Name        as C
-import Clash.Core.Scoped.Sig            (TyFamEqn (..))
-import Clash.Core.Scoped.Syntax hiding (Name)
-import Clash.Core.Scoped.Term           (primArg)
+import Clash.Core.Sig            (TyFamEqn (..))
+import Clash.Core.Syntax hiding (Name)
+import Clash.Core.Term           (primArg)
 import Clash.Core.TyCon
   (AlgTyConRhs (..), TyCon (..), TyConName, isTupleTyConLike)
 import Clash.Debug                      (trace)
@@ -142,7 +142,7 @@ data SubtermPos
   | PosAppArg !(Maybe (Text, Int, Int))
   -- ^ Argument of an application. If the argument is an applied primitive:
   -- the name of the primitive, and the numbers of type and term arguments it
-  -- is applied to, see 'Clash.Core.Scoped.Term.primArg'.
+  -- is applied to, see 'Clash.Core.Term.primArg'.
   | PosTyAppFun
   -- ^ Function of a type application
   | PosLetRhs !Int
@@ -571,7 +571,7 @@ pprTcApp env p tc tys
  where
   isSym = isSymName tc
 
--- | The view on types of 'Clash.Core.Scoped.Type.tyView', which imports this
+-- | The view on types of 'Clash.Core.Type.tyView', which imports this
 -- module
 data TypeView n
   = FunTyView (Type n) (Type n)
@@ -586,7 +586,7 @@ tyView = go []
     ConstTy Arrow -> case args of
       [arg, res] -> FunTyView arg res
       -- With the kinds of the argument and the result, see Note [Arrow
-      -- arguments] in "Clash.Core.Scoped.Type"
+      -- arguments] in "Clash.Core.Type"
       [_, _, arg, res] -> FunTyView arg res
       _ -> OtherTypeView
     AppTy l r -> go (r : args) l

@@ -27,9 +27,9 @@ import           GHC.Stack                       (HasCallStack)
 import           Clash.Annotations.Primitive     (HDL(..))
 import           Clash.Backend
   (Backend, blockDecl, hdlKind)
-import           Clash.Core.Scoped.HasType       (inferCoreTypeOf)
-import           Clash.Core.Scoped.Syntax        (Distinct, Term(Var))
-import           Clash.Core.Scoped.TermLiteral
+import           Clash.Core.HasType       (inferCoreTypeOf)
+import           Clash.Core.Syntax        (Distinct, Term(Var))
+import           Clash.Core.TermLiteral
   (liftTermToData#, termToDataError, termToDataErrorWith)
 import           Clash.Util                      (indexNote)
 import           Clash.Netlist.Scoped            (mkExpr)

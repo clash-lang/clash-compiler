@@ -42,7 +42,7 @@ import qualified System.Directory       as Directory
 import qualified System.FilePath        as FilePath
 import           System.IO.Error        (tryIOError)
 
-import           Clash.Core.Scoped.Syntax (Distinct, Term, Type)
+import           Clash.Core.Syntax (Distinct, Term, Type)
 import           Clash.Annotations.Primitive
   ( PrimitiveGuard(HasBlackBox, DontTranslate)
   , PrimitiveWarning(WarnNonSynthesizable)

@@ -15,7 +15,7 @@ module Clash.Primitives.GHC.Int (intTF) where
 import           Data.List.NonEmpty           (NonEmpty(..))
 
 import           Clash.Core.Literal           (Literal(..))
-import           Clash.Core.Scoped.Syntax     (Term(Literal), Type)
+import           Clash.Core.Syntax     (Term(Literal), Type)
 import           Clash.Primitives.GHC.Literal
   (literalTF, signed, signedLiteral, assign)
 import           Clash.Netlist.Types

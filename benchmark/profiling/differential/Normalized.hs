@@ -44,11 +44,11 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Driver.Types (Binding (..), GlobalBindings)
 import Clash.Unique (Unique)
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.NameMap (globalEnvFromList, lookupGlobalEnv)
-import Clash.Core.Scoped.Subst (substGlobals)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (walkTerm)
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.NameMap (globalEnvFromList, lookupGlobalEnv)
+import Clash.Core.Subst (substGlobals)
+import Clash.Core.Syntax
+import Clash.Core.Term (walkTerm)
 
 import Compare
 import SerialiseInstances (NormalizationInputs, readInputs)

@@ -5,7 +5,7 @@ module Main (main) where
 import           Clash.Backend
 import           Clash.Backend.VHDL (VHDLState)
 import           Clash.Core.Name
-import           Clash.Core.Scoped.Syntax     (globalIdName)
+import           Clash.Core.Syntax     (globalIdName)
 import           Clash.Driver.Types
 import           Clash.Netlist.Scoped (genNetlist, genTopNames, topEntityEnv)
 import           Clash.Netlist.Types          hiding (backend, hdlDir)

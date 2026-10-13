@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Type". The functions give the expected results
+  Tests for "Clash.Core.Type". The functions give the expected results
   on 'corpus' ('expected'), in the scope of the free type variables of the
   corpus, and sunk into a larger scope where all binders of the types are
   below the watermark of the scope.
@@ -30,15 +30,15 @@ import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 
-import Clash.Core.Scoped.Builder (TyB, annTyB, appTyB, constTyB, litTyB, runTyFamEqn)
+import Clash.Core.Builder (TyB, annTyB, appTyB, constTyB, litTyB, runTyFamEqn)
 import Clash.Core.TyCon (mkFunTyCon)
-import Clash.Core.Scoped.FreeVars (freeTyVarsOfType)
-import Clash.Core.Scoped.NameMap (nullNameSet)
-import Clash.Core.Scoped.Subst (unsinkType)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Type
-import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.FreeVars (freeTyVarsOfType)
+import Clash.Core.NameMap (nullNameSet)
+import Clash.Core.Subst (unsinkType)
+import Clash.Core.Syntax
+import Clash.Core.Type
+import Clash.Core.TypeEnv (TypeEnv, mkTypeEnv)
+import qualified Clash.Core.TysPrim as P
 
 import Test.Clash.Rewrite (addTyConName, cmpNatTyConName, mkTyConName, testTyConMap)
 import Test.Clash.Scoped
@@ -110,7 +110,7 @@ ppm = maybe "Nothing" pp
 -- | A function on types, whose results 'render' as text
 newtype Render = Render (forall n. Distinct n => Scope n -> Type n -> String)
 
--- | The functions of "Clash.Core.Scoped.Type", rendering their results
+-- | The functions of "Clash.Core.Type", rendering their results
 render :: [(String, Render)]
 render =
   [ ("tyView", Render $ \_ ty -> case tyView ty of

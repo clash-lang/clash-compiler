@@ -36,16 +36,16 @@ import Clash.Rewrite.StrategyDSL (Transformation, onPrim, toTransformation)
 import Clash.Rewrite.Types (primitives, tcCache)
 import Clash.Util (curLoc)
 
-import Clash.Core.Scoped.HasType (primInfoType)
-import Clash.Core.Scoped.Subst
+import Clash.Core.HasType (primInfoType)
+import Clash.Core.Subst
   (Subst, idSubst, substScope, substTy, substTyBinder, withFreshIdBinders, withFreshTyBinder)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (mkApps, mkLams, mkTmApps, mkTyApps, mkTyLams)
-import Clash.Core.Scoped.TermInfo (MultiPrimInfo (..), multiPrimInfo')
-import Clash.Core.Scoped.Type
+import Clash.Core.Syntax
+import Clash.Core.Term (mkApps, mkLams, mkTmApps, mkTyApps, mkTyLams)
+import Clash.Core.TermInfo (MultiPrimInfo (..), multiPrimInfo')
+import Clash.Core.Type
   (PiTele (..), SplitFunForall (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
-import Clash.Core.Scoped.TysPrim (liftedTypeKind)
-import Clash.Core.Scoped.Util (internalName, listToLets)
+import Clash.Core.TysPrim (liftedTypeKind)
+import Clash.Core.Util (internalName, listToLets)
 import Clash.Rewrite.Scoped (TransformContext, changed, tfScope)
 
 {- Note [MultiResult type]

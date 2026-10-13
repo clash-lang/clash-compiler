@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree", on
+  Tests for "Clash.Core.Evaluator.Primitives.Clash.Sized.RTree", on
   fixed inputs.
 -}
 
@@ -14,8 +14,8 @@ module Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree (tests) wh
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.Builder (TmB, dataB)
-import Clash.Core.Scoped.Syntax (emptyScope)
+import Clash.Core.Builder (TmB, dataB)
+import Clash.Core.Syntax (emptyScope)
 
 import Test.Clash.Rewrite (ghcPairDc, ghcPairTcNm)
 import Test.Clash.Scoped.Evaluator (assertSameValue)

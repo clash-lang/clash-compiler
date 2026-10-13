@@ -83,7 +83,7 @@ import           Clash.Core.Literal            (Literal (IntLiteral))
 import qualified Clash.Core.Name               as C
 import           Clash.Core.Pretty             (showPpr)
 import           Clash.Core.TyCon              (tyConDataCons)
-import           Clash.Core.Scoped.TysPrim (undefinedTy)
+import           Clash.Core.TysPrim (undefinedTy)
 import qualified Clash.Data.UniqMap            as UniqMap
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxMeta (..), BlackBoxTemplate, Element (Text), RenderVoid (..),
@@ -111,19 +111,19 @@ import           Clash.Driver.Warning          (warnAboutM)
 import           Data.Foldable                 (for_)
 import qualified Data.Set                      as Set
 
-import           Clash.Core.Scoped.FreeVars    (tmNameOccursIn)
-import           Clash.Core.Scoped.HasType     (inferCoreTypeOf)
-import           Clash.Core.Scoped.NameMap     (lookupGlobalEnv)
-import           Clash.Core.Scoped.Subst
+import           Clash.Core.FreeVars    (tmNameOccursIn)
+import           Clash.Core.HasType     (inferCoreTypeOf)
+import           Clash.Core.NameMap     (lookupGlobalEnv)
+import           Clash.Core.Subst
   (extendTmSubst, idSubst, openBind, openIdBinder, openTyBinder, substTm,
    teleIdVars, withFreshIdBinder)
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Term
+import           Clash.Core.Syntax
+import           Clash.Core.Term
   (collectArgs, collectArgsTicks, collectTicks, mkApps, mkTicks, stripTicks)
-import           Clash.Core.Scoped.TermInfo
+import           Clash.Core.TermInfo
   (isFun, isLiteral, multiPrimInfo', splitMultiPrimArgs)
-import           Clash.Core.Scoped.Type        (TypeView (..), mkFunTy, splitFunTys, tyView)
-import           Clash.Core.Scoped.Util
+import           Clash.Core.Type        (TypeView (..), mkFunTy, splitFunTys, tyView)
+import           Clash.Core.Util
   (inverseTopSortOrderOf, primAtType, splitShouldSplit)
 
 import {-# SOURCE #-} Clash.Netlist.Scoped

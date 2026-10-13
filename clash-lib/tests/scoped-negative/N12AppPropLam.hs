@@ -5,7 +5,7 @@
 -- that #1040 fixed)
 module N12AppPropLam where
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 
 appPropLam :: Term n -> [Term n] -> Term n
 appPropLam fun args = case (fun, args) of

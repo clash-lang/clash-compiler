@@ -14,7 +14,7 @@ module Clash.Primitives.GHC.Word (wordTF) where
 import           Data.List.NonEmpty           (NonEmpty(..))
 
 import           Clash.Core.Literal           (Literal(..))
-import           Clash.Core.Scoped.Syntax     (Term(Literal), Type)
+import           Clash.Core.Syntax     (Term(Literal), Type)
 import           Clash.Primitives.GHC.Literal
   (literalTF, unsigned, unsignedLiteral, assign)
 import           Clash.Netlist.Types

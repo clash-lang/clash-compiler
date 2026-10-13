@@ -7,7 +7,7 @@
   Utility functions used by the normalisation transformations.
 
   Utility functions used by the normalization transformations on scoped Clash
-  Core ("Clash.Core.Scoped.Syntax").
+  Core ("Clash.Core.Syntax").
 
   = Globals
 
@@ -90,15 +90,15 @@ import           Clash.Rewrite.Types
   , FrameKind (..), Rewrite, TransformContext, ctxFrames, mkDerivedName, tfScope )
 import           Clash.Unique                (fromGhcUnique)
 
-import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
-import           Clash.Core.Scoped.FreeVars  (teleNameBinders, termGlobalIds)
-import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
-import           Clash.Core.Scoped.NameMap
-import           Clash.Core.Scoped.Subst
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Term
-import           Clash.Core.Scoped.TermInfo  (isClosed)
-import           Clash.Core.Scoped.Type
+import           Clash.Core.Alpha     (AlphaTerm (..), AlphaType (..))
+import           Clash.Core.FreeVars  (teleNameBinders, termGlobalIds)
+import           Clash.Core.HasType   (inferCoreTypeOf)
+import           Clash.Core.NameMap
+import           Clash.Core.Subst
+import           Clash.Core.Syntax
+import           Clash.Core.Term
+import           Clash.Core.TermInfo  (isClosed)
+import           Clash.Core.Type
   (PiTele (..), TypeView (..), isClockOrReset, mkFunTy, piTeleNameBinders, tyView)
 import           Clash.Rewrite.Scoped.Apply  (runRewrite)
 import           Clash.Rewrite.Scoped.Globals (freshGlobalId)

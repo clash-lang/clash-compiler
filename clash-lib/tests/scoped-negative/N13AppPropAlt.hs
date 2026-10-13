@@ -5,7 +5,7 @@
 -- (the capture bug in `appProp` that #1040 fixed)
 module N13AppPropAlt where
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 
 appPropAlt :: Term n -> [Term n] -> Term n
 appPropAlt fun args = case fun of

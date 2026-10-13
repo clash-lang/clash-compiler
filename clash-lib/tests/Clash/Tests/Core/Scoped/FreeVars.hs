@@ -19,12 +19,12 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.QuickCheck
 
-import Clash.Core.Scoped.FreeVars
-import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Subst
+import Clash.Core.FreeVars
+import Clash.Core.NameMap
+import Clash.Core.Subst
   (strengthenTyPat, unsinkAlt, unsinkIdBinder, unsinkTerm, unsinkTyBinder, unsinkType)
-import Clash.Core.Scoped.Syntax
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.Syntax
+import qualified Clash.Core.TysPrim as P
 
 import Test.Clash.Scoped
   ( TestScope (..), atRaw, closedTerm, emptyTestScope, forAllScrambled, kindedTyVarD, nameSetRaws

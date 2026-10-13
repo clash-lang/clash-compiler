@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector", on
+  Tests for "Clash.Core.Evaluator.Primitives.Clash.Sized.Vector", on
   fixed inputs.
 -}
 
@@ -19,10 +19,10 @@ module Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector (tests) w
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Builder (TmB, appB, dataB, runClosedType)
-import Clash.Core.Scoped.Subst (closeType)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Builder (TmB, appB, dataB, runClosedType)
+import Clash.Core.Subst (closeType)
+import Clash.Core.Syntax
 
 import Test.Clash.Rewrite (iHashDc, showPprU, snatDc)
 import Test.Clash.Scoped.Evaluator (assertSameValue)

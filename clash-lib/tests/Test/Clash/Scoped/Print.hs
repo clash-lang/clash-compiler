@@ -39,10 +39,10 @@ import qualified Clash.Core.DataCon as C (dcName)
 import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Basic as C (ConstTy (..), LitTy (..), NameMod (..))
-import Clash.Core.Scoped.FreeVars (HasNameBinder (..))
-import Clash.Core.Scoped.Internal.Scope (nameId, nameOf)
-import Clash.Core.Scoped.Syntax
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.FreeVars (HasNameBinder (..))
+import Clash.Core.Internal.Scope (nameId, nameOf)
+import Clash.Core.Syntax
+import qualified Clash.Core.TysPrim as P
 
 
 -- | The names of the variables in scope: of the binders by raw name, and the

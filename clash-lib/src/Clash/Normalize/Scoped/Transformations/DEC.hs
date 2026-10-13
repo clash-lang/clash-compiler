@@ -20,7 +20,7 @@
   The function, the type arguments and the shared term arguments of an
   application that is lifted out of the alternatives have to be values of
   scope @n@. DEC only gets them there by unsinking them out of the scope of
-  the binders on the path ('Clash.Core.Scoped.Subst.unsinkTerm'), which checks
+  the binders on the path ('Clash.Core.Subst.unsinkTerm'), which checks
   that none of those binders occur in them. So an application whose function
   or type arguments refer to a variable bound inside the alternatives can't be
   lifted, and an argument that refers to one can't be shared: the types
@@ -116,25 +116,25 @@ import Clash.Rewrite.Types
   (globalHeap, bindings, typeEnv, tupleTcCache)
 import Clash.Util (curLoc)
 
-import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
+import Clash.Core.Alpha (aeqTm, aeqTy)
 import Clash.Core.DataCon (DataConSig (..), dataConInstArgTys)
-import Clash.Core.Scoped.EqSolver (typeEq)
-import Clash.Core.Scoped.Evaluator (whnf)
-import Clash.Core.Scoped.Evaluator.Types (Env, Machine (..), PrimHeap, initMachine)
-import Clash.Core.Scoped.FreeVars
+import Clash.Core.EqSolver (typeEq)
+import Clash.Core.Evaluator (whnf)
+import Clash.Core.Evaluator.Types (Env, Machine (..), PrimHeap, initMachine)
+import Clash.Core.FreeVars
   (bindNameBinders, freeTmVars, patNameBinders, teleNameBinders)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf, piResultTy)
-import Clash.Core.Scoped.NameMap
+import Clash.Core.HasType (inferCoreTypeOf, piResultTy)
+import Clash.Core.NameMap
   ( GlobalEnv, NameBinders, appendNameBinders, emptyNameBinders, emptyNameMap
   , memberNameSet )
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term
+import Clash.Core.Subst
+import Clash.Core.Syntax
+import Clash.Core.Term
   (collectArgs, collectArgsTicks, mkApps, mkTicks, stripTicks)
-import Clash.Core.Scoped.Type
+import Clash.Core.Type
   (TypeView (..), coreView, mkTyConApp, splitFunTy, tyView, SplitFunForall (..), anyPiArg, isPolyFunTy, splitFunForallTy)
-import Clash.Core.Scoped.TypeEnv (TypeEnv, typeEnvTyConMap)
-import Clash.Core.Scoped.Util (internalName, mkSelectorCase)
+import Clash.Core.TypeEnv (TypeEnv, typeEnvTyConMap)
+import Clash.Core.Util (internalName, mkSelectorCase)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Letrec
 import Clash.Rewrite.Scoped
   (Transform (..), TransformContext, bottomupR, changed, tfScope)

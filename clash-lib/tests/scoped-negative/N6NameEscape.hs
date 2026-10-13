@@ -5,8 +5,8 @@ module N6NameEscape where
 
 import qualified Clash.Core.Name as C
 
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Subst
+import Clash.Core.Syntax
 
 occ :: C.Name Term
 occ = C.mkUnsafeSystemName (error "occ") 0

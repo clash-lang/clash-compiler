@@ -31,9 +31,9 @@ import Clash.Rewrite.Scoped (Rewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 
-import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences)
-import Clash.Core.Scoped.NameMap (GlobalEnv, emptyNameMap, globalEnvFromList, nameMapFromList)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.FreeVars (freeTmVarOccurrences)
+import Clash.Core.NameMap (GlobalEnv, emptyNameMap, globalEnvFromList, nameMapFromList)
+import Clash.Core.Syntax
 import Clash.Rewrite.Util (LetBinding (..), keepBindings, openLetBindings)
 
 import Test.Clash.Rewrite

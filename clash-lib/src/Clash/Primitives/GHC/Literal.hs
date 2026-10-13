@@ -26,7 +26,7 @@ import           Data.Text
 import           Data.Text.Extra              (showtl)
 import           Text.Read                    (readMaybe)
 
-import           Clash.Core.Scoped.Syntax     (Term, Type)
+import           Clash.Core.Syntax     (Term, Type)
 import           Clash.Netlist.Types          (BlackBox, BlackBoxFunction)
 import           Clash.Netlist.BlackBox.Types (Element(Text), BlackBoxMeta)
 

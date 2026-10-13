@@ -11,7 +11,7 @@
 -- @Vec (2^(k-1)) a@.
 --
 -- This test evaluates the subject of the case-expression in @topEntity@ with
--- the scoped evaluator ("Clash.Core.Scoped.Evaluator"), in the environment
+-- the scoped evaluator ("Clash.Core.Evaluator"), in the environment
 -- Clash uses, and checks the types of the binders of the patterns in the
 -- result, which must have some.
 module DTFoldBinderTypes where
@@ -26,19 +26,19 @@ import Data.Singletons (Apply, TyFun, type (@@))
 import Clash.Backend
 import Clash.Core.Name (nameOcc)
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Alpha (aeqTy)
 import Clash.Core.DataCon (dataConInstArgTys)
-import Clash.Core.Scoped.Evaluator (bindAllocated, whnf)
-import Clash.Core.Scoped.Evaluator.Types (Machine (..), initMachine)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.NameMap (emptyNameMap, foldrWithGlobalEnv)
-import Clash.Core.Scoped.Subst (openAlt, openBind, openIdBinder, openTyBinder, teleIdBinderTypes)
-import Clash.Core.Scoped.Syntax (Distinct, Scope)
-import qualified Clash.Core.Scoped.Syntax as S
+import Clash.Core.Evaluator (bindAllocated, whnf)
+import Clash.Core.Evaluator.Types (Machine (..), initMachine)
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.NameMap (emptyNameMap, foldrWithGlobalEnv)
+import Clash.Core.Subst (openAlt, openBind, openIdBinder, openTyBinder, teleIdBinderTypes)
+import Clash.Core.Syntax (Distinct, Scope)
+import qualified Clash.Core.Syntax as S
 import Clash.Core.DataCon (dcName)
-import Clash.Core.Scoped.Term (stripTicks)
-import Clash.Core.Scoped.Type (TypeView (..), coreView, tyView)
-import Clash.Core.Scoped.TypeEnv (TypeEnv, mkTypeEnv)
+import Clash.Core.Term (stripTicks)
+import Clash.Core.Type (TypeView (..), coreView, tyView)
+import Clash.Core.TypeEnv (TypeEnv, mkTypeEnv)
 import Clash.Driver.Types
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 import qualified Data.IntMap.Strict as IntMap

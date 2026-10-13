@@ -33,8 +33,8 @@ import qualified Data.IntMap.Strict as IntMap
 import qualified Data.List as List
 
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.Syntax
 
 -- * Comparing
 
@@ -89,7 +89,7 @@ firstDiff :: Term n -> Term n -> Maybe Diff
 firstDiff = diffTm emptyLv []
 
 -- | The level of the next binder, and the levels of the bound names of either
--- side, as in "Clash.Core.Scoped.Alpha"
+-- side, as in "Clash.Core.Alpha"
 data Lv = Lv !Int !(IntMap Int) !(IntMap Int)
 
 emptyLv :: Lv

@@ -23,8 +23,8 @@ import Clash.Netlist.Types
   , Expr (Identifier), Identifier, NetlistMonad, PortDirection (..), PortMap (NamedPortMap)
   , componentNames, CompCtx, LocalId (..), localIdVar)
 
-import Clash.Core.Scoped.NameMap (singletonGlobalEnv)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.NameMap (singletonGlobalEnv)
+import Clash.Core.Syntax
 import Clash.Netlist.Scoped (mkFunApp)
 
 import Test.Clash.Rewrite (runNetlistTest)

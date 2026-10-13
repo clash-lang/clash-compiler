@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Helpers for testing "Clash.Core.Scoped.TermLiteral": encoding Haskell
+  Helpers for testing "Clash.Core.TermLiteral": encoding Haskell
   values as the terms of scoped Clash Core that the decoders expect, and
   generating values.
 -}
@@ -46,16 +46,16 @@ import qualified Clash.Core.Literal as C
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Basic as C (IsMultiPrim (SingleResult), LitTy (NumTy), WorkInfo (WorkNever))
 
-import Clash.Core.Scoped.Builder (runDataConSig)
+import Clash.Core.Builder (runDataConSig)
 import Clash.Core.DataCon (mkDataCon)
-import Clash.Core.Scoped.Syntax (mkPrimInfo)
-import qualified Clash.Core.Scoped.Syntax as S
+import Clash.Core.Syntax (mkPrimInfo)
+import qualified Clash.Core.Syntax as S
 
 import Test.Clash.Scoped (closedType)
 
 -- | Encode a value as a closed term of scoped Clash Core, of the shape
 -- "Clash.GHC.GHC2Core" makes for it, as far as the decoders of
--- 'Clash.Core.Scoped.TermLiteral.TermLiteral' look. Type arguments and data
+-- 'Clash.Core.TermLiteral.TermLiteral' look. Type arguments and data
 -- constructor types are placeholders.
 class ToTerm a where
   toTerm :: a -> S.Term 'S.VoidS
@@ -65,7 +65,7 @@ intTy :: S.Type 'S.VoidS
 intTy = closedType "Int"
 
 -- | A data constructor with the given fully qualified name, as the derived
--- decoders match on (see 'Clash.Core.Scoped.TermLiteral.TH')
+-- decoders match on (see 'Clash.Core.TermLiteral.TH')
 namedDataCon :: String -> C.DataCon
 namedDataCon nm =
   mkDataCon (C.mkUnsafeName C.User (Text.pack nm) (fromIntegral (Hashable.hash nm))) 1 intTy

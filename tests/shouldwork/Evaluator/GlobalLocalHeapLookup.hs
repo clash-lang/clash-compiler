@@ -10,7 +10,7 @@
 --
 -- In scoped Clash Core, locals and globals are separate namespaces: a local
 -- has a raw name of its scope, a global a unique. The scoped evaluator
--- ("Clash.Core.Scoped.Evaluator") must keep them apart, also when the raw
+-- ("Clash.Core.Evaluator") must keep them apart, also when the raw
 -- name of a local is the unique of a global.
 --
 -- This test evaluates a global variable @f@, and an application of a free
@@ -30,17 +30,17 @@ import Clash.Driver.Types (Binding (..), IsPrim (IsFun))
 import GHC.Types.Basic (InlineSpec (NoUserInlinePrag))
 
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.Syntax (mkGlobalId)
-import Clash.Core.Scoped.Evaluator (whnf)
-import Clash.Core.Scoped.Evaluator.Types (Machine (..), initMachine)
-import Clash.Core.Scoped.NameMap (emptyNameMap, insertNameMap, singletonGlobalEnv)
-import Clash.Core.Scoped.Subst (withFreshIdBinder)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (stripAllTicks)
-import Clash.Core.Scoped.Type (mkFunTy)
-import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
-import Clash.Core.Scoped.TysPrim (intPrimTy)
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.Syntax (mkGlobalId)
+import Clash.Core.Evaluator (whnf)
+import Clash.Core.Evaluator.Types (Machine (..), initMachine)
+import Clash.Core.NameMap (emptyNameMap, insertNameMap, singletonGlobalEnv)
+import Clash.Core.Subst (withFreshIdBinder)
+import Clash.Core.Syntax
+import Clash.Core.Term (stripAllTicks)
+import Clash.Core.Type (mkFunTy)
+import Clash.Core.TypeEnv (mkTypeEnv)
+import Clash.Core.TysPrim (intPrimTy)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 
 mainVerilog :: IO ()

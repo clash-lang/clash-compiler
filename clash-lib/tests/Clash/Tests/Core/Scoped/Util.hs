@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Util". Most expected results are rendered as
+  Tests for "Clash.Core.Util". Most expected results are rendered as
   text.
 -}
 
@@ -21,11 +21,11 @@ import Test.Tasty.HUnit
 import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 
-import Clash.Core.Scoped.Builder (appTyB, constTyB, litTyB)
-import Clash.Core.Scoped.FreeVars (teleNameBinders)
-import Clash.Core.Scoped.Subst (unsinkTerm)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Util
+import Clash.Core.Builder (appTyB, constTyB, litTyB)
+import Clash.Core.FreeVars (teleNameBinders)
+import Clash.Core.Subst (unsinkTerm)
+import Clash.Core.Syntax
+import Clash.Core.Util
 
 import Test.Clash.Rewrite
   (addTyConName, brDc, consDc, lrDc, nilDc)
@@ -281,7 +281,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Util"
   , primTests
   ]
 
--- | The expected results of the functions of "Clash.Core.Scoped.Util",
+-- | The expected results of the functions of "Clash.Core.Util",
 -- rendered as text ('pp'), by test, as lines
 expected :: [(String, [String])]
 expected =

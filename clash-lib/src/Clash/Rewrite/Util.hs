@@ -9,7 +9,7 @@
   Utilities of the rewrite monad: running a rewrite session, signaling
   change, counting transformations, and the caches of the rewrite state.
 
-  Utilities for rewriting scoped Clash Core ("Clash.Core.Scoped.Syntax"):
+  Utilities for rewriting scoped Clash Core ("Clash.Core.Syntax"):
   creating binders, the representability of terms and types, inlining,
   lifting and removing let-bindings, recognizing join points, and binding
   what the evaluator allocated.
@@ -35,7 +35,7 @@
 
   New global bindings are closed terms, created with
   "Clash.Rewrite.Scoped.Globals". 'liftBinding' abstracts a binding over its
-  free variables with 'Clash.Core.Scoped.Subst.closeOver'.
+  free variables with 'Clash.Core.Subst.closeOver'.
 -}
 
 {-# LANGUAGE BangPatterns #-}
@@ -105,18 +105,18 @@ import           GHC.Stack                   (HasCallStack)
 import           GHC.Types.Basic             (InlineSpec (..))
 
 import qualified Clash.Core.Name             as C
-import           Clash.Core.Scoped.FreeVars
+import           Clash.Core.FreeVars
   (bindNameBinders, freeTmVars, teleNameBinders, tmNameOccursIn)
-import           Clash.Core.Scoped.HasType   (inferCoreKindOf, inferCoreTypeOf)
-import           Clash.Core.Scoped.NameMap
+import           Clash.Core.HasType   (inferCoreKindOf, inferCoreTypeOf)
+import           Clash.Core.NameMap
   ( NameMap, emptyNameMap, insertNameMap, nameSetToList, nullNameMap
   , singletonNameMap )
-import           Clash.Core.Scoped.Subst
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Term
+import           Clash.Core.Subst
+import           Clash.Core.Syntax
+import           Clash.Core.Term
   (AbsBinder (..), collectArgs, mkApps, mkLams, mkTyLams, stripTicks)
-import           Clash.Core.Scoped.Type      (mkFunTy, normalizeType)
-import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
+import           Clash.Core.Type      (mkFunTy, normalizeType)
+import           Clash.Core.TypeEnv   (TypeEnv)
 import           Clash.Debug                 (traceIf)
 import           Clash.Driver.Types
   (ClashEnv (..), ClashOpts (..), DebugOpts (..), TransformationInfo (..))
@@ -271,7 +271,7 @@ normalizeTermTypes te sc e = case e of
 
 -- | Order type variable occurrences such that every type variable comes
 -- after the type variables in its kind, keeping their order otherwise, e.g.
--- to bind them with 'Clash.Core.Scoped.Subst.closeOver'.
+-- to bind them with 'Clash.Core.Subst.closeOver'.
 --
 -- Only the dependencies between the given type variables are taken into
 -- account. Elements that are not type variables are left in place.
@@ -314,7 +314,7 @@ letBindingVar :: LetBinding l -> Term l
 letBindingVar (LetBinding occ ty nm _) = Var occ ty nm
 
 -- | Go under the binders of a let-expression, see
--- 'Clash.Core.Scoped.Subst.openBind'. Gives its binders as a telescope, and
+-- 'Clash.Core.Subst.openBind'. Gives its binders as a telescope, and
 -- its bindings in the scope of the body, whether the let-expression is
 -- recursive or not: the right-hand side of a non-recursive binding is sunk
 -- into that scope.
@@ -336,7 +336,7 @@ openLetBindings sc bind body k = openBind sc bind body $ \sc' bind' body' -> cas
 
 -- | Substitute terms for some of the variables of the scope, e.g. for binders
 -- of a let-expression opened with 'openLetBindings', see
--- 'Clash.Core.Scoped.Subst.tmVarsSubst'. Partially apply it to substitute in
+-- 'Clash.Core.Subst.tmVarsSubst'. Partially apply it to substitute in
 -- several terms.
 substVars :: Distinct n => Scope n -> NameMap TmName n (Term n) -> Term n -> Term n
 substVars sc m
@@ -349,7 +349,7 @@ substVars sc m
 -- occur in the right-hand sides of the given ones, or in the body.
 --
 -- The binders keep their names if they are fresh for the outer scope in the
--- given order ('Clash.Core.Scoped.Subst.rebindIds'), as they are if the
+-- given order ('Clash.Core.Subst.rebindIds'), as they are if the
 -- bindings keep the order of the telescope. Otherwise they get fresh names in
 -- the outer scope, which takes a substitution.
 keepBindings

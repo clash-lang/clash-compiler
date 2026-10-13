@@ -64,18 +64,18 @@ import qualified Clash.Sized.RTree
 import qualified Clash.Sized.Vector
 import Clash.Util (textNameLit)
 
-import Clash.Core.Scoped.Alpha (aeqTm)
-import Clash.Core.Scoped.FreeVars (hasFreeVarsType)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf, piResultTys, primInfoType)
-import Clash.Core.Scoped.NameMap (NameMap, insertNameMap)
-import Clash.Core.Scoped.Subst (unsinkType, withFreshIdBinder)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)
-import Clash.Core.Scoped.Type
+import Clash.Core.Alpha (aeqTm)
+import Clash.Core.FreeVars (hasFreeVarsType)
+import Clash.Core.HasType (inferCoreTypeOf, piResultTys, primInfoType)
+import Clash.Core.NameMap (NameMap, insertNameMap)
+import Clash.Core.Subst (unsinkType, withFreshIdBinder)
+import Clash.Core.Syntax
+import Clash.Core.Term (collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)
+import Clash.Core.Type
   ( PiTele (..), SplitFunForall (..), TypeView (..), coreView, mkTyConApp
   , piTeleNameBinders, splitFunForallTy, tyNatSize, tyView )
-import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
-import Clash.Core.Scoped.Util (mkVec, shouldSplit)
+import Clash.Core.TypeEnv (TypeEnv, lookupTyCon)
+import Clash.Core.Util (mkVec, shouldSplit)
 import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.Scoped
   ( FrameKind (..), TransformContext, Under (LamBody)

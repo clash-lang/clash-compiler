@@ -21,9 +21,9 @@ import Data.Text (Text)
 import Clash.Core.Basic
   (IsMultiPrim (..), WorkInfo (..), removedArgName, undefinedName, undefinedXName)
 
-import Clash.Core.Scoped.Syntax (mkPrimInfo)
-import Clash.Core.Scoped.Syntax (PrimInfo, PrimUnfolding (..))
-import Clash.Core.Scoped.TysPrim (undefinedTy)
+import Clash.Core.Syntax (mkPrimInfo)
+import Clash.Core.Syntax (PrimInfo, PrimUnfolding (..))
+import Clash.Core.TysPrim (undefinedTy)
 
 -- | The removedArg primitive represents an argument which is computationally
 -- irrelevant, and has been removed from the circuit (as removing it does not

@@ -17,8 +17,8 @@ import qualified Clash.Netlist.BlackBox.Types                 as CL
 import qualified Data.HashMap.Strict                          as HM
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Core.Scoped.Binary (decodeWithHeader, encodeWithHeader)
-import           Clash.Core.Scoped.Syntax (GlobalId)
+import           Clash.Core.Binary (decodeWithHeader, encodeWithHeader)
+import           Clash.Core.Syntax (GlobalId)
 import           Clash.Core.TyCon (TyConMap,TyConName)
 import           Clash.Driver.Types (DomainMap, GlobalBindings)
 import qualified Data.ByteString.Lazy as BL
@@ -70,7 +70,7 @@ type NetlistInputs =
   )
 
 -- | Write inputs, or normalized bindings, to a file of scoped Clash Core: with
--- the header of "Clash.Core.Scoped.Binary"
+-- the header of "Clash.Core.Binary"
 writeInputs :: Binary a => FilePath -> a -> IO ()
 writeInputs f = BL.writeFile f . encodeWithHeader
 

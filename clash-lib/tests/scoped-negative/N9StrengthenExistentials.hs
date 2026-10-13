@@ -5,8 +5,8 @@
 -- `caseCast` and `extractHeadTail`)
 module N9StrengthenExistentials where
 
-import Clash.Core.Scoped.Subst
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Subst
+import Clash.Core.Syntax
 
 strengthenPat :: Pat n l -> Type l -> Maybe (Type n)
 strengthenPat p ty = case p of

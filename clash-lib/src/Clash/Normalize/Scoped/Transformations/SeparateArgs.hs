@@ -10,7 +10,7 @@
 
   It doesn't split arguments of a product type of which the type of a field
   mentions an existentially quantified type variable, see
-  'Clash.Core.Scoped.Util.shouldSplit'.
+  'Clash.Core.Util.shouldSplit'.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -38,14 +38,14 @@ import Clash.Rewrite.StrategyDSL
   , toTransformation )
 import Clash.Rewrite.Types (typeEnv)
 
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Subst
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.Subst
   (closeType, extendSubstScope, extendTmSubst, idSubst, openTyBinder, substTm, withFreshIdBinders)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgsTicks, mkApps, mkLams, mkTicks)
-import Clash.Core.Scoped.Type
+import Clash.Core.Syntax
+import Clash.Core.Term (collectArgsTicks, mkApps, mkLams, mkTicks)
+import Clash.Core.Type
   (SplitFunForall (..), TypeView (..), mkFunTy, piTeleTmArity, piTeleTyArity, splitFunForallTy, tyView)
-import Clash.Core.Scoped.Util (SplitInfo (..), shouldSplit)
+import Clash.Core.Util (SplitInfo (..), shouldSplit)
 import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
 
 -- | Split apart (global) function arguments that contain types that we want

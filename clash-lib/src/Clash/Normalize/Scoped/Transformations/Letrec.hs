@@ -86,23 +86,23 @@ import Clash.Rewrite.StrategyDSL
   , onTyAppNode, anyConstructor, toTransformation )
 import Clash.Rewrite.Types (curFun, primitives, typeEnv)
 
-import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
-import Clash.Core.Scoped.FreeVars
+import Clash.Core.Alpha (aeqTm, aeqTy)
+import Clash.Core.FreeVars
   (freeTmVarOccurrences, teleNameBinders, tmNameOccursIn)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf, primInfoType)
-import Clash.Core.Scoped.NameMap
+import Clash.Core.HasType (inferCoreTypeOf, primInfoType)
+import Clash.Core.NameMap
   (emptyNameMap, lookupNameMap, nameMapFromList, singletonNameMap)
-import Clash.Core.Scoped.Subst
+import Clash.Core.Subst
   (openAlt, teleIdVars, unsinkAlt, unsinkIdBinder, unsinkTerm)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term
+import Clash.Core.Syntax
+import Clash.Core.Term
   ( AbsBinder (..), appendTele, collectArgs, collectArgsTicks, collectTicks
   , mkApps, mkLams, mkTicks, openBndrs, partitionTicks, stripAllTicks, stripTicks )
-import Clash.Core.Scoped.TermInfo (isCon, isLocalVar)
-import Clash.Core.Scoped.Type
+import Clash.Core.TermInfo (isCon, isLocalVar)
+import Clash.Core.Type
   (SplitFunForall (..), TypeView (..), isClassTy, normalizeType, piTeleTmArity, splitFunForallTy, tyNatSize, tyView)
-import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
-import Clash.Core.Scoped.Util
+import Clash.Core.TypeEnv (TypeEnv, lookupTyCon)
+import Clash.Core.Util
   (LetGroup (..), inverseTopSortOrder, mkLets, mkVec, regroupLetBindings)
 import Clash.Rewrite.Scoped
   ( FrameKind (..), TransformContext, changed, ctxFrames, isLambdaBodyKind

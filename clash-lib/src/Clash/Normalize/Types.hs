@@ -21,9 +21,9 @@ import Data.Text                  (Text)
 
 import Clash.Driver.Types (Binding)
 import Clash.Rewrite.Types (RewriteMonad, Rewrite)
-import Clash.Core.Scoped.Alpha (AlphaTerm, AlphaType)
-import Clash.Core.Scoped.NameMap (GlobalEnv)
-import qualified Clash.Core.Scoped.Syntax as S
+import Clash.Core.Alpha (AlphaTerm, AlphaType)
+import Clash.Core.NameMap (GlobalEnv)
+import qualified Clash.Core.Syntax as S
 
 -- | State of the 'NormalizeMonad'
 data NormalizeState

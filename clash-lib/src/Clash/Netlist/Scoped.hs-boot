@@ -27,7 +27,7 @@ import Data.List.NonEmpty (NonEmpty)
 import GHC.Stack (HasCallStack)
 
 import Clash.Core.DataCon (DataCon)
-import Clash.Core.Scoped.Syntax (Alt, Distinct, GlobalId, Term, Type)
+import Clash.Core.Syntax (Alt, Distinct, GlobalId, Term, Type)
 import Clash.Netlist.Types (CompCtx, LocalId, NetlistId)
 import Clash.Netlist.Types
   (Component, ComponentMeta, Declaration, DeclarationType, Expr, HWType, Identifier,

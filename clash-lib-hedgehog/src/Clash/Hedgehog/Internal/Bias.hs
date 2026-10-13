@@ -13,7 +13,7 @@ module Clash.Hedgehog.Internal.Bias
   ) where
 
 import Clash.Core.TyCon
-import Clash.Core.Scoped.TysPrim
+import Clash.Core.TysPrim
 
 -- | Determine the bias of an item. This is used to set the weight of that item
 -- so we can sample using the 'Hedgehog.Gen.frequency' generator instead of

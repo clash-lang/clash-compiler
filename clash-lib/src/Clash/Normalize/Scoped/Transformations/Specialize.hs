@@ -19,7 +19,7 @@
     variables bound at the call site.
 
   * The free variables of the argument are bound with
-    'Clash.Core.Scoped.Subst.closeOver', type variables first, every type
+    'Clash.Core.Subst.closeOver', type variables first, every type
     variable after the type variables in its kind.
 
   Only global variables ('GlobalVar') are looked up in the binding map, the
@@ -85,7 +85,7 @@ import           Clash.Core.Literal          (Literal (..))
 import qualified Clash.Core.Name             as C
 import           Clash.Core.Pretty           (showPpr)
 import qualified Clash.Core.TyCon            as C
-import           Clash.Core.Scoped.TysPrim   (integerPrimTyConName, naturalPrimTyConName, typeNatKindTyConName)
+import           Clash.Core.TysPrim   (integerPrimTyConName, naturalPrimTyConName, typeNatKindTyConName)
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (Binding (..), TransformationInfo (..), hasTransformationInfo)
@@ -98,23 +98,23 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (Unique)
 import           Clash.Util                  (ClashException (..))
 
-import           Clash.Core.Scoped.Builder   (TyB, forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
+import           Clash.Core.Builder   (TyB, forAllTyB, funTyB, runClosedType, tyConAppB, varTyB)
 import           Clash.Core.DataCon   (dataConInstArgTys)
-import           Clash.Core.Scoped.FreeVars  (freeTyVars, freeTyVarsOfType)
-import           Clash.Core.Scoped.HasType   (inferCoreTypeOf, piResultTy)
-import           Clash.Core.Scoped.Alpha     (AlphaTerm (..), AlphaType (..))
-import           Clash.Core.Scoped.NameMap
+import           Clash.Core.FreeVars  (freeTyVars, freeTyVarsOfType)
+import           Clash.Core.HasType   (inferCoreTypeOf, piResultTy)
+import           Clash.Core.Alpha     (AlphaTerm (..), AlphaType (..))
+import           Clash.Core.NameMap
   (insertWithGlobalEnv, lookupGlobalEnv, nullNameSet, singletonNameMap)
-import           Clash.Core.Scoped.Subst
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Term
+import           Clash.Core.Subst
+import           Clash.Core.Syntax
+import           Clash.Core.Term
   ( AbsBinder (..), collectArgs, collectArgsTicks, mkAbstraction, mkApps, mkLams, mkTicks
   , mkTyLams )
-import           Clash.Core.Scoped.TermInfo  (isLocalVar, isPolyFun, isVar)
-import           Clash.Core.Scoped.Type
+import           Clash.Core.TermInfo  (isLocalVar, isPolyFun, isVar)
+import           Clash.Core.Type
   (TypeView (..), applyFunTy, coreView1, normalizeType, splitTyConAppM, tyView)
-import           Clash.Core.Scoped.TypeEnv   (TypeEnv, lookupTyCon)
-import           Clash.Core.Scoped.Util      (mkLets)
+import           Clash.Core.TypeEnv   (TypeEnv, lookupTyCon)
+import           Clash.Core.Util      (mkLets)
 import           Clash.Normalize.Util (ConstantSpecInfo (..), constantSpecInfo)
 import           Clash.Rewrite.Scoped.Combinators (topdownR)
 import           Clash.Rewrite.Scoped.Globals
@@ -895,7 +895,7 @@ of their first occurrence instead, yielding:
 -- insertion-ordered set].
 --
 -- This gives the occurrences of the variables, of which
--- 'Clash.Core.Scoped.Subst.closeOver' makes the binders. The free type
+-- 'Clash.Core.Subst.closeOver' makes the binders. The free type
 -- variables of a type are in the order of their first occurrence too.
 specArgBndrsAndVars
   :: HasCallStack

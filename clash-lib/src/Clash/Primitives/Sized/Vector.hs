@@ -32,9 +32,9 @@ import           GHC.Stack                          (HasCallStack)
 import Clash.Core.Basic (LitTy (..))
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, blockDecl)
-import           Clash.Core.Scoped.Syntax           (Type(LitTy))
-import           Clash.Core.Scoped.TermInfo         (isLiteral, isVar)
-import           Clash.Core.Scoped.Type             (coreView)
+import           Clash.Core.Syntax           (Type(LitTy))
+import           Clash.Core.TermInfo         (isLiteral, isVar)
+import           Clash.Core.Type             (coreView)
 import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types

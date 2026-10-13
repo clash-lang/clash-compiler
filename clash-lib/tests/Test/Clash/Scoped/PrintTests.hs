@@ -14,7 +14,7 @@ module Test.Clash.Scoped.PrintTests (tests) where
 import Test.Tasty (TestTree, testGroup)
 import Test.Tasty.HUnit (assertBool, testCase)
 
-import Clash.Core.Scoped.Alpha (aeqTm)
+import Clash.Core.Alpha (aeqTm)
 import Test.Clash.Rewrite (TestTerm, parseTestTerm, termQQ)
 import Test.Clash.Scoped (termIn, withClashing, withTerm, varD)
 import Test.Clash.Scoped.Print (showTestTerm)

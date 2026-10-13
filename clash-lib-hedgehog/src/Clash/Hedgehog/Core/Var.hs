@@ -6,7 +6,7 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Random generation of core variables, and the environments of the variables in
 scope where types and terms are generated.
 
-Types and terms of scoped Clash Core ("Clash.Core.Scoped.Syntax") are indexed
+Types and terms of scoped Clash Core ("Clash.Core.Syntax") are indexed
 by their scope. The generators generate them in an 'Env', which has the
 'Scope' and the variables in it that a generated type or term may mention.
 The generators that bind variables give them fresh binders in that scope
@@ -35,8 +35,8 @@ import Hedgehog (MonadGen)
 import qualified Clash.Core.Name as C
 
 
-import Clash.Core.Scoped.Subst (withFreshIdBinder, withFreshIdBinders, withFreshTyBinder)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Subst (withFreshIdBinder, withFreshIdBinders, withFreshTyBinder)
+import Clash.Core.Syntax
 
 -- | The variables in scope where a type or term is generated
 data Env n = Env

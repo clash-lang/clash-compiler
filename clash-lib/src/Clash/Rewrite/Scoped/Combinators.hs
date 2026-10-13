@@ -47,7 +47,7 @@ import qualified Control.Monad.Writer        as Writer
 import qualified Data.Monoid                 as Monoid
 import           GHC.Exts                    (isTrue#, reallyUnsafePtrEquality#)
 
-import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Syntax
 import           Clash.Rewrite.Types
 
 {-
@@ -247,7 +247,7 @@ Most traversals change few nodes, so this saves rebuilding all the others,
 and keeps the unchanged parts of a term shared with the term before the
 traversal.
 
-Going under a binder may rename it (see "Clash.Core.Scoped.Subst"), which
+Going under a binder may rename it (see "Clash.Core.Subst"), which
 gives a new binder and a new body. A copy then has the new names, so the
 traversal rebuilds the node, as it did before: sharing never changes the term
 a traversal gives, only whether it is a copy. Without renaming, opening a

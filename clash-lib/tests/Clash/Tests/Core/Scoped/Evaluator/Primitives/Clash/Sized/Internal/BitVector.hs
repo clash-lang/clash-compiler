@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector"
+  Tests for "Clash.Core.Evaluator.Primitives.Clash.Sized.Internal.BitVector"
   on fixed inputs, e.g. of the reductions that build their result from the
   type of the primitive.
 -}
@@ -22,8 +22,8 @@ import Test.Tasty.HUnit
 import Clash.Core.TyCon (tyConDataCons)
 import qualified Clash.Data.UniqMap as UniqMap
 
-import Clash.Core.Scoped.Builder (TmB, TyB, dataB)
-import Clash.Core.Scoped.Evaluator.Primitives.Util (bvConPrim)
+import Clash.Core.Builder (TmB, TyB, dataB)
+import Clash.Core.Evaluator.Primitives.Util (bvConPrim)
 
 import Test.Clash.Rewrite
   (ghcFalseDataCon, ghcTrueDataCon, mkTyConName, t2TyConName, testTyConMap)

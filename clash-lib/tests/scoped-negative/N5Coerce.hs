@@ -5,7 +5,7 @@ module N5Coerce where
 
 import Data.Coerce (coerce)
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 
 escape :: Term n -> Term l
 escape = coerce

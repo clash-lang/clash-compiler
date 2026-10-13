@@ -5,7 +5,7 @@
 -- `appProp`)
 module N4MoveUnderBinder where
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 
 pushUnder :: Term n -> Term n -> Term n
 pushUnder (Lam b e) arg = Lam b (App e (sink arg))

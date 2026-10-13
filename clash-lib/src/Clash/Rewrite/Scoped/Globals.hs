@@ -43,11 +43,11 @@ import           Clash.Rewrite.Types
 import           Clash.Unique                (Unique, getUnique, setUnique)
 import           Clash.Util                  (MonadUnique (..))
 
-import           Clash.Core.Scoped.Alpha     (aeqTm)
-import           Clash.Core.Scoped.FreeVars  (termGlobalIds)
-import           Clash.Core.Scoped.HasType   (inferCoreTypeOf)
-import           Clash.Core.Scoped.NameMap
-import           Clash.Core.Scoped.Syntax
+import           Clash.Core.Alpha     (aeqTm)
+import           Clash.Core.FreeVars  (termGlobalIds)
+import           Clash.Core.HasType   (inferCoreTypeOf)
+import           Clash.Core.NameMap
+import           Clash.Core.Syntax
 import qualified Clash.Rewrite.Scoped.WorkFree as WorkFree
 
 -- | The binding of a global, as a closed term

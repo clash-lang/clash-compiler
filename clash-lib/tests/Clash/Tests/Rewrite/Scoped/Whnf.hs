@@ -28,7 +28,7 @@ import Test.Tasty.HUnit
 import Clash.Normalize.Types (NormalizeState)
 import Clash.Rewrite.Types (RewriteState (..))
 
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Syntax
 import Clash.Rewrite.Scoped (Rewrite, Transform (..), changed)
 import qualified Clash.Rewrite.Scoped as S
 

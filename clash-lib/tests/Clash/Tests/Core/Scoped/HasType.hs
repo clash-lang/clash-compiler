@@ -27,15 +27,15 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Basic as C (IsMultiPrim (MultiResult), WorkInfo (WorkNever))
 import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (CharTy))
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Builder
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Builder
   ( TmB, TyB, annTyB, appB, appTyB, castB, constTyB, deDupTickB, forAllTyB, funTyB, litTyB, primB
   , runClosedType, tickB, tyAppB, tyLamB, varTyB)
-import Clash.Core.Scoped.HasType
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Type (mkFunTy)
-import Clash.Core.Scoped.TypeEnv (TypeEnv)
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.HasType
+import Clash.Core.Syntax
+import Clash.Core.Type (mkFunTy)
+import Clash.Core.TypeEnv (TypeEnv)
+import qualified Clash.Core.TysPrim as P
 
 import Test.Clash.Rewrite (mkTyConName, showPprU)
 import Test.Clash.Scoped
@@ -75,7 +75,7 @@ mrPrim =
   mkPrimInfo "mr" (runClosedType (forallA (\a -> funTyB [a] (tupleB a intB)))) C.WorkNever
     C.MultiResult NoUnfolding
 
--- | A coercion primitive, as 'Clash.Core.Scoped.Util.primCo' makes them
+-- | A coercion primitive, as 'Clash.Core.Util.primCo' makes them
 coPrim :: TmB
 coPrim = primB (testPrim "_CO_" "forall a. a")
 
@@ -222,7 +222,7 @@ piCases =
   ]
 
 -- | Types whose kinds don't need checking applications of type constructors
--- to their arguments (see 'Clash.Core.Scoped.HasType.piResultKinds'), and
+-- to their arguments (see 'Clash.Core.HasType.piResultKinds'), and
 -- their kinds
 kindCases :: [(TestType, Kind 'VoidS)]
 kindCases =

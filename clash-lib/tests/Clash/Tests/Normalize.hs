@@ -25,8 +25,8 @@ import Clash.Driver.Types (Binding (..))
 import Clash.Normalize (cleanupGraph)
 import Clash.Rewrite.Types (RewriteState (..))
 
-import Clash.Core.Scoped.NameMap (lookupGlobalEnv)
-import Clash.Core.Scoped.Syntax (GlobalId)
+import Clash.Core.NameMap (lookupGlobalEnv)
+import Clash.Core.Syntax (GlobalId)
 
 import Test.Clash.Rewrite
   ( TestDefs (..), parseTestTermWith, runRewriteTest, testGlobalId )

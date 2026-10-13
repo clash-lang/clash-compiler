@@ -27,15 +27,15 @@ import qualified Clash.Core.Name as C
 import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
 
-import Clash.Core.Scoped.Builder (TyB, appTyB, constTyB, litTyB)
-import Clash.Core.Scoped.EqSolver
-import Clash.Core.Scoped.NameMap
-import Clash.Core.Scoped.Subst (substTm)
-import Clash.Core.Scoped.Syntax
+import Clash.Core.Builder (TyB, appTyB, constTyB, litTyB)
+import Clash.Core.EqSolver
+import Clash.Core.NameMap
+import Clash.Core.Subst (substTm)
+import Clash.Core.Syntax
 import Clash.Core.DataCon (withDataConPat)
-import Clash.Core.Scoped.Type (mkFunTy)
-import Clash.Core.Scoped.TypeEnv (TypeEnv)
-import qualified Clash.Core.Scoped.TysPrim as P
+import Clash.Core.Type (mkFunTy)
+import Clash.Core.TypeEnv (TypeEnv)
+import qualified Clash.Core.TysPrim as P
 
 import Test.Clash.Rewrite (addTyConName, vConsDataCon, vNilDataCon)
 import Test.Clash.Scoped

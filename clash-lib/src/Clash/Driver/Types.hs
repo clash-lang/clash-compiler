@@ -51,9 +51,9 @@ import           Clash.Signal.Internal
 
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
-import           Clash.Core.Scoped.NameMap      (GlobalEnv)
-import           Clash.Core.Scoped.Binary       ()
-import qualified Clash.Core.Scoped.Syntax       as Scoped
+import           Clash.Core.NameMap      (GlobalEnv)
+import           Clash.Core.Binary       ()
+import qualified Clash.Core.Syntax       as Scoped
 
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Driver.Bool              (OverridingBool(..))
@@ -78,7 +78,7 @@ data ClashDesign = ClashDesign
 
 -- | Forces the bindings, but not their bodies:
 -- 'Clash.GHC.GenerateBindings.generateBindings' builds the body of a binding
--- when it is first used (see "Clash.Core.Scoped.Builder"), and most bodies
+-- when it is first used (see "Clash.Core.Builder"), and most bodies
 -- never are.
 instance NFData ClashDesign where
   rnf design =
@@ -116,8 +116,8 @@ data Binding a = Binding
     -- bindings in a way similar to Let / Letrec. GHC also does this.
   } deriving (Binary, Functor, Generic, NFData, Show)
 
--- | Global function binders of scoped Clash Core ("Clash.Core.Scoped.Syntax"):
--- closed terms, keyed by their 'Clash.Core.Scoped.Syntax.GlobalId'.
+-- | Global function binders of scoped Clash Core ("Clash.Core.Syntax"):
+-- closed terms, keyed by their 'Clash.Core.Syntax.GlobalId'.
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
 type GlobalBindings = GlobalEnv (Binding (Scoped.Term 'Scoped.VoidS))

@@ -8,8 +8,8 @@ import Clash.Prelude
 
 import Clash.Backend
 import Clash.Core.Name
-import Clash.Core.Scoped.NameMap (globalEnvElems)
-import Clash.Core.Scoped.Syntax (globalIdName)
+import Clash.Core.NameMap (globalEnvElems)
+import Clash.Core.Syntax (globalIdName)
 import Clash.Driver.Types
 import GHC.BasicTypes.Extra
 

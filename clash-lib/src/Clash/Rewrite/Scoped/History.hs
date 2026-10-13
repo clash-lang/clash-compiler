@@ -5,7 +5,7 @@
 
   The rewrite history of @-fclash-debug-history@: a file of 'RewriteStep's,
   which @clash-term@ shows. It starts with the header of the files of scoped
-  Clash Core ('Clash.Core.Scoped.Binary.putHeader').
+  Clash Core ('Clash.Core.Binary.putHeader').
 
   A transformation rewrites a subterm, which may mention variables bound
   around it. A step stores closed terms: the term before and the term after
@@ -42,10 +42,10 @@ import           System.IO.Unsafe            (unsafePerformIO)
 import           Clash.Driver.Types          (DebugOpts (..))
 import           Clash.Rewrite.Types         (RewriteMonad, RewriteStep (..), debugOpts)
 
-import           Clash.Core.Scoped.Binary    (getHeader, putHeader)
-import           Clash.Core.Scoped.Subst     (Closure (..), closeOver, freeVarOccs)
-import           Clash.Core.Scoped.Syntax
-import           Clash.Core.Scoped.Term      (mkLams, mkTyLams)
+import           Clash.Core.Binary    (getHeader, putHeader)
+import           Clash.Core.Subst     (Closure (..), closeOver, freeVarOccs)
+import           Clash.Core.Syntax
+import           Clash.Core.Term      (mkLams, mkTyLams)
 import           Clash.Rewrite.Util   (dependencySortTyVars)
 
 -- | Start a rewrite history: a file with just the header

@@ -56,15 +56,15 @@ import Clash.Rewrite.Types (curFun, typeEnv)
 import Clash.Util (ClashException (..), curLoc)
 import Clash.Warning (ClashWarning (WarnCastSpecialization))
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
-import Clash.Core.Scoped.Subst
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.HasType (inferCoreTypeOf)
+import Clash.Core.Subst
   ( extendSubstScope, extendTmSubstTele, idSubst, openAlt, openBind
   , strengthenTyIds, substTm, substTy, teleIdBinderTypes, withFreshIdBinders )
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Term (collectArgs, stripTicks)
-import Clash.Core.Scoped.TermInfo (isCast)
-import Clash.Core.Scoped.Type (normalizeType)
+import Clash.Core.Syntax
+import Clash.Core.Term (collectArgs, stripTicks)
+import Clash.Core.TermInfo (isCast)
+import Clash.Core.Type (normalizeType)
 import Clash.Normalize.Scoped.Transformations.Specialize (specialize)
 import Clash.Rewrite.Scoped (TransformContext, changed, mkDerivedName, tfScope)
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)

@@ -33,9 +33,9 @@ import Hedgehog (MonadGen, Range)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Syntax (Type)
-import Clash.Core.Scoped.Type (TypeView(FunTy), isPolyTy, tyView)
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Syntax (Type)
+import Clash.Core.Type (TypeView(FunTy), isPolyTy, tyView)
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique

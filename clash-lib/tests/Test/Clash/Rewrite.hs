@@ -42,23 +42,23 @@ import Clash.Netlist.Types
   ( FilteredHWType (..), HWType (Signed), HWTypeTranslator (..), NetlistMonad
   , PreserveCase (PreserveCase), SomeBackend (..) )
 import Clash.Rewrite.Types
-import Clash.Core.Scoped.Builder
+import Clash.Core.Builder
   ( runDataConSig, Key, TickB, TmB, TyB, appB, appTyB, caseB, castB, constTyB, dataAltB, dataB, deDupTickB
   , defaultAltB, forAllTyB, funTyB, globalB, lamB, letB, letrecB, litAltB, litTyB, literalB
   , nameModTickB, noDeDupTickB, primB, runClosedType, runNewTyConSig, runTyFamEqn
   , srcSpanTickB, tickB, tyAppB, tyConAppB, tyLamB, uniqueKey, varB, varTyB )
 import qualified Clash.Core.TyCon as S (mkAlgTyCon, mkFunTyCon, mkNewTyConRhs, mkPrimTyCon)
 import qualified Clash.Core.DataCon as S (mkDataCon)
-import qualified Clash.Core.Scoped.Syntax as S (mkGlobalId, mkPrimInfo)
-import qualified Clash.Core.Scoped.TysPrim as P
-import Clash.Core.Scoped.Syntax (PrimInfo (..), PrimUnfolding (NoUnfolding))
-import Clash.Core.Scoped.Evaluator.Primitives.Util (tupleTyConName)
-import Clash.Core.Scoped.Sig (DataConSig (..))
-import Clash.Core.Scoped.Syntax (GlobalId (..), teleLength)
-import Clash.Core.Scoped.NameMap (GlobalEnv, emptyGlobalEnv, emptyGlobalSet)
-import qualified Clash.Core.Scoped.Syntax as ST (S (VoidS), Term, Type)
-import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
-import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
+import qualified Clash.Core.Syntax as S (mkGlobalId, mkPrimInfo)
+import qualified Clash.Core.TysPrim as P
+import Clash.Core.Syntax (PrimInfo (..), PrimUnfolding (NoUnfolding))
+import Clash.Core.Evaluator.Primitives.Util (tupleTyConName)
+import Clash.Core.Sig (DataConSig (..))
+import Clash.Core.Syntax (GlobalId (..), teleLength)
+import Clash.Core.NameMap (GlobalEnv, emptyGlobalEnv, emptyGlobalSet)
+import qualified Clash.Core.Syntax as ST (S (VoidS), Term, Type)
+import Clash.Core.TypeEnv (mkTypeEnv)
+import qualified Clash.Core.Type as S (TypeView (..), tyView)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
 import Clash.Normalize.Types
 import qualified Clash.Util.Interpolate as I
@@ -325,7 +325,7 @@ termParseMode = defaultParseMode
 --
 -- The parser of scoped Clash Core. It parses very simple Haskell expressions,
 -- with the identifiers of 'parseNameScope', into builders
--- ("Clash.Core.Scoped.Builder") rather than terms, so that a test can build
+-- ("Clash.Core.Builder") rather than terms, so that a test can build
 -- the term in a scope of its choice. See "Test.Clash.Scoped" for how tests
 -- use it.
 --
@@ -387,7 +387,7 @@ termParseMode = defaultParseMode
 --     without bangs is recursive.
 --
 -- Variables refer to their binders by /key/: the unique of the identifier,
--- see 'Clash.Core.Scoped.Builder.Key'. So an identifier that a binder binds
+-- see 'Clash.Core.Builder.Key'. So an identifier that a binder binds
 -- again refers to the inner binder within its scope, like in Haskell:
 -- @\\(x_1 :: Int) -> let { !(x_1 :: Int) = f x_1 } in x_1@ binds @x_1@ twice,
 -- and the right-hand side refers to the lambda's binder.
@@ -425,7 +425,7 @@ data TestType = TestType
 instance IsString TestType where
   fromString = parseTestType
 
--- | A term made with the builders ("Clash.Core.Scoped.Builder"), e.g. for
+-- | A term made with the builders ("Clash.Core.Builder"), e.g. for
 -- what the parser can't parse, such as primitives. The builders of a parsed
 -- term are 'testTermB'. Its free variables are not known: a scope that the
 -- term is built in must have them.
@@ -1058,7 +1058,7 @@ intTyCon = S.mkPrimTyCon (parseTyConName "Int") (runClosedType typeB) 0
 -- * Fixtures
 --
 -- The data and type constructors of the tests, built with the builders of
--- "Clash.Core.Scoped.Builder". A type variable of a fixture is a 'FxTyVar',
+-- "Clash.Core.Builder". A type variable of a fixture is a 'FxTyVar',
 -- whose key is its unique.
 
 -- | A type variable of a fixture: its key, name and kind
@@ -1396,7 +1396,7 @@ applicativeDc =
 
 -- | GHC's boxed pairs, by the name under which "Clash.GHC.GHC2Core" gives
 -- them, and the reductions of primitives look them up
--- ('Clash.Core.Scoped.Evaluator.Primitives.Util.tupleTyConName')
+-- ('Clash.Core.Evaluator.Primitives.Util.tupleTyConName')
 ghcPairTcNm :: C.TyConName
 ghcPairTcNm = tupleTyConName 2
 

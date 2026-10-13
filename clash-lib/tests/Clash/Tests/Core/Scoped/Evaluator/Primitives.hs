@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives": the registry of
+  Tests for "Clash.Core.Evaluator.Primitives": the registry of
   reductions, and examples of reductions on fixed inputs.
 -}
 
@@ -24,23 +24,23 @@ import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (..))
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Builder (TmB, TyB, appB, dataB, literalB, runClosedType)
-import Clash.Core.Scoped.Evaluator.Primitives (primReductionMap)
-import Clash.Core.Scoped.Evaluator.Primitives.Util (bvConPrim, signedConPrim)
-import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving as PDeriving
-import qualified Clash.Core.Scoped.Evaluator.Primitives.Clash.Promoted.Nat as PNat
-import qualified Clash.Core.Scoped.Evaluator.Primitives.Data.Text.Show as PShow
-import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Base as PBase
-import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Float as PFloat
-import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Internal.Float as PInternalFloat
-import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Num.Integer as PInteger
-import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim as PPrim
-import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeLits as PTypeLits
-import qualified Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeNats as PTypeNats
-import Clash.Core.Scoped.Evaluator.Types (PrimReduction)
-import Clash.Core.Scoped.Syntax (S (VoidS), Term (..), emptyScope)
-import Clash.Core.Scoped.Term (collectArgs)
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Builder (TmB, TyB, appB, dataB, literalB, runClosedType)
+import Clash.Core.Evaluator.Primitives (primReductionMap)
+import Clash.Core.Evaluator.Primitives.Util (bvConPrim, signedConPrim)
+import qualified Clash.Core.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving as PDeriving
+import qualified Clash.Core.Evaluator.Primitives.Clash.Promoted.Nat as PNat
+import qualified Clash.Core.Evaluator.Primitives.Data.Text.Show as PShow
+import qualified Clash.Core.Evaluator.Primitives.GHC.Base as PBase
+import qualified Clash.Core.Evaluator.Primitives.GHC.Float as PFloat
+import qualified Clash.Core.Evaluator.Primitives.GHC.Internal.Float as PInternalFloat
+import qualified Clash.Core.Evaluator.Primitives.GHC.Num.Integer as PInteger
+import qualified Clash.Core.Evaluator.Primitives.GHC.Prim as PPrim
+import qualified Clash.Core.Evaluator.Primitives.GHC.TypeLits as PTypeLits
+import qualified Clash.Core.Evaluator.Primitives.GHC.TypeNats as PTypeNats
+import Clash.Core.Evaluator.Types (PrimReduction)
+import Clash.Core.Syntax (S (VoidS), Term (..), emptyScope)
+import Clash.Core.Term (collectArgs)
 
 import Test.Clash.Rewrite
   ( doubleDc, doubleTcNm, eqDc, ghcFalseDataCon, ghcTrueDataCon, gtDc, ltDc, mkTyConName

@@ -24,10 +24,10 @@ import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Unique (Unique, fromGhcUnique)
 import qualified GHC.Builtin.Names as GHC
 
-import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Type (mkFunTy)
-import Clash.Core.Scoped.TysPrim
+import Clash.Core.Alpha (aeqTy)
+import Clash.Core.Syntax
+import Clash.Core.Type (mkFunTy)
+import Clash.Core.TysPrim
 
 import Test.Clash.Scoped (assertTypeIs, emptyTestScope)
 import Test.Clash.Rewrite (ghcName)
