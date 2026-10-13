@@ -390,8 +390,8 @@ index n val =
 
 -- * Boxed numbers
 
--- | GHC's boxed 'Int', 'Test.Clash.Rewrite.hIntTy', unlike the @Int@ of the
--- parser
+-- | GHC's boxed 'Int', of 'Test.Clash.Rewrite.hIntTcNm', unlike the @Int@ of
+-- the parser
 boxedIntTy :: TyB
 boxedIntTy = tc R.hIntTcNm []
 

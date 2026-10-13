@@ -213,7 +213,7 @@ freeTyVarsOfType = \case
   AnnType _ t -> freeTyVarsOfType t
 
 -- | The free term variables of a term, with the number of times they occur
--- in it. See 'Clash.Core.FreeVars.countFreeOccurances'.
+-- in it.
 freeTmVarOccurrences :: Term n -> NameMap TmName n Int
 freeTmVarOccurrences = \case
   Var _ _ n -> singletonNameMap n 1

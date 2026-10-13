@@ -53,7 +53,7 @@
   A worker that doesn't fire returns the node it was given, unchanged. A
   worker that changes the term says so with 'changed'. With
   @-fclash-debug-invariants@, 'applyDebug' reports a change without notice
-  (up to alpha-equivalence); free variable and shadowing checks are no longer
+  (up to alpha-equivalence); free variable and shadowing checks aren't
   needed, as the type checker enforces them.
 
   = The context

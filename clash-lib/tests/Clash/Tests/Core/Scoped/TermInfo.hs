@@ -3,7 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.TermInfo", against "Clash.Core.TermInfo"
+  Tests for "Clash.Core.Scoped.TermInfo"
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -57,8 +57,7 @@ literalExamples =
   ]
 
 -- | Assert that a function on terms gives the expected results on terms, each
--- built in the scope of its free variables. The expected results are those
--- of the functions of Clash Core that the functions of scoped Core replace.
+-- built in the scope of its free variables.
 assertResults
   :: (Eq a, Show a)
   => [TestTerm] -> (forall n. Distinct n => Scope n -> Term n -> a) -> [a] -> Assertion

@@ -8,12 +8,11 @@
   let-bindings of its context, which a test builds by going under the binders
   of a term to the variable.
 
-  In Clash Core, a binder that shadows a let-binder, or a free variable of its
-  right-hand side, makes the binding unusable, and the variable stays as it is.
-  In scoped Core, the shadowing binder has another name, so the binding is
-  used where it is valid: the variable evaluates to the free variable of the
-  right-hand side, not to the binder in between that has its name in the
-  source.
+  A binder that shadows a let-binder, or a free variable of its right-hand
+  side, in the source of a test has another name in scoped Core, so the
+  binding is used where it is valid: the variable evaluates to the free
+  variable of the right-hand side, not to the binder in between that has its
+  name in the source.
   The evaluator marks a variable it looked up with a name modifier. A
   recursive binding is not usable in the right-hand sides of its group.
 -}

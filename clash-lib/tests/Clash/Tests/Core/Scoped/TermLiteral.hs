@@ -4,9 +4,8 @@ Copyright   :  (C) 2022, Google Inc.
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-Tests for 'Clash.Core.Scoped.TermLiteral': the scoped twins of
-"Clash.Tests.Core.TermLiteral", and checks that the decoders decode the
-encodings of generated values to these values.
+Tests for "Clash.Core.Scoped.TermLiteral", and checks that the decoders
+decode the encodings of generated values to these values.
 -}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE MagicHash #-}

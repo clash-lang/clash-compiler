@@ -454,10 +454,10 @@ appPropTests =
         (tm "\\(x :: Int) -> let { !(x2 :: Int) = f_3 x; !(y :: Int) = f_3 x } in y")
     -- @(\\f -> f) (\\k x -> k) x y@ reduces to the free variable @x@. The
     -- first argument binds @x@, which is also free in the second argument.
-    -- 'appProp' substituted work-free arguments using 'unsafeSubstTm', which
-    -- does not avoid capture: after substituting the first argument for @f@,
-    -- that argument is the head of the application, and substituting @x@ for
-    -- @k@ puts it under the binder @x@.
+    -- 'appProp' substituted work-free arguments without avoiding capture:
+    -- after substituting the first argument for @f@, that argument is the
+    -- head of the application, and substituting @x@ for @k@ puts it under the
+    -- binder @x@.
     --
     -- https://github.com/clash-lang/clash-compiler/pull/3479
   , testCase "appProp does not capture free variables (#3479)" $ do
@@ -670,9 +670,9 @@ specializeTests =
 
     -- 'specialize' creates a binder for every argument before the one it
     -- specializes on, and inferred the kind of a type argument with
-    -- 'Clash.Core.HasType.inferCoreKindOf' to do so. With the @debug@ flag,
-    -- that errored for applications of type constructors, such as @Maybe a@
-    -- in
+    -- 'Clash.Core.Scoped.HasType.inferCoreKindOf' to do so. With the @debug@
+    -- flag, that errored for applications of type constructors, such as
+    -- @Maybe a@ in
     --
     -- > h @(Maybe a) f
   , testCase "specialize binds a type argument applying a type constructor" $

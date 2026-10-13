@@ -3,8 +3,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for the free variables of scoped Clash Core. Ports of the tests in
-  "Clash.Tests.Core.FreeVars", and tests of occurrence checks.
+  Tests for the free variables of scoped Clash Core, and tests of occurrence
+  checks.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -46,7 +46,7 @@ freeVarsAgree tm =
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.FreeVars"
   [ -- @f g@, where the local @f@ has the raw name of the unique of the global
-    -- @g@ (D5)
+    -- @g@
     testCase "local and global variables are kept apart" $ do
       withTestScope [atRaw 20 (varD "f" "Int -> Int")] $ \ts -> do
         let tm = termIn ts "f (g_G20 :: Int)"

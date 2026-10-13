@@ -76,15 +76,10 @@ data ClashDesign = ClashDesign
   , designBindings :: GlobalBindings
   }
 
--- | Forces the bindings, but not their bodies: GHC2Core produces bindings of
--- Clash Core, which 'Clash.GHC.GenerateBindings.generateBindings' converts to
--- scoped Clash Core when a body is first used, see
--- 'Clash.Rewrite.Scoped.Globals.fromClashBindings'. Forcing the bindings
--- forces GHC2Core's conversion of the bodies, as forcing the bodies of Clash
--- Core used to.
---
--- TODO(Phase 5, GHC2Core): force the bodies too, once GHC2Core produces
--- scoped Clash Core.
+-- | Forces the bindings, but not their bodies:
+-- 'Clash.GHC.GenerateBindings.generateBindings' builds the body of a binding
+-- when it is first used (see "Clash.Core.Scoped.Builder"), and most bodies
+-- never are.
 instance NFData ClashDesign where
   rnf design =
     designEntities design `seq`
@@ -156,14 +151,9 @@ data DebugOpts = DebugOpts
   --
   -- Command line flag: -fclash-debug-invariants
   , dbg_invariantsShadowing :: Bool
-  -- ^ When checking invariants, additionally run the scope lint of
-  -- "Clash.Core.Lint" on the input of normalization and on the result of every
-  -- transformation. It checks that every local variable, including the type
-  -- variables in types, is bound, that every global variable exists, that no
-  -- binder shadows a variable in scope, and that no local binder has the
-  -- unique of a global binder. Clash does not maintain these invariants yet,
-  -- so these checks fail for most designs. They are meant for developing
-  -- transformations.
+  -- ^ When checking invariants, additionally check the scoping of variables.
+  -- Scoped Clash Core enforces this by construction: binders never shadow one
+  -- another, and every variable is in scope. So this flag has no effect.
   --
   -- Command line flag: -fclash-debug-invariants-shadowing
   , dbg_transformationInfo :: TransformationInfo
@@ -226,8 +216,8 @@ instance Hashable DebugOpts where
 -- Other flags, such as writing to a history file or offsetting which applied
 -- transformation to show information from do not affect the result, as it is
 -- possible to enable these but still not perform any debugging checks in
--- functions like 'applyDebug'. If this is no longer the case, this function
--- will need to be changed.
+-- functions like 'Clash.Rewrite.Scoped.Apply.applyDebug'. If this is no
+-- longer the case, this function will need to be changed.
 isDebugging :: DebugOpts -> Bool
 isDebugging opts = or
   [ dbg_invariants opts

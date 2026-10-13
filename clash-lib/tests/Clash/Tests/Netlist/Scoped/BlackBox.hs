@@ -47,10 +47,8 @@ functionDecls bbCtx = case IntMap.lookup 0 (bbFunctions bbCtx) of
   Just ((Right (_, decls), _, _, _, _, _) : _) -> decls
   _ -> error "Expected the declarations of a function argument"
 
--- | Clash Core's 'mkFunInput' determined whether a function argument was a
--- top entity or a global binder by looking up its unique, so it turned a
--- local variable with the same unique as a global binder into an instance of
--- that binder. On scoped Core a local function is a 'Var', which can't be
+-- | A local variable whose raw name is the unique of a global binder is not
+-- an instance of that binder: a local function is a 'Var', which can't be
 -- turned into a component, so this is an error.
 mkFunInputLocalShadowingGlobal :: Assertion
 mkFunInputLocalShadowingGlobal = do

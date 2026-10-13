@@ -134,9 +134,8 @@ data SplitNormalized where
 -- let-expressions go on every right-hand side. Gives the reason if the term
 -- is not in normal form.
 --
--- Clash Core's 'Clash.Netlist.Util.splitNormalized' had to deshadow nested
--- let-expressions where a binder captured a variable ('squashLets'), but the
--- binders of scoped Core are distinct.
+-- Nested let-expressions need no deshadowing: the binders of scoped Core are
+-- distinct.
 splitNormalized :: TypeEnv -> Term 'VoidS -> Either String SplitNormalized
 splitNormalized tenv expr = lams emptyScope [] expr
  where
@@ -193,9 +192,7 @@ data UniqueNormalized where
     -> UniqueNormalized
 
 -- | Give the variables of a component unique HDL identifiers, and generate its
--- ports. Like Clash Core's 'Clash.Netlist.Util.mkUniqueNormalized': it
--- generates the same identifiers, in the same order, but puts them in the
--- context rather than in the occurrence names of the variables.
+-- ports. The identifiers go in the context (t'CompCtx').
 mkUniqueNormalized
   :: HasCallStack
   => TypeEnv
@@ -387,10 +384,7 @@ mkUniqueResult sc (Just (ExpandedTopEntity{et_output=Just iPort})) res = do
   (ports, decls, portI) <- mkTopOutput iPort
   return (Just (ports, decls, Id.unsafeMake (Id.toText portI)))
 
--- | A unique HDL identifier based on the human readable name of a variable.
--- Like Clash Core's 'Clash.Netlist.Util.mkUnique', which put it in the
--- occurrence name of the variable, from where
--- 'Clash.Netlist.Id.unsafeFromCoreId' made it an identifier again.
+-- | A unique HDL identifier based on the human readable name of a variable
 uniqueIdentifier :: C.Name Term -> NetlistMonad Identifier
 uniqueIdentifier occ = Id.unsafeMake . Id.toText <$> Id.make (C.nameOcc occ)
 
@@ -431,10 +425,10 @@ idToPort sc i ty = do
     else return (Just (i, hwTy))
 
 -- | The context that the warnings of a guarded primitive mention (see
--- 'Clash.Netlist.BlackBox.extractPrimWarnOrFail'): the variable its result is
--- assigned to, and the arguments it is applied to. Variables among the
--- arguments are resolved into the given sibling let-bindings, a few levels
--- deep.
+-- 'Clash.Netlist.Scoped.BlackBox.extractPrimWarnOrFail'): the variable its
+-- result is assigned to, and the arguments it is applied to. Variables among
+-- the arguments are resolved into the given sibling let-bindings, a few
+-- levels deep.
 primWarnContext
   :: forall n
    . [(LocalId n, Term n)]
@@ -591,7 +585,7 @@ coreTypeToHWTypeM' sc ty = fmap stripFiltered <$> coreTypeToHWTypeM sc ty
 -- * Ticks
 
 -- | Run an action in the context of the given source ticks and name modifier
--- ticks. See 'Clash.Netlist.Util.withTicks'.
+-- ticks.
 --
 -- The attributes of an 'Attributes' tick are evaluated with the evaluator of
 -- scoped Clash Core ('nfData').
@@ -654,7 +648,7 @@ withTicks ctx ticks0 k = go [] (reverse (List.nubBy eqTick ticks0))
       Right nm1 -> local (applyNameMod m (Text.pack nm1)) (go decls ticks)
       _ -> go decls ticks
 
-  -- See the 'Eq' instance of 'C.TickInfo'
+  -- See 'Clash.Core.Scoped.Term.eqTickInfo'
   eqTick :: TickInfo n -> TickInfo n -> Bool
   eqTick t1 t2 = case (t1, t2) of
     (SrcSpan sp1, SrcSpan sp2) -> sp1 == sp2

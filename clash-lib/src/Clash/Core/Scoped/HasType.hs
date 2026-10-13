@@ -3,8 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The types of scoped Clash Core terms, and the kinds of their types. Ports of
-  "Clash.Core.HasType".
+  The types of scoped Clash Core terms, and the kinds of their types.
 
   Local variables carry their type ('Var', and 'idBinderType'), and so do
   case-expressions and casts, and global variables ('globalIdType'). Data
@@ -113,7 +112,7 @@ multiResultType ty = case splitFunForallTy ty of
     PiForall b rest -> PiForall b (appendArgs rest args)
     PiArg a rest -> PiArg a (appendArgs rest args)
 
--- | The type of a term. See 'C.inferCoreTypeOf', and the module header.
+-- | The type of a term. See the module header.
 inferCoreTypeOf :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Type n
 inferCoreTypeOf = inferTypeOpen
 
@@ -180,8 +179,7 @@ inferTypeSubst tenv = go
     (fun, args) ->
       applyTypeToArgsWith e tenv (substScope s) (go s fun) (map (fmap (substTy s)) args)
 
--- | The result type of a function, given its type and its arguments. See
--- 'C.applyTypeToArgs'.
+-- | The result type of a function, given its type and its arguments
 applyTypeToArgs
   :: (HasCallStack, Distinct n)
   => Term n
@@ -226,12 +224,12 @@ applyTypeToArgsWith e tenv sc = go
   goTyArgs opTy revTys (Right ty:args) = goTyArgs opTy (ty:revTys) args
   goTyArgs opTy revTys args = go (piResultTys tenv sc opTy (reverse revTys)) args
 
--- | Like 'piResultTys', but only applies a single type. See 'C.piResultTy'.
+-- | Like 'piResultTys', but only applies a single type
 piResultTy :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Type n -> Type n
 piResultTy tenv sc ty arg = piResultTys tenv sc ty [arg]
 
 -- | @(piResultTys f_ty [ty1, ..., tyn])@ gives the type of @(f ty1 .. tyn)@
--- where @f :: f_ty@. See 'C.piResultTys'.
+-- where @f :: f_ty@.
 --
 -- The function type may have more or fewer foralls than there are arguments:
 -- e.g. @piResultTys (forall a. a) [forall b. b -> b, Int]@ is @Int -> Int@.
@@ -249,8 +247,7 @@ piResultTys
 piResultTys = piResultTysWith True
 
 -- | Like 'piResultTys', but applies a kind to types. The arrows of the kind are
--- dropped without checking the kinds of the types against them. See
--- @piResultKinds@ in "Clash.Core.HasType".
+-- dropped without checking the kinds of the types against them.
 piResultKinds
   :: (HasCallStack, Distinct n)
   => TypeEnv
@@ -277,7 +274,9 @@ piResultTysWith checkArgs tenv sc ty origArgs@(arg:args)
   | Just ty' <- coreView1 tenv sc ty
   = piResultTysWith checkArgs tenv sc ty' origArgs
   | FunTy a res <- tyView ty
-  -- See 'C.piResultTys' for why this uses 'coreView'
+  -- TODO coreView is used here because the partial evaluator will sometimes
+  -- encounter / not encounter a Signal as an argument unexpectedly. When PR
+  -- #1064 is merged the coreView calls should be removed again.
   = if debugIsOn && checkArgs && not (aeqTy (coreView tenv sc a) (coreView tenv sc arg)) then error [I.i|
       Unexpected application. A function with type:
 
@@ -313,7 +312,7 @@ piResultTysWith checkArgs tenv sc ty origArgs@(arg:args)
 
 -- * Kinds of types
 
--- | The kind of a type. See 'C.inferCoreKindOf'.
+-- | The kind of a type
 inferCoreKindOf :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Kind n
 inferCoreKindOf tenv sc ty = case tyView ty of
   FunTy {} ->

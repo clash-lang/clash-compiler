@@ -3,12 +3,9 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Util": the regression tests that the
-  Clash Core implementation had, and tests whose expected results are those of
-  "Clash.Normalize.Scoped.Util", which agreed with the Clash Core
-  implementation.
-  The tests of functions on terms and types run in the scope of the free
-  variables of their input, and in a scope that the binders of the input
+  Tests for "Clash.Normalize.Scoped.Util": regression tests, and tests of its
+  results. The tests of functions on terms and types run in the scope of the
+  free variables of their input, and in a scope that the binders of the input
   clash with.
 -}
 
@@ -82,7 +79,7 @@ tvSubstGives input expected = withType input $ \ts ty -> do
 
 substWithTyEqTests :: [TestTree]
 substWithTyEqTests =
-  -- The regression tests that the Clash Core implementation had
+  -- Regression tests
   [ testCase "substWithTyEq doesn't introduce free variables (#1060)" $ do
       let input = "\\(dom :: Type) (eq :: dom ~ \"System\") -> eq"
       substGives input
@@ -127,7 +124,7 @@ substWithTyEqTests =
 
 tvSubstWithTyEqTests :: [TestTree]
 tvSubstWithTyEqTests =
-  -- The regression test that the Clash Core implementation had
+  -- A regression test
   [ testCase "tvSubstWithTyEq avoids capture (#1868)" $
       tvSubstGives
         "forall (a :: Type) (dom :: Type). (dom ~ a) -> forall (a :: Type). dom -> a"

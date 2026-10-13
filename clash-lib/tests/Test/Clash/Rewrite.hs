@@ -7,9 +7,9 @@
   in, type constructors to test them with ('testTyConMap'), and parsers of
   terms from strings.
 
-  'parseToTerm' parses a term of Clash Core. 'parseTestTerm' parses the same
-  language into scoped Clash Core, see the section "Parsing scoped Core" and
-  "Test.Clash.Scoped" for the test scopes that build its terms.
+  'parseTestTerm' parses a term of scoped Clash Core, see the section
+  "Parsing scoped Core" and "Test.Clash.Scoped" for the test scopes that
+  build its terms.
 -}
 
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -139,8 +139,9 @@ testTypeTranslator = HWTypeTranslator $ \_reprs _tenv _sc ty -> pure $ Just $
     S.FunTy {} -> Left "function types are not representable"
     _ -> Right (FilteredHWType (Signed 64) [])
 
--- | Run a Netlist action with the given global bindings of scoped Core, and
--- the environment of 'runNetlistTest'
+-- | Run a 'NetlistMonad' action for VHDL, with the given global bindings of
+-- scoped Core, in the environment of the default 'RewriteEnv' (e.g. its type
+-- translator) with the type constructors of 'testTyConMap'
 runScopedNetlistTest :: GlobalEnv (Binding (ST.Term 'ST.VoidS)) -> NetlistMonad a -> IO a
 runScopedNetlistTest bs act =
   fst <$>
@@ -301,15 +302,16 @@ parseName = fst . parseNameScope
 -- compares free variables by unique alone.
 --
 -- Note that this only applies to /references/: binders always need their type
--- declared, see 'parsePats'.
+-- declared, see the section "Parsing scoped Core".
 freeVarType :: C.TyConName
 freeVarType = C.Name C.Internal (Text.pack "FreeVar") 0 C.noSrcSpan
 
--- | Parse mode used by 'parseToTerm'. Enables:
+-- | The base of the parse mode of 'parseTestTerm', see 'scopedParseMode'.
+-- Enables:
 --
 --   * @ScopedTypeVariables@, so lambda binders can spell out their type:
 --     @\\(x_0 :: Int) -> x_0@, and so a type binder can spell out its kind:
---     @\\(a :: Type) -> ..@, see 'parseLamPats'.
+--     @\\(a :: Type) -> ..@, see the section "Parsing scoped Core".
 --   * @RankNTypes@, for @forall@ in a type: @(x :: forall a. a)@.
 --   * @TypeApplications@, for type application: @f \@Int@.
 termParseMode :: ParseMode
@@ -321,16 +323,24 @@ termParseMode = defaultParseMode
 
 -- * Parsing scoped Core
 --
--- The parser of scoped Clash Core. It parses the same language as
--- 'parseToTerm', with the same identifiers (see 'parseNameScope'), but builds
--- builders ("Clash.Core.Scoped.Builder") rather than terms of Clash Core, so
--- that a test can build the term in a scope of its choice. See
--- "Test.Clash.Scoped" for how tests use it.
+-- The parser of scoped Clash Core. It parses very simple Haskell expressions,
+-- with the identifiers of 'parseNameScope', into builders
+-- ("Clash.Core.Scoped.Builder") rather than terms, so that a test can build
+-- the term in a scope of its choice. See "Test.Clash.Scoped" for how tests
+-- use it.
 --
--- Compared to 'parseToTerm', it also parses:
+-- Every binder needs an explicit type annotation, as there is no type
+-- inference. The annotation may be spelled out in the pattern itself,
+-- @\\(x_0 :: Int) -> x_0@, or declared in a type signature of an enclosing
+-- let-expression. A lambda binder annotated with a kind,
+-- @\\(a :: Type) (x :: a) -> x@, binds a type variable: Haskell has no syntax
+-- for a type lambda, so the kind annotation is what marks one.
+--
+-- Besides variables, applications, type applications, lambdas and
+-- let-expressions, it parses:
 --
 --   * Type constructors and data constructors of 'zeroWidthTyConMap', by
---     their names, see 'resolveTyConName' and 'resolveDataCon':
+--     their names, see 'resolveTyConName' and 'resolveDataConIn':
 --     @Maybe Int@, @Clash.Sized.Vector.Vec 2 Int@, @Just \@Int 1@.
 --
 --   * Function types @Int -> Int@, type-level numbers and strings, and the
@@ -374,7 +384,7 @@ termParseMode = defaultParseMode
 --     @let { !(x :: Int) = 1 } in x@. Like in Haskell, where a bang binding
 --     can't be recursive, its right-hand side is outside of its scope. A let
 --     with several bang bindings binds them one after the other. A let
---     without bangs is recursive, as in 'parseToTerm'.
+--     without bangs is recursive.
 --
 -- Variables refer to their binders by /key/: the unique of the identifier,
 -- see 'Clash.Core.Scoped.Builder.Key'. So an identifier that a binder binds
@@ -547,7 +557,7 @@ stringQQ f = TH.QuasiQuoter
   , TH.quoteDec = error "stringQQ.quoteDec: NYI"
   }
 
--- | The parse mode of 'parseTestTerm': that of 'parseToTerm', with
+-- | The parse mode of 'parseTestTerm': 'termParseMode', with
 -- @BangPatterns@ for non-recursive let-bindings, @DataKinds@ for type-level
 -- literals, @KindSignatures@ for kinded type binders, and @MagicHash@ for
 -- names like @Int#@
@@ -559,7 +569,8 @@ scopedParseMode = termParseMode
   }
 
 -- | The keys of the variables bound around a subterm, and the types that let
--- expressions declare for binders by key, see 'parsePats'
+-- expressions declare for binders by key, see the section "Parsing scoped
+-- Core"
 data PEnv = PEnv
   { _peTyVars :: !IntSet.IntSet
   , _peVars :: !IntSet.IntSet
@@ -676,7 +687,7 @@ clashSpelledGhcNames :: [Text.Text]
 clashSpelledGhcNames = map Text.pack ["GHC.Prim.unsafeCoerce#", "GHC.Prim.~#"]
 
 -- | The name of a type constructor: one of 'testTyCons' (see 'lookupByOcc'),
--- or else as 'parseType' names it, e.g. @Maybe_9@ is the name @Maybe@ with
+-- or else as 'parseName' names it, e.g. @Maybe_9@ is the name @Maybe@ with
 -- unique 9
 resolveTyConName :: HasCallStack => String -> C.TyConName
 resolveTyConName s = case lookupByOcc (C.nameOcc . C.tyConName) testTyCons s of
@@ -864,7 +875,7 @@ varRef env@(PEnv _ tms _ defs) nm0 annot = case parseNameScope nm0 of
 
 -- | A binder of a term variable: its key, name and type. The type is its
 -- annotation, or that of a type signature of an enclosing let-expression, see
--- 'parsePats'.
+-- the section "Parsing scoped Core".
 spIdBinder :: (HasCallStack, Show l) => PEnv -> Pat l -> P (Key, C.Name ST.Term, TyB)
 spIdBinder env@(PEnv _ _ sigs _) = \case
   PParen _ p -> spIdBinder env p
@@ -882,8 +893,8 @@ spIdBinder env@(PEnv _ _ sigs _) = \case
           |]
   p -> error ("parseTestTerm: unsupported binder: " <> show p)
 
--- | Lambdas. A binder annotated with a kind binds a type variable, see
--- 'parseLamPats'.
+-- | Lambdas. A binder annotated with a kind binds a type variable, see the
+-- section "Parsing scoped Core".
 spLams :: (HasCallStack, Show l) => PEnv -> [Pat l] -> Exp l -> P TmB
 spLams env [] body = spTm env body
 spLams env (p : ps) body = case kindBinderPat p of
@@ -1035,8 +1046,8 @@ testAlgTyCon nm tvs dcs =
  where
   tcNm = resolveTyConName nm
 
--- | The name 'parseType' produces for a type constructor whose name it
--- derives a unique from, e.g. @Int@
+-- | The name of a type constructor whose unique is derived from its name (see
+-- 'nameToUnique'), e.g. @Int@
 parseTyConName :: HasCallStack => String -> C.TyConName
 parseTyConName nm = C.Name C.User (Text.pack nm) (nameToUnique nm) C.noSrcSpan
 
@@ -1228,8 +1239,8 @@ unconsSymbolTyConName :: C.TyConName
 unconsSymbolTyConName =
   mkTyConName "GHC.TypeLits.UnconsSymbol" (fromGhcUnique typeUnconsSymbolTyFamNameKey)
 
--- | The name of the type constructor of 'liftedEqTy'. The parser of scoped
--- Core parses @a ~ b@ as its application to @Type@, @a@ and @b@.
+-- | The name of the type constructor of lifted equality, @a ~ b@. The parser
+-- of scoped Core parses @a ~ b@ as its application to @Type@, @a@ and @b@.
 liftedEqTyConName :: C.TyConName
 liftedEqTyConName = C.mkUnsafeName C.User (Text.pack "~") (fromGhcUnique eqTyConKey)
 
@@ -1481,8 +1492,8 @@ clkPairDc =
   fxDataCon "MkClkPair" 2025 1 [] [] [tcAppB clockTcNm [litTyB (C.SymTy "System")], intB]
     (tcAppB clkPairTcNm [])
 
--- | The type constructors of the types above, and those of 'C.tysPrimMap',
--- 'intTyCon' and 'pairTy'
+-- | The type constructors of the types above, and those of 'P.tysPrimMap',
+-- 'intTyCon' and @Pair@
 testTyConMap :: C.TyConMap
 testTyConMap = UniqMap.fromList [(C.tyConName tc, tc) | tc <- tcs]
  where

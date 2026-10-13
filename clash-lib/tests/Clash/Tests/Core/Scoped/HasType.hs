@@ -4,10 +4,9 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for the types of scoped Clash Core terms. Like
-  "Clash.Tests.Core.Scoped.Type", most tests check agreement with
-  "Clash.Core.HasType", in the scope of the free variables of their input, and
-  in a larger scope where all of its binders clash with the scope. The
-  expected types are those that "Clash.Core.HasType" gave.
+  "Clash.Tests.Core.Scoped.Type", most tests check the expected results in
+  the scope of the free variables of their input, and in a larger scope where
+  all of its binders clash with the scope.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -90,7 +89,7 @@ aKey = 77001
 intB :: TyB
 intB = testTypeB "Int"
 
--- | A tuple type, like 'Test.Clash.Rewrite.tupleTy'
+-- | A tuple type
 tupleB :: TyB -> TyB -> TyB
 tupleB t1 t2 = appTyB (appTyB (constTyB (C.TyCon (mkTyConName "GHC.Tuple.(,)" 3036))) t1) t2
 
@@ -223,8 +222,8 @@ piCases =
   ]
 
 -- | Types whose kinds don't need checking applications of type constructors
--- to their arguments, which 'Clash.Core.HasType.piResultTys' of Clash Core
--- rejected when debugging is on, and their kinds
+-- to their arguments (see 'Clash.Core.Scoped.HasType.piResultKinds'), and
+-- their kinds
 kindCases :: [(TestType, Kind 'VoidS)]
 kindCases =
   [ ("Int", P.liftedTypeKind)

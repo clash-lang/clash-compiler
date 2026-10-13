@@ -3,10 +3,10 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Type". The functions give the results that
-  their counterparts in "Clash.Core.Type" gave on 'corpus' ('expected'), in
-  the scope of the free type variables of the corpus, and sunk into a larger
-  scope where all binders of the types are below the watermark of the scope.
+  Tests for "Clash.Core.Scoped.Type". The functions give the expected results
+  on 'corpus' ('expected'), in the scope of the free type variables of the
+  corpus, and sunk into a larger scope where all binders of the types are
+  below the watermark of the scope.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -159,9 +159,8 @@ piTeleShape = \case
   PiForall _ rest -> False : piTeleShape rest
   PiArg _ rest -> True : piTeleShape rest
 
--- | The results of the functions of "Clash.Core.Type" on 'corpus', as
--- 'render' renders them: per function, the results on the types of the corpus
--- in order
+-- | The expected results of the functions on 'corpus', as 'render' renders
+-- them: per function, the results on the types of the corpus in order
 expected :: [(String, [String])]
 expected =
   [ ("tyView",
@@ -489,8 +488,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.Type"
         maybe (assertFailure "no reduction") (assertTypeIs ts "N Bool")
           (reduceTypeFamily tenv (testScope ts) ty)
 
-    -- Unlike Clash.Core.Type, an equation whose right-hand side mentions a
-    -- pattern variable that its left-hand side doesn't bind doesn't reduce
+    -- An equation whose right-hand side mentions a pattern variable that its
+    -- left-hand side doesn't bind doesn't reduce
   , testCase "reduceTypeFamily of an equation with an unbound pattern variable" $ do
       let uNm = mkTyConName "U" 3105
           uTc = mkFunTyCon uNm (mkFunTy P.liftedTypeKind P.liftedTypeKind) 1

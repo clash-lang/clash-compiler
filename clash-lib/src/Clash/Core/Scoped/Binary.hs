@@ -4,8 +4,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   'Binary' instances of closed types and terms of scoped Clash Core
-  ("Clash.Core.Scoped.Syntax"), and of the values they share with Clash Core:
-  global variables, primitives, data constructors and type constructors. E.g.
+  ("Clash.Core.Scoped.Syntax"), and of the values they refer to: global
+  variables, primitives, data constructors and type constructors. E.g.
   the manifest hashes the call graph of a top entity with them
   ('Clash.Driver.Manifest.readFreshManifest'), the rewrite history of
   @-fclash-debug-history@ is written with them, and so are the inputs of the

@@ -172,8 +172,7 @@ data S
 
 -- | A name in scope @n@.
 --
--- The raw name is an 'Int'; 'nameId' gives it, for printing, for maps, and
--- for conversion to Clash Core.
+-- The raw name is an 'Int'; 'nameId' gives it, for printing and for maps.
 newtype Name (n :: S) = UnsafeName Int
   deriving (Eq, Ord, Show)
 type role Name nominal
@@ -207,7 +206,7 @@ nameOf (UnsafeNameBinder name) = name
 -- /may/ clash, and is renamed to the name just above the watermark
 -- ('withFresh').
 --
--- Conversion from Clash Core ("Clash.Core.Scoped.Convert") numbers binders so
+-- Conversion from GHC Core ("Clash.Core.Scoped.Builder") numbers binders so
 -- that names increase along every path from the root, so opening them only
 -- raises the watermark: there is no set to insert into, nor a membership test.
 -- Only binders of terms moved into a scope that already has larger names are

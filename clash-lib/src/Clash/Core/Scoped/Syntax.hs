@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Scoped Clash Core: Clash Core ("Clash.Core.Term") in the style of the foil
+  Scoped Clash Core: Clash's core language in the style of the foil
   (Maclaurin, Radul, Paszke, "The Foil: Capture-Avoiding Substitution With No
   Sharp Edges", IFL 2022, <https://doi.org/10.1145/3587216.3587224>).
 
@@ -41,10 +41,9 @@
   = Design
 
   * __One scope, two sorts.__ Type variables and term variables live in a
-    single scope, exactly like Clash's 'Clash.Core.VarEnv.InScopeSet' contains
-    both. The sorts are kept apart by the newtypes 'TyName' and 'TmName'. A
-    'TyName' can only be obtained from a t'TyBinder', a 'TmName' only from an
-    t'IdBinder', so a type never mentions a term variable.
+    single scope. The sorts are kept apart by the newtypes 'TyName' and
+    'TmName'. A 'TyName' can only be obtained from a t'TyBinder', a 'TmName'
+    only from an t'IdBinder', so a type never mentions a term variable.
 
   * __Binders carry their payload in the outer scope.__ An t'IdBinder' @n l@
     carries the type of the bound variable in scope @n@; a t'TyBinder' carries

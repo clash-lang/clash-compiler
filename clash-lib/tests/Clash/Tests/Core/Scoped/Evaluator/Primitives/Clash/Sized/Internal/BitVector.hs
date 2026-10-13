@@ -4,9 +4,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Internal.BitVector"
-  on fixed inputs: the reductions that build their result from the type of
-  the primitive, and those whose primitives the designs of
-  @clash-differential prims@ don't have.
+  on fixed inputs, e.g. of the reductions that build their result from the
+  type of the primitive.
 -}
 
 {-# LANGUAGE BinaryLiterals #-}

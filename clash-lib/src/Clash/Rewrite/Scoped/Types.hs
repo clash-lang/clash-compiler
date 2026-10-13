@@ -25,15 +25,14 @@
 
   = Let-bindings
 
-  'Clash.Rewrite.Scoped.Whnf.whnfRW' evaluates a subterm with the
-  let-bindings of its context on the heap of the evaluator (decision D6 of the
-  port: the context carries them). The context keeps that heap, 'tfHeap', as
-  it is extended: 'pushUnder' adds the bindings of a 'LetBody', and sinks it
-  under every other binder. Its keys are the names of the scope @n@ of the
-  subterm, which is t'Distinct'. So a binder between a let-binding and the
-  subterm can't shadow the let-binder, nor a free variable of its right-hand
-  side, as it can in Clash Core (#2571): it has a different name. And the
-  heap is built as the context is, instead of from all frames at every
+  'Clash.Rewrite.Scoped.Whnf.whnfRW' evaluates a subterm with the let-bindings
+  of its context on the heap of the evaluator: the context carries them. The
+  context keeps that heap, 'tfHeap', as it is extended: 'pushUnder' adds the
+  bindings of a 'LetBody', and sinks it under every other binder. Its keys are
+  the names of the scope @n@ of the subterm, which is t'Distinct'. So a binder
+  between a let-binding and the subterm can't shadow the let-binder, nor a
+  free variable of its right-hand side (see #2571): it has a different name.
+  And the heap is built as the context is, instead of from all frames at every
   evaluation. It is lazy, so it is only built when it is used.
 
   = Inspecting the context
@@ -152,8 +151,7 @@ data Path (n :: S) where
   PUnder :: (Distinct i, DExt i n) => !(Under i n) -> !(Path i) -> Path n
 type role Path nominal
 
--- | A frame of the context that doesn't bind variables. See
--- 'Clash.Core.Term.CoreContext'.
+-- | A frame of the context that doesn't bind variables
 data Frame (n :: S) where
   -- | Function position of an application
   AppFun :: Frame n
@@ -175,7 +173,7 @@ data Frame (n :: S) where
 type role Frame nominal
 
 -- | A frame of the context that goes under binders, extending scope @i@ to
--- @n@. See 'Clash.Core.Term.CoreContext'.
+-- @n@
 data Under (i :: S) (n :: S) where
   -- | Body of a lambda
   LamBody :: !(IdBinder i n) -> Under i n
@@ -184,7 +182,7 @@ data Under (i :: S) (n :: S) where
   -- | Right-hand side of a case alternative
   CaseAlt :: !(Pat i n) -> Under i n
   -- | Body of a let-expression, with its bindings (as they were before the
-  -- right-hand sides were transformed, like in Clash Core)
+  -- right-hand sides were transformed)
   LetBody :: !(Bind i n) -> Under i n
   -- | The right-hand side with the given index of a recursive let-binding
   LetBindingRec :: !(Tele IdBinder i n) -> !Int -> Under i n
@@ -204,9 +202,9 @@ pushFrame f (TransformContext sc p h) = TransformContext sc (PFrame f p) h
 -- the only way to extend the scope of a context.
 --
 -- The let-bindings of a 'LetBody' are added to the heap ('tfHeap'), as they
--- were before their right-hand sides were transformed, like in Clash Core.
--- The other bindings of a recursive let-binding are not, while transforming
--- one of its right-hand sides ('LetBindingRec'), also like in Clash Core.
+-- were before their right-hand sides were transformed. The other bindings of
+-- a recursive let-binding are not, while transforming one of its right-hand
+-- sides ('LetBindingRec').
 pushUnder
   :: (Distinct i, DExt i n)
   => Scope n -> Under i n -> TransformContext i -> TransformContext n
@@ -227,7 +225,7 @@ pushUnder sc u (TransformContext _ p h) = TransformContext sc (PUnder u p) h'
 {-# INLINE pushUnder #-}
 
 -- | The frame of the argument of an application, given the (already
--- transformed) function. See 'Clash.Core.Term.primArg'.
+-- transformed) function. See 'primArg'.
 appArgFrame :: Term n -> Frame n
 appArgFrame = AppArg . primArg
 
@@ -368,12 +366,12 @@ ctxFrames = go . tfPath
     | i <= 0 = idBinderOcc b
     | otherwise = teleOcc bs (i - 1)
 
--- | See 'Clash.Core.Term.isLambdaBodyCtx'
+-- | Is the frame the body of a lambda?
 isLambdaBodyKind :: FrameKind -> Bool
 isLambdaBodyKind KLamBody = True
 isLambdaBodyKind _ = False
 
--- | See 'Clash.Core.Term.isTickCtx'
+-- | Is the frame the body of a tick?
 isTickKind :: FrameKind -> Bool
 isTickKind KTickC = True
 isTickKind _ = False

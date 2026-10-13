@@ -3,8 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for solving type equations in scoped Clash Core. Most expected
-  results are those that "Clash.Core.EqSolver" gave.
+  Tests for solving type equations in scoped Clash Core.
 -}
 
 {-# LANGUAGE PolyKinds #-}
@@ -213,7 +212,7 @@ lastFieldTy = \case
   go (TCons b TNil) = Just (pp (idBinderType b))
   go (TCons _ bs) = go bs
 
--- * The results of "Clash.Core.EqSolver" on 'equations'
+-- * The expected results on 'equations'
 
 expectedSolveEq :: [[Sol]]
 expectedSolveEq =

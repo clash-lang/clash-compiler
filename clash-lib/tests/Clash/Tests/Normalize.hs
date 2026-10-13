@@ -8,11 +8,8 @@
   variables it binds, and is the expected term.
 
   Note that there is no test for #448 ("Use proper InScopeSet in
-  flattenCallTree"): since commit
-  https://github.com/clash-lang/clash-compiler/commit/d997cb6314372803c036da1bba7f1807706d0728
-  ("Disambiguate local and global ids"), 'flattenCallTree' substitutes globals
-  only, whose replacements are closed terms, so its in-scope set no longer
-  matters for correctness.
+  flattenCallTree"): 'flattenCallTree' substitutes globals only, whose
+  replacements are closed terms, so they can't capture variables.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}

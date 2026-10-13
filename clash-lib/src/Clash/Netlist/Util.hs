@@ -1471,7 +1471,8 @@ nestM (Indexed (RTree (-1) t1,l,_)) (Indexed (RTree d t2,10,k))
 
 nestM _ _ = Nothing
 
--- | Apply a name modifier to the names of the environment, see 'withTicks'
+-- | Apply a name modifier to the names of the environment, see
+-- 'Clash.Netlist.Scoped.Util.withTicks'
 applyNameMod :: NameMod -> Text -> NetlistEnv -> NetlistEnv
 applyNameMod PrefixName s2 env@(NetlistEnv {_prefixName = s1})
   | Text.null s1 = env {_prefixName = s2}

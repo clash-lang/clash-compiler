@@ -113,9 +113,9 @@ applyWith = \s _ctx expr0 action -> do
 -- * Free variables that the transformation introduced: a result in scope @n@
 --   only mentions variables of @n@.
 --
--- * Let-bindings and patterns that bind a variable twice, and the scope lint
---   ("Clash.Core.Lint"): binders in a 'Distinct' scope never shadow one
---   another, and every variable occurrence is in scope.
+-- * Let-bindings and patterns that bind a variable twice, and the scoping of
+--   variables: binders in a 'Distinct' scope never shadow one another, and
+--   every variable occurrence is in scope.
 applyDebug
   :: String
   -- ^ Name of the transformation

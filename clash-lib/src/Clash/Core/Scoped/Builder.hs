@@ -18,17 +18,13 @@
      The builders refer to variables by their 'Key's.
 
   2. 'runClosedTerm' builds the scoped term. It gives the binders fresh names
-     in depth-first order, from a supply, like
-     'Clash.Core.Scoped.Convert.fromClashTermClosed' numbers the binders of a
-     term of Clash Core. So the native conversion and the conversion through
-     Clash Core give the same raw names. That matters: some transformations,
-     such as @inlineCleanup@, depend on the order of names.
+     in depth-first order, from a supply. That order matters: some
+     transformations, such as @inlineCleanup@, depend on the order of names.
 
   The phases are separate because phase 1 can't number the binders itself: it
   converts the body of a lambda before the lambda's binder, as the binder's
-  source location comes from the body. Phase 2 also stays lazy per binding,
-  like the conversion through Clash Core was: most bindings that GHC2Core
-  produces are never looked at.
+  source location comes from the body. Phase 2 also stays lazy per binding:
+  most bindings that GHC2Core produces are never looked at.
 
   Every builder is strict in its parts, so forcing a builder to weak head
   normal form forces all of it (see its 'NFData' instance). The builders hold
@@ -38,20 +34,20 @@
 
   A 'TyB' of a closed type without binders holds the scoped type itself
   ('TyClosed'), which every use shares. Other types are built per use, as the
-  names of their binders depend on where they occur. Types are built natively
-  ('varTyB', 'forAllTyB', ...), or from types of Clash Core ('clashTyB').
+  names of their binders depend on where they occur. Types are built with
+  'varTyB', 'forAllTyB', ...
 
   = Variables
 
   A 'Key' is any 'Int' that identifies a variable, chosen by the user of the
-  builders: GHC2Core uses the uniques of GHC's variables ('uniqueKey'), and
-  'clashTyB' the uniques of Clash's type variables. The environment of phase 2
-  maps the keys of the variables in scope to their occurrences, where an inner
-  binder shadows an outer one with the same key, as in GHC Core. So the keys
-  of different variables need only differ where one is in the scope of the
-  other. The builders of "Clash.GHC.Scoped.GHC2Core" that don't come from GHC
-  Core, such as those of the signal primitives, are closed: their bodies only
-  refer to their own binders, so any keys work for them.
+  builders: GHC2Core uses the uniques of GHC's variables ('uniqueKey'). The
+  environment of phase 2 maps the keys of the variables in scope to their
+  occurrences, where an inner binder shadows an outer one with the same key,
+  as in GHC Core. So the keys of different variables need only differ where
+  one is in the scope of the other. The builders of "Clash.GHC.Scoped.GHC2Core"
+  that don't come from GHC Core, such as those of the signal primitives, are
+  closed: their bodies only refer to their own binders, so any keys work for
+  them.
 
   Building errors on a variable whose key is not in scope.
 
@@ -59,9 +55,8 @@
 
   'runTermIn' and 'runTypeIn' build a term or type in a scope with free
   variables, which the builders refer to by the keys that the caller gives
-  them. The binders get names from just above the watermark of the scope, as
-  'Clash.Core.Scoped.Convert.fromClashTerm' gives them. The tests build their
-  inputs this way.
+  them. The binders get names from just above the watermark of the scope. The
+  tests build their inputs this way.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -189,16 +184,14 @@ nextName (Supply a) = do
 
 -- | Build types in the same scope, each with the names of the supply from
 -- where it is now: the binders of one type are not in scope in the others,
--- so they can share names. That numbers them like
--- 'Clash.Core.Scoped.Convert.fromClashType' numbers each type it converts.
+-- so they can share names.
 typesInScope :: Distinct n => BEnv s n -> ST s (TyB -> ST s (Type n))
 typesInScope env@(BEnv _ _ _ (Supply a)) = do
   start <- readByteArray a 0
   pure (\t -> writeByteArray a 0 (start :: Int) >> runTyB t env)
 
--- | Bind a type variable, with the next name of the supply. Like
--- 'Clash.Core.Scoped.Convert.fromClashTerm', the caller builds the kind
--- before calling this, so the binders in the kind come first.
+-- | Bind a type variable, with the next name of the supply. The caller builds
+-- the kind before calling this, so the binders in the kind come first.
 withTyBinder
   :: Distinct n
   => BEnv s n
@@ -379,7 +372,7 @@ tyConAppB tc = List.foldl' appTyB (constTyB (TyCon tc))
 data TmB = TmB
   { tmbHead :: !(Maybe PrimInfo)
   -- ^ The primitive at the head of the term, under applications and ticks,
-  -- like 'C.collectArgs'
+  -- like 'Clash.Core.Scoped.Term.collectArgs'
   , tmbRun :: !(Run Term)
   }
 

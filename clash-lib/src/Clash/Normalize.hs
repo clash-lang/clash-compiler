@@ -206,8 +206,7 @@ normalize' nm = do
       (isFunction, resTyRep) <- case splitCoreFunForallTy te emptyScope ty1 of
         SplitCoreFunForall scR tele resTy -> do
           resTyRep <- not <$> isUntranslatableType False scR resTy
-          -- Whether it quantifies over type variables, like the code for
-          -- Clash Core does
+          -- Whether it quantifies over type variables
           pure (piTeleTyArity tele /= 0, resTyRep)
       if resTyRep
          then do
@@ -265,11 +264,11 @@ normalize' nm = do
 
     Nothing -> error $ $(curLoc) ++ "Expr belonging to bndr: " ++ nmS ++ " not found"
 
--- | The globals a term refers to, in the order in which they first occur,
--- in the order of 'Clash.Core.FreeVars.globalIds': the right-hand sides of a
--- let-expression before its body, and the term of a tick before the term it
--- is attached to. It determines the order in which 'normalize' normalizes
--- them, and with that, the uniques of the globals that normalization creates.
+-- | The globals a term refers to, in the order in which they first occur: the
+-- right-hand sides of a let-expression before its body, and the term of a tick
+-- before the term it is attached to. It determines the order in which
+-- 'normalize' normalizes them, and with that, the uniques of the globals that
+-- normalization creates.
 globalsInOrder :: Term n -> [GlobalId]
 globalsInOrder = dedup emptyGlobalSet . ($ []) . go
  where
@@ -357,15 +356,14 @@ data SingleBinding
   -- ^ Binds a single variable. If the function only applies another function
   -- to its own arguments, in order, the eta-reduced function.
 
--- | Whether a normalized function, which has the shape @\\x1 .. xn -> let y =
--- e in y@ (see 'Clash.Netlist.Util.splitNormalized'), binds a single variable,
--- and if so, whether it is a wrapper @\\x1 .. xn -> let y = f a1 .. am x1 .. xn
--- in y@ that eta-reduces to @f a1 .. am@: when @f@ and the @ai@ mention none of
--- the @xi@, nor @y@. The ticks around the let-expression and around the
--- application are kept.
---
--- Unlike the function of Clash Core that 'flattenNode' replaces, it only
--- eta-reduces a wrapper whose result is its let-bound variable.
+-- | Whether a normalized function, which has the shape
+-- @\\x1 .. xn -> let y = e in y@ (see
+-- 'Clash.Netlist.Scoped.Util.splitNormalized'), binds a single variable, and
+-- if so, whether it is a wrapper @\\x1 .. xn -> let y = f a1 .. am x1 .. xn
+-- in y@ that eta-reduces to @f a1 .. am@: when @f@ and the @ai@ mention none
+-- of the @xi@, nor @y@. The ticks around the let-expression and around the
+-- application are kept. It only eta-reduces a wrapper whose result is its
+-- let-bound variable.
 etaReduceWrapper :: Term 'VoidS -> SingleBinding
 etaReduceWrapper e = openBndrs emptyScope e $ \_ bs body ->
   case (termBinders bs, collectTicks body) of

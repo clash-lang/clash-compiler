@@ -201,7 +201,7 @@ tests =
             |])
         -- DEC used to consider arguments shareable if all their free variables
         -- are in scope of the case-expression. The pattern-bound @x@ had the
-        -- same unique as the @x@ in scope in Clash Core, so DEC shared @f x@,
+        -- same unique as the @x@ in scope, so DEC shared @f x@,
         -- making the second alternative refer to the wrong @x@.
       , testCase "DEC does not share arguments bound in the alternatives" $ do
           decTo [varD "s_30" "Int", varD "x_31" "Int", varD "p_47" "Pair"]

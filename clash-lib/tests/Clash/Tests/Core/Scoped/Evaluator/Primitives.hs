@@ -3,10 +3,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Evaluator.Primitives": the registry of ported
-  reductions, and examples of ported reductions on fixed inputs.
-  @clash-differential prims@ compares the ported reductions with those of
-  Clash Core.
+  Tests for "Clash.Core.Scoped.Evaluator.Primitives": the registry of
+  reductions, and examples of reductions on fixed inputs.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -108,8 +106,7 @@ portedTests =
       let appendTy =
             forAll "m_9002" natKind $ \m -> forAll "n_9001" natKind $ \n ->
               knownNatTy m ~> bvTy n ~> bvTy m ~> bvTy (addTy n m)
-          -- The size of the result is the result type's, like the reduction
-          -- of Clash Core gives
+          -- The size of the result is the result type's
           expected = apps (conPrim (bvConPrim bvTcNm))
             [ Right (addTy (numTy 2) (numTy 3)), Left (natLit 5), Left (natLit 0b00001)
             , Left (integerLit 0b10011) ]
@@ -167,8 +164,8 @@ resultTypeTests =
           pfTy = forAll "a_9003" typeKind $ \b -> integralTy b ~> doublePrimTy ~> t2Ty b doubleTy
           call nm = apps (prim nm pfTy)
             [Right (signedTy (numTy 8)), Left (natLit 0), Left (doubleLit (-2.5))]
-          -- The reduction of Clash Core gives the type arguments of the type of
-          -- the primitive, @b@ and @Double@
+          -- The reduction gives the type arguments of the type of the
+          -- primitive, @b@ and @Double@
           expected = apps (dataB t2DataCon)
             [ Right (signedTy (numTy 8)), Right doubleTy
             , Left (signed 8 (-2)), Left (appB (dataB doubleDc) (doubleLit (-0.5))) ]

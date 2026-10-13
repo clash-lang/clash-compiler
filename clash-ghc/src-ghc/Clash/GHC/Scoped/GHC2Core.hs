@@ -7,14 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Conversion of GHC Core to closed terms of scoped Clash Core
-  ("Clash.Core.Scoped.Syntax").
-
-  This is 'Clash.GHC.GHC2Core.coreToTerm', building scoped Core instead of
-  Clash Core. It gives the same terms as converting the result of
-  'Clash.GHC.GHC2Core.coreToTerm' with
-  'Clash.Core.Scoped.Convert.fromClashTermClosed', with the same raw names,
-  except for primitives of open types, see "Primitives" below. It converts in
-  two phases, see "Clash.Core.Scoped.Builder".
+  ("Clash.Core.Scoped.Syntax"). It converts in two phases, see
+  "Clash.Core.Scoped.Builder".
 
   = Types
 
@@ -27,8 +21,7 @@
   The type of a primitive is closed in scoped Core. Primitives that stand in
   for a term of some type, @_RUBBISH_@, @_TY_@ and @_CO_@, have the shape of
   'Clash.Core.Scoped.Util.primAtType': if the type is open, they are a
-  primitive of type @forall a. a@ applied to the type. 'coreToTerm' gives
-  @_RUBBISH_@ the open type itself.
+  primitive of type @forall a. a@ applied to the type.
 
   = Recursive groups
 
@@ -122,10 +115,9 @@ import           Clash.Util                  (curLoc)
 
 -- * Terms
 
--- | Convert a GHC term, see the module header. Like
--- 'Clash.GHC.GHC2Core.coreToTerm', given the compiled primitives and the
--- unlocatable variables. The given global binders are local variables of the
--- term, see "Recursive groups" in the module header.
+-- | Convert a GHC term, see the module header, given the compiled primitives
+-- and the unlocatable variables. The given global binders are local
+-- variables of the term, see "Recursive groups" in the module header.
 coreToTermB
   :: CompiledPrimMap
   -> [Var]
@@ -137,7 +129,17 @@ coreToTermB primMap unlocs recLocals = term
     term :: CoreExpr -> C2C TmB
     term e
 #if MIN_VERSION_ghc(9,14,0)
-      -- See 'Clash.GHC.GHC2Core.coreToTerm'
+      -- See Note [Unary class magic] in GHC.Core.TyCon. The worker for a unary
+      -- class data constructor (e.g. 'C:KnownNat') is semantically the identity
+      -- on its single value field. Peel it off here so that downstream
+      -- transformations (in particular the evaluator's literal extractors) see
+      -- the underlying value directly, as they would have on GHC < 9.14 when
+      -- unary classes were represented as newtypes.
+      -- Match a fully-saturated worker application: all type args, then
+      -- exactly one value arg. A naive '[Type _, val]' pattern would also
+      -- match a partial application like 'C:IP @"callStack" @CallStack'
+      -- (two 'Type' args, no value yet), binding 'val' to a 'Type' node
+      -- and producing '_TY_'-wrapped junk when peeled.
       | (Var x, args) <- collectArgs e
       , Just dc <- isDataConId_maybe x
       , isUnaryClassTyCon (dataConTyCon dc)
@@ -289,7 +291,25 @@ coreToTermB primMap unlocs recLocals = term
       ty' <- coreToTypeB ty
       case tmbHead s' of
         Just p | S.primName p `elem` undefinedXPrims ->
-          -- See 'Clash.GHC.GHC2Core.coreToTerm'
+          -- GHC translates things like:
+          --
+          --   xToBV (Index.pack# (errorX @TY "QQ"))
+          --
+          -- to
+          --
+          --   xToBV (case (errorX @TY "QQ") of {})
+          --
+          --
+          -- Here we then translate
+          --
+          --   case (errorX @TY "QQ") of {}
+          --
+          -- to
+          --
+          --   undefinedX @TY
+          --
+          -- So that the evaluator rule for 'xToBV' can recognize things that
+          -- would normally throw XException
           return (tyAppB (primB NP.undefinedX) ty')
         _ ->
           return (tyAppB (primB NP.undefined) ty')
@@ -331,9 +351,9 @@ coreToTermB primMap unlocs recLocals = term
 
     var x = do
         xPrim <- if isGlobalId x then coreToPrimVar x else coreToVar x
-        -- Converted for every variable, as 'coreToTerm' does, although only
-        -- primitives use it: converting it caches the names in it, see
-        -- 'coreToTypeB'. Its closed type is only built when used.
+        -- Converted for every variable, although only primitives use it:
+        -- converting it caches the names in it, see 'coreToTypeB'. Its
+        -- closed type is only built when used.
         xType  <- coreToVarTypeB x
         let xNameS = C.nameOcc xPrim
             -- The builder terms split the GHC type
@@ -373,7 +393,10 @@ coreToTermB primMap unlocs recLocals = term
               | f == showt 'GHC.Stack.withFrozenCallStack -> withFrozenCallStackB xTy
               | f == showt 'GHC.Magic.noinline            -> idB xTy
               | f == showt 'GHC.Magic.lazy                -> idB xTy
-              -- See 'Clash.GHC.GHC2Core.coreToTerm'
+              -- 'nospec' is a wired-in magic Id in 'GHC.Magic' (resp.
+              -- 'GHC.Internal.Magic' on GHC >= 9.14). It is not user-importable,
+              -- so we can't quote it via TH. Both module names need a literal
+              -- match here so that this clause fires across GHC versions.
               | f == "GHC.Magic.nospec"                   -> idB xTy
               | f == "GHC.Internal.Magic.nospec"          -> idB xTy
               | f == showt 'GHC.Magic.runRW#              -> runRWB xTy
@@ -416,9 +439,7 @@ coreToTermB primMap unlocs recLocals = term
         tmvs' <- mapM (\v -> (\(ty, occ) -> (varKey v, occ, ty)) <$> coreToIdSP sp1 v) tmvs
         return (dataAltB dc' tyvs' tmvs' e')
 
--- | Convert a term variable binder: its type and name. Like
--- 'Clash.GHC.GHC2Core.coreToId', which converts the type of a global through
--- 'coreToVarType'.
+-- | Convert a term variable binder: its type and name
 coreToIdB :: Id -> C2C (TyB, C.Name S.Term)
 coreToIdB i = (,) <$> coreToTypeB (varType i) <*> coreToVar i
 
@@ -434,18 +455,19 @@ coPrim = mkPrimInfo (pack "_CO_") undefinedTy WorkNever SingleResult S.NoUnfoldi
 -- the primitive. Their bodies only refer to their own binders, so the keys
 -- of their term variables are arbitrary, see "Clash.Core.Scoped.Builder".
 --
--- They split the GHC type as 'Clash.GHC.GHC2Core' splits its conversion to
--- Clash Core, and convert the parts. These are part of the conversion of the
--- whole type, which the caller converts first, so this looks up no new names.
+-- They split the GHC type as its conversion ('coreToTypeB') would be split,
+-- and convert the parts. These are part of the conversion of the whole type,
+-- which the caller converts first, so this looks up no new names.
 
--- | Split a forall-type, like matching 'C.ForAllTy' on the conversion of the
+-- | Split a forall-type, like matching 'S.ForAllTy' on the conversion of the
 -- type
 forAllView :: Type -> Maybe (TyVar, Type)
 forAllView ty | Just ty' <- coreView ty = forAllView ty'
 forAllView (ForAllTy (Bndr tv _) ty) = Just (tv, ty)
 forAllView _ = Nothing
 
--- | Split a function type, like matching 'C.FunTy' of 'C.tyView' on the
+-- | Split a function type, like matching
+-- 'Clash.Core.Scoped.Type.FunTy' of 'Clash.Core.Scoped.Type.tyView' on the
 -- conversion of the type
 funView :: Type -> Maybe (Type, Type)
 funView ty | Just ty' <- coreView ty = funView ty'
@@ -464,7 +486,27 @@ tyLamsB tvs body = foldr tyLam (pure body) tvs
     (key, occ, k) <- withoutSrcSpan (coreToTyVarB tv)
     tyLamB key occ k <$> r
 
--- | See 'Clash.GHC.GHC2Core.bundleUnbundleTerm'
+-- | Given the type:
+--
+-- @
+--     forall dom a0 a1 .. aN
+--   . Signal dom (a0, a1, .., aN)
+--  -> (Signal dom a0, Signal dom a1, .., Signal dom aN)
+-- @
+--
+-- or the type
+--
+-- @
+--     forall dom a0 a1 .. aN
+--   . (Signal dom a0, Signal dom a1, .., Signal dom aN)
+--  -> Signal dom (a0, a1, .., aN)
+-- @
+--
+-- Generate the term:
+--
+-- @/\dom. /\a0. /\a1. .. /\aN. \x -> x@
+--
+-- In other words: treat "bundle" and "unbundle" primitives as id.
 bundleUnbundleB :: Int -> Type -> C2C TmB
 bundleUnbundleB nTyVarsExpected = go []
  where
@@ -485,7 +527,16 @@ applyB fTy xTy =
   lamB 1 (C.mkUnsafeSystemName "x" 1) xTy $
   appB (varB 0) (varB 1)
 
--- | See 'Clash.GHC.GHC2Core.mapSignalTerm'
+-- | Given the type:
+--
+-- @forall a. forall b. forall clk. (a -> b) -> Signal clk a -> Signal clk b@
+--
+-- Generate the term:
+--
+-- @
+-- /\(a:*)./\(b:*)./\(clk:Clock).\(f : (Signal clk a -> Signal clk b)).
+-- \(x : Signal clk a).f x
+-- @
 mapSignalB :: Type -> C2C TmB
 mapSignalB ty
   | Just (aTV, ty1) <- forAllView ty
@@ -499,7 +550,13 @@ mapSignalB ty
     tyLamsB [aTV, bTV, clkTV] (applyB (funTyB [aTyB] bTyB) aTyB)
 mapSignalB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.signalTerm'
+-- | Given the type:
+--
+-- @forall a. forall dom. a -> Signal dom a@
+--
+-- Generate the term
+--
+-- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
 signalB :: Type -> C2C TmB
 signalB ty
   | Just (aTV, ty1) <- forAllView ty
@@ -510,7 +567,19 @@ signalB ty
     tyLamsB [aTV, domTV] (lamB 0 (C.mkUnsafeSystemName "x" 0) saTyB (varB 0))
 signalB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.appSignalTerm'
+-- | Given the type:
+--
+-- @
+-- forall dom. forall a. forall b. Signal dom (a -> b) -> Signal dom a ->
+-- Signal dom b
+-- @
+--
+-- Generate the term:
+--
+-- @
+-- /\(dom:Domain)./\(a:*)./\(b:*).\(f : (Signal dom a -> Signal dom b)).
+-- \(x : Signal dom a).f x
+-- @
 appSignalB :: Type -> C2C TmB
 appSignalB ty
   | Just (domTV, ty1) <- forAllView ty
@@ -524,7 +593,18 @@ appSignalB ty
     tyLamsB [domTV, aTV, bTV] (applyB (funTyB [saTyB] sbTyB) saTyB)
 appSignalB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.vecUnwrapTerm'
+-- | Given the type:
+--
+-- @
+-- forall t.forall n.forall a.Vec n (Signal t a) ->
+-- Signal t (Vec n a)
+-- @
+--
+-- Generate the term:
+--
+-- @
+-- /\(t:Domain)./\(n:Nat)./\(a:*).\(vs:Signal t (Vec n a)).vs
+-- @
 vecUnwrapB :: Type -> C2C TmB
 vecUnwrapB ty
   | Just (tTV, ty1) <- forAllView ty
@@ -536,7 +616,19 @@ vecUnwrapB ty
     tyLamsB [tTV, nTV, aTV] (lamB 0 (C.mkUnsafeSystemName "vs" 0) vsTyB (varB 0))
 vecUnwrapB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.traverseTerm'
+-- | Given the type:
+--
+-- @
+-- forall f.forall a.forall b.forall dom.Applicative f => (a -> f b) ->
+-- Signal dom a -> f (Signal dom b)
+-- @
+--
+-- Generate the term:
+--
+-- @
+-- /\(f:* -> *)./\(a:*)./\(b:*)./\(dom:Clock).\(dict:Applicative f).
+-- \(g:a -> f b).\(x:Signal dom a).g x
+-- @
 traverseB :: Type -> C2C TmB
 traverseB ty
   | Just (fTV, ty1) <- forAllView ty
@@ -557,7 +649,13 @@ traverseB ty
       appB (varB 1) (varB 2)
 traverseB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.dollarTerm'
+-- | Given the type:
+--
+-- @forall (r :: Rep) (a :: TYPE Lifted) (b :: TYPE r). (a -> b) -> a -> b@
+--
+-- Generate the term:
+--
+-- @/\(r:Rep)/\(a:TYPE Lifted)./\(b:TYPE r).\(f : (a -> b)).\(x : a).f x@
 dollarB :: Type -> C2C TmB
 #if MIN_VERSION_ghc(9,8,0)
 dollarB ty
@@ -585,13 +683,25 @@ dollarB ty
 #endif
 dollarB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.joinTerm'
+-- | Given the type:
+--
+-- @forall a. forall dom. Signal dom (Signal dom a) -> Signal dom a@
+--
+-- Generate the term
+--
+-- @/\(a:*)./\(dom:Domain).\(x:Signal dom a).x@
 joinB :: Type -> C2C TmB
 joinB ty
   | Just _ <- forAllView ty = signalB ty
   | otherwise = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.withFrozenCallStackTerm'
+-- | Given the type:
+--
+-- @forall a. CallStack -> (HasCallStack => a) -> a@
+--
+-- Generate the term
+--
+-- @/\(a:*)./\(callStack:CallStack).\(f:HasCallStack => a).f callStack@
 withFrozenCallStackB :: Type -> C2C TmB
 withFrozenCallStackB ty
   | Just (aTV, funTy) <- forAllView ty
@@ -605,7 +715,13 @@ withFrozenCallStackB ty
       appB (varB 1) (varB 0)
 withFrozenCallStackB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.idTerm'
+-- | Given the type:
+--
+-- @forall a. a -> a@
+--
+-- Generate the term
+--
+-- @/\(a:*).\(x:a).x@
 idB :: Type -> C2C TmB
 idB ty
   | Just (aTV, funTy) <- forAllView ty
@@ -615,7 +731,13 @@ idB ty
     tyLamsB [aTV] (lamB 0 (C.mkUnsafeSystemName "x" 0) xTyB (varB 0))
 idB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.runRWTerm'
+-- | Given the type:
+--
+-- @forall (r :: RuntimeRep) (o :: TYPE r).(State# RealWorld -> o) -> o@
+--
+-- Generate the term:
+--
+-- @/\(r:RuntimeRep)./\(o:TYPE r).\(f:State# RealWord -> o) -> f realWorld#@
 runRWB :: Type -> C2C TmB
 runRWB ty
   | Just (rTV, ty1) <- forAllView ty
@@ -632,7 +754,13 @@ runRWB ty
       appB (varB 0) (primB realWorld)
 runRWB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.checkUnpackUndefTerm'
+-- | Given the type:
+--
+-- @forall (n :: Nat) (a :: Type) .Knownnat n => Typeable a => (BitVector n -> a) -> BitVector n -> a@
+--
+-- Generate the term:
+--
+-- @/\(n:Nat)./\(a:TYPE r).\(kn:KnownNat n).\(f:a -> BitVector n).f@
 checkUnpackUndefB :: Type -> C2C TmB
 checkUnpackUndefB ty
   | Just (nTV, ty1) <- forAllView ty
@@ -651,7 +779,13 @@ checkUnpackUndefB ty
       varB 2
 checkUnpackUndefB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.nameModTerm'
+-- | Given the type:
+--
+-- @forall (name :: Symbol) (a :: Type) . a -> (name ::: a)@
+--
+-- Generate the term:
+--
+-- @/\(name:Symbol)./\(a:Type).\(x:a) -> <TICK>x@
 nameModB :: NameMod -> Type -> C2C TmB
 nameModB sa ty
   | Just (nmTV, ty1) <- forAllView ty
@@ -664,7 +798,13 @@ nameModB sa ty
       tickB (nameModTickB sa (varTyB (varKey nmTV))) (varB 0)
 nameModB _ ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.xToErrorCtxTerm'
+-- | Given the type:
+--
+-- @forall (a :: Type) . String -> a -> a@
+--
+-- Generate the term:
+--
+-- @/\(a:Type).\(ctx:String).\(x:a) -> x@
 xToErrorCtxB :: Type -> C2C TmB
 xToErrorCtxB ty
   | Just (aTV, funTy) <- forAllView ty
@@ -679,7 +819,13 @@ xToErrorCtxB ty
       varB 1
 xToErrorCtxB ty = error $ $(curLoc) ++ showPprUnsafe ty
 
--- | See 'Clash.GHC.GHC2Core.annotateRegTerm'
+-- | Given the type
+--
+-- > forall n dom a . Vec n (Attr String) -> Signal dom a -> Signal dom a
+--
+-- Generate the term:
+--
+-- > /\(n:Nat) (dom:Symbol) (a:Type).\(attrs:Vec n (Attr String)) (x:Signal dom a).<TICK attrs> x
 annotateRegB :: Type -> C2C TmB
 annotateRegB ty
   | Just (nTV, ty1) <- forAllView ty

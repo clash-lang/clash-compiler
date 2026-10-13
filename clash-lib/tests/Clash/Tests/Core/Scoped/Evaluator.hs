@@ -4,7 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Core.Scoped.Evaluator": the whnf evaluator of scoped Clash
-  Core and its ported primitive reductions, in the environment Clash uses
+  Core and its primitive reductions, in the environment Clash uses
   ('Clash.Rewrite.Scoped.Whnf.evaluatorEnv').
 -}
 
@@ -98,7 +98,7 @@ machineTests =
       assertTermAlphaEq (closedTerm "42") (evalTWith globals "g_G4 :: Int")
 
     -- A local and a global with the same name: the raw name of the local is
-    -- the unique of the global (decision D5 of the port)
+    -- the unique of the global
   , testCase "locals are not looked up in the global heap" $
       withTestScope [atRaw 4 (varD "x_4" "Int")] $ \ts ->
         assertTermIs ts "x_4" (evalIn globals ts "x_4")

@@ -7,9 +7,8 @@
 
   Local names and global names live in separate namespaces: a 'NameMap' is
   keyed by local names ('TyName' or 'TmName') of one scope, a t'GlobalEnv' by
-  global names ('GlobalId'). Clash's 'Clash.Core.VarEnv.VarEnv' is keyed by the
-  unique of an 'Clash.Core.Var.Id', whether local or global, which makes it easy
-  to look up a local variable in a map of global bindings or vice versa.
+  global names ('GlobalId'). So a local variable can't be looked up in a map
+  of global bindings, nor vice versa.
 
   A 'NameSet' or 'NameMap' is indexed by the scope of its keys. Move it into an
   extended scope with 'sinkNameSet' and 'sinkNameMap', and out of the scope of

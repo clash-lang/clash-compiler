@@ -13,8 +13,8 @@
   A strategy compiles to a transformation of scoped Clash Core (see
   "Clash.Rewrite.Scoped"). The 'Target' says how: the term constructors, how a
   transformation is called, the instrumentation and combinators, and how a
-  traversal descends into a node. A traversal opens the binders it goes under
-  (decision D7 of the port).
+  traversal descends into a node. A traversal opens the binders it goes
+  under.
 -}
 
 {-# LANGUAGE DisambiguateRecordFields #-}
@@ -682,7 +682,7 @@ genTopDownFix target cs = do
 
 -- * Compiling strategies
 
--- | Compile a strategy for a target, see 'compileStrategy'
+-- | Compile a strategy for a target, see 'compileScopedStrategy'
 compileStrategyFor :: Target -> Strat -> Q Exp
 compileStrategyFor target strat = case strat of
   Seq a b -> binop target.seqName a b
@@ -702,7 +702,7 @@ compileStrategyFor target strat = case strat of
     [| $(varE op) $(compileStrategyFor target a) $(compileStrategyFor target b) |]
 
 -- | Compile a strategy into its unfused reference for a target, see
--- 'compileStrategyReference'
+-- 'compileScopedStrategyReference'
 compileStrategyReferenceFor :: Target -> Strat -> Q Exp
 compileStrategyReferenceFor target = goStrat
  where
@@ -738,13 +738,13 @@ compileStrategyReferenceFor target = goStrat
          $(asRewriteQFor target member) |]
 
 -- | A transformation as a plain uninstrumented rewrite for a target, see
--- 'asRewriteQ'
+-- 'asScopedRewriteQ'
 asRewriteQFor :: Target -> Transformation -> Q Exp
 asRewriteQFor target transformation = do
   validateTransformation transformation
   guardExp target invokeE transformation
 
--- | A node program as a plain rewrite for a target, see 'dispatchQ'
+-- | A node program as a plain rewrite for a target, see 'scopedDispatchQ'
 dispatchQFor :: Target -> Step -> Q Exp
 dispatchQFor target step = do
   cs <- compileStep target step
@@ -752,22 +752,29 @@ dispatchQFor target step = do
 
 -- ** Scoped Clash Core
 
--- | Like 'compileStrategy', for a strategy of transformations of scoped Core.
--- The result is an expression of type
--- @'Clash.Rewrite.Scoped.Types.ScopedRewrite' extra@.
+-- | Compile a strategy of transformations of scoped Core into its fused
+-- dispatch code. The result is an expression of type
+-- @'Clash.Rewrite.Scoped.Types.ScopedRewrite' extra@, with @extra@ fixed by
+-- the workers the spec references.
 compileScopedStrategy :: Strat -> Q Exp
 compileScopedStrategy = compileStrategyFor scopedTarget
 
--- | Like 'compileStrategyReference', for scoped Core, through the
--- "Clash.Rewrite.Scoped.Combinators" traversals
+-- | Compile a strategy into its unfused reference: the same transformations,
+-- run as a plain @apply@ chain through the "Clash.Rewrite.Scoped.Combinators"
+-- traversals
 compileScopedStrategyReference :: Strat -> Q Exp
 compileScopedStrategyReference = compileStrategyReferenceFor scopedTarget
 
--- | Like 'dispatchQ', for scoped Core
+-- | A node program as a plain rewrite: match the constructor once and run
+-- that constructor's program, without traversing. For composing a 'Step'
+-- with plain combinators, and for testing chains in isolation.
 scopedDispatchQ :: Step -> Q Exp
 scopedDispatchQ = dispatchQFor scopedTarget
 
--- | Like 'asRewriteQ', for scoped Core: an expression of type
--- @'Clash.Rewrite.Scoped.Types.ScopedRewrite' extra@
+-- | A transformation as a plain uninstrumented rewrite, an expression of type
+-- @'Clash.Rewrite.Scoped.Types.ScopedRewrite' extra@: match the term against
+-- the worker table, run the worker on a match, return the term untouched
+-- otherwise. Splice this where a transformation is invoked from inside
+-- another transformation (any instrumentation is the caller's).
 asScopedRewriteQ :: Transformation -> Q Exp
 asScopedRewriteQ = asRewriteQFor scopedTarget

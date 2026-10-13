@@ -303,8 +303,7 @@ makeAllTyCons opts hm fiEnvs = go hm hm
                                    old
         tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
 
--- | Convert a type constructor. Like 'makeTyConClash', which converts through
--- the types of Clash Core, and looks up the same names in the same order.
+-- | Convert a type constructor
 makeTyCon :: TyCon
           -> C2C C.TyCon
 makeTyCon tc = tycon
@@ -362,7 +361,9 @@ makeTyCon tc = tycon
 
 -- | An equation of a type family, given its left-hand side and right-hand
 -- side. Its pattern variables are the free type variables of the converted
--- types, ordered like 'C.mkFunTyConFromClash' orders them.
+-- types, closed over kinds, in the order of their first occurrence (in the
+-- left-hand side, then the right-hand side), except that every variable comes
+-- after the variables in its kind.
 tyFamEqnB :: FamInstEnvs -> [Type] -> Type -> C2C TyFamEqn
 tyFamEqnB envs lhs rhs = do
   lhs' <- mapM coreToTypeB lhs
@@ -379,7 +380,7 @@ tyFamEqnB envs lhs rhs = do
       | v `elemVarSet` seen = go seen vs
       | otherwise = v : go (extendVarSet seen v) vs
 
-  -- See 'C.dependencySortTyVars': every variable after those in its kind
+  -- Every variable after those in its kind, keeping their order otherwise
   dependencySort tvs = reverse (snd (foldl' visit (emptyVarSet, []) tvs))
    where
     tvEnv = mkVarEnv [ (tv, tv) | tv <- tvs ]
@@ -390,16 +391,21 @@ tyFamEqnB envs lhs rhs = do
               (seen1, acc1) = foldl' visit (extendVarSet seen tv, acc) kindTvs
           in  (seen1, tv : acc1)
 
--- | Convert the right-hand side of an algebraic data type. See
--- 'makeAlgTyConRhsClash'.
+-- | Convert the right-hand side of an algebraic data type
 makeAlgTyConRhs :: TyCon
                 -> AlgTyConRhs
                 -> C2C (Maybe C.AlgTyConRhs)
 makeAlgTyConRhs _tc algTcRhs = case algTcRhs of
 #if MIN_VERSION_ghc(9,14,0)
-  -- See 'makeAlgTyConRhsClash'
+  -- GHC 9.14 represents unary classes (a class with a single method or a single
+  -- superclass) with their own AlgTyConRhs constructor instead of as a newtype.
+  -- See Note [Unary class magic] in GHC.Core.TyCon. We map it back to Clash's
+  -- 'NewTyCon' so that the wrapper data constructor (e.g. 'C:KnownNat') is
+  -- treated as identity by clash's normalizer, which is what its semantics is.
   UnaryClassTyCon {data_con = dc} -> do
     let tvs = tyConTyVars _tc
+        -- The DataCon for a unary class has exactly one field; that's the
+        -- newtype's RHS (e.g. 'SNat n' for 'KnownNat n').
         rhsEtad = case dataConRepArgTys dc of
           [scaled] -> scaledThing scaled
           args -> error [__i|
@@ -738,18 +744,18 @@ varKey :: Var -> Key
 varKey = uniqueKey . fromGhcUnique . varUnique
 
 -- | Converts a GHC type to a type of scoped Core, as a builder (see
--- "Clash.Core.Scoped.Builder"). It gives the type that converting the type
--- of Clash Core of 'coreToType' would give.
+-- "Clash.Core.Scoped.Builder").
 --
--- It looks up the same names as 'coreToType', in the same order. That
--- matters: the names are cached by unique (see 'qualifiedNameStringM'), and
--- different GHC names can share a unique, so the order in which names are
--- first looked up decides their text. So it also converts the kinds of the
--- type variables it meets, as 'coreToType' does, although the builder of an
--- occurrence of a type variable doesn't need its kind.
+-- The order in which it looks up names matters: the names are cached by
+-- unique (see 'qualifiedNameStringM'), and different GHC names can share a
+-- unique, so the order in which names are first looked up decides their
+-- text. So it also converts the kinds of the type variables it meets,
+-- although the builder of an occurrence of a type variable doesn't need its
+-- kind.
 --
--- Memoized on the GHC type, like 'coreToType', which shares the closed types
--- without binders, see "Clash.Core.Scoped.Builder".
+-- Memoized on the GHC type, which shares the closed types without binders,
+-- see "Clash.Core.Scoped.Builder". The conversion runs 'withoutSrcSpan' so
+-- that it depends on the GHC type alone.
 coreToTypeB :: Type -> C2C TyB
 coreToTypeB ty = do
   cache <- use scopedTypeCache
@@ -773,7 +779,7 @@ coreToTypeB ty = do
                Just (HetReduction (Reduction _ ty') _) -> coreToTypeB ty'
          | otherwise = coreToTypeB' ty
 
--- | See 'coreToType''
+-- | See 'coreToTypeB'
 coreToTypeB' :: Type -> C2C TyB
 coreToTypeB' (TyVarTy tv) = varTyB (varKey tv) <$ coreToTyVarB tv
 coreToTypeB' (TyConApp tc args)
@@ -797,8 +803,13 @@ coreToTypeB' (CastTy t (Refl{})) = coreToTypeB' t
 coreToTypeB' t@(CastTy _ _)   = error ("Cannot handle CastTy " ++ showPprUnsafe t)
 coreToTypeB' t@(CoercionTy _) = error ("Cannot handle CoercionTy " ++ showPprUnsafe t)
 
--- | The closed type of a variable, see 'coreToVarType'. Memoized on the name
--- for global variables, like 'coreToVarType'.
+-- | The closed type of a variable, memoized on the variable's name.
+--
+-- Only global variables are memoized: their names come from GHC's name cache
+-- and are globally unique, so the same name always refers to the same
+-- variable, whose type is intrinsic. Names of local variables (e.g. binders
+-- instantiated when loading unfoldings from interface files) can collide
+-- between declarations and must not share cache entries.
 coreToVarTypeB :: Var -> C2C (S.Type 'S.VoidS)
 coreToVarTypeB v
   | isGlobalId v = makeCached (varName v) scopedVarTypeMap convert
@@ -806,16 +817,17 @@ coreToVarTypeB v
  where
   convert = runClosedType <$> coreToTypeB (varType v)
 
--- | A global variable, see 'coreToId'
+-- | A global variable: its name and closed type
 coreToGlobalIdB :: Id -> C2C S.GlobalId
 coreToGlobalIdB i = do
   ty <- coreToVarTypeB i
   nm <- coreToVar i
   pure (mkGlobalId nm ty)
 
--- | The free type variables of the type of Clash Core that 'coreToType'
--- converts a GHC type to, in the order of 'C.typeFreeVars': closed over the
--- kinds of type variables, with duplicates. Mirrors 'coreToType'.
+-- | The free type variables of the type that 'coreToTypeB' converts a GHC
+-- type to, in the order of their occurrences: closed over the kinds of type
+-- variables, a variable before the variables in its kind, with duplicates.
+-- Mirrors 'coreToTypeB'.
 convertedTyVars :: FamInstEnvs -> Type -> [TyVar]
 convertedTyVars envs = go emptyVarSet
  where
@@ -828,7 +840,11 @@ convertedTyVars envs = go emptyVarSet
 
   go' bound = \case
     TyVarTy tv
-      -- See Note [Closing over kind variables] in "Clash.Core.FreeVars"
+      -- When a type variable is free, its kind variables are free too, even
+      -- if a binder with the same name is in scope: in @forall k . b -> k@
+      -- with @b :: k -> Type@, the @k@ in the kind of @b@ is not the bound
+      -- @k@. So close over the kind of a free variable with nothing bound.
+      -- See also: https://gitlab.haskell.org/ghc/ghc/-/commit/503514b94f8dc7bd9eab5392206649aee45f140b
       | tv `elemVarSet` bound -> go bound (varType tv)
       | otherwise -> tv : go emptyVarSet (varType tv)
     TyConApp tc args
@@ -842,8 +858,8 @@ convertedTyVars envs = go emptyVarSet
     CastTy t (Refl{}) -> go' bound t
     _ -> []
 
--- | Convert a type variable binder: its key, name and kind. Like
--- 'coreToTyVar', it converts the kind first.
+-- | Convert a type variable binder: its key, name and kind. It converts the
+-- kind first, see 'coreToTypeB' for why the order matters.
 coreToTyVarB :: TyVar -> C2C (Key, C.Name S.Type, TyB)
 coreToTyVarB tv = do
   k <- coreToTypeB (varType tv)

@@ -8,15 +8,14 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Blackboxes of Netlist generation on scoped Clash Core: creating blackbox
-  contexts, and filling in the templates of primitives. The counterpart of
-  "Clash.Netlist.BlackBox".
+  contexts, and filling in the templates of primitives.
 
   The handlers get the t'CompCtx' of the terms they are given, which gives
-  the HDL identifiers of their local variables. Where Clash Core renamed the
-  binders of a term it went under, e.g. those of the lambdas of a function
-  argument of a blackbox ('mkFunInput') or the let-bindings of a 'mealyIO'
-  machine, these handlers open the binders, and extend the context with the
-  HDL identifiers of the variables they bind.
+  the HDL identifiers of their local variables. Where they go under the
+  binders of a term, e.g. those of the lambdas of a function argument of a
+  blackbox ('mkFunInput') or the let-bindings of a 'mealyIO' machine, these
+  handlers open the binders, and extend the context with the HDL identifiers
+  of the variables they bind.
 
   The result of a blackbox is not always a local variable: it can be a signal
   that Netlist generation made up. Internally, a result is therefore given by
@@ -140,9 +139,8 @@ import           Clash.Netlist.Scoped.Util
 type ResId n = (Identifier, Type n)
 
 -- | An identifier as the identifier of a result ('ResId'), or of a local
--- variable. Clash Core passed these identifiers through the occurrence names
--- of variables ('Clash.Netlist.Id.unsafeFromCoreId'), so that they lost their
--- structure, which e.g. 'Id.suffix' uses to make new identifiers.
+-- variable: made from its text alone ('Clash.Netlist.Id.unsafeMake'), so that
+-- it loses its structure, which e.g. 'Id.suffix' uses to make new identifiers.
 rawIdentifier :: Identifier -> Identifier
 rawIdentifier = Id.unsafeMake . Id.toText
 
@@ -295,8 +293,7 @@ mkArgument ctx bbName bndr declType nArg e = do
 
     return ((e',t,l),d)
 
--- | Turn a primitive application into an expression and declarations: see
--- 'Clash.Netlist.BlackBox.mkPrimitive'
+-- | Turn a primitive application into an expression and declarations
 mkPrimitive
   :: forall n
    . (HasCallStack, Distinct n)
@@ -1106,9 +1103,7 @@ mkFunInput ctx parentName declType resId e =
 -- The arguments of the mealy function and the let-bindings of its body are
 -- opened into an extension of the scope of the context, and become the
 -- let-bindings of the processes. The let-bindings are visited in the order of
--- 'inverseTopSortOrderOf', which, unlike Clash Core's
--- 'Clash.Core.Util.inverseTopSortLetBindings', doesn't depend on the uniques
--- of their binders.
+-- 'inverseTopSortOrderOf'.
 collectMealy
   :: forall n
    . (HasCallStack, Distinct n)
@@ -1462,8 +1457,8 @@ inverseTopSortBinds bs =
 -- side. 'Nothing' if the term is not a let-expression, or if its result is not
 -- a variable.
 --
--- The counterpart of Clash Core's 'Clash.Netlist.Util.splitNormalized' on a
--- term without lambdas. The variables of the bindings don't have HDL
+-- Like 'Clash.Netlist.Scoped.Util.splitNormalized' on a term without
+-- lambdas. The variables of the bindings don't have HDL
 -- identifiers in the extended context yet, see 'mkUniqueLets'.
 splitLets
   :: forall n r
@@ -1498,11 +1493,10 @@ sinkBinds = map (\(i, x) -> (sink i, sink x))
 -- let-bindings must be in the scope of the context, without HDL identifiers,
 -- see 'splitLets'.
 --
--- The counterpart of Clash Core's 'Clash.Netlist.Util.mkUniqueNormalized' on
--- a let-expression, see 'Clash.Netlist.Scoped.Util.mkUniqueNormalized' for
--- components. It generates the same identifiers in the same order. Like it, it
--- adds a let-binding when the result has to be redirected, so the continuation
--- gets the let-bindings and the result in a further extended scope.
+-- Like 'Clash.Netlist.Scoped.Util.mkUniqueNormalized', on a let-expression
+-- rather than a component. Like it, it adds a let-binding when the result has
+-- to be redirected, so the continuation gets the let-bindings and the result
+-- in a further extended scope.
 --
 -- The result is 'Nothing' when it is void.
 mkUniqueLets

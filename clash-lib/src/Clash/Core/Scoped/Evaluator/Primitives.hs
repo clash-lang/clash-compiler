@@ -95,7 +95,7 @@
         in "Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim".
 
       * __Primitives in results__ are closed, like every
-        'Clash.Core.Term.PrimInfo': build their types with closed Clash
+        'Clash.Core.Scoped.Syntax.PrimInfo': build their types with closed
         types. A primitive whose type mentions type variables of the type of
         the reduced primitive (e.g. @MutableByteArray#@ in the result of
         @newByteArray#@) gets a closed polymorphic type, and is applied to the

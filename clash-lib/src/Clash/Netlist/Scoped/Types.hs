@@ -17,10 +17,8 @@
   alternative, extend the context with the HDL identifiers of the variables
   they bind ('extendCompCtx').
 
-  Clash Core put the HDL identifier of a variable in its occurrence name
-  ('Clash.Netlist.Util.mkUnique'), and Netlist read it back with
-  'Clash.Netlist.Id.unsafeFromCoreId'. Here, the identifier lives in the
-  context, keyed by the scoped name of the variable ('localIdentifier').
+  The identifier lives in the context, keyed by the scoped name of the
+  variable ('localIdentifier'), not in the occurrence name of the variable.
 
   = Blackbox functions
 

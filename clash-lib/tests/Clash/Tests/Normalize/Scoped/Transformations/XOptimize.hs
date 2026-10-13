@@ -3,12 +3,9 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.XOptimize". The expected
-  results of the tests that compared the port with 'xOptimize' of Clash Core
-  are the results of the port, which agreed with Clash Core up to the known
-  difference in the form of the type of @errorX@ at an open type. 'assertRewritesTo'
-  runs every test in the scope of the free variables of its input, and in a
-  scope that the binders of the input clash with.
+  Tests for "Clash.Normalize.Scoped.Transformations.XOptimize".
+  'assertRewritesTo' runs every test in the scope of the free variables of its
+  input, and in a scope that the binders of the input clash with.
 -}
 
 {-# LANGUAGE LambdaCase #-}
@@ -113,7 +110,7 @@ tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.XOptimize"
   [ testGroup "regression tests"
       [ -- @case p of { DEFAULT -> err; MkPair p z -> f p }@, where the pattern
-        -- binder @p@ shadows the subject @p@ in Clash Core. 'xOptimize'
+        -- binder @p@ shadows the subject @p@. 'xOptimize'
         -- replaces a case-expression with a single defined alternative by
         -- let-bindings for its pattern binders, alongside a let-binding for the
         -- subject. It used to do so without renaming the pattern binders, so
@@ -162,8 +159,8 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.XOptimize"
           xOptTo [varD "x_33" "Int"]
             (tm "(case x_33 of { 1 -> Prim.err; _ -> Prim.err }) :: Int")
             (tm "Clash.XException.errorX")
-        -- Clash Core gives @errorX@ the type @a@, rather than applying it to
-        -- @a@ (the known difference "prim-type-form")
+        -- The type of a primitive is closed, so @errorX@ is applied to the
+        -- open type @a@, see 'Clash.Core.Scoped.Util.primAtType'
       , testCase "no defined alternatives, at an open type" $
           xOptTo [kindedTyVarD "a_50" "Type", varD "x_33" "Int"]
             (tm "(case x_33 of { _ -> Prim.err }) :: a_50")

@@ -106,7 +106,7 @@ data VHDLState =
   -- ^ Import directories passed in with @-i@
   , _memoryDataFiles:: [(String,String)]
   -- ^ Files to be stored: (filename, contents). These files are generated
-  -- during the execution of 'genNetlist'.
+  -- during the execution of 'Clash.Netlist.Scoped.genNetlist'.
   , _idSeen    :: IdentifierSet
   , _tyPkgCtx :: Bool
   -- ^ Are we in the context of generating the @_types@ package?

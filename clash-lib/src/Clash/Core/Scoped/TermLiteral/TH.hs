@@ -6,8 +6,7 @@ Copyright   :  (C) 2019, Myrtle Software Ltd,
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-Template Haskell utilities for "Clash.Core.Scoped.TermLiteral", the scoped
-Core port of "Clash.Core.TermLiteral.TH".
+Template Haskell utilities for "Clash.Core.Scoped.TermLiteral".
 -}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}

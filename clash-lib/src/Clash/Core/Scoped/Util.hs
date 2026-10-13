@@ -3,24 +3,21 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Smart constructors and destructors for scoped Clash Core: ports of
-  "Clash.Core.Util".
+  Smart constructors and destructors for scoped Clash Core.
 
   = Let-bindings
 
-  Clash Core passes let-bindings around as lists, which scoped Core can't:
-  the right-hand side of a binding may only mention the binders in scope at
-  it. The functions here take the bindings of a recursive let-expression
-  (@'Let' ('Rec' bs xs) body@) and regroup or reorder them, giving a
-  telescope of let-bindings ('Tele' t'Bind'). They reuse the binders when the
-  order of the bindings doesn't change, and give them fresh names otherwise.
+  Let-bindings can't be passed around as lists in scoped Core: the right-hand
+  side of a binding may only mention the binders in scope at it. The functions
+  here take the bindings of a recursive let-expression
+  (@'Let' ('Rec' bs xs) body@) and regroup or reorder them, giving a telescope
+  of let-bindings ('Tele' t'Bind'). They reuse the binders when the order of
+  the bindings doesn't change, and give them fresh names otherwise.
 
   = Fresh binders
 
   Functions that build terms with new binders, such as 'extractElems' and
   'mkSelectorCase', take the scope, and give the binders fresh names in it.
-  Their counterparts on Clash Core take a unique supply and an in-scope set,
-  or use fixed uniques.
 -}
 
 {-# LANGUAGE PolyKinds #-}
@@ -109,7 +106,7 @@ mkLets TNil e = e
 mkLets (TCons b bs) e = Let b (mkLets bs e)
 
 -- | Split recursive let-bindings into strongly connected components, and
--- wrap the body in a let-expression for each, see 'C.listToLets'
+-- wrap the body in a let-expression for each
 listToLets
   :: (HasCallStack, Distinct n)
   => Scope n
@@ -123,8 +120,7 @@ listToLets sc bs xs body = sccLetBindings sc bs xs body (\_ binds body' -> mkLet
 
 -- | Split recursive let-bindings into strongly connected components: a
 -- non-recursive binding for each binding that doesn't refer to itself or to
--- bindings that refer to it, and a recursive group for each cycle. See
--- 'C.sccLetBindings'.
+-- bindings that refer to it, and a recursive group for each cycle.
 --
 -- The components are in dependency order, and components that don't depend on
 -- each other are in the order of the bindings, so that bindings that are
@@ -144,7 +140,7 @@ sccLetBindings sc bs xs body =
 
 -- | Reorder recursive let-bindings such that bindings come after the ones
 -- they refer to, unless they are part of a cycle: in the post-order of a
--- depth-first search, see 'C.inverseTopSortLetBindings'. Bindings that are
+-- depth-first search. Bindings that are
 -- already in that order keep their binders.
 inverseTopSortLetBindings
   :: (HasCallStack, Distinct n)
@@ -378,7 +374,7 @@ coercionTy tenv sc dc tys = case dataConInstArgTys tenv sc dc tys of
   Just (ty:_) -> ty
   _ -> error ("coercionTy: can't instantiate " <> show dc)
 
--- | Create a vector of the given elements, see 'C.mkVec'
+-- | Create a vector of the given elements
 mkVec
   :: (HasCallStack, Distinct n)
   => TypeEnv
@@ -401,7 +397,7 @@ mkVec tenv sc nilCon consCon resTy n0 xs0 = appendVec tenv sc consCon resTy nil 
     , Right resTy
     , Left (primCo (coercionTy tenv sc nilCon [numTy 0, resTy])) ]
 
--- | Prepend the given elements to a vector, see 'C.appendToVec'
+-- | Prepend the given elements to a vector
 appendToVec
   :: (HasCallStack, Distinct n)
   => TypeEnv
@@ -473,14 +469,13 @@ selectField tenv sc dc tys nExts fieldNms subj fieldI = case dataConInstArgTys t
 systemName :: Text -> C.Name a
 systemName nm = C.mkUnsafeSystemName nm 0
 
--- | A human readable name of sort 'C.Internal', for a fresh binder, like
--- those of 'C.mkInternalVar'. Its unique is not used, see e.g.
--- 'withFreshIdBinder'.
+-- | A human readable name of sort 'C.Internal', for a fresh binder. Its
+-- unique is not used, see e.g. 'withFreshIdBinder'.
 internalName :: Text -> C.Name a
 internalName nm = C.mkUnsafeInternalName nm 0
 
 -- | Create let-bindings with case-expressions that select the first elements
--- of a vector, see 'C.extractElems'. For the @i@-th element, it binds
+-- of a vector. For the @i@-th element, it binds
 -- @el<c><i>@ to the element, and @rest<c><i>@ to the vector after it, except
 -- for the last element. Gives:
 --
@@ -489,9 +484,6 @@ internalName nm = C.mkUnsafeInternalName nm 0
 --   recursive let-binding,
 -- * the variables of the elements, and
 -- * a case-expression that selects the vector after the last element.
---
--- Note that 'C.extractElems' binds the vector after the last element as well,
--- and always extracts all elements.
 extractElems
   :: forall n r
    . (HasCallStack, Distinct n)
@@ -548,7 +540,7 @@ extractElems tenv sc0 consCon resTy0 s maxN count vec0 cont
   elName i = systemName ("el" <> suffix i)
   restName i = systemName ("rest" <> suffix i)
 
--- | Create a tree of the given elements, see 'C.mkRTree'
+-- | Create a tree of the given elements
 mkRTree
   :: (HasCallStack, Distinct n)
   => TypeEnv
@@ -582,7 +574,7 @@ mkRTree tenv sc lrCon brCon resTy = go
          , Left (go (n - 1) xsR) ]
 
 -- | Create let-bindings with case-expressions that select the elements of a
--- tree, see 'C.extractTElems'. Gives the binders, their right-hand sides in
+-- tree. Gives the binders, their right-hand sides in
 -- the scope of the binders (so that they form a recursive let-binding), and
 -- the variables of the elements.
 extractTElems
@@ -643,18 +635,17 @@ extractTElems tenv sc0 lrCon brCon resTy0 s maxN tree0 =
 -- * Data constructors
 
 -- | The types of the fields of a data constructor, given types for its
--- universally quantified type variables, see 'C.substArgTys'. 'Nothing' if
--- there are more or fewer types than universally quantified type variables,
--- or if a field type mentions an existentially quantified type variable,
--- which 'C.substArgTys' leaves free.
+-- universally quantified type variables. 'Nothing' if there are more or fewer
+-- types than universally quantified type variables, or if a field type
+-- mentions an existentially quantified type variable.
 substArgTys
   :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> DataCon -> [Type n] -> Maybe [Type n]
 substArgTys tenv sc dc tys = join $
   dataConInstExtTyVars tenv sc dc tys $ \_ exts argTys ->
     traverse (unsinkType (teleNameBinders exts)) argTys
 
--- | Make a case-expression that selects a field of a data constructor, see
--- 'C.mkSelectorCase'. The binders of the pattern get fresh names. Errors if
+-- | Make a case-expression that selects a field of a data constructor. The
+-- binders of the pattern get fresh names. Errors if
 -- the type of the field mentions an existentially quantified type variable
 -- that the type equations among the field types don't solve.
 mkSelectorCase
@@ -706,9 +697,9 @@ mkSelectorCase caller sc tenv scrut dcI fieldI = go (inferCoreTypeOf tenv sc scr
 
 -- * Primitives
 
--- | A coercion of the given type. Unlike 'C.primCo', the type is a type
--- argument of the primitive, as "Clash.GHC.GHC2Core" makes them: the type of
--- a primitive is closed.
+-- | A coercion of the given type. The type is a type argument of the
+-- primitive, as "Clash.GHC.Scoped.GHC2Core" makes them: the type of a
+-- primitive is closed.
 primCo :: Type n -> Term n
 primCo = TyApp (Prim coPrimInfo)
 
@@ -721,7 +712,7 @@ coPrimInfo = mkPrimInfo "_CO_" undefinedTy WorkNever SingleResult NoUnfolding
 -- case-expression without defined alternatives. The type of a primitive is
 -- closed: if the given type mentions type variables, this is the primitive,
 -- of type @forall a. a@, applied to the type, like 'primCo'. Otherwise, it is
--- the primitive with the given type, as Clash Core makes it.
+-- the primitive with the given type.
 primAtType :: PrimInfo -> Type n -> Term n
 primAtType p ty = case closeType ty of
   Just closed -> Prim (withType closed)
@@ -730,7 +721,7 @@ primAtType p ty = case closeType ty of
   withType t =
     mkPrimInfo (primName p) t (primWorkInfo p) (primMultiResult p) (primUnfolding p)
 
--- | An unsafe coercion, see 'C.primUCo'
+-- | An unsafe coercion
 primUCo :: Term n
 primUCo = Prim uCoPrimInfo
 
@@ -755,12 +746,10 @@ data SplitInfo n = SplitInfo
   }
 
 -- | Whether to split values of a product type, i.e. one that contains
--- clocks, resets, enables or file handles, see 'C.shouldSplit'. Only splits
--- one level at a time.
+-- clocks, resets, enables or file handles. Only splits one level at a time.
 --
--- Unlike 'C.shouldSplit', doesn't split product types of which the type of a
--- field mentions an existentially quantified type variable, see
--- 'substArgTys'.
+-- Doesn't split product types of which the type of a field mentions an
+-- existentially quantified type variable, see 'substArgTys'.
 shouldSplit :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Maybe (SplitInfo n)
 shouldSplit tenv sc ty = case tyView ty of
   -- Look through SimIO to find things like Files
@@ -814,8 +803,16 @@ shouldSplit0 tenv sc = \case
   shouldSplitTy :: TypeView n -> Bool
   shouldSplitTy ty = isJust (shouldSplit0 tenv sc ty) || splitTy ty
 
-  -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split,
-  -- see 'C.shouldSplit'
+  -- Hidden constructs (HiddenClock, HiddenReset, ..) don't need to be split
+  -- because KnownDomain will be filtered anyway during netlist generation due
+  -- to it being a zero-width type
+  --
+  -- TODO: This currently only handles (IP $x, KnownDomain) given that $x is any
+  -- TODO: of the constructs handled in 'splitTy'. In practice this means only
+  -- TODO: HiddenClock, HiddenReset, and HiddenEnable are handled. If a user were
+  -- TODO: to define their own versions with -for example- the elements of the
+  -- TODO: tuple swapped, 'isHidden' wouldn't recognize it. We could generalize
+  -- TODO: this in the future.
   isHidden :: C.TyConName -> [Type n] -> Bool
   isHidden nm [a1, a2]
     | TyConApp a2Nm _ <- tyView a2 =
@@ -839,7 +836,7 @@ shouldSplit0 tenv sc = \case
     _ -> False
 
 -- | Split the types of the arguments of a function that 'shouldSplit' splits,
--- recursively, see 'C.splitShouldSplit'
+-- recursively
 splitShouldSplit :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> [Type n] -> [Type n]
 splitShouldSplit tenv sc = foldr go []
  where

@@ -10,10 +10,8 @@
   its /signature/ (t'DataConSig', see "Clash.Core.Scoped.Sig") as scoped
   types. Instantiating a data constructor substitutes types for the type
   variables of its signature, which renames binders where needed. The
-  functions below take a t'TypeEnv', which they don't need any more: the
-  signature is stored in the data constructor. Contrast
-  this with 'Clash.Core.Util.dataConInstArgTys', which may capture free
-  variables of the types it substitutes.
+  functions below take a t'TypeEnv', which they don't use: the signature is
+  stored in the data constructor.
 -}
 
 {-# LANGUAGE FlexibleContexts #-}

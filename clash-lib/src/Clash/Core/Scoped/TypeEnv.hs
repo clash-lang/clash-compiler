@@ -7,8 +7,8 @@
   that types refer to.
 
   The functions on types that look up type constructors ("Clash.Core.Scoped.Type",
-  "Clash.Core.Scoped.HasType", ...) take a t'TypeEnv' where their Clash
-  counterparts take a 'TyConMap'. Make one with 'mkTypeEnv'.
+  "Clash.Core.Scoped.HasType", ...) take a t'TypeEnv' rather than a
+  'TyConMap'. Make one with 'mkTypeEnv'.
 
   Type constructors, data constructors, global variables and primitives store
   their scoped types and signatures ('tyConKind', 'Clash.Core.TyCon.tyConEqns',

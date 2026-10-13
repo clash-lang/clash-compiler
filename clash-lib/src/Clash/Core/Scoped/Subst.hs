@@ -23,10 +23,10 @@
   which may substitute for any of its variables, as the result stays in that
   scope: e.g. to inline the bindings of a let-expression, after opening it.
 
-  Like Clash's 'Clash.Core.Subst.Subst', substitution renames a binder only if
-  it may clash with the output scope: if it is at or below the watermark of the
-  scope (see 'Scope'). When a binder's type changes or the binder is renamed,
-  its occurrences are mapped to the updated variable.
+  Substitution renames a binder only if it may clash with the output scope: if
+  it is at or below the watermark of the scope (see 'Scope'). When a binder's
+  type changes or the binder is renamed, its occurrences are mapped to the
+  updated variable.
 
   = Going under binders
 
@@ -508,17 +508,17 @@ substBind s bs cont = case bs of
       cont s' (Rec bndrs' (map (substTm s') es))
 
 -- | Rename every binder in a value to the name just above the watermark of
--- the scope at the binder. Unlike conversion from Clash Core, which numbers
--- the binders of a term depth-first, this gives binders in different subterms
--- the same name: e.g. both binders in @f (\x -> x) (\y -> y)@. See
--- 'freshenDistinct' to give every binder a different name.
+-- the scope at the binder. This gives binders in different subterms the same
+-- name: e.g. both binders in @f (\x -> x) (\y -> y)@. See 'freshenDistinct'
+-- to give every binder a different name.
 freshen :: (Distinct n, HasSubst e) => Scope n -> e n -> e n
 freshen sc = subst (UnsafeSubst sc IntMap.empty IntMap.empty True)
 
--- | Rename every binder in a term to a distinct fresh name, like conversion
--- from Clash Core does ("Clash.Core.Scoped.Convert"): it numbers the binders
--- in depth-first order, from just above the watermark of the scope. So no two
--- binders in the result have the same name, and none clashes with the scope.
+-- | Rename every binder in a term to a distinct fresh name, like the
+-- conversion from GHC Core does ("Clash.Core.Scoped.Builder"): it numbers the
+-- binders in depth-first order, from just above the watermark of the scope.
+-- So no two binders in the result have the same name, and none clashes with
+-- the scope.
 -- E.g. the binders in @f (\x -> x) (\y -> y)@ get two different names, whereas
 -- 'freshen' gives them the same one.
 --
@@ -527,7 +527,7 @@ freshen sc = subst (UnsafeSubst sc IntMap.empty IntMap.empty True)
 -- free variables of the term). The order is the one of conversion: a binder
 -- after the binders in its type or kind, a non-recursive let-binding after its
 -- right-hand side, and the binders of a recursive let-binding before their
--- right-hand sides. So a term converted from Clash Core keeps its names.
+-- right-hand sides.
 freshenDistinct :: Distinct n => Scope n -> Term n -> Term n
 freshenDistinct sc tm = case distinctTm (idSubst sc) tm of
   Distinctly tm' _ -> tm'
@@ -935,8 +935,7 @@ data Occs (n :: S) = Occs !IntSet !IntSet [Type n] [Term n]
 
 -- | The free type variables and the free term variables of a term, as their
 -- first occurrences ('VarTy' and 'Var'), which carry their kinds and types.
--- In the order of their first occurrences, like the free variables that
--- 'Clash.Core.FreeVars.freeLocalVars' visits: depth-first, left to right, a
+-- In the order of their first occurrences: depth-first, left to right, a
 -- variable before the variables in its type or kind, and the type of a
 -- binder before its scope. Includes the variables of the types in the term,
 -- like 'freeVars'.
@@ -1153,9 +1152,9 @@ closeOver tvs ids cont = do
 
 -- * Global variables
 
--- | Replace global variables by the closed terms of a t'GlobalEnv', see
--- 'Clash.Core.Subst.extendGblSubstList'. It doesn't go under binders, as a
--- closed term can't capture variables, nor mention any.
+-- | Replace global variables by the closed terms of a t'GlobalEnv'. It
+-- doesn't go under binders, as a closed term can't capture variables, nor
+-- mention any.
 --
 -- Trusted: a closed term is a term in every scope, so it is coerced into the
 -- scope of the occurrence it replaces ('sinkClosed' without the need for a

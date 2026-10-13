@@ -3,12 +3,9 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Cast". The expected
-  results of the tests that compared a port with its Clash Core counterpart
-  are the results of the latter. 'assertRewritesTo' runs every test in the
-  scope of the free variables of its input, and in a scope that the binders of
-  the input clash with: e.g. the tests in which a binder shadowed a free
-  variable in Clash Core.
+  Tests for "Clash.Normalize.Scoped.Transformations.Cast". 'assertRewritesTo'
+  runs every test in the scope of the free variables of its input, and in a
+  scope that the binders of the input clash with.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}

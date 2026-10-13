@@ -368,7 +368,7 @@ callGraph bndrs = go emptyGlobalEnv
   go cg _ = cg
 
 -- | The number of occurrences of every global in a term, including in the
--- terms of ticks, like 'Clash.Core.FreeVars.globalIds'
+-- terms of ticks
 globalOccurrences :: Term n -> GlobalEnv Word
 globalOccurrences = go emptyGlobalEnv
  where

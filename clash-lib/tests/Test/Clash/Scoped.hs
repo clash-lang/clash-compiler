@@ -12,7 +12,7 @@
   "Test.Clash.Rewrite"), and build them in a /test scope/ ('TestScope'): a
   scope with variables that the test declares, which the strings refer to by
   their identifiers. Binders get names from just above the watermark of the
-  scope, in depth-first order, as conversion from Clash Core gives them.
+  scope, in depth-first order, as the conversion from GHC Core gives them.
 
   A closed term:
 
@@ -54,13 +54,10 @@
 
   = Shadowing
 
-  Clash Core allowed a binder to shadow a variable in scope, and many of its
-  bugs were about that. In scoped Core, a term built in a scope (or converted
-  into it) has binders with names above the names of the scope. A binder can
-  only clash with a name of its scope once the term is 'sink'ed into a larger
-  scope: that is the situation in which a function that goes under binders
-  must rename them, and so where the shadowing tests of Clash Core end up. A
-  test of shadowing:
+  In scoped Core, a term built in a scope has binders with names above the
+  names of the scope. A binder can only clash with a name of its scope once
+  the term is 'sink'ed into a larger scope: that is the situation in which a
+  function that goes under binders must rename them. A test of shadowing:
 
   1. builds its input in a scope;
   2. extends the scope with variables that get the names of the first binders
@@ -85,18 +82,6 @@
   binder in its scope, as in Haskell. The builder gives the two binders
   different names: shadowing in the source of a test is not shadowing in
   scoped Core.
-
-  = Converting from Clash Core
-
-  The older tests write their inputs as Clash Core, e.g. with
-  'Test.Clash.Rewrite.parseToTermQQ', and convert them (see the section
-  "Converting" below). Note that conversion deshadows, so a converted input
-  never has binders that clash with the scope. To test how a function handles
-  such binders, convert the part of the input that has them in a smaller
-  scope, and 'sink' it into a scope with more variables: e.g. into the scope
-  of 'extendSunk', which contains 'sunkVar', whose unique is above the names
-  conversion gave the binders. These helpers go with Clash Core, in package B
-  of the port.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -378,8 +363,7 @@ withTerms tms k =
 -- the new variables get the names just above the watermark of the scope, and
 -- so do the first binders of a term built there ('termIn'). A function that
 -- goes under these binders in the extended scope must rename them. So this
--- builds the scenarios in which Clash Core had shadowing, see the module
--- header.
+-- builds the scenarios of shadowing, see the module header.
 withClashing
   :: (HasCallStack, Distinct n, Sinkable e)
   => TestScope n
@@ -391,11 +375,14 @@ withClashing ts ds tm k = extendTestScope ts ds $ \ts' -> k ts' (sink tm)
 
 -- | A variable with a raw name above the names of the binders of the terms of
 -- the tests, of type @Int@: every binder of a term in a scope with it is below
--- the watermark of the scope, so going under it renames it. See 'sunkVar'.
+-- the watermark of the scope, so going under it renames it.
 sunkD :: ScopeDecl
 sunkD = atRaw 1000000 (varD "sunk_S1000000" "Int")
 
--- | 'withTermAndSunk' for types
+-- | Run an assertion on a type in the scope of its free variables (see
+-- 'withType'), and again sunk into that scope extended with 'sunkD', where
+-- all of its binders are below the watermark of the scope. So a function that
+-- goes under the binders of the type must rename them in the second run.
 withTypeAndSunk
   :: HasCallStack
   => TestType -> (forall n. Distinct n => TestScope n -> Type n -> Assertion) -> Assertion
@@ -637,13 +624,13 @@ withBinderClashes ts e k
 withTopEntities :: [GlobalId] -> RewriteEnv -> RewriteEnv
 withTopEntities gs env = env {C._topEntities = globalSetFromList gs}
 
--- | The scenario of a capture bug of Clash Core: a term with a binder that has
--- the name of a variable that the term mentions outside of the scope of the
--- binder. Builds a part of the term in a scope with the given variables, then
--- extends the scope with more variables, which get the names of the first
--- binders of that part (see 'withClashing'), and builds the term from the
--- part, sunk into the extended scope, where it can mention the new variables.
--- Asserts that the term is such a scenario, and runs an assertion on it.
+-- | The scenario of a capture bug: a term with a binder that has the name of a
+-- variable that the term mentions outside of the scope of the binder. Builds a
+-- part of the term in a scope with the given variables, then extends the scope
+-- with more variables, which get the names of the first binders of that part
+-- (see 'withClashing'), and builds the term from the part, sunk into the
+-- extended scope, where it can mention the new variables. Asserts that the
+-- term is such a scenario, and runs an assertion on it.
 --
 -- E.g. a binder of the inner case-expression of @case (case a of {MkT x ->
 -- f}) of {_ -> x}@ that has the name of the free @x@:
@@ -766,7 +753,7 @@ mapGlobals f = go
 
 -- | Give every global variable a unique derived from its occurrence name, so
 -- that terms that refer to new globals made by different runs, which get
--- different uniques, can be compared. See 'Test.Clash.Rewrite.globalsByName'.
+-- different uniques, can be compared.
 globalsByOcc :: Term n -> Term n
 globalsByOcc = go
  where
@@ -791,7 +778,7 @@ globalsByOcc = go
 -- | The context of a component whose local variables are the term variables
 -- of a test scope, with their occurrence names as their HDL identifiers. The
 -- context has the type environment 'testTypeEnv', like
--- 'Test.Clash.Rewrite.runNetlistTest'. See 'withCompCtxOf'.
+-- 'Test.Clash.Rewrite.runScopedNetlistTest'.
 testCompCtx :: Distinct n => TestScope n -> CompCtx n
 testCompCtx ts =
   compCtxFromList (testScope ts) testTypeEnv
@@ -934,8 +921,9 @@ lintTerm ls0 = goTm ls0
 -- the types in the term, except those of the types of variable occurrences,
 -- which are those of their binders.
 --
--- Values converted from Clash Core and 'freshen'ed ones have no such binders.
--- Others may: e.g. a value 'sink'ed into a larger scope.
+-- Values that the builders of "Clash.Core.Scoped.Builder" build, and
+-- 'freshen'ed ones, have no such binders. Others may: e.g. a value 'sink'ed
+-- into a larger scope.
 lowBinders :: Int -> Term n -> [Int]
 lowBinders = bindersNot (<)
 
@@ -994,11 +982,11 @@ bindersNot ok = goTm
   goTele payload (TCons b bs) w k =
     goTy w (payload b) <> check w (binderRaw b) <> goTele payload bs (max w (binderRaw b)) k
 
--- | The raw names of the binders of a term, in the order in which conversion
--- from Clash Core numbers them: depth-first, left to right, a binder after the
--- binders in its type, and a non-recursive let-binding after its right-hand
--- side. Leaves out the binders of the types of variable occurrences, which are
--- those of their binders.
+-- | The raw names of the binders of a term, in the order in which the builders
+-- of "Clash.Core.Scoped.Builder" number them: depth-first, left to right, a
+-- binder after the binders in its type, and a non-recursive let-binding after
+-- its right-hand side. Leaves out the binders of the types of variable
+-- occurrences, which are those of their binders.
 binderRaws :: Term n -> [Int]
 binderRaws = goTm
  where

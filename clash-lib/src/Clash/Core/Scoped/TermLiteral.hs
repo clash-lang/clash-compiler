@@ -6,10 +6,9 @@ Copyright   :  (C) 2019, Myrtle Software Ltd,
 License     :  BSD2 (see the file LICENSE)
 Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-Tools to convert a scoped 'Term' into its "real" representation: the scoped
-Core port of "Clash.Core.TermLiteral".
+Tools to convert a scoped 'Term' into its "real" representation.
 
-Unlike "Clash.Core.TermLiteral", there is no @TermLiteral Term@ instance: the
+There is no @TermLiteral Term@ instance: the
 scope of the decoded term is quantified in 'termToData#', so a decoded value
 can't mention it. Values with subterms as leaves, such as the
 @'Cv.Property'' (Maybe Text, Term)@ of "Clash.Primitives.Verification", are
