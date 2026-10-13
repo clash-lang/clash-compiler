@@ -86,6 +86,7 @@ import qualified Clash.Tests.Rewrite.Scoped.StrategyDSL
 import qualified Clash.Tests.Rewrite.Scoped.Util
 import qualified Clash.Tests.Rewrite.Scoped.ViaFoil
 import qualified Clash.Tests.Rewrite.Scoped.Whnf
+import qualified Clash.Tests.Rewrite.Scoped.WhnfContext
 import qualified Clash.Tests.Rewrite.Scoped.WorkFree
 import qualified Clash.Tests.Rewrite.StrategyDSL
 import qualified Clash.Tests.Rewrite.Util
@@ -186,6 +187,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Rewrite.Scoped.Util.tests
   , Clash.Tests.Rewrite.Scoped.ViaFoil.tests
   , Clash.Tests.Rewrite.Scoped.Whnf.tests
+  , Clash.Tests.Rewrite.Scoped.WhnfContext.tests
   , Clash.Tests.Rewrite.Scoped.WorkFree.tests
   , Clash.Tests.Rewrite.StrategyDSL.tests
   , Clash.Tests.Rewrite.Util.tests
