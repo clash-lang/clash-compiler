@@ -34,7 +34,6 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import qualified Clash.Core.TysPrim as C
 import qualified Clash.Core.Var as C
-import Clash.Unique (Unique)
 
 import Clash.Core.Scoped.Alpha (aeqTm)
 import Clash.Core.Scoped.Convert
@@ -50,9 +49,10 @@ import Test.Clash.Rewrite
   , intTy, localId, parseToTermQQ, tyVar)
 import Test.Clash.Scoped
   ( LintScope, abstractFreeVars, aeqTermTyped, assertScopedAlphaEq, assertScopedTyAlphaEq
-  , atScope, betaTm, betaTy, binderRaws, bindersNot, extendFreeVars, extendSunk
-  , forAllScrambled, lintScopeOf, lintTerm, reopenTerm, sinkInto, sunkVar, withFreeVars
-  , withTests)
+  , assertLintClean, assertTermAlphaEq, assertTermIs, atRaw, atScope, betaTm, betaTy
+  , binderRaws, bindersNot, clashingBinders, closedTerm, extendFreeVars, forAllScrambled
+  , lintScopeOf, lintTerm, reopenTerm, sinkInto, sunkD, termIn, testScope, varD
+  , withClashing, withFreeVars, withTerm, withTestScope, withTests)
 import Test.Clash.Scoped.Gen
   ( FreeVars (..), InScope (..), KnownCon (..), Redex (..), Sunk (..), ctxOf, genFreeVars
   , genInScope, genKnownCon, genRedex, genSunk, genType, inScopeOf, runG, shrinkInScope
@@ -124,17 +124,9 @@ knownConAgrees (KnownCon fvs0 fvs1 (pat, rhs) tys tms) = case pat of
             _ -> counterexample "unexpected shape" False
   _ -> discard
 
--- | The uniques of the binders of the lambdas and type lambdas at the head of
--- a Clash term
-lamBinders :: C.Term -> [Unique]
-lamBinders = \case
-  C.Lam v e -> C.varUniq v : lamBinders e
-  C.TyLam v e -> C.varUniq v : lamBinders e
-  _ -> []
-
--- | The unique of 'sunkVar', as a raw name
+-- | The raw name of 'sunkD'
 sunkRaw :: Int
-sunkRaw = fromIntegral (C.varUniq sunkVar)
+sunkRaw = 1000000
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Subst"
@@ -143,11 +135,12 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
     -- https://github.com/clash-lang/clash-compiler/pull/361
     testCase "substitution renames a lambda binder that would capture (#361)" $ do
       -- In the empty scope, y gets name 1 and z gets name 2
-      let fun = fromClashTermClosed [parseToTermQQ| \(y :: Int) (z :: Int) -> y |]
-          x = intId C.User "x" 2
-      withConvEnv [] [x] $ \env -> do
-        let res = betaTm (convScope env) (App (sinkClosed fun) (fromClashTerm env (C.Var x)))
-        assertScopedAlphaEq [parseToTermQQ| \(z :: Int) -> (x_2 :: Int) |] res
+      let fun = closedTerm "\\(y :: Int) (z :: Int) -> y"
+      -- x gets the name of z
+      withTestScope [atRaw 2 (varD "x" "Int")] $ \ts -> do
+        let res = betaTm (testScope ts) (App (sinkClosed fun) (termIn ts "x"))
+        assertTermIs ts "\\(z :: Int) -> x" res
+        assertLintClean ts res
         case res of
           Lam b _ -> assertBool "renamed" (tmNameRaw (tmNameOf b) /= 2)
           _ -> assertFailure "unexpected shape"
@@ -186,24 +179,22 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
 
     -- 'freshen' must rename a binder that clashes with the scope.
     -- https://github.com/clash-lang/clash-compiler/pull/361
-  , testCase "freshen renames binders that clash (#361)" $ do
-      let tm = [parseToTermQQ| \(x :: Int) (y :: Int) -> x |]
-      extendSunk emptyConvEnv [] [] $ \env -> do
-        let tm1 = sinkClosed (fromClashTermClosed tm)
-            tm2 = freshen (convScope env) tm1
-        assertAlphaEq (toClashTerm tm1) (toClashTerm tm2)
-        assertBool "all binders renamed" (all (> fromIntegral sunkRaw) (lamBinders (toClashTerm tm2)))
+  , testCase "freshen renames binders that clash (#361)" $
+      withTerm "\\(x :: Int) (y :: Int) -> x" $ \ts0 tm0 ->
+        withClashing ts0 [sunkD] tm0 $ \ts tm1 -> do
+          let tm2 = freshen (testScope ts) tm1
+          assertTermAlphaEq tm1 tm2
+          assertBool "all binders renamed" (all (> sunkRaw) (binderRaws tm2))
 
     -- 'freshen' gives binders in different subterms the same name,
     -- 'freshenDistinct' doesn't
-  , testCase "freshenDistinct gives sibling binders different names" $ do
-      let tm = [parseToTermQQ| (\(x :: Int) -> x) ((\(y :: Int) -> y) 1) |]
-      extendSunk emptyConvEnv [] [] $ \env -> do
-        let sc = convScope env
-            tm1 = sinkClosed (fromClashTermClosed tm)
-            w = scopeWatermark sc
-        binderRaws (freshen sc tm1) @?= [w + 1, w + 1]
-        binderRaws (freshenDistinct sc tm1) @?= [w + 1, w + 2]
+  , testCase "freshenDistinct gives sibling binders different names" $
+      withTerm "(\\(x :: Int) -> x) ((\\(y :: Int) -> y) 1)" $ \ts0 tm0 ->
+        withClashing ts0 [sunkD] tm0 $ \ts tm1 -> do
+          let sc = testScope ts
+              w = scopeWatermark sc
+          binderRaws (freshen sc tm1) @?= [w + 1, w + 1]
+          binderRaws (freshenDistinct sc tm1) @?= [w + 1, w + 2]
 
   , testCase "substitution keeps binders that don't clash" $ do
       let tm = [parseToTermQQ| (\(y :: Int) (z :: Int) -> y) (x_1 :: Int) |]
@@ -271,18 +262,16 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
               [(C.DataPat existentialDataCon [b'] [y'], C.TyApp (C.Var g) (C.VarTy bFree))])
             res
 
-  , testCase "openAlt renames pattern binders that clash" $ do
-      let v = localId C.User "v" 1 existentialTy
-          y = localId C.User "y" 2 (C.VarTy existentialTyVar)
-          tm = C.Lam v (C.Case (C.Var v) existentialTy [(C.DataPat existentialDataCon [existentialTyVar] [y], C.Var y)])
-      extendSunk emptyConvEnv [] [] $ \env -> case sinkClosed (fromClashTermClosed tm) of
+  , testCase "openAlt renames pattern binders that clash" $
+      withTerm "\\(v :: E) -> (case v of { MkE (b :: Type) (y :: b) -> y }) :: E" $ \ts0 tm0 ->
+        withClashing ts0 [sunkD] tm0 $ \ts tm -> case tm of
         Lam bv body -> do
-          let sc = convScope env
+          let sc = testScope ts
           -- The body of the lambda is in the scope of v, which has to be opened
           -- first
           openIdBinder sc bv body $ \sc1 bv1 body1 -> case body1 of
             Case subj1 ty1 [alt1] -> openAlt sc1 alt1 $ \_ p e -> do
-              assertScopedAlphaEq tm (Lam bv1 (Case subj1 ty1 [Alt p e]))
+              assertTermAlphaEq tm (Lam bv1 (Case subj1 ty1 [Alt p e]))
               case p of
                 DataPat _ (TCons tb TNil) (TCons ib TNil) -> do
                   assertBool "existential renamed" (tyNameRaw (tyNameOf tb) > sunkRaw)
@@ -344,22 +333,18 @@ tests = testGroup "Clash.Tests.Core.Scoped.Subst"
                  \_ b -> toClashTerm (Lam b (idBinderVar b))
       assertAlphaEq [parseToTermQQ| \(x :: Int) -> x |] tm
 
-  , testCase "going under a sunk binder that clashes renames it" $ do
-      let x = intId C.User "x" 1
+  , testCase "going under a sunk binder that clashes renames it" $
       -- In the empty scope, the binder of the lambda gets name 1
-      case fromClashTermClosed [parseToTermQQ| \(y :: Int) -> y |] of
-        lam@(Lam b0 _) -> do
-          tmNameRaw (tmNameOf b0) @?= 1
-          withConvEnv [] [x] $ \env -> do
-            let lam1 = sinkClosed lam
-            -- Sinking keeps the binder, which now shadows the free x
-            assertScopedAlphaEq [parseToTermQQ| \(y :: Int) -> y |] lam1
-            -- Going under it renames it
-            case lam1 of
-              Lam b1 e1 -> openIdBinder (convScope env) b1 e1 $ \_ b2 _ ->
-                assertBool "renamed" (tmNameRaw (tmNameOf b2) /= 1)
-              _ -> assertFailure "unexpected shape"
-        _ -> assertFailure "unexpected shape"
+      withTerm "\\(y :: Int) -> y" $ \ts0 lam0 ->
+        -- So does x, which the binder now shadows
+        withClashing ts0 [varD "x" "Int"] lam0 $ \ts lam1 -> do
+          clashingBinders ts lam1 @?= [1]
+          assertTermIs ts "\\(y :: Int) -> y" lam1
+          -- Going under it renames it
+          case lam1 of
+            Lam b1 e1 -> openIdBinder (testScope ts) b1 e1 $ \_ b2 _ ->
+              assertBool "renamed" (tmNameRaw (tmNameOf b2) /= 1)
+            _ -> assertFailure "unexpected shape"
   , testCase "extendTmSubstTele needs as many terms as binders" $ do
       let tm = [parseToTermQQ| let { (x :: Int) = x; (y :: Int) = x } in y |]
       case fromClashTermClosed tm of
