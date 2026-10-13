@@ -4,20 +4,17 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Compile a "Clash.Rewrite.StrategyDSL" strategy into executable dispatch
-  code. 'compileStrategy' produces the fused fast path: one constructor match
-  per node drives both the dispatch of the node program and the descent into
-  the node's children.
+  code. 'compileScopedStrategy' produces the fused fast path: one constructor
+  match per node drives both the dispatch of the node program and the descent
+  into the node's children.
 
-  = Targets
+  = Target
 
-  A strategy compiles to a transformation of Clash Core ('compileStrategy') or
-  of scoped Clash Core ('compileScopedStrategy', see "Clash.Rewrite.Scoped").
-  Both share this compiler; a 'Target' says what differs: the term
-  constructors, how a transformation is called, the instrumentation and
-  combinators, and how a traversal descends into a node. A scoped traversal
-  opens the binders it goes under (decision D7 of the port).
-
-  A strategy only contains transformations of the Core it is compiled for.
+  A strategy compiles to a transformation of scoped Clash Core (see
+  "Clash.Rewrite.Scoped"). The 'Target' says how: the term constructors, how a
+  transformation is called, the instrumentation and combinators, and how a
+  traversal descends into a node. A traversal opens the binders it goes under
+  (decision D7 of the port).
 -}
 
 {-# LANGUAGE DisambiguateRecordFields #-}
@@ -28,13 +25,7 @@
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Rewrite.StrategyDSL.TH
-  ( -- * Clash Core
-    compileStrategy
-  , compileStrategyReference
-  , dispatchQ
-  , asRewriteQ
-    -- * Scoped Clash Core
-  , compileScopedStrategy
+  ( compileScopedStrategy
   , compileScopedStrategyReference
   , scopedDispatchQ
   , asScopedRewriteQ
@@ -45,18 +36,12 @@ import Data.Foldable (traverse_)
 import Data.List (tails)
 import Language.Haskell.TH hiding (Prim)
 
-import Clash.Core.Term
-  (CoreContext (..), Term (..), bindToList, patIds, primArg)
-import Clash.Core.VarEnv (extendInScopeSet, extendInScopeSetList)
 import Clash.Rewrite.StrategyDSL
   ( Constructor (..), Step (..), Strat (..), Transformation (..)
-  , TransformationWorker (..), WorkerCore (..)
+  , TransformationWorker (..)
   )
-import Clash.Rewrite.Types (TransformContext (..))
-import Clash.Rewrite.Util (apply, applyWith)
 
 import qualified Clash.Core.Scoped.Syntax as S
-import qualified Clash.Rewrite.Combinators as Comb
 import qualified Clash.Rewrite.Scoped.Apply as SApply
 import qualified Clash.Rewrite.Scoped.Combinators as SComb
 import qualified Clash.Rewrite.Scoped.Types as S
@@ -70,12 +55,9 @@ import qualified Data.Monoid as Monoid
 -- rebuilt node's fields and the rebuilt node itself, the descent.
 type Descend = ([Q Exp] -> Q Exp -> Q Exp) -> Q Exp
 
--- | What differs between compiling for Clash Core and for scoped Core, see
--- the module header
+-- | How a strategy is compiled, see the module header
 data Target = Target
-  { core :: WorkerCore
-  -- ^ The Core of the transformations this target compiles natively
-  , patterns :: Constructor -> [(Name, [String])]
+  { patterns :: Constructor -> [(Name, [String])]
   -- ^ The term constructors of a DSL constructor, with binder hints for their
   -- fields. Underscore-prefixed because not every generated arm uses every
   -- field.
@@ -94,48 +76,19 @@ data Target = Target
   , descendDec :: Name -> Q Dec
   -- ^ The declaration of @descendD@, such that @descendD rec@ is the
   -- transformation applying @rec@ to the children of a node, like
-  -- 'Comb.allR'
-  , passE :: WorkerCore -> String -> Name -> Q Exp
-  -- ^ A whole-term pass of a rewrite of the given Core
+  -- 'SComb.allR'
+  , passE :: String -> Name -> Q Exp
+  -- ^ A whole-term pass of a rewrite
   }
 
 -- | Call a transformation on a context and a term
 callE :: Target -> Q Exp -> Q Exp -> Q Exp -> Q Exp
 callE target f ctxE tmE = [| $(target.call f ctxE) $tmE |]
 
--- | The target of Clash Core
-currentTarget :: Target
-currentTarget = Target
-  { core = CurrentCore
-  , patterns = \con -> [(currentConstructorName con, constructorFieldHints con)]
-  , wrap = id
-  , call = \f ctxE -> [| $f $ctxE |]
-  , applyWithName = 'applyWith
-  , applyName = 'apply
-  , seqName = '(Comb.>->)
-  , deepSeqName = '(Comb.>-!->)
-  , onChangeName = '(Comb.!->)
-  , onNoChangeName = '(Comb.>-!)
-  , repeatName = 'Comb.repeatR
-  , topdownName = 'Comb.topdownR
-  , bottomupName = 'Comb.bottomupR
-  , topdownFixName = 'Comb.topdownFixR
-  , topdownSucName = 'Comb.topdownSucR
-  , innerMostName = 'Comb.innerMost
-  , goDec = currentGoDec
-  , descendDec = currentDescendDec
-  , passE = \core name rewriteName -> case core of
-      CurrentCore -> [| apply $(stringE name) $(varE rewriteName) |]
-      ScopedCore ->
-        fail ("compileStrategy: pass " <> show name
-              <> " is a rewrite of scoped Core, not of Clash Core")
-  }
-
 -- | The target of scoped Clash Core
 scopedTarget :: Target
 scopedTarget = Target
-  { core = ScopedCore
-  , patterns = scopedPatterns
+  { patterns = scopedPatterns
   , wrap = \e -> [| S.ScopedTransform $e |]
   , call = \f ctxE -> [| S.runScopedTransform $f $ctxE |]
   , applyWithName = 'SApply.applyWith
@@ -152,46 +105,9 @@ scopedTarget = Target
   , innerMostName = 'SComb.innerMost
   , goDec = scopedGoDec
   , descendDec = scopedDescendDec
-  , passE = \core name rewriteName -> case core of
-      ScopedCore ->
-        [| SApply.apply $(stringE name) (S.ScopedTransform $(varE rewriteName)) |]
-      CurrentCore ->
-        fail ("compileScopedStrategy: pass " <> show name
-              <> " is a rewrite of Clash Core, not of scoped Core")
+  , passE = \name rewriteName ->
+      [| SApply.apply $(stringE name) (S.ScopedTransform $(varE rewriteName)) |]
   }
-
--- | The term constructor of Clash Core belonging to a 'Constructor'.
-currentConstructorName :: Constructor -> Name
-currentConstructorName con = case con of
-  CVar -> 'Var
-  CData -> 'Data
-  CLiteral -> 'Literal
-  CPrim -> 'Prim
-  CLam -> 'Lam
-  CTyLam -> 'TyLam
-  CApp -> 'App
-  CTyApp -> 'TyApp
-  CLet -> 'Let
-  CCase -> 'Case
-  CCast -> 'Cast
-  CTick -> 'Tick
-
--- | Binder hints for a constructor's fields in Clash Core. Underscore-prefixed
--- because not every generated arm uses every field.
-constructorFieldHints :: Constructor -> [String]
-constructorFieldHints con = case con of
-  CVar -> ["_i"]
-  CData -> ["_dc"]
-  CLiteral -> ["_lit"]
-  CPrim -> ["_p"]
-  CLam -> ["_v", "_e"]
-  CTyLam -> ["_tv", "_e"]
-  CApp -> ["_fun", "_arg"]
-  CTyApp -> ["_fun", "_argTy"]
-  CLet -> ["_bnd", "_body"]
-  CCase -> ["_subj", "_altsTy", "_alts"]
-  CCast -> ["_e", "_fromTy", "_toTy"]
-  CTick -> ["_tick", "_e"]
 
 -- | The term constructors of scoped Core belonging to a 'Constructor'. A
 -- variable is local ('S.Var') or global ('S.GlobalVar').
@@ -221,10 +137,6 @@ allPatterns target =
   , (conName, hints) <- target.patterns con
   ]
 
--- | Constructors whose nodes have no subterms to descend into.
-isLeafConstructor :: Constructor -> Bool
-isLeafConstructor con = con `elem` [CVar, CData, CLiteral, CPrim]
-
 -- * Invoking workers
 
 -- | How a bucket member is invoked once the constructor has matched.
@@ -252,34 +164,30 @@ invokeE _ (InvokeFields worker) ctxE nodeE fieldEs =
 invokeE _ (InvokeNode worker) ctxE nodeE _fieldEs =
   [| $(varE worker) $ctxE $nodeE |]
 
-validateChain :: Target -> [Transformation] -> Q ()
-validateChain target members = do
+validateChain :: [Transformation] -> Q ()
+validateChain members = do
   Monad.when (null members) (fail "compileStrategy: empty chain")
   case [name | name : rest <- tails (map (.name) members), name `elem` rest] of
     name : _ ->
       fail ("compileStrategy: duplicate transformation name in one chain: "
             <> show name <> " (alias one occurrence with 'named')")
     [] -> pure ()
-  traverse_ (validateTransformation target) members
+  traverse_ validateTransformation members
 
 -- | A transformation's worker table must be non-empty, register at most one
 -- worker per constructor, and not mix 'AnyWorker' with per-constructor
 -- workers: a transformation either fires at any constructor or at specific
 -- ones, never both. A transformation of scoped Core has no 'FieldWorker' for
--- 'CVar', see 'ScopedCore'. A strategy for scoped Core only contains
--- transformations of scoped Core.
-validateTransformation :: Target -> Transformation -> Q ()
-validateTransformation target transformation
+-- 'CVar', see "Clash.Rewrite.StrategyDSL".
+validateTransformation :: Transformation -> Q ()
+validateTransformation transformation
   | null workers = failWith "declares no workers"
   | any isAnyWorker workers, any (not . isAnyWorker) workers
   = failWith "mixes AnyWorker with per-constructor workers"
   | length (filter isAnyWorker workers) > 1 = failWith "has a duplicate AnyWorker"
   | con : _ <- duplicateConstructors = failWith ("has two workers for " <> show con)
-  | transformation.core == ScopedCore, any isVarFieldWorker workers
-  = failWith "is a transformation of scoped Core with a FieldWorker for CVar; use a Worker"
-  | target.core /= transformation.core
-  = failWith ("is a transformation of " <> showCore transformation.core
-              <> ", not of " <> showCore target.core)
+  | any isVarFieldWorker workers
+  = failWith "has a FieldWorker for CVar; use a Worker"
   | otherwise = pure ()
  where
   workers = transformation.workers
@@ -293,9 +201,6 @@ validateTransformation target transformation
 
   isVarFieldWorker (FieldWorker CVar _) = True
   isVarFieldWorker _ = False
-
-  showCore CurrentCore = "Clash Core"
-  showCore ScopedCore = "scoped Core"
 
   duplicateConstructors =
     [ con
@@ -445,7 +350,7 @@ compileStep target step = case step of
 
 compileChain :: Target -> [Transformation] -> Q CompiledStep
 compileChain target members = do
-  validateChain target members
+  validateChain members
   guardNames <- traverse (\member -> freshBinding ("g_" <> member.name)) members
   let guardDecs = zipWith (memberGuardDec target) guardNames members
   dispatch <- freshBinding "dispatch"
@@ -519,174 +424,6 @@ guardExp
 guardExp target wrapInvoke transformation =
   nodeCaseExp target $ \con ->
     wrapInvoke target <$> invokeAt target con transformation
-
--- ** Descent into a node of Clash Core
-
--- | The one-level descent for one constructor, replicating
--- 'Clash.Rewrite.Combinators.allR' exactly: same 'CoreContext' pushes, same
--- 'InScopeSet' extensions, and the argument's context computed from the
--- already-rewritten function. The continuation receives the rebuilt node's
--- fields and the rebuilt node itself; descent preserves the constructor, so
--- the continuation may run a statically matched program on the result.
-genDescend
-  :: Constructor
-  -> Q Exp            -- ^ recursion function @:: TransformContext -> Term -> m Term@
-  -> (Q Exp, Q Exp)   -- ^ the context's InScopeSet and CoreContext stack
-  -> Q Exp            -- ^ the node
-  -> [Q Exp]          -- ^ the node's fields
-  -> ([Q Exp] -> Q Exp -> Q Exp)  -- ^ continuation: rebuilt fields, rebuilt node
-  -> Q Exp
-genDescend con go (isE, cE) nodeE fieldEs continue = case (con, fieldEs) of
-  (CVar, _) -> leaf
-  (CData, _) -> leaf
-  (CLiteral, _) -> leaf
-  (CPrim, _) -> leaf
-
-  (CLam, [v, e]) -> do
-    e' <- newName "e'"
-    doE
-      [ bindS (varP e')
-          [| $go (TransformContext (extendInScopeSet $isE $v) (LamBody $v : $cE)) $e |]
-      , continueWith [v, varE e'] [| Lam $v $(varE e') |]
-      ]
-
-  (CTyLam, [tv, e]) -> do
-    e' <- newName "e'"
-    doE
-      [ bindS (varP e')
-          [| $go (TransformContext (extendInScopeSet $isE $tv) (TyLamBody $tv : $cE)) $e |]
-      , continueWith [tv, varE e'] [| TyLam $tv $(varE e') |]
-      ]
-
-  (CApp, [fun, arg]) -> do
-    fun' <- newName "fun'"
-    arg' <- newName "arg'"
-    doE
-      [ bindS (varP fun') [| $go (TransformContext $isE (AppFun : $cE)) $fun |]
-        -- The argument's context is computed from the already rewritten
-        -- function, so the function has to be rewritten first.
-      , bindS (varP arg')
-          [| $go (TransformContext $isE (AppArg (primArg $(varE fun')) : $cE)) $arg |]
-      , continueWith [varE fun', varE arg'] [| App $(varE fun') $(varE arg') |]
-      ]
-
-  (CTyApp, [fun, argTy]) -> do
-    fun' <- newName "fun'"
-    doE
-      [ bindS (varP fun') [| $go (TransformContext $isE (TyAppC : $cE)) $fun |]
-      , continueWith [varE fun', argTy] [| TyApp $(varE fun') $argTy |]
-      ]
-
-  (CLet, [bnd, body]) -> do
-    bs <- newName "bs"
-    bndrs <- newName "bndrs"
-    is' <- newName "is'"
-    isRhs <- newName "isRhs"
-    bs' <- newName "bs'"
-    bnd' <- newName "bnd'"
-    body' <- newName "body'"
-    doE
-      [ letS
-          [ valD (varP bs) (normalB [| bindToList $bnd |]) []
-          , valD (varP bndrs) (normalB [| map fst $(varE bs) |]) []
-          , valD (varP is') (normalB [| extendInScopeSetList $isE $(varE bndrs) |]) []
-          , valD (varP isRhs) (normalB [| Comb.letRhsInScope $isE $(varE is') $bnd |]) []
-          ]
-      , bindS (varP bs')
-          [| traverse
-               (\(b, rhs) ->
-                  fmap ((,) b)
-                    ($go (TransformContext $(varE isRhs)
-                            (LetBinding b $(varE bndrs) : $cE))
-                         rhs))
-               $(varE bs) |]
-      , bindS (varP body')
-          [| $go (TransformContext $(varE is') (LetBody $(varE bs) : $cE)) $body |]
-      , letS [valD (varP bnd') (normalB [| Comb.rebuildBind $bnd $(varE bs') |]) []]
-      , continueWith [varE bnd', varE body']
-          [| Let $(varE bnd') $(varE body') |]
-      ]
-
-  (CCase, [subj, altsTy, alts]) -> do
-    subj' <- newName "subj'"
-    alts' <- newName "alts'"
-    doE
-      [ bindS (varP subj') [| $go (TransformContext $isE (CaseScrut : $cE)) $subj |]
-      , bindS (varP alts')
-          [| traverse
-               (\(p, e) ->
-                  let (tvs, ids) = patIds p
-                      isAlt = extendInScopeSetList (extendInScopeSetList $isE tvs) ids
-                  in fmap ((,) p) ($go (TransformContext isAlt (CaseAlt p : $cE)) e))
-               $alts |]
-      , continueWith [varE subj', altsTy, varE alts']
-          [| Case $(varE subj') $altsTy $(varE alts') |]
-      ]
-
-  (CCast, [e, fromTy, toTy]) -> do
-    e' <- newName "e'"
-    doE
-      [ bindS (varP e') [| $go (TransformContext $isE (CastBody : $cE)) $e |]
-      , continueWith [varE e', fromTy, toTy] [| Cast $(varE e') $fromTy $toTy |]
-      ]
-
-  (CTick, [tick, e]) -> do
-    e' <- newName "e'"
-    doE
-      [ bindS (varP e') [| $go (TransformContext $isE (TickC $tick : $cE)) $e |]
-      , continueWith [tick, varE e'] [| Tick $tick $(varE e') |]
-      ]
-
-  _ -> fail ("genDescend: field count mismatch for " <> show con)
- where
-  leaf = continue fieldEs nodeE
-  continueWith fieldEs' rebuiltE = noBindS (continue fieldEs' rebuiltE)
-
--- | A recursive traversal of Clash Core: a function with a clause per
--- constructor, matching the context and the node.
-currentGoDec
-  :: Name -> (Constructor -> Q Exp -> Q Exp -> [Q Exp] -> Descend -> Q Exp) -> Q Dec
-currentGoDec go body = do
-  clauses <- traverse goClause allConstructors
-  pure (FunD go clauses)
- where
-  goClause con = do
-    ctx <- newName "_ctx"
-    is <- newName "_is"
-    c <- newName "_c"
-    tm <- newName "_tm"
-    fieldNames <- traverse newName (constructorFieldHints con)
-    let fieldEs = map varE fieldNames
-        descend = genDescend con (varE go) (varE is, varE c) (varE tm) fieldEs
-    b <- body con (varE ctx) (varE tm) fieldEs descend
-    pats <- sequence
-      [ asP ctx (conP 'TransformContext [varP is, varP c])
-      , asP tm (conP (currentConstructorName con) (map varP fieldNames))
-      ]
-    pure (Clause pats (NormalB b) [])
-
--- | @descendD rec ctx tm@, see 'descendDec'
-currentDescendDec :: Name -> Q Dec
-currentDescendDec descendD = do
-  clauses <- traverse descendClause allConstructors
-  pure (FunD descendD clauses)
- where
-  descendClause con = do
-    -- Leaf clauses never call the recursion argument; the underscore hint
-    -- keeps -Wunused-matches quiet there.
-    rec' <- newName (if isLeafConstructor con then "_rec" else "rec'")
-    is <- newName "_is"
-    c <- newName "_c"
-    tm <- newName "_tm"
-    fieldNames <- traverse newName (constructorFieldHints con)
-    body <- genDescend con (varE rec') (varE is, varE c) (varE tm)
-              (map varE fieldNames) (\_fieldEs' rebuiltE -> [| pure $rebuiltE |])
-    pats <- sequence
-      [ varP rec'
-      , conP 'TransformContext [varP is, varP c]
-      , asP tm (conP (currentConstructorName con) (map varP fieldNames))
-      ]
-    pure (Clause pats (NormalB body) [])
 
 -- ** Descent into a node of scoped Core
 
@@ -847,7 +584,7 @@ type NodeArm
 -- structure of each traversal is pinned to its "Clash.Rewrite.Combinators"
 -- counterpart, with the node program as @r@:
 --
--- * 'TopDown': @'Comb.topdownR' r = 'Comb.repeatR' r '>->' 'Comb.allR' …@. On
+-- * 'TopDown': @'SComb.topdownR' r = 'SComb.repeatR' r '>->' 'SComb.allR' …@. On
 --   change, re-enter @go@ at this node (which also re-matches the
 --   constructor); otherwise descend. See Note [topdown repeatR] in
 --   "Clash.Rewrite.Combinators".
@@ -906,10 +643,10 @@ genTraversal target strat = case strat of
       (cs.decs <> [target.goDec go (\con -> mkArm goE (cs.known con))])
       goE
 
--- | 'Comb.topdownFixR' with the node program as @r@: a local @settle@
--- (@'Comb.repeatR' r@) plus the tryParent\/childChanged\/parentChanged loop
+-- | 'SComb.topdownFixR' with the node program as @r@: a local @settle@
+-- (@'SComb.repeatR' r@) plus the tryParent\/childChanged\/parentChanged loop
 -- from Note [topdownFixR] in "Clash.Rewrite.Combinators", over a generated
--- 'Comb.allR' replica.
+-- 'SComb.allR' replica.
 genTopDownFix :: Target -> CompiledStep -> Q Exp
 genTopDownFix target cs = do
   goFix <- newName "goFix"
@@ -952,7 +689,7 @@ compileStrategyFor target strat = case strat of
   OnChange a b -> binop target.onChangeName a b
   OnNoChange a b -> binop target.onNoChangeName a b
   Repeat a -> [| $(varE target.repeatName) $(compileStrategyFor target a) |]
-  Pass core name rewriteName -> target.passE core name rewriteName
+  Pass name rewriteName -> target.passE name rewriteName
   CallStrategy name -> varE name
   TopDown{} -> genTraversal target strat
   BottomUp{} -> genTraversal target strat
@@ -976,7 +713,7 @@ compileStrategyReferenceFor target = goStrat
     OnChange a b -> binop target.onChangeName (goStrat a) (goStrat b)
     OnNoChange a b -> binop target.onNoChangeName (goStrat a) (goStrat b)
     Repeat a -> [| $(varE target.repeatName) $(goStrat a) |]
-    Pass core name rewriteName -> target.passE core name rewriteName
+    Pass name rewriteName -> target.passE name rewriteName
     CallStrategy name -> varE name
     TopDown step -> [| $(varE target.topdownName) $(goStep step) |]
     BottomUp step -> [| $(varE target.bottomupName) $(goStep step) |]
@@ -990,7 +727,7 @@ compileStrategyReferenceFor target = goStrat
     OnNoChangeS a b -> binop target.onNoChangeName (goStep a) (goStep b)
     EmbedS strat -> goStrat strat
     Chain members -> do
-      validateChain target members
+      validateChain members
       -- The sequential apply chain over all members, each guarded on its full
       -- worker table.
       foldr1 (\x y -> binop target.seqName x y) (map memberApplyE members)
@@ -1003,7 +740,7 @@ compileStrategyReferenceFor target = goStrat
 -- 'asRewriteQ'
 asRewriteQFor :: Target -> Transformation -> Q Exp
 asRewriteQFor target transformation = do
-  validateTransformation target transformation
+  validateTransformation transformation
   guardExp target invokeE transformation
 
 -- | A node program as a plain rewrite for a target, see 'dispatchQ'
@@ -1011,34 +748,6 @@ dispatchQFor :: Target -> Step -> Q Exp
 dispatchQFor target step = do
   cs <- compileStep target step
   letE cs.decs cs.dispatch
-
--- ** Clash Core
-
--- | Compile a strategy into its fused dispatch code. The result is an
--- expression of type @Rewrite extra@, with @extra@ fixed by the workers the
--- spec references.
-compileStrategy :: Strat -> Q Exp
-compileStrategy = compileStrategyFor currentTarget
-
--- | Compile a strategy into its unfused reference: the same transformations,
--- run as a plain @apply@ chain through the "Clash.Rewrite.Combinators"
--- traversals. Agrees with 'compileStrategy' on results, transformation
--- counts, and change flags.
-compileStrategyReference :: Strat -> Q Exp
-compileStrategyReference = compileStrategyReferenceFor currentTarget
-
--- | A node program as a plain rewrite: match the constructor once and run
--- that constructor's program, without traversing. For composing a 'Step'
--- with plain combinators, and for testing chains in isolation.
-dispatchQ :: Step -> Q Exp
-dispatchQ = dispatchQFor currentTarget
-
--- | A transformation as a plain uninstrumented rewrite: match the term
--- against the worker table, run the worker on a match, return the term
--- untouched otherwise. Splice this where a transformation is invoked from
--- inside another transformation (any instrumentation is the caller's).
-asRewriteQ :: Transformation -> Q Exp
-asRewriteQ = asRewriteQFor currentTarget
 
 -- ** Scoped Clash Core
 

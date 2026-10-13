@@ -344,19 +344,6 @@ Library
                       Clash.Normalize.Scoped.Util
                       Clash.Normalize.Strategy
                       Clash.Normalize.Strategy.Spec
-                      Clash.Normalize.Transformations
-                      Clash.Normalize.Transformations.ANF
-                      Clash.Normalize.Transformations.Case
-                      Clash.Normalize.Transformations.Cast
-                      Clash.Normalize.Transformations.DEC
-                      Clash.Normalize.Transformations.EtaExpand
-                      Clash.Normalize.Transformations.Inline
-                      Clash.Normalize.Transformations.Letrec
-                      Clash.Normalize.Transformations.MultiPrim
-                      Clash.Normalize.Transformations.Reduce
-                      Clash.Normalize.Transformations.SeparateArgs
-                      Clash.Normalize.Transformations.Specialize
-                      Clash.Normalize.Transformations.XOptimize
                       Clash.Normalize.Types
                       Clash.Normalize.Util
 
@@ -377,7 +364,6 @@ Library
                       Clash.Primitives.Verification
                       Clash.Primitives.Xilinx.ClockGen
 
-                      Clash.Rewrite.Combinators
                       Clash.Rewrite.Scoped
                       Clash.Rewrite.Scoped.Apply
                       Clash.Rewrite.Scoped.Combinators
@@ -391,7 +377,6 @@ Library
                       Clash.Rewrite.StrategyDSL.TH
                       Clash.Rewrite.Types
                       Clash.Rewrite.Util
-                      Clash.Rewrite.WorkFree
 
                       Clash.Unique
                       Clash.Util

@@ -4,14 +4,12 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Rewriting combinators and traversals for scoped Clash Core: the
-  counterparts of "Clash.Rewrite.Combinators". They behave the same, except
-  that traversals open the binders they go under (see
-  "Clash.Rewrite.Scoped.Types"), which renames a binder that clashes with the
-  scope.
+  Rewriting combinators and traversals for scoped Clash Core. Traversals open
+  the binders they go under (see "Clash.Rewrite.Scoped.Types"), which renames
+  a binder that clashes with the scope.
 
   See Note [topdown repeatR], Note [combinator inlining] and Note
-  [topdownFixR] in "Clash.Rewrite.Combinators".
+  [topdownFixR] below.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -40,6 +38,122 @@ import qualified Data.Monoid                 as Monoid
 import           Clash.Core.Scoped.Syntax
 import           Clash.Rewrite.Scoped.Types
 
+{-
+Note [topdown repeatR]
+~~~~~~~~~~~~~~~~~~~~~~
+In a topdown traversal we need to repeat the transformation r because
+if r replaces a parent node with one of its children
+we should still apply r to that child, before continuing with its children.
+
+Example: topdownR (inlineBinders (\_ _ -> return True))
+on:
+> letrec
+>   x = 1
+> in letrec
+>      y = 2
+>    in f x y
+
+inlineBinders would inline x and return:
+> letrec
+>   y = 2
+> in f 1 y
+
+Then we must repeat the transformation to let it also inline y.
+-}
+
+{-
+Note [combinator inlining]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The traversal combinators carry INLINE pragmas so that a call site applying
+them to a statically-known transformation gets its own copy of the traversal
+loop: GHC then fuses the RWST/Writer plumbing into an unboxed state loop and
+calls the transformation directly instead of through a function argument.
+
+That only works when two conditions hold:
+
+* The combinator is not (mutually) recursive at the top level. GHC picks a
+  loop-breaker in every top-level recursive group and never inlines it, so an
+  INLINE pragma on such a function is silently ignored. The recursion has to
+  go through a local binding instead.
+
+* The local loop closes over the transformation rather than passing it along
+  as an argument. GHC does not specialize a loop on an invariant argument
+  (the static argument transformation is off by default), so with
+  'go r = r !-> go r' the call to 'r' stays a call to an unknown function;
+  with 'go = r !-> go' the simplifier sees the concrete 'r' once the
+  combinator is inlined.
+
+'allR' is INLINABLE rather than INLINE: specializing it to the concrete monad
+removes the per-node Monad-dictionary dispatch, while full inlining would
+duplicate its per-constructor case alternatives at every call site for no
+extra benefit.
+-}
+
+{-
+Note [topdownFixR]
+~~~~~~~~~~~~~~~~~~
+'topdownFixR r' is an optimized alternative to some uses of
+'repeatR (topdownR r)'. It repeats 'r' top-down, but when a child changes it
+only rechecks the ancestors of that child instead of restarting traversal from
+the root.
+
+For example, suppose 'r' can rewrite both:
+
+> let x = True in x
+
+to:
+
+> True
+
+and:
+
+> case True of { True -> a; False -> b }
+
+to:
+
+> a
+
+When traversing:
+
+> h (case (let x = True in x) of { True -> a; False -> b })
+
+'topdownFixR r' first cannot rewrite the 'case', so it descends into the
+scrutinee. Rewriting the scrutinee exposes a new redex at the parent 'case', so
+the parent is checked again immediately and rewritten to 'a'. That change then
+bubbles up to 'h a'. With 'repeatR (topdownR r)' the same result is reached by
+starting another complete traversal from 'h'.
+
+Only use 'topdownFixR' as a replacement for 'repeatR (topdownR r)' when 'r' is
+local and context-stable: it should fire or fail based on the current node, and
+the relevant parts of 'TransformContext' should not change when sibling
+subtrees are rewritten. Rewrites that inspect let-bound context whose binding
+terms may have changed, for example through 'whnfRW', still need an outer
+repeat or a normal repeated top-down traversal.
+
+Note [topdownFixR is not for inlining bundles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'topdownFixR' trades traversals for re-descents, and that trade is only a win
+when rewrites are cheap and rarely fire at the same node twice.
+
+Whenever 'r' succeeds at a node, 'topdownFixR' re-descends into that node's
+_entire_ subtree, because the rewrite may have restructured it. So one
+'topdownFixR' costs
+
+> n + sum over nodes v of (times r fired at v) * size of subtree(v)
+
+node visits, where 'repeatR (topdownR r)' costs 'n' per round. 'topdownFixR'
+wins when it saves enough rounds to pay for those re-descents.
+
+For bundles that inline (@inlineWorkFree@, @inlineSmall@, @inlineOrLiftNonRep@)
+it loses: inlining replaces a small node by an arbitrarily large body, every
+enclosing node tends to become rewritable in turn, and each of those rewrites
+re-descends a subtree that just grew. Measured on
+@tests/shouldwork/Basic/T1354B.hs@ (a deeply nested chain of function
+compositions), using 'topdownFixR' for 'inlineAndPropagate' reaches exactly the
+same fixed point but needs 1.57x the node visits, costing ~40% wall-clock. It
+was ~3% slower on a larger industrial design we've measured too. See #3250.
+-}
+
 -- | Apply a transformation on the subtrees of a term. Opens the binders it
 -- goes under.
 allR :: forall m. Monad m => ScopedTransform m -> ScopedTransform m
@@ -52,7 +166,7 @@ allR (ScopedTransform trans) = ScopedTransform go
     App e1 e2 -> do
       e1' <- trans (pushFrame AppFun ctx) e1
       -- The argument's context is computed from the already rewritten
-      -- function, like in "Clash.Rewrite.Combinators"
+      -- function, like below
       e2' <- trans (pushFrame (appArgFrame e1') ctx) e2
       pure (App e1' e2')
     TyApp e ty -> (`TyApp` ty) <$> trans (pushFrame TyAppC ctx) e
@@ -113,8 +227,7 @@ infixr 6 >-!->
   forceTerm e' `seq` r2 c e'
 {-# INLINE (>-!->) #-}
 
--- | Evaluate a term fully, like 'Control.DeepSeq.deepseq' does in
--- "Clash.Rewrite.Combinators". The fields of scoped terms are strict, except
+-- | Evaluate a term fully, like 'Control.DeepSeq.deepseq' would. The fields of scoped terms are strict, except
 -- for the lists of case alternatives and recursive right-hand sides, so a term
 -- in WHNF is evaluated except for those.
 forceTerm :: Term n -> ()
@@ -140,16 +253,14 @@ forceTerm = \case
 
 -- | Apply a transformation in a topdown traversal
 topdownR :: ScopedRewrite extra -> ScopedRewrite extra
--- See Note [topdown repeatR] and Note [combinator inlining] in
--- "Clash.Rewrite.Combinators"
+-- See Note [topdown repeatR] and Note [combinator inlining]
 topdownR r = go
  where
   go = repeatR r >-> allR go
 {-# INLINE topdownR #-}
 
 -- | Apply a transformation in a repeated top-down traversal. Optimized for
--- local, context-stable transformations, see Note [topdownFixR] in
--- "Clash.Rewrite.Combinators".
+-- local, context-stable transformations, see Note [topdownFixR].
 topdownFixR :: ScopedRewrite extra -> ScopedRewrite extra
 topdownFixR r = go True
  where
@@ -172,7 +283,7 @@ topdownFixR r = go True
 
 -- | Apply a transformation in a bottomup traversal
 bottomupR :: Monad m => ScopedTransform m -> ScopedTransform m
--- See Note [combinator inlining] in "Clash.Rewrite.Combinators"
+-- See Note [combinator inlining]
 bottomupR r = go
  where
   go = allR go >-> r
@@ -200,7 +311,7 @@ infixr 5 >-!
 
 -- | Keep applying a transformation until it fails
 repeatR :: ScopedRewrite extra -> ScopedRewrite extra
--- See Note [combinator inlining] in "Clash.Rewrite.Combinators"
+-- See Note [combinator inlining]
 repeatR r = go
  where
   go = r !-> go
@@ -208,7 +319,7 @@ repeatR r = go
 
 -- | Topdown traversal, stops upon first success
 topdownSucR :: ScopedRewrite extra -> ScopedRewrite extra
--- See Note [combinator inlining] in "Clash.Rewrite.Combinators"
+-- See Note [combinator inlining]
 topdownSucR r = go
  where
   go = r >-! allR go
@@ -217,7 +328,7 @@ topdownSucR r = go
 -- | Bottomup traversal; when the transformation succeeds, re-traverse the
 -- result until the innermost fixpoint is reached
 innerMost :: ScopedRewrite extra -> ScopedRewrite extra
--- See Note [combinator inlining] in "Clash.Rewrite.Combinators"
+-- See Note [combinator inlining]
 innerMost r = go
  where
   go = bottomupR (r !-> go)

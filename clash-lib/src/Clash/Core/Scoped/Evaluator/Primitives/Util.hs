@@ -282,7 +282,6 @@ import Clash.Core.Pretty (showPpr)
 import Clash.Core.TyCon (TyConName, tyConDataCons)
 import Clash.Debug (trace)
 import qualified Clash.Normalize.Scoped.Primitives as NP
-import Clash.Normalize.PrimitiveReductions (typeNatAdd)
 import Clash.Sized.Internal.BitVector (Bit (..), BitVector (..))
 import Clash.Sized.Internal.Signed (Signed (..))
 import Clash.Sized.Internal.Unsigned (Unsigned (..))
@@ -299,7 +298,7 @@ import Clash.Core.Scoped.Builder
   (Key, TyB, forAllTyB, funTyB, litTyB, runClosedType, tyConAppB, varTyB)
 import Clash.Core.Scoped.Convert (fromClashTermClosedIn, toClashTerm, mkPrimInfo)
 import Clash.Core.Scoped.TysPrim
-  (integerPrimTyConName, liftedTypeKindTyConName, naturalPrimTyConName,
+  (integerPrimTyConName, liftedTypeKindTyConName, naturalPrimTyConName, typeNatAdd,
    typeNatKindTyConName, wordPrimTyConName)
 import Clash.Core.Scoped.Evaluator
   (integerLiteral, naturalLiteral, reduceIn, whnf, wrapSigned, wrapUnsigned)
