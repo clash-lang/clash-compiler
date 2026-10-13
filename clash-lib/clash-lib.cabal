@@ -632,4 +632,6 @@ test-suite unittests
                  Test.Clash.Scoped.Evaluator.Primitives
                  Test.Clash.Scoped.Gen
                  Test.Clash.Scoped.Gen.Clash
+                 Test.Clash.Scoped.Print
+                 Test.Clash.Scoped.PrintTests
                  Test.Clash.TermLiteral
