@@ -877,7 +877,7 @@ data BlackBoxContext
   , bbResults :: [(Expr,HWType)]
   -- ^ Result names and types. Will typically be a list with a single item.
   -- Multiple result targets will be used for "multi result primitives". See
-  -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
+  -- 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'.
   , bbInputs :: [(Expr,HWType,Bool)]
   -- ^ Argument names, types, and whether it is a literal
   , bbFunctions :: IntMap [(Either BlackBox (Identifier,[Declaration])

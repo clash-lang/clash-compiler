@@ -348,7 +348,8 @@ mkPrimitive ctx bbEParen bbEasD declType dst pInfo args tickDecls =
                     bbName wf bbRenderVoid multiResult bbKind () bbOutputUsage
                     bbLibrary bbImports bbFunctionPlurality bbIncludes
                     bbResultNames bbResultInits bbTemplate)
-        -- See 'setupMultiResultPrim' in "Clash.Normalize.Transformations":
+        -- See Note [MultiResult type] in
+        -- "Clash.Normalize.Scoped.Transformations.MultiPrim":
         P.BlackBox {name="c$multiPrimSelect"} ->
           pure (Noop, [])
         p@P.BlackBox {multiResult=True, name, template} -> do

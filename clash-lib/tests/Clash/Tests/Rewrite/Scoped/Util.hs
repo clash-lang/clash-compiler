@@ -3,9 +3,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Rewrite.Scoped.Util": the scoped twins of the regression
-  tests in "Clash.Tests.Rewrite.Util", and the results that the functions of
-  "Clash.Rewrite.Util" gave on the same inputs.
+  Tests for "Clash.Rewrite.Scoped.Util": regression tests, and the results of
+  its functions on a range of inputs.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -107,8 +106,7 @@ renameGlobal g g' = go
 rL :: GlobalId
 rL = testGlobalId "rL_G99" "Int"
 
--- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util".
--- Lifting
+-- | Lifting
 --
 -- > r = \z -> k (/\a -> r z) x    where x :: a, and a is free
 --
@@ -124,8 +122,7 @@ liftBindingTyVarCapture = do
       "\\(a :: Type) (x :: a) (z :: Int) -> k_G33 (\\(b :: Type) -> rL_G99 @a x z) x"
       (renameGlobal g rL body)
 
--- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util".
--- Lifting
+-- | Lifting
 --
 -- > r = \z -> k (r z) x    where x :: a, a :: kk, and kk is free
 --
@@ -146,8 +143,7 @@ liftBindingTyVarOrder = do
       (_, args) -> assertFailure ("unexpected arguments: " <> show (length args))
     assertLintClean emptyTestScope body
 
--- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util":
--- 'liftBinding' replaces the recursive occurrences by an application of the
+-- | 'liftBinding' replaces the recursive occurrences by an application of the
 -- new function /before/ abstracting over the free variables.
 liftBindingSubstitutesBeforeAbstracting :: Assertion
 liftBindingSubstitutesBeforeAbstracting = do
@@ -158,8 +154,7 @@ liftBindingSubstitutesBeforeAbstracting = do
     assertTermIs ts "rL_G99 x" (renameGlobal g rL newExpr)
     assertTermIs emptyTestScope "\\(x :: Int) (z :: Int) -> k_G33 (rL_G99 x z) x" (renameGlobal g rL body)
 
--- | Scoped twin of the test of the same name in "Clash.Tests.Rewrite.Util":
--- the new global function gets a unique from the supply, which can be the
+-- | The new global function gets a unique from the supply, which can be the
 -- raw name of a free local variable of the lifted binding. The two must not be
 -- confused.
 liftBindingLocalSharesUniqueWithGlobal :: Assertion
@@ -274,7 +269,7 @@ inlineOrLiftInputs =
   ]
 
 -- | Join points, and functions that aren't, and whether the first binder is
--- one, as 'Clash.Rewrite.Util.isJoinPointIn' found
+-- one
 joinPointInputs :: [(TestTerm, Bool)]
 joinPointInputs =
   [ ("let { !(j :: Int -> Int) = \\(z :: Int) -> (f :: Int -> Int) z } in (case (s :: Int) of { 1 -> j 1; _ -> j 2 }) :: Int", True)

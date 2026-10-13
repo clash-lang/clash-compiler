@@ -3,12 +3,11 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.Specialize": the
-  regression tests of the specializations of Clash Core, and tests of the
-  cases of the specializations, whose expected results are those of Clash
-  Core. 'assertRewritesTo' and 'assertSpecializesTo' run every test in the
-  scope of the free variables of its input, and in a scope that the binders of
-  the input clash with.
+  Tests for "Clash.Normalize.Scoped.Transformations.Specialize": regression
+  tests of the specializations and of 'appProp', and tests of the cases of the
+  specializations. 'assertRewritesTo' and 'assertSpecializesTo' run every test
+  in the scope of the free variables of its input, and in a scope that the
+  binders of the input clash with.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -345,12 +344,11 @@ tests =
 -- Up to #1040, 'appProp' relied on its input being deshadowed. Several passes
 -- broke that invariant: the flattening stage (fixed in #492 by deshadowing
 -- there), and 'bindConstantVar' (#1035). #1040 made 'appProp' deshadow the
--- function part of the application itself, see Note [AppProp no shadowing],
--- and removed the deshadowing from the flattening stage and the inlining
--- transformations again. The tests of Clash Core run 'appProp' on terms in
--- which a binder in the function part has the same unique as a free variable
--- of an argument. Here, 'assertRewritesTo' runs them in a scope that the
--- binders of the input clash with.
+-- function part of the application itself, and removed the deshadowing from
+-- the flattening stage and the inlining transformations again. Each test runs
+-- 'appProp' on a term in which a binder in the function part has the name of
+-- a free variable of an argument, and 'assertRewritesTo' also runs it in a
+-- scope that the binders of the input clash with.
 
 -- | Run the scoped 'Clash.Normalize.Scoped.Transformations.Inline.bindConstantVar'
 -- on @let a = .. in \\x -> e@, and 'appProp' on the body of the resulting
@@ -374,7 +372,8 @@ bindConstantVarThenAppProp decls input expected =
 
 appPropTests :: [TestTree]
 appPropTests =
-  [ -- Case 3 of Note [AppProp no shadowing]:
+  [ -- The arguments are moved into the body of a let-expression in the
+    -- function part, so its binders must not capture their free variables:
     --
     -- > (let x = w in \y -> y) x  ==>  let x' = w in x
     --
@@ -390,9 +389,9 @@ appPropTests =
       capturing [varD "w_3" "Int"] "let { (x :: Int) = w_3 } in \\(y :: Int) -> y" [varD "x_1" "Int"]
         (\ts fn -> App fn (termIn ts (tm "x_1")))
         "let { (x :: Int) = w_3 } in x_1"
-    -- Case 2 of Note [AppProp no shadowing]: a lambda applied to an argument
-    -- that performs work becomes a let-binding, so its binder must not
-    -- capture the free variables of the remaining arguments:
+    -- A lambda applied to an argument that performs work becomes a
+    -- let-binding, so its binder must not capture the free variables of the
+    -- remaining arguments:
     --
     -- > (\x -> \y -> y) (f x) (f x)  ==>  let x' = f x in let y = f x in y
     --
@@ -405,9 +404,8 @@ appPropTests =
       capturing [varD "f_3" "Int -> Int"] "\\(x :: Int) (y :: Int) -> y" [varD "x_1" "Int"]
         (\ts fn -> App (App fn (termIn ts (tm "f_3 x_1"))) (termIn ts (tm "f_3 x_1")))
         "let { !(x :: Int) = f_3 x_1; !(y :: Int) = f_3 x_1 } in y"
-    -- Case 1 of Note [AppProp no shadowing]: arguments are pushed into case
-    -- alternatives, so pattern binders must not capture their free
-    -- variables:
+    -- Arguments are pushed into case alternatives, so pattern binders must
+    -- not capture their free variables:
     --
     -- > (case s of MkPair a b -> \k -> k) b  ==>  case s of MkPair a b' -> b
     --

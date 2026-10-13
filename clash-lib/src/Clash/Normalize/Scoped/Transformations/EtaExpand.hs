@@ -6,14 +6,12 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The eta-expansion transformations of scoped Clash Core: the ported
-  counterparts of "Clash.Normalize.Transformations.EtaExpand".
+  The eta-expansion transformations of scoped Clash Core.
 
   'etaExpansionTL' moves the lambdas in the body of a let-expression out of
   it. It creates new binders for them in the scope of the let-expression, so
   they can't capture the free variables of the let-bindings, and the
-  let-binders can't capture references to them: a bug of the transformation
-  of Clash Core.
+  let-binders can't capture references to them.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -57,8 +55,7 @@ import Clash.Rewrite.Scoped
 import Clash.Rewrite.Scoped.Globals (isTopEntity)
 
 -- | Eta-expand functions with a Synthesize annotation, needed to allow such
--- functions to appear as arguments to higher-order primitives. See
--- 'Clash.Normalize.Transformations.EtaExpand.etaExpandSyn'.
+-- functions to appear as arguments to higher-order primitives.
 etaExpandSyn :: Transformation
 etaExpandSyn =
   toScopedTransformation "etaExpandSyn"
@@ -91,8 +88,9 @@ etaExpandSynWorker ctx e
     _ -> False
 {-# SCC etaExpandSynWorker #-}
 
--- | Eta-expand top-level lambdas (DON'T use in a traversal!), see
--- 'Clash.Normalize.Transformations.EtaExpand.etaExpansionTL'
+-- | Eta-expand top-level lambdas (DON'T use in a traversal!): eta-expands the
+-- body under the lambdas and let-expressions at the top of a term, if it has
+-- a function type, and moves lambdas out of the body of a let-expression
 etaExpansionTL
   :: (HasCallStack, Distinct n)
   => TransformContext n

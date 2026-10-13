@@ -3,12 +3,9 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.SeparateArgs". The
-  expected results are those of the port, which agreed with
-  'Clash.Normalize.Transformations.SeparateArgs.separateArguments' of Clash
-  Core, up to the form of coercions. 'assertRewritesTo' runs every test in the
-  scope of the free variables of its input, and in a scope that the binders of
-  the input clash with.
+  Tests for "Clash.Normalize.Scoped.Transformations.SeparateArgs".
+  'assertRewritesTo' runs every test in the scope of the free variables of its
+  input, and in a scope that the binders of the input clash with.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -91,8 +88,7 @@ lambdaTests = testGroup "Lambdas"
         (tm "\\(p :: ClkPair) -> h_40 p")
         (tm "\\(p1 :: Clash.Signal.Internal.Clock \"System\") (p2 :: Int) -> h_40 (MkClkPair p1 p2)")
       assertNames [] [varD "h_40" "ClkPair -> Int"] (tm "\\(p :: ClkPair) -> h_40 p") ["c$p", "c$p"]
-    -- The vectors of the port are built with 'Clash.Core.Scoped.Util.primCo',
-    -- unlike those of Clash Core (the known difference "coercion-form")
+    -- The vectors are built with 'Clash.Core.Scoped.Util.primCo'
   , testCase "splits the binder of a vector type" $
       separates []
         (tm "\\(v :: Clash.Sized.Vector.Vec 2 (Clash.Signal.Internal.Clock \"System\")) -> v")
@@ -168,8 +164,8 @@ spineTests = testGroup "Application spines"
       keeps [varD "p_30" "ClkPair", varD "h_40" "ClkPair -> Int"] (tm "h_40 p_30")
   ]
 
--- | Run the port on an application of a global function, with the given
--- variables in scope, and assert that it gives the global function the
+-- | Run 'Scoped.separateArguments' on an application of a global function,
+-- with the given variables in scope, and assert that it gives the global function the
 -- expected type, and that the type of the application doesn't change
 assertGlobalType :: [ScopeDecl] -> String -> TestTerm -> Assertion
 assertGlobalType decls expected input = withTestScope decls $ \ts -> do

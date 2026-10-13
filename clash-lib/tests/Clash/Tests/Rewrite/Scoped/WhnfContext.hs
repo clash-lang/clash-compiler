@@ -3,9 +3,8 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  The cases of "whnfRW uses the context's let-bindings (#2571)" in
-  "Clash.Tests.Rewrite.Util" ('Clash.Tests.Rewrite.Util.whnfContextTests'), on
-  scoped Core: 'Clash.Rewrite.Scoped.whnfRW' evaluates a variable with the
+  The cases of \"whnfRW uses the context's let-bindings (#2571)\":
+  'Clash.Rewrite.Scoped.whnfRW' evaluates a variable with the
   let-bindings of its context, which a test builds by going under the binders
   of a term to the variable.
 
@@ -14,8 +13,7 @@
   In scoped Core, the shadowing binder has another name, so the binding is
   used where it is valid: the variable evaluates to the free variable of the
   right-hand side, not to the binder in between that has its name in the
-  source. (Run through 'Test.Clash.Scoped.ViaFoil.viaFoil', in a context of
-  frames converted from Clash Core, these cases kept the variable as it is.)
+  source.
   The evaluator marks a variable it looked up with a name modifier. A
   recursive binding is not usable in the right-hand sides of its group.
 -}

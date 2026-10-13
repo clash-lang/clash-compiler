@@ -993,8 +993,8 @@ mkResultCon tenv scope primTy tyArgs fields =
   let (dc, tcArgs) = resultDataCon tenv scope primTy tyArgs
   in mkApps (Data dc) (map Right tcArgs ++ map Left fields)
 
--- | @Cons@ of a vector of the given length, see
--- 'Clash.Normalize.PrimitiveReductions.mkVecCons'
+-- | Create a vector of the given length out of its head and its tail, with the
+-- @Cons@ constructor. The length must be positive.
 mkVecCons
   :: (HasCallStack, Distinct n)
   => TypeEnv -> Scope n -> DataCon -> Type n -> Integer -> Term n -> Term n -> Term n
@@ -1002,7 +1002,8 @@ mkVecCons tenv scope consCon elTy n h t
   | n <= 0 = error ($(curLoc) ++ "n <= 0")
   | otherwise = appendToVec tenv scope consCon elTy t n [h]
 
--- | An empty vector, see 'Clash.Normalize.PrimitiveReductions.mkVecNil'
+-- | Create an empty vector of the given element type, with the @Nil@
+-- constructor
 mkVecNil :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> DataCon -> Type n -> Term n
 mkVecNil tenv scope nilCon elTy = mkVec tenv scope nilCon nilCon elTy 0 []
 
@@ -1671,7 +1672,7 @@ bvSplitTy bvNm =
 
 -- | 'Clash.Sized.Vector.head' and 'Clash.Sized.Vector.last', given the type
 -- constructor of 'Clash.Sized.Vector.Vec': @forall n a. Vec (n + 1) a -> a@.
--- See 'Clash.Normalize.PrimitiveReductions.vecHeadPrim'.
+-- They have the same type.
 vecHeadPrim, vecLastPrim :: TyConName -> Term n
 vecHeadPrim = closedPrim "Clash.Sized.Vector.head" WorkNever . vecHeadTy
 vecLastPrim = closedPrim "Clash.Sized.Vector.last" WorkNever . vecHeadTy
@@ -1683,7 +1684,7 @@ vecHeadTy vecNm =
 
 -- | 'Clash.Sized.Vector.tail' and 'Clash.Sized.Vector.init', given the type
 -- constructor of 'Clash.Sized.Vector.Vec': @forall n a. Vec (n + 1) a -> Vec n
--- a@. See 'Clash.Normalize.PrimitiveReductions.vecTailPrim'.
+-- a@. They have the same type.
 vecTailPrim, vecInitPrim :: TyConName -> Term n
 vecTailPrim = closedPrim "Clash.Sized.Vector.tail" WorkNever . vecTailTy
 vecInitPrim = closedPrim "Clash.Sized.Vector.init" WorkNever . vecTailTy

@@ -581,13 +581,14 @@ type NodeArm
 
 -- | Generate a fused traversal: a recursive @go@ whose single constructor
 -- match drives both the node program and the descent. The recursion
--- structure of each traversal is pinned to its "Clash.Rewrite.Combinators"
--- counterpart, with the node program as @r@:
+-- structure of each traversal is pinned to its
+-- "Clash.Rewrite.Scoped.Combinators" counterpart, with the node program as
+-- @r@:
 --
 -- * 'TopDown': @'SComb.topdownR' r = 'SComb.repeatR' r '>->' 'SComb.allR' …@. On
 --   change, re-enter @go@ at this node (which also re-matches the
 --   constructor); otherwise descend. See Note [topdown repeatR] in
---   "Clash.Rewrite.Combinators".
+--   "Clash.Rewrite.Scoped.Combinators".
 -- * 'BottomUp': descend first, run the program once on the rebuilt node,
 --   whose constructor is already known, so no re-match.
 -- * 'TopDownSuc': run the program once; when it fired, stop, neither
@@ -645,8 +646,8 @@ genTraversal target strat = case strat of
 
 -- | 'SComb.topdownFixR' with the node program as @r@: a local @settle@
 -- (@'SComb.repeatR' r@) plus the tryParent\/childChanged\/parentChanged loop
--- from Note [topdownFixR] in "Clash.Rewrite.Combinators", over a generated
--- 'SComb.allR' replica.
+-- from Note [topdownFixR] in "Clash.Rewrite.Scoped.Combinators", over a
+-- generated 'SComb.allR' replica.
 genTopDownFix :: Target -> CompiledStep -> Q Exp
 genTopDownFix target cs = do
   goFix <- newName "goFix"

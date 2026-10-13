@@ -4,8 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Evaluating a subterm of a scoped rewrite to weak-head normal form, with the
-  evaluator of scoped Clash Core ("Clash.Core.Scoped.Evaluator"). The scoped
-  counterpart of 'Clash.Rewrite.Util.whnfRW'.
+  evaluator of scoped Clash Core ("Clash.Core.Scoped.Evaluator").
 
   The evaluator gets the let-bindings of the context ('tfHeap') as its local
   heap. Its result lives in the scope of the subterm extended with the
@@ -46,7 +45,7 @@ evaluatorEnv te = Env te (PrimReductions scopedPrimReductions Nothing)
 
 -- | Evaluate a term to weak-head normal form, and apply a transformation to
 -- the result, in the context extended with the bindings the evaluator
--- allocated. See 'Clash.Rewrite.Util.whnfRW', and the module header.
+-- allocated. See the module header.
 --
 -- If the transformation signals a change, its result is bound by those
 -- bindings, of which the work-free ones are inlined, and the unused ones

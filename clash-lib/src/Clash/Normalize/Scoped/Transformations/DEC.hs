@@ -5,9 +5,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Disjoint expression consolidation for scoped Clash Core: the ported
-  counterpart of "Clash.Normalize.Transformations.DEC". See there for what the
-  transformation does.
+  Disjoint expression consolidation (DEC) for scoped Clash Core. See
+  'disjointExpressionConsolidation' for what the transformation does.
 
   = Moving applications out of the alternatives
 
@@ -25,10 +24,9 @@
   that none of those binders occur in them. So an application whose function
   or type arguments refer to a variable bound inside the alternatives can't be
   lifted, and an argument that refers to one can't be shared: the types
-  enforce what the current code checks with the set of variables bound in the
-  alternatives (see the regression tests in
-  "Clash.Tests.Normalize.Transformations.DEC"). The arguments that aren't
-  shared stay where they are, in the case-trees that select them.
+  enforce this (see the regression tests in
+  "Clash.Tests.Normalize.Scoped.Transformations.DEC"). The arguments that
+  aren't shared stay where they are, in the case-trees that select them.
 
   = Heads
 
@@ -37,35 +35,33 @@
   local variable with the same unique as a global one is a different head, and
   a local variable bound inside the alternatives is no head at all.
 
-  = Differences with "Clash.Normalize.Transformations.DEC"
+  = Details
 
   * Let-expressions keep their bindings in their order, and non-recursive ones
-    stay non-recursive. The current code reorders them into strongly connected
-    components, and makes them recursive.
+    stay non-recursive.
 
   * The lifted applications are let-bound in the order of their heads: the
-    globals by unique, then the locals, then the primitives by name. The
-    current code orders them by the alpha-comparison of their functions.
+    globals by unique, then the locals, then the primitives by name.
 
   * The applications in the right-hand side of a non-recursive let-binding are
-    not put under that let-binding in the 'CaseTree'. The current code does,
-    where the binding is dead, and removed by the dead-code pass at the end.
+    not put under that let-binding in the 'CaseTree': its binder isn't in
+    scope of the right-hand side.
 
   * The bindings of a recursive let-expression are visited in dependency
-    order, and bindings that don't depend on each other in their order. The
-    current code visits them in the order of the strongly connected components
-    that "Data.Graph" gives for their uniques.
+    order, and bindings that don't depend on each other in their order.
+    Bindings that are part of a cycle are skipped, see 'collectRec'.
 
   * An argument that isn't shared is let-bound with its type moved out of the
     alternatives, or with the type of the parameter of the function if that
-    mentions a variable bound in the alternatives. The current code uses the
-    type of the argument, which may mention one.
+    mentions a variable bound in the alternatives. Clash drops casts, so after
+    matching on a GADT, an argument can have a type that mentions an
+    existential type variable where the function expects another type.
 
   * Applications of the same function to different numbers of arguments
-    aren't lifted, where the current code would crash, or drop arguments. They
-    don't occur: with the same type arguments, they have different types, so
-    one of them has a function type, which isn't representable, and DEC
-    doesn't collect applications of a type that isn't representable.
+    aren't lifted. They don't occur: with the same type arguments, they have
+    different types, so one of them has a function type, which isn't
+    representable, and DEC doesn't collect applications of a type that isn't
+    representable.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -156,9 +152,51 @@ import qualified GHC.Classes
 import qualified GHC.Num.Integer
 import qualified GHC.Prim
 
--- | Lift applications of global binders out of alternatives of
--- case-statements, see
--- 'Clash.Normalize.Transformations.DEC.disjointExpressionConsolidation'
+-- | This transformation lifts applications of global binders out of
+-- alternatives of case-statements.
+--
+-- e.g. It converts:
+--
+-- @
+-- case x of
+--   A -> f 3 y
+--   B -> f x x
+--   C -> h x
+-- @
+--
+-- into:
+--
+-- @
+-- let f_arg0 = case x of {A -> 3; B -> x}
+--     f_arg1 = case x of {A -> y; B -> x}
+--     f_out  = f f_arg0 f_arg1
+-- in  case x of
+--       A -> f_out
+--       B -> f_out
+--       C -> h x
+-- @
+--
+-- Though that's a lie. It actually converts it into:
+--
+-- @
+-- let f_tupIn = case x of {A -> (3,y); B -> (x,x)}
+--     f_arg0  = case f_tupIn of (l,_) -> l
+--     f_arg1  = case f_tupIn of (_,r) -> r
+--     f_out   = f f_arg0 f_arg1
+-- in  case x of
+--       A -> f_out
+--       B -> f_out
+--       C -> h x
+-- @
+--
+-- In order to share the expression that's in the subject of the case
+-- expression, and to share the /decoder/ circuit that logic synthesis will
+-- create to map the bits of the subject expression to the bits needed to make
+-- the selection in the multiplexer.
+--
+-- Besides applications of global binders, it lifts applications of local
+-- functions of the context of the case-expression, and of certain
+-- primitives, see 'interestingHead'.
 disjointExpressionConsolidation :: Transformation
 disjointExpressionConsolidation =
   toScopedTransformation "DEC" (onCase 'disjointExpressionConsolidationWorker)
@@ -206,9 +244,26 @@ disjointExpressionConsolidationWorker ctx e _scrut _ty (_:_:_) = do
         let nbsOut = teleNameBinders outs
             keys = map (gKey . fst) lifted
             replacements = Map.fromList (zip keys outVars)
-        -- See 'Clash.Normalize.Transformations.DEC.disjointExpressionConsolidationWorker'
-        -- for why the substitution of a lifted expression leaves out the
-        -- lifted expression itself.
+        -- The substitution of a lifted expression leaves out the lifted
+        -- expression itself. With e.g. the substitution
+        --
+        -- [foo _ _ := foo_out; bar _ _ := bar_out]
+        --
+        -- applied to a lifted expression of the form `foo (case ...) (case
+        -- ...)`, we would end up with let-bindings that are simply:
+        --
+        -- > let foo_out = foo_out ; bar_out = bar_out
+        --
+        -- instead of the desired:
+        --
+        -- > let foo_out = (foo (case ...) (case ...))[bar _ _ := bar_out]
+        -- >     bar_out = (bar (case ...) (case ...))[foo _ _ := foo_out]
+        --
+        -- A different approach,
+        -- https://github.com/clash-lang/clash-compiler/commit/73d237017c4a5fff0c49bb72c9c4d5f6c68faf69,
+        -- led to the generation of combinational loops. Now that recursive
+        -- groups of let-bindings aren't traversed, issue #1316, which that
+        -- commit tried to solve, no longer shows up.
         lifted1 <- Monad.forM lifted $ \(g, l) ->
           fst <$> collectTm env nbsOut (Map.delete (gKey g) replacements) scOut
                     (gSeen g) (sink l)
@@ -246,8 +301,8 @@ decEnv = do
 -- * Heads
 
 -- | The function of an application, as a key that keeps globals, locals, and
--- primitives apart (decision D5 of the port). A local variable is one of the
--- scope of the case-expression: it can't be bound inside the alternatives.
+-- primitives apart. A local variable is one of the scope of the
+-- case-expression: it can't be bound inside the alternatives.
 data HeadKey (n :: S)
   = HGlobal !GlobalId
   | HLocal !(TmName n)
@@ -263,8 +318,9 @@ data Head (n :: S) = Head
   -- ^ The function
   }
 
--- | The name for the let-binders of a lifted application, see
--- 'Clash.Normalize.Transformations.DEC.decFunName'
+-- | The name for the let-binders of a lifted application: the unqualified
+-- name of its function, or @complex_expression@ if that isn't a variable or a
+-- primitive
 decFunName :: Term n -> C.OccName
 decFunName fun = last . Text.splitOn "." $ case fun of
   GlobalVar g -> C.nameOcc (globalIdName g)
@@ -280,9 +336,10 @@ newtype Args (n :: S) = Args [Either (Term n) (Type n)]
 -- | Selected terms
 newtype Terms (n :: S) = Terms [Term n]
 
--- | A case-tree of values in the scope of the binders on their path, see
--- 'Clash.Normalize.Transformations.DEC.CaseTree'. The constructors that go
--- under binders keep the scope they extend scope @n@ to.
+-- | A case-tree of values in the scope of the binders on their path: the
+-- case-expressions and let-expressions on the path from a case-expression to
+-- every value, with the values at the leaves. The constructors that go under
+-- binders keep the scope they extend scope @n@ to.
 data CaseTree (a :: S -> K.Type) (n :: S) where
   Leaf :: !(a n) -> CaseTree a n
   -- | The let-bindings of a let-expression, and the tree under them
@@ -324,8 +381,8 @@ leavesOf sc0 = go sc0 emptyNameBinders
 
 -- | Test if a 'CaseTree' collected from an expression indicates that
 -- application of a global binder is disjoint: occur in separate branches of a
--- case-expression. See 'Clash.Normalize.Transformations.DEC.isDisjoint'; the
--- equality of the type arguments is checked by 'disjointGroup'.
+-- case-expression. The equality of the type arguments is checked by
+-- 'disjointGroup'.
 isDisjoint :: CaseTree a n -> Bool
 isDisjoint (Branch _ [_]) = False
 isDisjoint ct0 = go ct0
@@ -346,15 +403,16 @@ data Collected (n :: S) (l :: S) = Collected
   { cHead :: Term n
   -- ^ The function
   , cSeen :: [HeadKey n]
-  -- ^ The heads seen before, see
-  -- 'Clash.Normalize.Transformations.DEC.collectGlobals'
+  -- ^ The heads seen before the application. The substitution of references
+  -- to lifted applications in the lifted application starts with these, as
+  -- it would otherwise perform incorrect substitutions in its arguments.
   , cTree :: CaseTree Args l
   }
 
 -- | Collect 'CaseTree's for (potentially) disjoint applications out of an
 -- expression in scope @l@, inside the case-expression in scope @n@. Also
 -- substitute truly disjoint applications by a reference to a lifted out
--- application. See 'Clash.Normalize.Transformations.DEC.collectGlobals'.
+-- application.
 collectTm
   :: forall n l
    . Distinct l
@@ -386,7 +444,9 @@ collectTm env nbs repl sc seen e = case e of
         return (e, Map.empty)
       else do
         -- Look for, and substitute by, disjoint applications in the arguments
-        -- first, see 'Clash.Normalize.Transformations.DEC.collectGlobals'
+        -- first, before considering the current term in function position.
+        -- Doing it in the other order (this term in function position first,
+        -- followed by arguments) resulted in issue #1322.
         (args1, collectedArgs) <- collectArgsC env nbs repl sc seen args
         let seenInArgs = Map.keys collectedArgs ++ seen
         case interestingHead env sc nbs fun args ticks of
@@ -428,8 +488,9 @@ collectTm env nbs repl sc seen e = case e of
   underLB :: DExt l l1 => Scope l1 -> Bind l l1 -> Collected n l1 -> Collected n l
   underLB sc1 bind1 c = c {cTree = LB sc1 bind1 (cTree c)}
 
--- | Collect 'CaseTree's out of the arguments of an application, see
--- 'Clash.Normalize.Transformations.DEC.collectGlobalsArgs'
+-- | Collect 'CaseTree's out of the arguments of an application. Also
+-- substitute truly disjoint applications by a reference to a lifted out
+-- application.
 collectArgsC
   :: Distinct l
   => DecEnv
@@ -451,7 +512,8 @@ collectArgsC env nbs repl sc = go
     return (Right ty : args1, collectedArgs)
 
 -- | Collect 'CaseTree's out of the alternatives of a case-expression, grouped
--- by head, see 'Clash.Normalize.Transformations.DEC.collectGlobalsAlts'
+-- by head. Also substitute truly disjoint applications by a reference to a
+-- lifted out application.
 collectAlts
   :: forall n l
    . Distinct l
@@ -477,8 +539,9 @@ collectAlts env nbs repl sc seen alts = do
            , fmap (\c -> (cHead c, cSeen c, [CaseAlt sc1 p (cTree c)])) collected )
 
 -- | Collect 'CaseTree's out of the right-hand sides of a recursive
--- let-binding, in dependency order. Skips the bindings that are part of a
--- cycle, see 'Clash.Normalize.Transformations.DEC.collectGlobalsLbs'.
+-- let-binding, in dependency order. Also substitute truly disjoint
+-- applications by a reference to a lifted out application. Skips the
+-- bindings that are part of a cycle.
 collectRec
   :: forall n l k
    . Distinct l
@@ -503,8 +566,20 @@ collectRec env nbs repl sc seen0 bs xs = do
     Graph.AcyclicSCC i -> do
       (x1, collected) <- collectTm env nbs repl sc seen (xs !! i)
       return (Map.keys collected ++ seen, IntMap.insert i (x1, collected) done)
-    -- See 'Clash.Normalize.Transformations.DEC.collectGlobalsLbs' for why
-    -- bindings in a cycle are skipped
+    -- TODO: This completely skips bindings in a cycle in the collection of
+    -- potentially disjoint applications; and skips substituting truly
+    -- disjoint applications by a reference to a lifted out application.
+    --
+    -- This is to prevent the creation of combinational loops that have
+    -- occurred "in the wild", but for which we have not been able to a create
+    -- small unit test that triggers this creation-of-combinational-loops bug.
+    -- Completely skipping recursive let-bindings is taking the hammer to
+    -- solving this bug, without knowing whether a scalpel even existed and
+    -- what it might look like. We should at some point think hard how
+    -- traversing recursive let-bindings can introduce combinational loops, and
+    -- whether there exists a solution that can traverse recursive
+    -- let-bindings, finding more opportunities for DEC, while not introducing
+    -- combinational loops.
     Graph.CyclicSCC _ -> return (seen, done)
 
   -- The variables of the binders, in their scope
@@ -515,7 +590,7 @@ collectRec env nbs repl sc seen0 bs xs = do
 
 -- | The head of an application that is interesting to lift out of a
 -- case-expression in scope @n@: all global and local functions, and certain
--- primitives, see 'Clash.Normalize.Transformations.DEC.interestingToLift'.
+-- primitives, see 'interestingPrim'.
 -- 'Nothing' for a local function bound inside the alternatives: it can't be
 -- lifted out of them.
 interestingHead
@@ -562,9 +637,10 @@ isInterestingApp env sc tm = case collectArgsTicks tm of
 
 -- | Whether an application of a primitive is interesting to lift out of a
 -- case-expression: all non-cheap multiplications, and all division-like
--- operations with a non-cheap divisor, see
--- 'Clash.Normalize.Transformations.DEC.interestingToLift'. Multiplying or
--- dividing by zero or a power of two is cheap.
+-- operations with a non-cheap divisor. Multiplying or dividing by zero or a
+-- power of two is cheap. A higher-order primitive is interesting if one of
+-- its arguments is an interesting application, and every primitive is
+-- interesting under a 'DeDup' tick.
 interestingPrim
   :: Distinct l
   => DecEnv
@@ -634,9 +710,8 @@ interestingPrim env sc pInfo args ticks =
   isHOTy t = case splitFunForallTy t of
     SplitFunForall tele _ -> anyPiArg isPolyFunTy tele
 
--- | Whether a term evaluates to a power of two (or zero), see
--- 'Clash.Normalize.Transformations.DEC.interestingToLift'. Evaluates without
--- the let-bindings of the context, like the current code.
+-- | Whether a term evaluates to a power of two (or zero). Evaluates without
+-- the let-bindings of the context.
 termIsPow2 :: Distinct l => DecEnv -> Scope l -> Term l -> Bool
 termIsPow2 env sc e =
   whnf (deEvalEnv env) False
@@ -677,12 +752,10 @@ data Group (n :: S) = Group
 -- | Whether the applications of a head are disjoint, and can be lifted out
 -- of the alternatives: their function is one of scope @n@ (which
 -- 'interestingHead' ensures), and their type arguments are the same values
--- of scope @n@. See 'Clash.Normalize.Transformations.DEC.isDisjoint' and
--- 'Clash.Normalize.Transformations.DEC.isLiftable'.
+-- of scope @n@. See 'isDisjoint'.
 --
 -- Also checks that every application has the same number of arguments, in
--- the same order of types and terms, which
--- 'Clash.Normalize.Transformations.DEC.mkDisjointGroup' assumes.
+-- the same order of types and terms, which 'mkDisjointGroup' assumes.
 disjointGroup
   :: forall n. Distinct n => Scope n -> (HeadKey n, Collected n n) -> Maybe (Group n)
 disjointGroup sc (key, Collected fun seen ct)
@@ -724,8 +797,10 @@ data ArgSlot (n :: S)
 
 -- | Given a group of disjoint applications, give the lifted application: the
 -- function applied to the shared arguments, and to let-bound case-expressions
--- that select between the other arguments. See
--- 'Clash.Normalize.Transformations.DEC.mkDisjointGroup'.
+-- that select between the other arguments.
+--
+-- Case-expressions whose type would be non-representable are not let-bound,
+-- but occur directly in the argument position of the lifted application.
 mkDisjointGroup
   :: forall n
    . (HasCallStack, Distinct n)
@@ -815,8 +890,12 @@ mkDisjointGroup env sc g = do
 
   -- The term argument at position @i@, if all applications share it: it
   -- doesn't mention variables bound inside the alternatives, and is either
-  -- the same for all, or a proof of an equality, see
-  -- 'Clash.Normalize.Transformations.DEC.areShared'
+  -- the same for all, or a proof of an equality. We don't care about the
+  -- shape of a proof: whether we have `Refl : True ~ True` or
+  -- `SomeAxiom : (1 <=? 2) ~ True`, when we normalize both sides we always end
+  -- up with a proof of `True ~ True`. DEC only fires for applications where
+  -- all the type arguments are equal, so all equality arguments witness the
+  -- same equality.
   sharedArg :: Int -> [SomeLeaf Args n] -> Maybe (Term n)
   sharedArg i ls = case map unsunk ls of
     Just x : rest
@@ -831,7 +910,7 @@ mkDisjointGroup env sc g = do
     _ -> False
 
 -- | Create a case-expression that selects between the distinct arguments given
--- a case-tree, see 'Clash.Normalize.Transformations.DEC.genCase'
+-- a case-tree
 genCase
   :: forall n
    . Distinct n
@@ -863,7 +942,40 @@ genCase te tupTcs sc0 ty argTys = go sc0
   goAlt (CaseAlt (sc1 :: Scope l1) p ct) = withExtTrans @n @l @l1 $ Alt p (go sc1 ct)
 
 -- | Add a default alternative to the alternatives of a case-tree, if they're
--- not exhaustive, see 'Clash.Normalize.Transformations.DEC.genCase' (#2770)
+-- not exhaustive.
+--
+-- A 'CaseTree' only contains alternatives for the branches in which the
+-- lifted function is applied, so the case-expressions generated from it are
+-- not necessarily exhaustive (#2770). e.g. for
+--
+-- @
+-- case x of
+--   Left y  -> f y
+--   Right z -> case z of
+--     Left a  -> h a
+--     Right w -> f w
+-- @
+--
+-- the transformation will (naively) rewrite it to:
+--
+-- @
+-- case x of
+--   Left y  -> f_shared
+--   Right z -> case z of
+--     Left a  -> h a
+--     Right w -> f_shared
+--  where
+--   f_shared = f f_arg
+--   f_arg = case x of
+--     Left y -> y
+--     Right z -> case z of
+--       Right w -> w
+-- @
+--
+-- Note that the case on @z@ doesn't have a 'Left' branch. It doesn't need
+-- to, because it only gets called in cases where it has already been proven
+-- that z ~ Right. Still, this is malformed Core and the evaluator will crash
+-- on it if it ever sees it. We therefore add a 'DefaultPat'.
 addDefault :: forall n. Distinct n => TypeEnv -> Scope n -> Term n -> Type n -> [Alt n] -> [Alt n]
 addDefault te sc scrut ty alts
   | any isDefaultAlt alts
@@ -929,8 +1041,8 @@ mkSmallTupTy te tupTcs tys = mkTyConApp (fst (findTup te tupTcs (length tys))) t
 
 mkBigTupTy te tupTcs = mkChunkified (mkSmallTupTy te tupTcs)
 
--- | Select the @n@-th element of a big tuple, see
--- 'Clash.Normalize.Transformations.DEC.mkBigTupSelector'
+-- | Select the @n@-th element of a big tuple: a tuple of tuples if it has more
+-- than 'mAX_TUPLE_SIZE' elements
 mkSmallTupSelector, mkBigTupSelector
   :: Distinct n => Scope n -> TypeEnv -> IntMap TyConName -> Term n -> [Type n] -> Int -> Term n
 mkSmallTupSelector _ _ _ scrut [_] 0 = scrut

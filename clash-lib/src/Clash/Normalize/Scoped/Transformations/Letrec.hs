@@ -6,8 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on let-expressions of scoped Clash Core: the ported
-  counterparts of "Clash.Normalize.Transformations.Letrec".
+  Transformations on let-expressions of scoped Clash Core.
 
   = Merging let-bindings
 
@@ -18,19 +17,15 @@
   binder to be opened first ('openLetBindings'). Opening renames the binder if
   it clashes with the scope. So a binder that shadows a variable its
   right-hand side refers to, as in @\\x -> let x = g x in x@, can't be merged
-  into the loop @letrec x = g x@: the bug that the Clash Core versions fix by
-  deshadowing ('Clash.Normalize.Transformations.Letrec.deshadowNonRec') is a
-  type error here.
+  into the loop @letrec x = g x@: that would be a type error.
 
   = Order of let-bindings
 
-  'simpleCSE' keeps the bindings in the order of the Clash Core version: the
-  reverse of the inverse topological order in which it visits them. But that
-  order is computed from the positions of the bindings
-  ('inverseTopSortOrder'), where the Clash Core version uses their uniques: the
-  @letrecOrder@ difference of the differential tests. 'flattenLet' keeps the
-  order of the Clash Core version: the bindings of a let-expression in a
-  right-hand side come right before the binding whose right-hand side it was.
+  'simpleCSE' keeps the bindings in the reverse of the inverse topological
+  order in which it visits them, which is computed from the positions of the
+  bindings ('inverseTopSortOrder'). In the result of 'flattenLet', the
+  bindings of a let-expression in a right-hand side come right before the
+  binding whose right-hand side it was.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -137,8 +132,7 @@ deadCodeWorker ctx e bind body =
 
 -- * removeUnusedExpr
 
--- | Replace the unused arguments of primitives by 'removedArg', see
--- 'Clash.Normalize.Transformations.Letrec.removeUnusedExpr'
+-- | Replace the unused arguments of primitives by 'removedArg'
 removeUnusedExpr :: Transformation
 removeUnusedExpr = toScopedTransformation "removeUnusedExpr"
   (  onPrimNode 'removeUnusedExprSpine
@@ -163,9 +157,26 @@ removeUnusedExprCase _ e _subj _ty [Alt p@(DataPat _ TNil _) altExpr] =
 removeUnusedExprCase _ e _subj _ty _alts = return e
 
 -- | The application-spine handlers of 'removeUnusedExpr': replace unused
--- arguments of primitives (and 'Vec's 'Vec.Cons') with 'removedArg'. See
--- 'Clash.Normalize.Transformations.Letrec.removeUnusedExprSpine' for why only
--- the root of a spine is rewritten.
+-- arguments of primitives (and 'Vec's 'Vec.Cons') with 'removedArg'.
+--
+-- This collects the whole application spine with 'collectArgsTicks'. Say we
+-- have an application:
+--
+--     f a b c
+--
+-- Then we're only interested in the root (@f a b c@), not in the inner nodes
+-- (@f a@, @f a b@). At the root, 'collectArgsTicks' collects the full argument
+-- list @[a, b, c]@; an inner node would only ever see a prefix of that (@[a]@,
+-- @[a, b]@) at the same argument indices. So any argument an inner node could
+-- remove, the root removes too, which makes the inner attempts wasted work.
+-- This holds through ticks and type applications as well, since
+-- 'collectArgsTicks' looks through both. We therefore skip any node whose
+-- parent continues the spine (a 'KAppFun', 'KTyAppC', or 'KTickC' frame);
+-- 'removeUnusedExpr' only routes spine nodes (@App@, @TyApp@, @Prim@, @Tick@)
+-- here, so no explicit node-constructor check is needed. The
+-- single-alternative-Case handling lives in 'removeUnusedExprCase' and is
+-- unaffected: the spine only threads through applications, type applications,
+-- and ticks, so a Case is never an inner node of a spine.
 removeUnusedExprSpine
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -299,12 +310,10 @@ occurrences x e = fromMaybe 0 (lookupNameMap x (freeTmVarOccurrences e))
 --
 -- NB: must only be called in the cleaning up phase.
 --
--- See 'Clash.Normalize.Transformations.Letrec.flattenLet'. Unlike that one, it
--- never makes a 'NonRec' binding recursive: its right-hand side doesn't refer
--- to the binder by construction. So a let-expression @let x = g x in e@ in a
--- right-hand side, where @g x@ refers to a variable @x@ that the binder
--- shadows, is inlined (if the other conditions hold), where Clash Core merged
--- it as the loop @x' = g x'@.
+-- It never makes a 'NonRec' binding recursive: its right-hand side doesn't
+-- refer to the binder by construction. So a let-expression @let x = g x in e@
+-- in a right-hand side, where @g x@ refers to a variable @x@ that the binder
+-- shadows, is inlined (if the other conditions hold).
 flattenLet :: Transformation
 flattenLet = toScopedTransformation "flattenLet" (onLetNode 'flattenLetWorker)
 
@@ -435,11 +444,10 @@ mergeLetRhss sc0 xs0 body0 k = go sc0 TNil (length xs0) [] (zip [0..] xs0) body0
 -- means that all recursive calls are replaced by the same variable reference as
 -- found in the body of the top-level let-expression.
 --
--- See 'Clash.Normalize.Transformations.Letrec.recToLetRec'. It only applies to
--- a term in normal form ('Clash.Netlist.Util.splitNormalized'): lambdas
--- around let-expressions whose body is a variable. It doesn't fire if the
--- variable is one of the bindings that it would replace by the variable,
--- where the Clash Core version would leave it unbound.
+-- It only applies to a term in normal form
+-- ('Clash.Netlist.Util.splitNormalized'): lambdas around let-expressions whose
+-- body is a variable. It doesn't fire if the variable is one of the bindings
+-- that it would replace by the variable.
 recToLetRec
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -500,8 +508,7 @@ recToLetRec ctx e
   -- constructing, and checks if the field-expression projects the
   -- corresponding (sub)field from the target variable.
   --
-  -- TODO: See [Note: Breaks on constants and predetermined equality] in
-  -- "Clash.Normalize.Transformations.Letrec"
+  -- TODO: See Note [Breaks on constants and predetermined equality]
   --
   -- Since 'aeqTm' looks at ticks when determining equality, all ticks are
   -- removed with 'stripAllTicks'.
@@ -531,7 +538,26 @@ recToLetRec ctx e
     = False
 
   -- Recursively check whether a term /e/ is semantically equal to some
-  -- variable /v/, see 'Clash.Normalize.Transformations.Letrec.recToLetRec'
+  -- variable /v/. Currently it can only assert equality when /e/:
+  --
+  --   * is syntactically equal to /v/; or
+  --   * is constructed out of projections of /v/; or
+  --   * is constructed out of type-equal class dictionaries
+  --
+  -- or a mix of these.
+  --
+  -- Note [Breaks on constants and predetermined equality]
+  -- This function currently breaks if:
+  --
+  --   * One or more subfields are constants. Constants might have been
+  --     inlined for the construction, instead of being a projection of the
+  --     target variable.
+  --
+  --   * One or more subfields are determined to be equal and one is simply
+  --     swapped / replaced by the other. For example, say we have
+  --     `x :: (a, a)`. If GHC determines that both elements of the tuple will
+  --     always be the same, it might replace the (semantically equal to 'x')
+  --     construction of `y` with `(fst x, fst x)`.
   eqDat :: Distinct l => TypeEnv -> Scope l -> Term l -> [Int] -> Term l -> Bool
   eqDat te sc v fTrace (collectArgs -> (Data _, args)) =
     and (zipWith (eqDat te sc v) (map (:fTrace) [0..]) (Either.lefts args))
@@ -571,8 +597,8 @@ idTele = \case
   TCons (AbsId b) bs -> TCons b <$> idTele bs
   TCons (AbsTy _) _ -> Nothing
 
--- | Whether a type is a class constraint, see
--- 'Clash.Normalize.Transformations.Letrec.isClassConstraint'
+-- | Whether a type is a class constraint: a constraint tuple, or the type of
+-- the dictionary of a class
 isClassConstraint :: Type n -> Bool
 isClassConstraint (tyView -> TyConApp nm0 _) =
   if -- Constraint tuple. The host module is 'GHC.Classes' on GHC <= 9.12 and
@@ -589,8 +615,15 @@ isClassConstraint _ = False
 -- * simpleCSE
 
 -- | Simplified CSE, only works on let-bindings, does an inverse topological
--- sort of the let-bindings and then works from top to bottom. See
--- 'Clash.Normalize.Transformations.Letrec.simpleCSE'.
+-- sort of the let-bindings and then works from top to bottom
+--
+-- XXX: Check whether inverse top-sort followed by single traversal removes as
+-- many binders as the previous "apply-until-fixpoint" approach in the presence
+-- of recursive groups in the let-bindings. If not but just for checking whether
+-- changes to transformation affect the eventual size of the circuit, it would
+-- be really helpful if we tracked circuit size in the regression/test suite.
+-- On the two examples that were tested, Reducer and PipelinesViaFolds, this new
+-- version of CSE removed the same amount of let-binders.
 simpleCSE :: Transformation
 simpleCSE = toScopedTransformation "CSE" (onLet 'simpleCSEWorker)
 
@@ -629,8 +662,7 @@ simpleCSEWorker ctx term bind body = case bind of
 -- * topLet
 
 -- | Ensure that top-level lambda's eventually bind a let-expression of which
--- the body is a variable-reference. See
--- 'Clash.Normalize.Transformations.Letrec.topLet'.
+-- the body is a variable-reference.
 topLet :: Transformation
 topLet = scopedAnyConstructor "topLet" 'topLetWorker
 
@@ -656,8 +688,15 @@ topLetWorker ctx e
                 -- be moved into the scope of its binder: opening it renamed
                 -- the binder if it could capture a variable.
                 --
-                -- NB: We cannot nest the new binding instead, see
-                -- 'Clash.Normalize.Transformations.Letrec.topLet'.
+                -- NB: We cannot nest the new binding instead:
+                --
+                -- Let bind (Let (NonRec result body) (Var result))
+                --
+                -- 'flattenLet' would later inline the single use of its
+                -- binder, e.g. after this let-expression was inlined into an
+                -- argument of 'bindSimIO#', leaving a let-expression whose
+                -- body is not a variable. That makes
+                -- tests/shouldwork/SimIO/Test00.hs fail.
                 mkTmBinderFor te scL (C.mkUnsafeSystemName "result" 0) body1 $ \_ b ->
                   changed (Let (Rec (appendTele bs (TCons b TNil))
                                     (map (sink . lbRhs) lbs ++ [sink body1]))

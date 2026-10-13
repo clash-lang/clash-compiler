@@ -6,30 +6,23 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations on case-expressions of scoped Clash Core: the ported
-  counterparts of "Clash.Normalize.Transformations.Case".
+  Transformations on case-expressions of scoped Clash Core.
 
-  The capture bugs that the current transformations guard against with
-  deshadowing ('caseCase', 'caseLet') or with fresh let-binders ('caseCon')
-  are type errors here: moving the alternatives of a case-expression under the
-  binders of a pattern or a let-expression needs the scope those extend, which
-  only opening them gives ('Clash.Core.Scoped.Subst.openAlt',
-  'Clash.Core.Scoped.Subst.openBind'). Returning the right-hand side of an
+  Moving the alternatives of a case-expression under the binders of a pattern
+  or a let-expression ('caseCase', 'caseLet') needs the scope those extend,
+  which only opening them gives ('Clash.Core.Scoped.Subst.openAlt',
+  'Clash.Core.Scoped.Subst.openBind'), so those binders can't capture the
+  free variables of the alternatives. Returning the right-hand side of an
   alternative without its pattern needs that the variables the pattern binds
   don't occur in it ('Clash.Core.Scoped.Subst.unsinkAlt').
 
-  Differences with the current transformations:
-
   * 'caseCon' evaluates the subject with the evaluator of scoped Clash Core
     ('Clash.Rewrite.Scoped.Whnf.whnfRW'), which uses the let-bindings of the
-    context that the current one drops because they are shadowed. Its
-    primitive reductions build coercions as @_CO_ \@ty@
+    context. Its primitive reductions build coercions as @_CO_ \@ty@
     ('Clash.Core.Scoped.Util.primCo').
 
-  * When 'caseCon' let-binds the fields of a data constructor, it binds them
-    in the order of the fields. The current one binds them in the order that
-    'Clash.Core.Util.listToLets' gives independent bindings, which depends on
-    the uniques of their binders (by descending unique).
+  * When 'caseCon' let-binds the fields of a data constructor, it gives the
+    let-binders fresh names, and binds them in the order of the fields.
 -}
 
 {-# LANGUAGE BangPatterns #-}
@@ -132,7 +125,7 @@ caseCase = toScopedTransformation "caseCase" (onCase 'caseCaseWorker)
 -- The alternatives of the outer case-expression are moved under the patterns
 -- of the inner one, which needs the scopes that opening those patterns gives:
 -- a pattern that binds a variable that occurs free in the outer alternatives
--- is renamed. See 'Clash.Normalize.Transformations.Case.caseCaseWorker'.
+-- is renamed.
 caseCaseWorker
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -154,13 +147,32 @@ caseCaseWorker ctx e (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2 = do
 caseCaseWorker _ e _ _ _ = return e
 {-# SCC caseCaseWorker #-}
 
+{- Note [caseOneAlt before caseCon']
+
+When you put a bang on a signal argument:
+    f :: Signal d a -> _
+    f !x = ...
+GHC generates a case like:
+    case x of
+      _ :- _ -> ...
+
+When this f is inlined in an:
+    g = f (pure False)
+And clash does its Signal d a ~ a thing we get:
+    g = case False of
+      _ :- _ -> ...
+Because no pattern matches caseCon transforms this into
+    g = undefined
+
+By trying caseOneAlt first clash can instead drop the case
+and use the body of the single alternative.
+-}
+
 -- | Specialize a Case-decomposition (replace by the RHS of an alternative) if
 -- the subject is (an application of) a DataCon; or if there is only a single
--- alternative that doesn't reference variables bound by the pattern. See
--- 'Clash.Normalize.Transformations.Case.caseCon'.
+-- alternative that doesn't reference variables bound by the pattern.
 --
--- Tries 'caseOneAlt' first, see NOTE: caseOneAlt before caseCon' in
--- "Clash.Normalize.Transformations.Case".
+-- Tries 'caseOneAlt' first, see Note [caseOneAlt before caseCon'].
 caseCon :: Transformation
 caseCon = toScopedTransformation "caseCon" (onCase 'caseConWorker)
 
@@ -187,13 +199,18 @@ caseConOn
   => TransformContext n -> Term n -> Type n -> [Alt n] -> NormalizeSession (Term n)
 caseConOn ctx subj ty alts = caseConWorker ctx (Case subj ty alts) subj ty alts
 
--- | See 'Clash.Normalize.Transformations.Case.caseCon''.
+-- | Specialize a Case-decomposition (replace by the RHS of an alternative) if
+-- the subject is (an application of) a DataCon; or if there is only a single
+-- alternative that doesn't reference variables bound by the pattern.
 --
 -- When the subject is an applied data constructor, the fields that the
 -- matching alternative uses are substituted for the variables of its pattern
 -- if they are work free, and let-bound otherwise. The let-binders get fresh
--- names, so they can't capture the free variables of the fields (see
--- Note [CaseCon deshadow] in "Clash.Normalize.Transformations.Case").
+-- names, so they can't capture the free variables of the fields.
+--
+-- When the subject is an applied primitive, it is reduced to WHNF first. When
+-- the subject is a variable of a zero-width number type, it is matched as the
+-- literal @0@.
 caseCon'
   :: forall n. (HasCallStack, Distinct n)
   => TransformContext n
@@ -407,7 +424,10 @@ bindFields sc s (TCons b bs) ((used, arg):args) k
 bindFields _ _ _ _ _ =
   error "caseCon: the numbers of fields of a pattern and of its data constructor differ"
 
--- | See 'Clash.Normalize.Transformations.Case.matchLiteralContructor'. The
+-- | Select the alternative of a case-expression whose subject is an
+-- @Integer@ or @Natural@ literal: the one whose data constructor (@IS@, @IP@
+-- or @IN@ for an @Integer@, @NS@ or @NB@ for a @Natural@) encodes the
+-- literal, the one with an equal literal pattern, or the default one. The
 -- variable of the pattern of the matching alternative, if it is used, is
 -- let-bound to the field of the literal, with the binder of the pattern.
 matchLiteralConstructor
@@ -472,8 +492,26 @@ bindField x val e = case unsinkIdBinder x e of
   Just e' -> changed e'
   Nothing -> changed (Let (NonRec x val) e)
 
--- | Remove non-reachable alternatives, see
--- 'Clash.Normalize.Transformations.Case.caseEliminateNonReachable'
+-- | Remove non-reachable alternatives. For example, consider:
+--
+-- @
+-- data STy ty where
+--   SInt :: Int -> STy Int
+--   SBool :: Bool -> STy Bool
+--
+-- f :: STy ty -> ty
+-- f (SInt b) = b + 1
+-- f (SBool True) = False
+-- f (SBool False) = True
+-- {\-\# NOINLINE f \#-\}
+--
+-- g :: STy Int -> Int
+-- g = f
+-- @
+--
+-- @f@ is always specialized on @STy Int@. The SBool alternatives are therefore
+-- unreachable. Additional information can be found at:
+-- https://github.com/clash-lang/clash-compiler/pull/465
 caseEliminateNonReachable :: Transformation
 caseEliminateNonReachable =
   toScopedTransformation "caseEliminateNonReachable"
@@ -498,8 +536,46 @@ caseEliminateNonReachableWorker ctx case0 scrut altsTy alts0 = do
     _  -> changed =<< caseOneAlt (Case scrut altsTy altsOther)
 {-# SCC caseEliminateNonReachableWorker #-}
 
--- | Flatten ridiculous case-statements generated by GHC, see
--- 'Clash.Normalize.Transformations.Case.caseFlat'
+-- | Flatten ridiculous case-statements generated by GHC
+--
+-- For case-statements in haskell of the form:
+--
+-- @
+-- f :: Unsigned 4 -> Unsigned 4
+-- f x = case x of
+--   0 -> 3
+--   1 -> 2
+--   2 -> 1
+--   3 -> 0
+-- @
+--
+-- GHC generates Core that looks like:
+--
+-- @
+-- f = \\(x :: Unsigned 4) -> case x == fromInteger 3 of
+--                             False -> case x == fromInteger 2 of
+--                               False -> case x == fromInteger 1 of
+--                                 False -> case x == fromInteger 0 of
+--                                   False -> error "incomplete case"
+--                                   True  -> fromInteger 3
+--                                 True -> fromInteger 2
+--                               True -> fromInteger 1
+--                             True -> fromInteger 0
+-- @
+--
+-- Which would result in a priority decoder circuit where a normal decoder
+-- circuit was desired.
+--
+-- This transformation transforms the above Core to the saner:
+--
+-- @
+-- f = \\(x :: Unsigned 4) -> case x of
+--        _ -> error "incomplete case"
+--        0 -> fromInteger 3
+--        1 -> fromInteger 2
+--        2 -> fromInteger 1
+--        3 -> fromInteger 0
+-- @
 caseFlat :: Transformation
 caseFlat = toScopedTransformation "caseFlat" (onCase 'caseFlatWorker)
 
@@ -533,9 +609,11 @@ caseFlatWorker ctx e (collectEqArgs -> Just (scrut', val)) ty _ =
 caseFlatWorker _ e _ _ _ = return e
 {-# SCC caseFlatWorker #-}
 
--- | See 'Clash.Normalize.Transformations.Case.collectFlat'. The right-hand
--- sides of the alternatives of the comparisons are moved out of the scopes of
--- their patterns: the patterns of 'True' and 'False' don't bind variables.
+-- | The alternatives of a case-expression on a subject, collected from a
+-- chain of case-expressions on comparisons of that subject with literals, see
+-- 'caseFlat'. The right-hand sides of the alternatives of the comparisons are
+-- moved out of the scopes of their patterns: the patterns of 'True' and
+-- 'False' don't bind variables.
 collectFlat :: Term n -> Term n -> Maybe [Alt n]
 collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
   | scrut' `aeqTm` scrut
@@ -576,7 +654,8 @@ collectFlat scrut (Case (collectEqArgs -> Just (scrut', val)) _ty [lAlt,rAlt])
 collectFlat _ _ = Nothing
 {-# SCC collectFlat #-}
 
--- | See 'Clash.Normalize.Transformations.Case.collectEqArgs'
+-- | The subject and the value of a comparison for equality of @BitVector@,
+-- @Index@, @Signed@, @Unsigned@ or @Int@ values, see 'caseFlat'
 collectEqArgs :: Term n -> Maybe (Term n, Term n)
 collectEqArgs f@(collectArgsTicks -> (Prim p, args, ticks))
   | nm == Text.showt 'BV.eq#
@@ -606,8 +685,7 @@ caseLet = toScopedTransformation "caseLet" (onCase 'caseLetWorker)
 --
 -- The alternatives are moved under the let-binders, which needs the scope
 -- that opening them gives: a let-binder that binds a variable that occurs
--- free in the alternatives is renamed. See Note [CaseLet deshadow] in
--- "Clash.Normalize.Transformations.Case".
+-- free in the alternatives is renamed.
 caseLetWorker
   :: (HasCallStack, Distinct n)
   => TransformContext n
@@ -628,8 +706,7 @@ caseLetWorker _ e _ _ _ = return e
 
 -- | Replace a case-expression by the right-hand side of its alternative, if
 -- it has one alternative, or by that of all its alternatives, if they are
--- equal. Only if the variables that the patterns bind don't occur in it. See
--- 'Clash.Normalize.Transformations.Case.caseOneAlt'.
+-- equal. Only if the variables that the patterns bind don't occur in it.
 caseOneAlt :: Term n -> NormalizeSession (Term n)
 caseOneAlt e = case e of
   Case _ _ [Alt p altE]
@@ -640,8 +717,31 @@ caseOneAlt e = case e of
 {-# SCC caseOneAlt #-}
 
 -- | Tries to eliminate existentials by using heuristics to determine what the
--- existential should be, see
--- 'Clash.Normalize.Transformations.Case.elimExistentials'
+-- existential should be. For example, consider Vec:
+--
+-- > data Vec :: Nat -> Type -> Type where
+-- >   Nil       :: Vec 0 a
+-- >   Cons x xs :: a -> Vec n a -> Vec (n + 1) a
+--
+-- Thus, 'null' (annotated with existentials) could look like:
+--
+-- > null :: forall n . Vec n Bool -> Bool
+-- > null v =
+-- >   case v of
+-- >     Nil  {n ~ 0}                                     -> True
+-- >     Cons {n1:Nat} {n~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--
+-- When it's applied to a vector of length 5, this becomes:
+--
+-- > null :: Vec 5 Bool -> Bool
+-- > null v =
+-- >   case v of
+-- >     Nil  {5 ~ 0}                                     -> True
+-- >     Cons {n1:Nat} {5~n1+1} (x :: a) (xs :: Vec n1 a) -> False
+--
+-- This function solves @n1@ and replaces every occurrence with its solution.
+-- A very limited number of solutions are currently recognized: only adds
+-- (such as in the example) will be solved.
 elimExistentials :: Transformation
 elimExistentials =
   toScopedTransformation "elimExistentials" (onCase 'elimExistentialsWorker)
@@ -677,8 +777,26 @@ elimExistentialsWorker ctx _node scrut altsTy alts0 = do
 {-# SCC elimExistentialsWorker #-}
 
 -- | This finds cases on Integers and Naturals and rewrites them to remove the
--- alternatives with bignums/bytearrays in them, see
--- 'Clash.Normalize.Transformations.Case.elimCaseBigNumInternals'
+-- alternatives with bignums/bytearrays in them.
+--
+-- Natural and Integer are defined as:
+--
+-- @
+-- data Natural = NS Word# | NB ByteArray#
+-- data Integer = IS Int#  | IP ByteArray#  | IN ByteArray#
+-- @
+--
+-- Both 'Natural' and 'Integer' have invariants stating that they will only use
+-- NB/IP/IN when their values doesn't fit in NS/IS. And the code in base also
+-- makes use of that. So we can be sure that small values, that are
+-- representable in HDL, are always encoded with NS/IS.
+--
+-- Because the NB/IP/IN don't/can't exist in HDL, this transformation looks for
+-- case with patterns for NS/IS and just always picks those alternatives, and
+-- removes the other alternatives.
+--
+-- This is as "safe" as the rest of the Natural/Integer handling that clash
+-- does in HDL, because numbers bigger then Word/Int can't exist there anyway.
 elimCaseBigNumInternals :: Transformation
 elimCaseBigNumInternals =
   toScopedTransformation "elimCaseBigNum" (onCase 'elimCaseBigNumInternalsWorker)

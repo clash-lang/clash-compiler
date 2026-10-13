@@ -242,13 +242,3 @@ type Transform m = TransformContext -> Term -> m Term
 
 -- | A 'Transform' action in the context of the 'RewriteMonad'
 type Rewrite extra = Transform (RewriteMonad extra)
-
--- Moved into Clash.Rewrite.WorkFree
-
--- TODO:
--- {-# SPECIALIZE isWorkFree
---       :: Lens' (RewriteState extra) (VarEnv Bool)
---       -> BindingMap
---       -> Term
---       -> RewriteMonad extra Bool
---   #-}

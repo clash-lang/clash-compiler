@@ -1002,7 +1002,7 @@ renameBinder binds (i, collectArgsTicks -> (k, args, ticks)) = withTicks ticks $
   context = primWarnContext binds (showPpr (varName i)) args
 
   -- Routine for multi result primitives. For more info:
-  -- 'Clash.Normalize.Transformations.setupMultiResultPrim'.
+  -- 'Clash.Normalize.Scoped.Transformations.MultiPrim.setupMultiResultPrim'.
   goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(Id, Id)]
   goMulti pInfo (BlackBoxHaskell{function=(_, function)}) = do
     tcm <- Lens.view tcCache

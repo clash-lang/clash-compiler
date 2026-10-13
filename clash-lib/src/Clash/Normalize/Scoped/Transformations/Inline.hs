@@ -6,8 +6,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Transformations for inlining on scoped Clash Core: the ported counterparts
-  of "Clash.Normalize.Transformations.Inline".
+  Transformations for inlining on scoped Clash Core.
 
   = Globals
 
@@ -27,9 +26,7 @@
 
   The transformations on let-expressions work on its bindings in the scope of
   the body ('Clash.Rewrite.Scoped.Util.openLetBindings'), so a right-hand side
-  of a non-recursive binding can't refer to its own binder: unlike in Clash
-  Core, where such a reference is to a shadowed variable with the same
-  unique.
+  of a non-recursive binding can't refer to its own binder.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -135,8 +132,7 @@ curFunGlobal :: NormalizeSession GlobalId
 curFunGlobal = fst <$> Lens.use curFun
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
--- is constant (except clock or reset generators). See
--- 'Clash.Normalize.Transformations.Inline.bindConstantVar'.
+-- is constant (except clock or reset generators)
 bindConstantVar :: Transformation
 bindConstantVar =
   toScopedTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
@@ -171,7 +167,7 @@ bindConstantVarWorker = inlineBinders test
 
 -- | Only inline casts that just contain a variable, because these are
 -- guaranteed work-free. These are the result of the 'splitCastWork'
--- transformation. See 'Clash.Normalize.Transformations.Inline.inlineCast'.
+-- transformation.
 inlineCast :: Transformation
 inlineCast = toScopedTransformation "inlineCast" (onLet 'inlineCastWorker)
 
@@ -188,8 +184,7 @@ inlineCastWorker = inlineBinders test
     _ -> False
 {-# SCC inlineCastWorker #-}
 
--- | Inline anything of type `SimIO`: IO actions cannot be shared. See
--- 'Clash.Normalize.Transformations.Inline.inlineSimIO'.
+-- | Inline anything of type `SimIO`: IO actions cannot be shared
 inlineSimIO :: Transformation
 inlineSimIO = toScopedTransformation "bindSimIO" (onLet 'inlineSimIOWorker)
 
@@ -205,8 +200,8 @@ inlineSimIOWorker = inlineBinders test
     _ -> return False
 {-# SCC inlineSimIOWorker #-}
 
--- | Inline or lift let-bindings of a non-representable type. See
--- 'Clash.Normalize.Transformations.Inline.inlineOrLiftNonRep'.
+-- | Inline or lift let-bindings of a non-representable type, see
+-- 'inlineOrLiftBinders'
 inlineOrLiftNonRep :: Transformation
 inlineOrLiftNonRep =
   toScopedTransformation "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepWorker)
@@ -254,8 +249,7 @@ data Mark
   -- ^ Processed, recursive
 
 -- | Used (transitively) by 'inlineCleanup' to inline to-inline let-binders
--- into the other to-inline let-binders. See
--- 'Clash.Normalize.Transformations.Inline.reduceBindersCleanup'.
+-- into the other to-inline let-binders.
 --
 -- The let-bindings are those of a let-expression opened with
 -- 'openLetBindings', in the scope of its body. A free variable of a
@@ -347,8 +341,7 @@ reduceBindersCleanup scL origInl (!subst, !substFVs, !doneInl) u =
 {-# SCC reduceBindersCleanup #-}
 
 -- | Used by 'inlineCleanup' to inline binders that we want to inline into the
--- binders that we want to keep. See
--- 'Clash.Normalize.Transformations.Inline.inlineBndrsCleanup'.
+-- binders that we want to keep.
 --
 -- Gives the bindings to keep: the given ones, followed by those of the
 -- bindings to inline that turned out to be recursive, in the order of their
@@ -399,8 +392,6 @@ inlineBndrsCleanup scL origInl = go
 --   * a projection case-expression (1 alternative)
 --   * a data constructor
 --   * I/O actions
---
--- See 'Clash.Normalize.Transformations.Inline.inlineCleanup'.
 inlineCleanup :: Transformation
 inlineCleanup = toScopedTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
 
@@ -507,10 +498,18 @@ inlineCleanupWorker ctx node bind body0 = do
 
 -- * collapseRHSNoops
 
+{- Note [relation collapseRHSNoops and inlineCleanup]
+The `collapseRHSNoops` transformation replaces functions/primitives that are
+the identity in HDL, but not in Haskell, by `unsafeCoerce`. `inlineCleanup`
+subsequently inlines these `unsafeCoerce` calls. The end result of all of this
+is that we get no/fewer assignments in HDL where the RHS is simply a variable
+reference. See issue #779.
+-}
+
 -- | Takes a binding and collapses its term if it is a noop. Only runs at
 -- synthesis boundaries (NOINLINE/OPAQUE functions) to avoid running too early
 -- on functions that might be inlined later. See #3036, and
--- 'Clash.Normalize.Transformations.Inline.collapseRHSNoops'.
+-- Note [relation collapseRHSNoops and inlineCleanup].
 collapseRHSNoops :: Transformation
 collapseRHSNoops =
   toScopedTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
@@ -607,8 +606,7 @@ collapseRHSNoopsWorker ctx letrec letBind body = do
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition. It's a custom topdown traversal that -for efficiency
 -- reasons- does not explore alternative of cases whose subject triggered an
--- 'inlineNonRepWorker'. See
--- 'Clash.Normalize.Transformations.Inline.inlineNonRep'.
+-- 'inlineNonRepWorker'.
 inlineNonRep
   :: (HasCallStack, Distinct n)
   => TransformContext n -> Term n -> NormalizeSession (Term n)
@@ -639,8 +637,7 @@ inlineNonRep ctx e0 = case e0 of
 
 -- | Inline function with a non-representable result if it's the subject
 -- of a Case-decomposition. This worker function only tries the given term
--- (i.e., it does not traverse it). See
--- 'Clash.Normalize.Transformations.Inline.inlineNonRepWorker'.
+-- (i.e., it does not traverse it).
 --
 -- It sets the changed flag in the NormalizeSession if it successfully inlines
 -- a binder.
@@ -694,8 +691,26 @@ inlineNonRepWorker ctx e = case e of
 -- * inlineSmall and inlineWorkFree
 
 -- | True when @e@, appearing in context @ctx@, is an inner (partial) position
--- of a variable-headed application spine. See
--- 'Clash.Normalize.Transformations.Inline.isPartOfVarAppSpine'.
+-- of a variable-headed application spine. That is, for a fully applied
+-- function call:
+--
+--     f a b c
+--
+-- this function returns 'True' for:
+--
+--     f
+--     f a
+--     f a b
+--
+-- This is useful for functions such as 'inlineSmall' and 'inlineWorkFree'. The
+-- former doesn't really care about arguments at all, but it is still useful to
+-- only run once while traversing the tree. The latter will refuse to do any
+-- work for partially applied functions in the first place -- but it only finds
+-- out after performing relatively expensive checks.
+--
+-- Note that this will also return 'True' in the context of a tick ('KTickC').
+-- That means that transformations using this as a performance guard should be
+-- careful to use 'collectTicks' before matching on a constructor.
 isPartOfVarAppSpine :: TransformContext n -> Term n -> Bool
 isPartOfVarAppSpine ctx e = case ctxFrames ctx of
   k : _ -> isSpineKind k && isSpineNode e
@@ -715,8 +730,7 @@ isPartOfVarAppSpine ctx e = case ctxFrames ctx of
     Tick {} -> True
     _ -> False
 
--- | Inline small functions. See
--- 'Clash.Normalize.Transformations.Inline.inlineSmall'.
+-- | Inline small functions
 inlineSmall :: Transformation
 inlineSmall =
   toScopedTransformation "inlineSmall"
@@ -761,8 +775,7 @@ inlineSmallWorker ctx e
 
 -- | Inline work-free functions, i.e. fully applied functions that evaluate to
 -- a constant. Applications to closed arguments are normalized before they're
--- inlined, see 'normalizeWorkFreeApp'. See
--- 'Clash.Normalize.Transformations.Inline.inlineWorkFree'.
+-- inlined, see 'normalizeWorkFreeApp'.
 inlineWorkFree :: Transformation
 inlineWorkFree =
   toScopedTransformation "inlineWorkFree"

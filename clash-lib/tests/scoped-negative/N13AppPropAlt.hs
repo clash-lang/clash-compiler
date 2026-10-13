@@ -2,7 +2,7 @@
 -- EXPECT: rigid type variable
 -- | Capture: push the arguments of an application into the alternatives of
 -- a case-expression in its function part without opening their patterns
--- (case 1 of Note [AppProp no shadowing], the bug in `appProp`)
+-- (the capture bug in `appProp` that #1040 fixed)
 module N13AppPropAlt where
 
 import Clash.Core.Scoped.Syntax
