@@ -20,7 +20,7 @@ import qualified Clash.Core.TyCon as C
 import qualified Clash.Data.UniqMap as UniqMap
 
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.TyCon
+import Clash.Core.TyCon
 
 import Test.Clash.Rewrite (intTyCon, nTyConName, pTyConName, testTyConMap)
 import Test.Clash.Scoped

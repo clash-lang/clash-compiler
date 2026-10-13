@@ -11,7 +11,7 @@
     variables of the newtype, in the empty scope, and its eta-reduced
     representation type in their scope. Unwrapping a newtype is then
     substituting types for these type variables
-    ('Clash.Core.Scoped.TyCon.newTyConInstRhs').
+    ('Clash.Core.TyCon.newTyConInstRhs').
 
   * The /equations of a type family/ (t'TyFamEqn'): for every equation, a
     telescope of its pattern variables, in the empty scope, and its left-hand
