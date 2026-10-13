@@ -46,12 +46,12 @@ import GHC.Stack (HasCallStack)
 import GHC.Builtin.Names
   (eqPrimTyConKey, eqTyConKey, typeNatAddTyFamNameKey, unsafeReflDataConKey)
 
-import Clash.Core.DataCon (DataCon (dcUniq))
+import Clash.Core.DataCon (DataCon (dcUniq), dcSig)
 import Clash.Core.Name (Name (nameUniq))
 import qualified Clash.Core.Type as C
 import Clash.Unique (fromGhcUnique)
 
-import Clash.Core.Scoped.DataCon (DataConSig (..), dataConSigOf)
+import Clash.Core.Scoped.DataCon (DataConSig (..))
 import Clash.Core.Scoped.NameMap
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
@@ -302,7 +302,7 @@ dataConInstArgTysE
   -- ^ Types for the universally quantified type variables
   -> (forall l. DExt n l => Scope l -> Tele TyBinder n l -> [Type l] -> r)
   -> Maybe r
-dataConInstArgTysE tenv sc dc univTys k = case dataConSigOf tenv dc of
+dataConInstArgTysE tenv sc dc univTys k = case dcSig dc of
   DataConSig univ ext argTys -> do
     s1 <- extendTySubstTele (closedSubst sc) univ univTys
     pure $ openTyVars IntMap.empty s1 ext $ \s2 ext' names ->
