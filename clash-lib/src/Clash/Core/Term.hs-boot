@@ -8,7 +8,6 @@
 
 module Clash.Core.Term where
 
-import Control.DeepSeq (NFData)
 import GHC.Generics    (Generic)
 import Clash.Core.Name (Name)
 
@@ -22,14 +21,5 @@ instance Generic Term
 
 data PrimInfo
 
-data NameMod
-instance Show NameMod
-instance NFData NameMod
 
-data WorkInfo
-instance Show WorkInfo
-instance NFData WorkInfo
 
-data IsMultiPrim
-instance Show IsMultiPrim
-instance NFData IsMultiPrim

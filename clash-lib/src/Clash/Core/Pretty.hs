@@ -60,14 +60,14 @@ import System.Environment               (lookupEnv)
 import System.IO.Unsafe                 (unsafePerformIO)
 import Text.Read                        (readMaybe)
 
+import Clash.Core.Basic (ConstTy (..), LitTy (..), NameMod (..))
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Literal               (Literal (..))
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Term
-  (Pat (..), Term (..), TickInfo (..), NameMod (..), CoreContext (..), primArg, PrimInfo(primName),Bind(..))
+  (Pat (..), Term (..), TickInfo (..), CoreContext (..), primArg, PrimInfo(primName), Bind(..))
 import Clash.Core.TyCon                 (TyConName, isTupleTyConLike)
-import Clash.Core.Type                  (ConstTy (..), Kind, LitTy (..),
-                                         Type (..), TypeView (..), tyView)
+import Clash.Core.Type                  (Kind, Type (..), TypeView (..), tyView)
 import Clash.Core.Var                   (Id, TyVar, Var (..), IdScope(..))
 import Clash.Debug                      (trace)
 import Clash.Util

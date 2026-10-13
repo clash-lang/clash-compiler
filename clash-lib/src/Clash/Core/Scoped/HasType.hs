@@ -46,12 +46,11 @@ module Clash.Core.Scoped.HasType
 import Data.Maybe (fromMaybe)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Basic (IsMultiPrim (..), LitTy (..))
 import Clash.Core.DataCon (DataCon (dcType))
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Pretty (showPpr)
-import qualified Clash.Core.Term as C (IsMultiPrim (..))
 import Clash.Core.TyCon (isTupleTyConLike)
-import qualified Clash.Core.Type as C
 import Clash.Debug (debugIsOn)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
@@ -94,8 +93,8 @@ literalType = \case
 -- type] in "Clash.Normalize.Transformations.MultiPrim".
 primInfoType :: (HasCallStack, Distinct n) => PrimInfo -> Type n
 primInfoType p = case primMultiResult p of
-  C.SingleResult -> sinkClosed (primType p)
-  C.MultiResult -> sinkClosed (multiResultType (primType p))
+  SingleResult -> sinkClosed (primType p)
+  MultiResult -> sinkClosed (multiResultType (primType p))
 {-# INLINE primInfoType #-}
 
 -- | The type of a multi-result primitive, from the type of the primitive that
@@ -332,9 +331,9 @@ inferCoreKindOf tenv sc ty = case tyView ty of
           (error $ $(curLoc) ++ "inferCoreKindOf: kind mentions the type variable: "
                      ++ showPpr ty)
           (unsinkType (tyBinderNameBinders b') (inferCoreKindOf tenv sc' a'))
-      LitTy C.NumTy {} -> typeNatKind
-      LitTy C.SymTy {} -> typeSymbolKind
-      LitTy C.CharTy {} -> charPrimTy
+      LitTy NumTy {} -> typeNatKind
+      LitTy SymTy {} -> typeSymbolKind
+      LitTy CharTy {} -> charPrimTy
       AnnType _ a -> inferCoreKindOf tenv sc a
       AppTy a b -> goApp a [b]
  where

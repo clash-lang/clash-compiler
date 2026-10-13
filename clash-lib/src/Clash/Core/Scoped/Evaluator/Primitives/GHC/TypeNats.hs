@@ -22,8 +22,8 @@ module Clash.Core.Scoped.Evaluator.Primitives.GHC.TypeNats
 
 import Data.Text (Text)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Core.Literal (Literal (..))
-import qualified Clash.Core.Type as C
 import Clash.Util (textNameLit)
 
 import qualified GHC.TypeNats
@@ -53,7 +53,7 @@ primitives =
         | Lit (NaturalLiteral n) : fun : _ <- args
         -- 'GHC.TypeNats.SNat' is a newtype over 'Natural', which Clash
         -- represents by the value it wraps, so the literal is the 'SNat'.
-        -> let nTy = LitTy (C.NumTy n)
+        -> let nTy = LitTy (NumTy n)
                snat = Literal (NaturalLiteral n)
                ret = mkApps (valToTerm fun) [Right nTy, Left snat]
             in reduce ret

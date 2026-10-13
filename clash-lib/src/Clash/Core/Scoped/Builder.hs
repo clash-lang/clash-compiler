@@ -135,6 +135,7 @@ import Data.Text (Text)
 import GHC.Stack (HasCallStack)
 import GHC.Types.SrcLoc (SrcSpan)
 
+import Clash.Core.Basic (ConstTy (..), LitTy, NameMod)
 import Clash.Annotations.SynthesisAttributes (Attr)
 
 import Clash.Core.DataCon (DataCon)
@@ -348,7 +349,7 @@ varTyB !key = TyOpen $ Run $ \(BEnv _ tys _ _) -> case IntMap.lookup key tys of
   Just ty -> pure ty
   Nothing -> error ("Clash.Core.Scoped.Builder: type variable not in scope: " ++ show key)
 
-constTyB :: C.ConstTy -> TyB
+constTyB :: ConstTy -> TyB
 constTyB !c = TyClosed (ConstTy c)
 
 -- | A forall-type: key, name and kind of the type variable, and the body
@@ -361,7 +362,7 @@ appTyB :: TyB -> TyB -> TyB
 appTyB (TyClosed t1) (TyClosed t2) = TyClosed (AppTy t1 t2)
 appTyB !t1 !t2 = TyOpen $ Run $ \env -> AppTy <$> runTyB t1 env <*> runTyB t2 env
 
-litTyB :: C.LitTy -> TyB
+litTyB :: LitTy -> TyB
 litTyB !l = TyClosed (LitTy l)
 
 annTyB :: [Attr Text] -> TyB -> TyB
@@ -371,11 +372,11 @@ annTyB attrs t0 = rnf attrs `seq` case t0 of
 
 -- | A function type: the types of the arguments, and of the result
 funTyB :: [TyB] -> TyB -> TyB
-funTyB args res = foldr (\a r -> appTyB (appTyB (constTyB C.Arrow) a) r) res args
+funTyB args res = foldr (\a r -> appTyB (appTyB (constTyB Arrow) a) r) res args
 
 -- | A type constructor applied to types
 tyConAppB :: TyConName -> [TyB] -> TyB
-tyConAppB tc = List.foldl' appTyB (constTyB (C.TyCon tc))
+tyConAppB tc = List.foldl' appTyB (constTyB (TyCon tc))
 
 -- | A type of Clash Core, whose type variables are bound by the builders
 -- around it, by their uniques. Unless it is closed and without binders, it
@@ -579,7 +580,7 @@ newtype TickB = TickB (Run TickInfo)
 srcSpanTickB :: SrcSpan -> TickB
 srcSpanTickB !sp = TickB (Run (\_ -> pure (SrcSpan sp)))
 
-nameModTickB :: C.NameMod -> TyB -> TickB
+nameModTickB :: NameMod -> TyB -> TickB
 nameModTickB !m !ty = TickB $ Run $ \env -> NameMod m <$> runTyB ty env
 
 deDupTickB :: TickB

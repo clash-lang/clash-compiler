@@ -105,6 +105,7 @@ import qualified Data.Text.Extra as Text (showt)
 import GHC.Exts (State#)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Explicit.SimIO (SimIO)
 import Clash.Signal.Internal (Signal (..))
 
@@ -112,7 +113,6 @@ import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Literal (Literal)
 import qualified Clash.Core.Name as C
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
 import Clash.Util (curLoc)
 
 import Clash.Core.Scoped.FreeVars
@@ -475,7 +475,7 @@ teleTyRaws (TCons b bs) = tyNameRaw (tyNameOf b) : teleTyRaws bs
 -- in the alternative, see 'anfAlt'. It doesn't occur in the result.
 unusedExistential :: Type n
 unusedExistential =
-  LitTy (C.SymTy "Clash.Normalize.Scoped.Transformations.ANF.unusedExistential")
+  LitTy (SymTy "Clash.Normalize.Scoped.Transformations.ANF.unusedExistential")
 
 -- | Rebuild an alternative. The pattern of an 'APat' gets fresh binders, see
 -- the module header.

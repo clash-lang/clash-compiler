@@ -66,14 +66,13 @@ import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
 import qualified GHC.Types.SrcLoc                 as GHC (SrcSpan)
 import           GHC.Utils.Outputable             (ppr, showSDocUnsafe)
 
+import Clash.Core.Basic (ConstTy (..), IsMultiPrim (..), LitTy (..))
 import           Clash.Annotations.BitRepresentation.Internal
   (ConstrRepr' (..), CustomReprs, DataRepr' (..), Type' (..), getConstrRepr, getDataRepr)
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.Literal               (Literal (..))
 import           Clash.Core.Pretty                (showPpr)
 import qualified Clash.Core.Name                  as C (nameLoc, nameOcc)
-import qualified Clash.Core.Term                  as C
-import qualified Clash.Core.Type                  as C
 import           Clash.Driver.Types
   (Binding (..), ClashEnv (..), ClashOpts (..), GlobalBindings)
 import           Clash.Netlist                    (genNames, runNetlistMonad)
@@ -288,7 +287,7 @@ mkNetDecl ctx (id_,tm) | (_,_,ticks) <- collectArgsTicks tm = preserveVarEnv $ w
         Nothing
 
   if | not (shouldRenderDecl hwTy tm) -> return []
-     | (Prim pInfo@PrimInfo{primMultiResult=C.MultiResult}, args) <- collectArgs tm ->
+     | (Prim pInfo@PrimInfo{primMultiResult=MultiResult}, args) <- collectArgs tm ->
           multiDecls srcNote pInfo args
      | otherwise -> pure <$> singleDecl srcNote hwTy
 
@@ -807,7 +806,7 @@ mkSelection ctx declType bndr scrut altTy alts0 tickDecls = do
       LitPat  (NaturalLiteral n) -> return (Just (NumLit n), altExpr)
       LitPat l -> do
         (_,sp) <- Lens.use curCompNm
-        throw (ClashException sp ($(curLoc) ++ "Not an integer literal in LitPat:\n\n" ++ showPpr (C.LitPat l)) Nothing)
+        throw (ClashException sp ($(curLoc) ++ "Not an integer literal in LitPat:\n\n" ++ showPpr l) Nothing)
 
   mkScrutExpr :: GHC.SrcSpan -> HWType -> Alt n -> Expr -> Expr
   mkScrutExpr sp scrutHTy (Alt pat _) scrutE = case pat of
@@ -891,9 +890,9 @@ reorderCustom ctx reprs ty alts =
   typeName :: Type n -> Either String Type'
   typeName = \case
     AppTy t1 t2 -> AppTy' <$> typeName t1 <*> typeName t2
-    ConstTy (C.TyCon nm) -> Right (ConstTy' (C.nameOcc nm))
-    LitTy (C.NumTy n) -> Right (LitTy' n)
-    LitTy (C.SymTy lit) -> Right (SymLitTy' (StrictText.pack lit))
+    ConstTy (TyCon nm) -> Right (ConstTy' (C.nameOcc nm))
+    LitTy (NumTy n) -> Right (LitTy' n)
+    LitTy (SymTy lit) -> Right (SymLitTy' (StrictText.pack lit))
     t -> Left ($(curLoc) ++ "Unexpected type: " ++ show t)
 
 patPos :: CustomReprs -> Alt n -> Int

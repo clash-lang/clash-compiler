@@ -30,9 +30,9 @@ import qualified Control.Lens as Lens
 import Data.Text.Extra (showt)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Basic (IsMultiPrim (..), WorkInfo (..))
 import Clash.Annotations.Primitive (extractPrim)
 import qualified Clash.Core.Name as C (mkUnsafeSystemName)
-import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (TyConMap)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Primitives.Types (Primitive (..))
@@ -66,7 +66,7 @@ setupMultiResultPrimWorker
   -> Term n
   -> PrimInfo
   -> NormalizeSession (Term n)
-setupMultiResultPrimWorker ctx node pInfo@PrimInfo{primMultiResult = C.SingleResult} = do
+setupMultiResultPrimWorker ctx node pInfo@PrimInfo{primMultiResult = SingleResult} = do
   tcm <- Lens.view tcCache
   prim <- Lens.view (primitives . Lens.at (primName pInfo))
 
@@ -85,7 +85,7 @@ setupMultiResultPrimWorker _ctx node _primInfo = return node
 -- @
 --   /\\a b c -> \\(a1 :: a) ->
 --     letrec
---       r  = prim \@a \@b \@c a1 r2 r3 -- With 'C.MultiResult'
+--       r  = prim \@a \@b \@c a1 r2 r3 -- With 'MultiResult'
 --       r2 = c$multiPrimSelect \@b \@(b, c) r2 r
 --       r3 = c$multiPrimSelect \@c \@(b, c) r3 r
 --     in
@@ -130,14 +130,14 @@ setupMultiResultPrim' tcm sc pInfo =
 -- | The primitive with multiple results
 multiResultPrimInfo :: PrimInfo -> PrimInfo
 multiResultPrimInfo p =
-  mkPrimInfo (primName p) (primType p) (primWorkInfo p) C.MultiResult (primUnfolding p)
+  mkPrimInfo (primName p) (primType p) (primWorkInfo p) MultiResult (primUnfolding p)
 
 -- | The primitive that selects a result of a multi-result primitive, of type
 -- @forall a b. a -> b -> a@, see
 -- 'Clash.Normalize.Transformations.MultiPrim.setupMultiResultPrim'
 multiPrimSelectInfo :: PrimInfo
 multiPrimSelectInfo =
-  mkPrimInfo "c$multiPrimSelect" selTy C.WorkAlways C.SingleResult NoUnfolding
+  mkPrimInfo "c$multiPrimSelect" selTy WorkAlways SingleResult NoUnfolding
  where
   selTy =
     withFreshTyBinder emptyScope (C.mkUnsafeSystemName "a" 0) liftedTypeKind $ \sc1 a ->

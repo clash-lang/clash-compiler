@@ -18,8 +18,6 @@
 
 module Clash.Core.Util where
 
-import Control.Exception.Base (patError)
-import GHC.Prim.Panic (absentError)
 import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet
@@ -32,9 +30,6 @@ import Data.Maybe
 import qualified Data.Set                      as Set
 import qualified Data.Set.Lens                 as Lens
 import qualified Data.Text                     as T
-import           Data.Text.Extra               (showt)
-import           GHC.Real
-  (divZeroError, overflowError, ratioZeroDenominatorError, underflowError)
 import           GHC.Stack                     (HasCallStack)
 
 import           GHC.Builtin.Names       (ipClassKey)
@@ -60,8 +55,6 @@ import Clash.Unique                      (fromGhcUnique)
 import Clash.Util
 import Clash.Util.Supply                 (Supply, freshId)
 
-import {-# SOURCE #-} qualified Clash.Normalize.Primitives as Primitives
-import Clash.XException (errorX)
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
 -- of bindings and remaking Let (NonRec ...) ... and Let (Rec ...) ...
@@ -485,26 +478,6 @@ primUCo =
                 , primMultiResult = SingleResult
                 , primUnfolding = NoUnfolding
                 }
-
-undefinedPrims :: [T.Text]
-undefinedPrims = fmap showt
-  [ 'Primitives.undefined
-  , 'patError
-  , 'error
-  , 'errorWithoutStackTrace
-  , 'undefined
-  , 'absentError
-  , 'divZeroError
-  , 'overflowError
-  , 'ratioZeroDenominatorError
-  , 'underflowError
-  ]
-
-undefinedXPrims :: [T.Text]
-undefinedXPrims = fmap showt
-  [ 'Primitives.undefinedX
-  , 'errorX
-  ]
 
 substArgTys
   :: DataCon

@@ -66,6 +66,7 @@ import           GHC.Stack               (HasCallStack)
 import           GHC.Utils.Monad         (zipWith3M)
 import           GHC.Utils.Outputable    (ppr, showSDocUnsafe)
 
+import Clash.Core.Basic (ConstTy (..), IsMultiPrim (..), LitTy (..), NameMod (..))
 import           Clash.Annotations.TopEntity
   (TopEntity(..), PortName(..), defSyn)
 import           Clash.Annotations.BitRepresentation.Internal
@@ -87,14 +88,12 @@ import           Clash.Core.Subst
   (Subst (..), deshadowLetExpr, extendIdSubst, extendIdSubstList,
    extendInScopeId, extendInScopeIdList, mkSubst, substTm)
 import           Clash.Core.Term
-  (primMultiResult, MultiPrimInfo(..), Alt, Bind (..), LetBinding, Pat (..), Term (..), TickInfo (..), NameMod (..),
-   IsMultiPrim (..), bindToList, collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
+  (primMultiResult, MultiPrimInfo(..), Alt, Bind (..), LetBinding, Pat (..), Term (..), TickInfo (..), bindToList, collectArgsTicks, collectTicks, collectBndrs, PrimInfo(primName), mkTicks, stripTicks)
 import           Clash.Core.TermInfo
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (LitTy (..), Type (..), TyVar, TypeView (..), normalizeType,
-   splitTyConAppM, stripAnnTypes, tyView)
+  (Type (..), TyVar, TypeView (..), normalizeType, splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
   (tyLitShow)
 import           Clash.Core.Var
@@ -116,7 +115,6 @@ import qualified Clash.Core.Scoped.Syntax as S
 import qualified Clash.Core.Scoped.Type as S (TypeView (..), coreView1, tyView)
 import qualified Clash.Core.Scoped.Util as S (splitShouldSplit)
 import           Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, typeEnvTyConMap)
-import qualified Clash.Core.Type as C (ConstTy (..))
 import {-# SOURCE #-} Clash.Netlist.BlackBox
 import {-# SOURCE #-} Clash.Netlist.BlackBox.Util
 import           Clash.Netlist.BlackBox.Types
@@ -402,7 +400,7 @@ maybeConvertToCustomRepr _reprs _ty hwTy = hwTy
 typeToType' :: S.Type n -> Either String Type'
 typeToType' = \case
   S.AppTy t1 t2 -> AppTy' <$> typeToType' t1 <*> typeToType' t2
-  S.ConstTy (C.TyCon name) -> return (ConstTy' (nameOcc name))
+  S.ConstTy (TyCon name) -> return (ConstTy' (nameOcc name))
   S.LitTy (NumTy n) -> return (LitTy' n)
   S.LitTy (SymTy lit) -> return (SymLitTy' (Text.pack lit))
   e -> Left ($(curLoc) ++ "Unexpected type: " ++ show e)

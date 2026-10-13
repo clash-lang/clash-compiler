@@ -45,6 +45,7 @@ import           Clash.Core.Subst
 import           Clash.Core.Term
 import           Clash.Core.TyCon
 import           Clash.Core.Type
+import           Clash.Core.Basic (undefinedPrims, undefinedXPrims)
 import           Clash.Core.Util
 import           Clash.Core.Var
 import           Clash.Core.VarEnv

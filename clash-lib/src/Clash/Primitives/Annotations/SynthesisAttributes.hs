@@ -18,12 +18,12 @@ import Text.Show.Pretty (ppShow)
 
 import qualified Data.Text as T
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Annotations.SynthesisAttributes
 import Clash.Backend (Backend)
 import Clash.Core.Scoped.Syntax (Type(LitTy))
 import Clash.Core.Scoped.TermLiteral (termToDataError)
 import Clash.Core.Scoped.Type (coreView)
-import Clash.Core.Type (LitTy(NumTy))
 import Clash.Netlist.BlackBox.Types hiding (BlackBoxFunction)
 import Clash.Netlist.Scoped.Types (BlackBoxFunction, bbScope, bbTypeEnv)
 import Clash.Netlist.Types

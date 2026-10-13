@@ -87,6 +87,7 @@ import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
 import           GHC.Types.SrcLoc                  (SrcSpan)
 import           GHC.BasicTypes.Extra             ()
 
+import Clash.Core.Basic (LitTy (..))
 import           Clash.Annotations.Primitive
   (HDL (..), extractPrim)
 import           Clash.Annotations.TopEntity
@@ -95,7 +96,6 @@ import           Clash.Annotations.TopEntity.Extra ()
 import           Clash.Backend
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
-import           Clash.Core.Type                  (LitTy(SymTy))
 import           Clash.Core.Var
   (varName, varUniq)
 import           Clash.Debug                      (debugIsOn)

@@ -38,10 +38,10 @@ import qualified Data.List.Extra as List
 import qualified Data.Text.Extra as Text (showt)
 import GHC.Stack (HasCallStack)
 
+import Clash.Core.Basic (IsMultiPrim (..), WorkInfo (..))
 import Clash.XException (errorX)
 
 import Clash.Annotations.Primitive (extractPrim)
-import qualified Clash.Core.Term as C
 import Clash.Core.Scoped.TysPrim (undefinedTy)
 import Clash.Core.DataCon (DataCon)
 import Clash.Netlist.BlackBox.Types (Element (Err))
@@ -97,7 +97,7 @@ xOptimizeWorker ctx node subj ty alts = do
 -- | @errorX@ at a type, see the module header
 errorXOf :: Type n -> Term n
 errorXOf = primAtType
-  (mkPrimInfo (Text.showt 'errorX) undefinedTy C.WorkConstant C.SingleResult NoUnfolding)
+  (mkPrimInfo (Text.showt 'errorX) undefinedTy WorkConstant SingleResult NoUnfolding)
 
 -- | An expression equivalent to the alternative given. When only one
 -- alternative is defined, this replaces the case-expression.

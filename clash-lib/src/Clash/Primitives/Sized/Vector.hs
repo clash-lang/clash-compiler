@@ -29,12 +29,12 @@ import           Text.Trifecta.Result               (Result(Success))
 import qualified Data.String.Interpolate            as I
 import           GHC.Stack                          (HasCallStack)
 
+import Clash.Core.Basic (LitTy (..))
 import           Clash.Backend
   (Backend, hdlTypeErrValue, expr, blockDecl)
 import           Clash.Core.Scoped.Syntax           (Type(LitTy))
 import           Clash.Core.Scoped.TermInfo         (isLiteral, isVar)
 import           Clash.Core.Scoped.Type             (coreView)
-import           Clash.Core.Type                    (LitTy(NumTy))
 import           Clash.Netlist.BlackBox.Util        (renderElem)
 import           Clash.Netlist.BlackBox.Parser      (runParse)
 import           Clash.Netlist.BlackBox.Types

@@ -15,6 +15,7 @@ module Clash.Annotations.BitRepresentation.ClashLib
   , bitsToBits
   ) where
 
+import Clash.Core.Basic (ConstTy (..), LitTy (..))
 import           Clash.Annotations.BitRepresentation.Internal
   (Type'(..))
 import qualified Clash.Annotations.BitRepresentation.Util as BitRepresentation
@@ -35,11 +36,11 @@ coreToType'
        -- Bit representation type
 coreToType' (C.AppTy t1 t2) =
   AppTy' <$> coreToType' t1 <*> coreToType' t2
-coreToType' (C.ConstTy (C.TyCon name)) =
+coreToType' (C.ConstTy (TyCon name)) =
   return $ ConstTy' (nameOcc name)
-coreToType' (C.LitTy (C.NumTy n)) =
+coreToType' (C.LitTy (NumTy n)) =
   return $ LitTy' n
-coreToType' (C.LitTy (C.SymTy lit)) =
+coreToType' (C.LitTy (SymTy lit)) =
   return $ SymLitTy' (T.pack lit)
 coreToType' e =
   Left $ $(curLoc) ++ "Unexpected type: " ++ show e

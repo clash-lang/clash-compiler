@@ -172,6 +172,7 @@ import Data.Text (Text)
 import GHC.Types.SrcLoc (SrcSpan)
 
 import Clash.Annotations.SynthesisAttributes (Attr)
+import Clash.Core.Basic (ConstTy, IsMultiPrim, LitTy, NameMod, WorkInfo)
 -- Through boot files: data constructors store scoped types, and so will type
 -- constructors, which the types of Clash Core refer to
 import {-# SOURCE #-} Clash.Core.DataCon (DataCon)
@@ -255,8 +256,8 @@ data PrimInfo = PrimInfo
   -- ^ Lazy, like the types of global variables. The type of a multi-result
   -- primitive is the type of the primitive that returns a tuple, see
   -- 'Clash.Core.Scoped.HasType.primInfoType'.
-  , primWorkInfo :: !C.WorkInfo
-  , primMultiResult :: !C.IsMultiPrim
+  , primWorkInfo :: !WorkInfo
+  , primMultiResult :: !IsMultiPrim
   , primUnfolding :: !PrimUnfolding
   , primLegacy :: C.PrimInfo
   -- ^ Transitional, see above. Lazy.
@@ -357,10 +358,10 @@ teleLength = go 0
 data Type (n :: S) where
   -- | Type variable occurrence: human readable name, kind, and the name itself
   VarTy    :: !(C.Name C.Type) -> !(Kind n) -> !(TyName n) -> Type n
-  ConstTy  :: !C.ConstTy -> Type n
+  ConstTy  :: !ConstTy -> Type n
   ForAllTy :: !(TyBinder n l) -> !(Type l) -> Type n
   AppTy    :: !(Type n) -> !(Type n) -> Type n
-  LitTy    :: !C.LitTy -> Type n
+  LitTy    :: !LitTy -> Type n
   AnnType  :: [Attr Text] -> !(Type n) -> Type n
 type role Type nominal
 
@@ -428,7 +429,7 @@ deriving instance Show (Pat n l)
 -- | Clash's 'C.TickInfo', with scoped types and terms
 data TickInfo (n :: S)
   = SrcSpan !SrcSpan
-  | NameMod !C.NameMod !(Type n)
+  | NameMod !NameMod !(Type n)
   | DeDup
   | NoDeDup
   | Attributes !(Type n) !(Term n)

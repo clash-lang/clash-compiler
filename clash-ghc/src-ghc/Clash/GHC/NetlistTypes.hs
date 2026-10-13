@@ -41,11 +41,12 @@ import qualified GHC.Stack.Types
 import GHC.Word                         (Word8, Word16, Word32, Word64)
 import Language.Haskell.TH.Syntax       (showName)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Core.DataCon               (dcArgTys)
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (tyConDataCons)
-import qualified Clash.Core.Type as C   (LitTy (..), TypeView (..), tyView)
+import qualified Clash.Core.Type as C   (TypeView (..), tyView)
 import Clash.Core.Scoped.DataCon        (dataConInstExtTyVars)
 import Clash.Core.Scoped.Pretty         ()
 import Clash.Core.Scoped.Syntax         (Distinct, Scope, Type (..))
@@ -351,12 +352,12 @@ liftE = mapExceptT (MaybeT . pure . Just . coerce)
 
 domTag :: (Monad m, Distinct n) => TypeEnv -> Scope n -> Type n -> ExceptT String (MaybeT m) String
 domTag m sc (coreView1 m sc -> Just ty) = domTag m sc ty
-domTag _ _ (LitTy (C.SymTy tag)) = pure tag
+domTag _ _ (LitTy (SymTy tag)) = pure tag
 domTag _ _ ty = throwE $ "Internal error. Cannot translate domain tag:\n" ++ showPpr ty
 
 domPeriod :: (Monad m, Distinct n) => TypeEnv -> Scope n -> Type n -> ExceptT String (MaybeT m) Integer
 domPeriod m sc (coreView1 m sc -> Just ty) = domPeriod m sc ty
-domPeriod _ _ (LitTy (C.NumTy period)) = pure period
+domPeriod _ _ (LitTy (NumTy period)) = pure period
 domPeriod _ _ ty = throwE $ "Internal error. Cannot translate domain period:\n" ++ showPpr ty
 
 fromType

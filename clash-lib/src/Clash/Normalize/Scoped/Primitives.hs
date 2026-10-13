@@ -4,13 +4,9 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Special primitives created during the normalization process, in scoped
-  Clash Core: those of "Clash.Normalize.Primitives", with the same names.
-  Each has the type @forall a. a@, and is applied to the type of the term it
-  stands for.
+  Special primitives created during the normalization process. Each has the
+  type @forall a. a@, and is applied to the type of the term it stands for.
 -}
-
-{-# LANGUAGE TemplateHaskellQuotes #-}
 
 module Clash.Normalize.Scoped.Primitives
   ( removedArg
@@ -21,29 +17,31 @@ module Clash.Normalize.Scoped.Primitives
 import Prelude hiding (undefined)
 
 import Data.Text (Text)
-import qualified Data.Text.Extra as Text
 
-import Clash.Core.Term (IsMultiPrim (..), WorkInfo (..))
-import qualified Clash.Normalize.Primitives as C
+import Clash.Core.Basic
+  (IsMultiPrim (..), WorkInfo (..), removedArgName, undefinedName, undefinedXName)
 
 import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.Syntax (PrimInfo, PrimUnfolding (..))
 import Clash.Core.Scoped.TysPrim (undefinedTy)
 
--- | An argument which is computationally irrelevant, and has been removed from
--- the circuit. See 'C.removedArg'.
+-- | The removedArg primitive represents an argument which is computationally
+-- irrelevant, and has been removed from the circuit (as removing it does not
+-- change the behaviour of the circuit). Examples of such arguments are unused
+-- arguments to blackboxes, as removing them does not affect the rendered HDL.
 removedArg :: PrimInfo
-removedArg = special (Text.showt 'C.removedArg)
+removedArg = special removedArgName
 
--- | An undefined value that was identified during normalization. See
--- 'C.undefined'.
+-- | The undefined primitive represents an undefined value that was identified
+-- during normalization. This includes undefined results to compile-time
+-- evaluation, such as division by zero.
 undefined :: PrimInfo
-undefined = special (Text.showt 'C.undefined)
+undefined = special undefinedName
 
--- | An X-exception throwing value that was identified during normalization.
--- See 'C.undefinedX'.
+-- | The undefinedX primitive represents an X-exception throwing value that was
+-- identified during normalization.
 undefinedX :: PrimInfo
-undefinedX = special (Text.showt 'C.undefinedX)
+undefinedX = special undefinedXName
 
 special :: Text -> PrimInfo
 special nm = mkPrimInfo nm undefinedTy WorkNever SingleResult NoUnfolding

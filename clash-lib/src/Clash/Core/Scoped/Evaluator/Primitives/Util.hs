@@ -274,13 +274,12 @@ import GHC.Types.Basic (Boxity (..))
 import GHC.Types.Name (getSrcSpan, nameModule_maybe, nameOccName, occNameString)
 import GHC.Unit.Module (moduleName, moduleNameString)
 
+import Clash.Core.Basic (IsMultiPrim (..), LitTy (..), WorkInfo (..))
 import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
-import qualified Clash.Core.Term as C
 import Clash.Core.TyCon (TyConName, tyConDataCons)
-import qualified Clash.Core.Type as C
 import Clash.Debug (trace)
 import qualified Clash.Normalize.Scoped.Primitives as NP
 import Clash.Normalize.PrimitiveReductions (typeNatAdd)
@@ -1061,7 +1060,7 @@ extractTySizeInfo tenv scope primTy tyArgs = case tyView resTy of
 
 -- | A natural number as a type
 numTy :: Integer -> Type n
-numTy = LitTy . C.NumTy
+numTy = LitTy . NumTy
 
 -- | A type in some scope, e.g. to look at the names of its type constructors
 data SomeType where
@@ -1464,8 +1463,8 @@ powImplWorker PrimStepContext{..}
 -- | A primitive with the given name, work info and closed type. The types of
 -- the primitives below are built with "Clash.Core.Scoped.Builder": the keys
 -- of their type variables only need to differ within a type.
-closedPrim :: Text -> C.WorkInfo -> TyB -> Term n
-closedPrim nm wi ty = Prim (mkPrimInfo nm (runClosedType ty) wi C.SingleResult NoUnfolding)
+closedPrim :: Text -> WorkInfo -> TyB -> Term n
+closedPrim nm wi ty = Prim (mkPrimInfo nm (runClosedType ty) wi SingleResult NoUnfolding)
 
 -- | A type constructor
 tyConB :: TyConName -> TyB
@@ -1485,7 +1484,7 @@ typeNatAddB m n = tyConAppB typeNatAdd [m, n]
 -- constructor of 'Bit'
 bConPrim :: TyConName -> Term n
 bConPrim bTcNm =
-  closedPrim (showt 'Clash.Sized.Internal.BitVector.fromInteger##) C.WorkNever
+  closedPrim (showt 'Clash.Sized.Internal.BitVector.fromInteger##) WorkNever
     (funTyB [tyConB wordPrimTyConName, tyConB integerPrimTyConName] (tyConB bTcNm))
 
 -- | 'Clash.Sized.Internal.BitVector.fromInteger#', given the type
@@ -1513,7 +1512,7 @@ unsignedConPrim = sizedConPrim (showt 'Clash.Sized.Internal.Unsigned.fromInteger
 -- extra args -> Integer -> sized n@
 sizedConPrim :: Text -> [TyB] -> TyConName -> Term n
 sizedConPrim nm extraArgs tcNm =
-  closedPrim nm C.WorkNever $ forAllNatB 0 "n" $
+  closedPrim nm WorkNever $ forAllNatB 0 "n" $
     funTyB
       ([tyConB naturalPrimTyConName] ++ extraArgs ++ [tyConB integerPrimTyConName])
       (tyConAppB tcNm [varTyB 0])
@@ -1526,7 +1525,7 @@ splitAtPrim
   -- ^ Vec TyCon name
   -> Term n
 splitAtPrim snatTcNm vecTcNm =
-  closedPrim (showt 'Clash.Sized.Vector.splitAt) C.WorkNever (splitAtTy snatTcNm vecTcNm)
+  closedPrim (showt 'Clash.Sized.Vector.splitAt) WorkNever (splitAtTy snatTcNm vecTcNm)
 
 splitAtTy
   :: TyConName
@@ -1562,7 +1561,7 @@ vecAppendPrim
   -- ^ Vec TyCon name
   -> Term n
 vecAppendPrim vecNm =
-  closedPrim (showt '(Clash.Sized.Vector.++)) C.WorkNever (vecAppendTy vecNm)
+  closedPrim (showt '(Clash.Sized.Vector.++)) WorkNever (vecAppendTy vecNm)
 
 vecAppendTy
   :: TyConName
@@ -1584,7 +1583,7 @@ vecZipWithPrim
   -- ^ Vec TyCon name
   -> Term n
 vecZipWithPrim vecNm =
-  closedPrim (showt 'Clash.Sized.Vector.zipWith) C.WorkNever (vecZipWithTy vecNm)
+  closedPrim (showt 'Clash.Sized.Vector.zipWith) WorkNever (vecZipWithTy vecNm)
 
 vecZipWithTy
   :: TyConName
@@ -1635,7 +1634,7 @@ bvAppendPrim
   -- ^ BitVector TyCon name
   -> Term n
 bvAppendPrim bvTcNm =
-  closedPrim (showt '(Clash.Sized.Internal.BitVector.++#)) C.WorkNever (bvAppendTy bvTcNm)
+  closedPrim (showt '(Clash.Sized.Internal.BitVector.++#)) WorkNever (bvAppendTy bvTcNm)
 
 bvAppendTy
   :: TyConName
@@ -1656,7 +1655,7 @@ bvSplitPrim
   -- ^ BitVector TyCon name
   -> Term n
 bvSplitPrim bvTcNm =
-  closedPrim (showt 'Clash.Sized.Internal.BitVector.split#) C.WorkNever (bvSplitTy bvTcNm)
+  closedPrim (showt 'Clash.Sized.Internal.BitVector.split#) WorkNever (bvSplitTy bvTcNm)
 
 bvSplitTy
   :: TyConName
@@ -1675,26 +1674,26 @@ bvSplitTy bvNm =
 -- constructor of 'Clash.Sized.Vector.Vec': @forall n a. Vec (n + 1) a -> a@.
 -- See 'Clash.Normalize.PrimitiveReductions.vecHeadPrim'.
 vecHeadPrim, vecLastPrim :: TyConName -> Term n
-vecHeadPrim = closedPrim "Clash.Sized.Vector.head" C.WorkNever . vecHeadTy
-vecLastPrim = closedPrim "Clash.Sized.Vector.last" C.WorkNever . vecHeadTy
+vecHeadPrim = closedPrim "Clash.Sized.Vector.head" WorkNever . vecHeadTy
+vecLastPrim = closedPrim "Clash.Sized.Vector.last" WorkNever . vecHeadTy
 
 vecHeadTy :: TyConName -> TyB
 vecHeadTy vecNm =
   forAllNatB 0 "n" $ forAllTypeB 1 "a" $
-    funTyB [tyConAppB vecNm [typeNatAddB (varTyB 0) (litTyB (C.NumTy 1)), varTyB 1]] (varTyB 1)
+    funTyB [tyConAppB vecNm [typeNatAddB (varTyB 0) (litTyB (NumTy 1)), varTyB 1]] (varTyB 1)
 
 -- | 'Clash.Sized.Vector.tail' and 'Clash.Sized.Vector.init', given the type
 -- constructor of 'Clash.Sized.Vector.Vec': @forall n a. Vec (n + 1) a -> Vec n
 -- a@. See 'Clash.Normalize.PrimitiveReductions.vecTailPrim'.
 vecTailPrim, vecInitPrim :: TyConName -> Term n
-vecTailPrim = closedPrim "Clash.Sized.Vector.tail" C.WorkNever . vecTailTy
-vecInitPrim = closedPrim "Clash.Sized.Vector.init" C.WorkNever . vecTailTy
+vecTailPrim = closedPrim "Clash.Sized.Vector.tail" WorkNever . vecTailTy
+vecInitPrim = closedPrim "Clash.Sized.Vector.init" WorkNever . vecTailTy
 
 vecTailTy :: TyConName -> TyB
 vecTailTy vecNm =
   forAllNatB 0 "n" $ forAllTypeB 1 "a" $
     funTyB
-      [tyConAppB vecNm [typeNatAddB (varTyB 0) (litTyB (C.NumTy 1)), varTyB 1]]
+      [tyConAppB vecNm [typeNatAddB (varTyB 0) (litTyB (NumTy 1)), varTyB 1]]
       (tyConAppB vecNm [varTyB 0, varTyB 1])
 
 -- | The name of the type constructor of boxed tuples of the given arity, as

@@ -90,6 +90,7 @@ import qualified GHC.Classes
 import qualified GHC.CString
 import qualified GHC.Prim
 
+import Clash.Core.Basic (LitTy (..), NameMod (..), undefinedPrims, undefinedXPrims)
 import qualified Clash.Sized.Internal.BitVector
 import qualified Clash.Sized.Internal.Index
 import qualified Clash.Sized.Internal.Signed
@@ -101,8 +102,6 @@ import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
 import qualified Clash.Core.Term as C
-import qualified Clash.Core.Type as C
-import Clash.Core.Util (undefinedPrims, undefinedXPrims)
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding (..))
 import qualified Clash.Normalize.Scoped.Primitives as NP
@@ -359,7 +358,7 @@ step env m = case mTerm m of
 -- | The tick that names the result of evaluating a variable after it. See
 -- 'Clash.GHC.Evaluator.stepVar'.
 nameModTick :: C.Name a -> TickInfo n
-nameModTick occ = NameMod C.PrefixName (LitTy (C.SymTy (toStr occ)))
+nameModTick occ = NameMod PrefixName (LitTy (SymTy (toStr occ)))
  where
   unQualName = snd . Text.breakOnEnd "."
   toStr = Text.unpack . unQualName . flip Text.snoc '_' . C.nameOcc

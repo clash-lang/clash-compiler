@@ -7,8 +7,6 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 Special primitives created during the normalization process.
 -}
 
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
 module Clash.Normalize.Primitives
   ( removedArg
   , undefined
@@ -17,9 +15,9 @@ module Clash.Normalize.Primitives
 
 import Prelude hiding (undefined)
 
-import qualified Data.Text.Extra as Text
-
-import Clash.Core.Term (IsMultiPrim(..), PrimInfo(..), PrimUnfolding(..), WorkInfo(..))
+import Clash.Core.Basic
+  (IsMultiPrim (..), WorkInfo (..), removedArgName, undefinedName, undefinedXName)
+import Clash.Core.Term (PrimInfo(..), PrimUnfolding(..))
 import Clash.Core.Util (undefinedTy)
 
 -- | The removedArg primitive represents an argument which is computationally
@@ -29,7 +27,7 @@ import Clash.Core.Util (undefinedTy)
 --
 removedArg :: PrimInfo
 removedArg = PrimInfo
-  { primName = Text.showt 'removedArg
+  { primName = removedArgName
   , primType = undefinedTy
   , primWorkInfo = WorkNever
   , primMultiResult = SingleResult
@@ -42,7 +40,7 @@ removedArg = PrimInfo
 --
 undefined :: PrimInfo
 undefined = PrimInfo
-  { primName = Text.showt 'undefined
+  { primName = undefinedName
   , primType = undefinedTy
   , primWorkInfo = WorkNever
   , primMultiResult = SingleResult
@@ -54,7 +52,7 @@ undefined = PrimInfo
 --
 undefinedX :: PrimInfo
 undefinedX = PrimInfo
-  { primName = Text.showt 'undefinedX
+  { primName = undefinedXName
   , primType = undefinedTy
   , primWorkInfo = WorkNever
   , primMultiResult = SingleResult

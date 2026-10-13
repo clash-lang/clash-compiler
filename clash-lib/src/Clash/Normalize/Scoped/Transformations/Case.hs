@@ -77,6 +77,7 @@ import GHC.Stack (HasCallStack)
 
 import GHC.Num.Integer (Integer(..))
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Sized.Internal.BitVector as BV (BitVector, eq#)
 import Clash.Sized.Internal.Index as I (Index, eq#)
 import Clash.Sized.Internal.Signed as S (Signed, eq#)
@@ -86,7 +87,6 @@ import Clash.Core.DataCon (DataCon(..), dcUnivTyVars)
 import Clash.Core.Literal (Literal(..))
 import qualified Clash.Core.Name as C (nameOcc)
 import Clash.Core.Pretty (showPpr)
-import qualified Clash.Core.Type as C (LitTy(..))
 import Clash.Core.Scoped.TysPrim (integerIsDc, naturalNsDc)
 import Clash.Driver.Types (DebugOpts(dbg_invariants))
 import Clash.Driver.Warning (warnAboutM)
@@ -346,7 +346,7 @@ caseCon' ctx e subj ty alts = do
   isNum0 _ _ = False
 
   isLitX :: TypeEnv -> Integer -> Type n -> Bool
-  isLitX _ n (LitTy (C.NumTy m)) = n == m
+  isLitX _ n (LitTy (NumTy m)) = n == m
   isLitX te n (coreView1 te sc -> Just t) = isLitX te n t
   isLitX _ _ _ = False
 {-# SCC caseCon' #-}

@@ -28,9 +28,9 @@ import Data.Text.Extra (showt)
 import GHC.Float
 import GHC.TypeLits (KnownNat)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (Name (..))
-import Clash.Core.Type (LitTy (..))
 
 import Clash.Sized.Internal.Signed (Signed (..))
 

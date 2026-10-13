@@ -33,9 +33,9 @@ module Clash.Primitives.Types
   , CompiledPrimMap
   ) where
 
+import Clash.Core.Basic (WorkInfo (..))
 import {-# SOURCE #-} Clash.Netlist.Types (BlackBox, Usage(..))
 import           Clash.Annotations.Primitive  (PrimitiveGuard)
-import           Clash.Core.Term (WorkInfo (..))
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxTemplate, TemplateKind (..), RenderVoid(..))
 import           Clash.Netlist.Scoped.Types   (SomeBlackBoxFunction)

@@ -29,7 +29,7 @@ import Control.Monad.Extra (allM, andM)
 import Control.Monad.State.Class (MonadState)
 import GHC.Stack (HasCallStack)
 
-import qualified Clash.Core.Term as C
+import Clash.Core.Basic (WorkInfo (..))
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize.Scoped.Primitives (removedArg)
 
@@ -94,11 +94,11 @@ isWorkFree cache bndrs = go True
     Literal _ -> pure True
     Prim pr -> case primWorkInfo pr of
       -- The primitive outputs a constant, whatever its arguments
-      C.WorkConstant -> pure True
-      C.WorkNever -> allM goArg args
-      C.WorkIdentity _ _ -> allM goArg args
-      C.WorkVariable -> pure (all isConstantArg args)
-      C.WorkAlways -> pure False
+      WorkConstant -> pure True
+      WorkNever -> allM goArg args
+      WorkIdentity _ _ -> allM goArg args
+      WorkVariable -> pure (all isConstantArg args)
+      WorkAlways -> pure False
     Lam _ e -> andM [go False e, allM goArg args]
     TyLam _ e -> andM [go False e, allM goArg args]
     Let (NonRec _ x) e -> andM [go False e, go False x, allM goArg args]
@@ -168,8 +168,8 @@ isWorkFreeIsh tenv sc e =
       (Data _, args) -> all isWorkFreeIshArg args
       (Prim pInfo, args) -> case primWorkInfo pInfo of
         -- Things like clock or reset generators always perform work
-        C.WorkAlways -> False
-        C.WorkVariable -> all isConstantArg args
+        WorkAlways -> False
+        WorkVariable -> all isConstantArg args
         _ -> all isWorkFreeIshArg args
       (Lam _ _, _) -> isClosed e
       (Literal _, _) -> True

@@ -75,6 +75,7 @@ import GHC.Generics
 import GHC.Types.SrcLoc                        (SrcSpan)
 
 -- Internal Modules
+import Clash.Core.Basic                        (IsMultiPrim (..), NameMod (..), WorkInfo (..))
 import Clash.Core.DataCon                      (DataCon)
 import Clash.Core.Literal                      (Literal)
 import Clash.Core.Name                         (Name (..))
@@ -129,23 +130,6 @@ data TickInfo
 instance Ord TickInfo where
   compare = acmpTickInfo
 
--- | Tag to indicate which instance/register name modifier was used
-data NameMod
-  = PrefixName
-  -- ^ @Clash.Magic.prefixName@
-  | SuffixName
-  -- ^ @Clash.Magic.suffixName@
-  | SuffixNameP
-  -- ^ @Clash.Magic.suffixNameP@
-  | SetName
-  -- ^ @Clash.Magic.setName@
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
-
-data IsMultiPrim
-  = SingleResult
-  | MultiResult
-  deriving (Show, Generic, NFData, Eq, Hashable, Binary)
-
 data PrimInfo = PrimInfo
   { primName :: !Text
   , primType :: !Type
@@ -170,22 +154,6 @@ data MultiPrimInfo = MultiPrimInfo
   , mpi_resultDc :: DataCon
   , mpi_resultTypes :: [Type]
   }
-
-data WorkInfo
-  = WorkConstant
-  -- ^ Ignores its arguments, and outputs a constant
-  | WorkNever
-  -- ^ Never adds any work
-  | WorkVariable
-  -- ^ Does work when the arguments are variable
-  | WorkAlways
-  -- ^ Performs work regardless of whether the variables are constant or
-  -- variable; these are things like clock or reset generators
-  | WorkIdentity Int [Int]
-  -- ^ A more restrictive version of 'WorkNever', where the value is the
-  -- argument at the given position if all arguments for the given list of
-  -- positions are also 'WorkIdentity'
-  deriving (Eq,Show,Generic,NFData,Hashable,Binary)
 
 -- | Term reference
 type TmName     = Name Term

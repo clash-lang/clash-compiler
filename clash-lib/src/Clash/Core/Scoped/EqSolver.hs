@@ -46,9 +46,9 @@ import GHC.Stack (HasCallStack)
 import GHC.Builtin.Names
   (eqPrimTyConKey, eqTyConKey, typeNatAddTyFamNameKey, unsafeReflDataConKey)
 
+import Clash.Core.Basic (LitTy (..))
 import Clash.Core.DataCon (DataCon (dcUniq), dcSig)
 import Clash.Core.Name (Name (nameUniq))
-import qualified Clash.Core.Type as C
 import Clash.Unique (fromGhcUnique)
 
 import Clash.Core.Scoped.DataCon (DataConSig (..))
@@ -150,7 +150,7 @@ solveAdd solveSet ab =
   case normalizeAdd ab of
     Just (n, m, VarTy _ _ tv) | memberNameSet tv solveSet ->
       if n >= 0 && m >= 0 && n - m >= 0 then
-        Solution tv (LitTy (C.NumTy (n - m)))
+        Solution tv (LitTy (NumTy (n - m)))
       else
         AbsurdSolution
     _ ->
@@ -176,8 +176,8 @@ normalizeAdd (a, b) = do
     _ ->
       Nothing
  where
-  lhsLit x (LitTy (C.NumTy n)) = Just (n, x)
-  lhsLit (LitTy (C.NumTy n)) y = Just (n, y)
+  lhsLit x (LitTy (NumTy n)) = Just (n, x)
+  lhsLit (LitTy (NumTy n)) y = Just (n, y)
   lhsLit _ _ = Nothing
 
 -- | If the type is an equation, its left-hand and right-hand side. See
