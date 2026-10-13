@@ -31,7 +31,7 @@ import           Control.Exception                (evaluate, finally, throw, Exc
 import qualified Control.Monad                    as Monad
 import           Control.Monad                    (unless, foldM, forM)
 import           Control.Monad.Catch              (MonadThrow (throwM), try)
-import           Control.Monad.Extra              (whenM, ifM, unlessM)
+import           Control.Monad.Extra              (ifM, unlessM)
 import           Control.Monad.State              (evalState, get)
 import qualified Control.Monad.State.Strict       as State
 import qualified Crypto.Hash.SHA256               as Sha256
@@ -115,6 +115,7 @@ import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), HWTypeTranslator, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
 import           Clash.Netlist.Util               (checkTopEntityPorts)
+import           Clash.Rewrite.Scoped.History     (startRewriteHistory)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Core.Scoped.NameMap
@@ -267,12 +268,10 @@ replaceChar a b = map go
     | c == a = b
     | otherwise = c
 
-removeHistoryFile :: Maybe FilePath -> IO ()
-removeHistoryFile =
-  maybe (pure ()) removeHistory
- where
-  removeHistory path =
-    whenM (Directory.doesFileExist path) (Directory.removeFile path)
+-- | Start the rewrite history of @-fclash-debug-history@, if it is on: a
+-- file with just the header, see "Clash.Rewrite.Scoped.History"
+startHistoryFile :: Maybe FilePath -> IO ()
+startHistoryFile = mapM_ startRewriteHistory
 
 prefixModuleName
   :: HDL
@@ -325,7 +324,7 @@ generateHDL env design hdlState typeTrans mainTopEntity startTime = do
     -- Detect "broken" GHCs and throw an error (unless silenced)
     unless (opt_ignoreBrokenGhcs opts) BrokenGhcs.assertWorking
 
-    removeHistoryFile (dbg_historyFile (opt_debug opts))
+    startHistoryFile (dbg_historyFile (opt_debug opts))
 
     unless (opt_cachehdl opts) $
       putStrLn "Clash: Ignoring previously made caches"
