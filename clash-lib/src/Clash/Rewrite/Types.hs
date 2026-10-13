@@ -15,6 +15,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -24,19 +25,18 @@ module Clash.Rewrite.Types where
 import Control.DeepSeq                       (NFData)
 import Control.Lens                          (use, (.=))
 import qualified Control.Lens as Lens
-import Control.Monad.Fix                     (MonadFix)
-import Control.Monad.IO.Class                (MonadIO)
+import Control.Monad.Fix                     (MonadFix (..))
+import Control.Monad.IO.Class                (MonadIO (..))
 import Control.Monad.State.Strict            (State)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
-import Control.Monad.Trans.RWS.CPS           (RWST)
-import qualified Control.Monad.Trans.RWS.CPS as RWS
 import Control.Monad.Writer                  (MonadWriter (..))
 import Data.Binary                           (Binary)
 import Data.HashMap.Strict                   (HashMap)
 import Data.IntMap.Strict                    (IntMap)
 import Data.Monoid                           (Any)
 import Data.Text                             (Text)
+import GHC.Exts                              (oneShot)
 import GHC.Generics
 
 import Clash.Core.PartialEval as PE          (Evaluator)
@@ -174,18 +174,105 @@ normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
 -- | Monad that keeps track how many transformations have been applied and can
 -- generate fresh variables and unique identifiers. In addition, it keeps track
 -- if a transformation/rewrite has been successfully applied.
-newtype RewriteMonad extra a = R
-  { unR :: RWST RewriteEnv Any (RewriteState extra) IO a }
-  deriving newtype
-    ( Applicative
-    , Functor
-    , Monad
-    , MonadFix
-    , MonadIO
-    , MonadState (RewriteState extra)
-    , MonadWriter Any
-    , MonadReader RewriteEnv
-    )
+--
+-- A reader, writer and state monad over 'IO', whose functions are one-shot:
+-- see Note [one-shot rewrite monad].
+newtype RewriteMonad extra a = MkR
+  { unR :: RewriteEnv -> RewriteState extra -> Any -> IO (a, RewriteState extra, Any) }
+
+-- | Make a 'RewriteMonad' action, marking its function one-shot, see Note
+-- [one-shot rewrite monad]
+pattern R
+  :: (RewriteEnv -> RewriteState extra -> Any -> IO (a, RewriteState extra, Any))
+  -> RewriteMonad extra a
+pattern R m <- MkR m
+  where
+    R m = MkR (oneShot (\r -> oneShot (\s -> oneShot (\w -> m r s w))))
+{-# COMPLETE R #-}
+
+{-
+Note [one-shot rewrite monad]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An action of the rewrite monad is a function of the environment, the state and
+the change flag. When GHC sees an action built inside such a function from
+values bound outside of it, full laziness floats the building out of the
+function, so that it is shared between runs of the function. But an action
+almost always runs once: the floating only allocates the action, and the
+closures it captures, earlier and unconditionally. In the traversals of
+"Clash.Rewrite.Scoped.Combinators" and "Clash.Rewrite.StrategyDSL.TH", that
+happened for every node: GHC built the actions for all constructors before the
+node was matched.
+
+'R' marks the functions one-shot ('oneShot'), which tells GHC that they run at
+most once, so it leaves the building where it is. When an action does run
+more than once, work inside it is redone rather than shared, which is what
+the code says anyway. GHC's own monads do the same, see Note [The one-shot
+state monad trick] in GHC.Utils.Monad.
+
+The instances are those of
+@'Control.Monad.Trans.RWS.CPS.RWST' 'RewriteEnv' 'Any' ('RewriteState' extra) 'IO'@,
+which this monad was before.
+-}
+
+instance Functor (RewriteMonad extra) where
+  fmap f (R m) = R $ \r s w -> do
+    (a, s', w') <- m r s w
+    pure (f a, s', w')
+  {-# INLINE fmap #-}
+
+instance Applicative (RewriteMonad extra) where
+  pure a = R $ \_ s w -> pure (a, s, w)
+  {-# INLINE pure #-}
+  R mf <*> R mx = R $ \r s w -> do
+    (f, s', w') <- mf r s w
+    (x, s'', w'') <- mx r s' w'
+    pure (f x, s'', w'')
+  {-# INLINE (<*>) #-}
+
+instance Monad (RewriteMonad extra) where
+  R m >>= k = R $ \r s w -> do
+    (a, s', w') <- m r s w
+    unR (k a) r s' w'
+  {-# INLINE (>>=) #-}
+
+instance MonadFix (RewriteMonad extra) where
+  mfix f = R $ \r s w -> mfix $ \ ~(a, _, _) -> unR (f a) r s w
+
+instance MonadIO (RewriteMonad extra) where
+  liftIO io = R $ \_ s w -> do
+    a <- io
+    pure (a, s, w)
+  {-# INLINE liftIO #-}
+
+instance MonadState (RewriteState extra) (RewriteMonad extra) where
+  get = R $ \_ s w -> pure (s, s, w)
+  {-# INLINE get #-}
+  put s = R $ \_ _ w -> pure ((), s, w)
+  {-# INLINE put #-}
+  state f = R $ \_ s w -> let (a, s') = f s in pure (a, s', w)
+  {-# INLINE state #-}
+
+instance MonadReader RewriteEnv (RewriteMonad extra) where
+  ask = R $ \r s w -> pure (r, s, w)
+  {-# INLINE ask #-}
+  local f (R m) = R $ \r s w -> m (f r) s w
+  {-# INLINE local #-}
+  reader f = R $ \r s w -> pure (f r, s, w)
+  {-# INLINE reader #-}
+
+instance MonadWriter Any (RewriteMonad extra) where
+  tell w' = R $ \_ s w -> let wt = w <> w' in wt `seq` pure ((), s, wt)
+  {-# INLINE tell #-}
+  listen (R m) = R $ \r s w -> do
+    (a, s', w') <- m r s mempty
+    let wt = w <> w'
+    wt `seq` pure ((a, w'), s', wt)
+  {-# INLINE listen #-}
+  pass (R m) = R $ \r s w -> do
+    ((a, f), s', w') <- m r s mempty
+    let wt = w <> f w'
+    wt `seq` pure (a, s', wt)
+  {-# INLINE pass #-}
 
 instance HasClashOpts (RewriteMonad extra) where
   askClashOpts = Lens.view clashOpts
@@ -198,7 +285,7 @@ runR
   -> RewriteEnv
   -> RewriteState extra
   -> IO (a, RewriteState extra, Any)
-runR m = RWS.runRWST (unR m)
+runR m r s = unR m r s mempty
 
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
@@ -208,7 +295,10 @@ instance MonadUnique (RewriteMonad extra) where
     a `seq` return a
 
 censor :: (Any -> Any) -> RewriteMonad extra a -> RewriteMonad extra a
-censor f = R . RWS.censor f . unR
+censor f (R m) = R $ \r s w -> do
+  (a, s', w') <- m r s mempty
+  let wt = w <> f w'
+  wt `seq` pure (a, s', wt)
 {-# INLINE censor #-}
 
 data TransformContext
