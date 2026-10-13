@@ -6,8 +6,7 @@
   Compare the results of two whole normalizations of a design: the normalized
   bindings that @clash-profile-normalization-run@ writes when
   @CLASH_NORMALIZED_OUT@ is set (@\<design\>.norm.bin@), e.g. those of the
-  normalizer of Clash Core at one commit and those of the normalizer of scoped
-  Clash Core at another.
+  normalizer at two commits.
 
   = Matching globals
 
@@ -16,17 +15,15 @@
   the unique supply, in the order in which they are created, and often share
   their names. So globals are matched by where they are used: starting from
   the top entity, the globals that two matched bindings refer to are matched
-  by the order in which they occur, after normalizing the known differences
-  away. A binding of the second run is compared
+  by the order in which they occur. A binding of the second run is compared
   with the globals it refers to renamed to their matches in the first run, up
-  to alpha-equivalence and the known differences.
+  to alpha-equivalence.
 -}
 
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Normalized
   ( NormOptions (..)
@@ -39,29 +36,23 @@ import qualified Data.List as List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
+import qualified Data.Text as Text
 import System.IO (hFlush, stdout)
 
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.TyCon (TyConMap)
-import qualified Clash.Core.Subst as C (aeqType)
-import qualified Clash.Core.Type as C (Type)
-import qualified Clash.Core.Var as C
+import Clash.Driver.Types (Binding (..), GlobalBindings)
 import Clash.Unique (Unique)
-import qualified Clash.Data.UniqMap as UniqMap
-import Clash.Driver.Types (Binding (..), BindingMap)
 
-import Clash.Core.Scoped.Convert (fromClashTermClosed)
-import Clash.Core.Scoped.NameMap (globalEnvFromList)
+import Clash.Core.Scoped.Alpha (aeqTy)
+import Clash.Core.Scoped.NameMap (globalEnvFromList, lookupGlobalEnv)
+import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst (substGlobals)
 import Clash.Core.Scoped.Syntax
-import Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
 import Clash.Core.Scoped.Term (walkTerm)
 
-
-import Legacy (readBindingMap)
+import Compare
 import SerialiseInstances (NormalizationInputs, readInputs)
-import Test.Clash.Differential
 
 -- | Options of the @normalized@ command
 data NormOptions = NormOptions
@@ -74,19 +65,16 @@ data NormOptions = NormOptions
 -- | The outcome of comparing one pair of matched bindings
 data Result
   = REqual
-  | RKnown [String]
-  | RDifferent C.Id Mismatch
-  | RMissing C.Id String
+  | RDifferent GlobalId Mismatch
+  | RMissing GlobalId String
   -- ^ A global without a binding in one of the runs
-  | RTypeDifferent C.Id C.Type C.Type
+  | RTypeDifferent GlobalId (Type 'VoidS) (Type 'VoidS)
   -- ^ The binders of a binding have different types
 
 -- | Compare the normalized bindings of a design in two runs. Gives whether
--- they agree up to the known differences.
+-- they agree.
 compareNormalized
   :: NormOptions
-  -> (TyConMap -> [KnownDifference])
-  -- ^ The known differences, given the type constructors of the design
   -> FilePath
   -- ^ The normalization inputs of the design (@\<design\>.bin@)
   -> FilePath
@@ -94,39 +82,29 @@ compareNormalized
   -> FilePath
   -- ^ The normalized bindings of the second run
   -> IO Bool
-compareNormalized opts kdsFor design fileA fileB = do
-  (_, tcm, _, _, _, _, top, _) <- readInputs design :: IO NormalizationInputs
-  compareNormalizedWith opts (kdsFor tcm) design (globalIdLegacy top) fileA fileB
-
--- | 'compareNormalized', given the known differences and the top entity
-compareNormalizedWith
-  :: NormOptions -> [KnownDifference] -> FilePath -> C.Id -> FilePath -> FilePath -> IO Bool
-compareNormalizedWith opts kds design top fileA fileB = do
-  bmA <- readBindingMap fileA
-  bmB <- readBindingMap fileB
-  results <- go bmA bmB [(C.varUniq top, top, top)] Set.empty Map.empty []
+compareNormalized opts design fileA fileB = do
+  (_, _, _, _, _, _, top, _) <- readInputs design :: IO NormalizationInputs
+  bmA <- readInputs fileA :: IO GlobalBindings
+  bmB <- readInputs fileB :: IO GlobalBindings
+  results <- go bmA bmB [(top, top)] Set.empty Map.empty []
   let equal = length [() | REqual <- results]
       compared = length [() | r <- results, not (isTypeDiff r)]
       isTypeDiff = \case
         RTypeDifferent {} -> True
         _ -> False
-      known = Map.fromListWith (+) [(nm, 1 :: Int) | RKnown nms <- results, nm <- nms]
-      nKnown = length [() | RKnown _ <- results]
       different = [(i, m) | RDifferent i m <- results]
       missing = [(i, why) | RMissing i why <- results]
       tyDiffs = [(i, t1, t2) | RTypeDifferent i t1 t2 <- results]
   forM_ (take (noShow opts) different) $ \(i, m) ->
-    putStr (renderMismatch (noLines opts) (noWidth opts) i m)
+    putStr (renderMismatch ("first run", "second run") (noLines opts) (noWidth opts) (nameOf i) m)
   forM_ (take (noShow opts) missing) $ \(i, why) ->
-    putStrLn ("--- " <> show (C.nameOcc (C.varName i)) <> ": " <> why)
+    putStrLn ("--- " <> nameOf i <> ": " <> why)
   forM_ (take (noShow opts) tyDiffs) $ \(i, t1, t2) ->
-    putStrLn ("--- " <> show (C.nameOcc (C.varName i)) <> ": the types of the binders differ:\n"
+    putStrLn ("--- " <> nameOf i <> ": the types of the binders differ:\n"
               <> showPpr t1 <> "\n" <> showPpr t2)
   putStrLn $ design <> ": " <> show compared <> " bindings compared, "
-    <> show equal <> " equal, " <> show nKnown <> " known-different"
-    <> (if Map.null known then "" else " (" <> List.intercalate ", "
-          [nm <> ": " <> show k | (nm, k) <- Map.toList known] <> ")")
-    <> ", " <> show (length different) <> " different, "
+    <> show equal <> " equal, "
+    <> show (length different) <> " different, "
     <> show (length missing) <> " missing, "
     <> show (length tyDiffs) <> " with binders of different types"
     <> "; " <> show (length bmA) <> " and " <> show (length bmB)
@@ -134,52 +112,47 @@ compareNormalizedWith opts kds design top fileA fileB = do
   hFlush stdout
   pure (null different && null missing && null tyDiffs)
  where
-  -- A work list of matched globals: their unique in the first run, and their
-  -- variables in both runs. Globals of the second run are renamed to their
-  -- matches in the first run.
+  nameOf = Text.unpack . C.nameOcc . globalIdName
+
+  -- A work list of matched globals, of the first and the second run. Globals
+  -- of the second run are renamed to their matches in the first run.
   go
-    :: BindingMap -> BindingMap -> [(Unique, C.Id, C.Id)] -> Set.Set Unique
-    -> Map Unique C.Id -> [Result] -> IO [Result]
+    :: GlobalBindings -> GlobalBindings -> [(GlobalId, GlobalId)] -> Set.Set Unique
+    -> Map Unique GlobalId -> [Result] -> IO [Result]
   go _ _ [] _ _ acc = pure (reverse acc)
-  go bmA bmB ((u, a, b) : rest) seen ren acc
-    | u `Set.member` seen = go bmA bmB rest seen ren acc
-    | otherwise = case (UniqMap.lookup a bmA, UniqMap.lookup b bmB) of
+  go bmA bmB ((a, b) : rest) seen ren acc
+    | globalIdUniq a `Set.member` seen = go bmA bmB rest seen ren acc
+    | otherwise = case (lookupGlobalEnv a bmA, lookupGlobalEnv b bmB) of
         (Just ba, Just bb) -> do
-          let tA = fromClashTermClosed (bindingTerm ba)
-              tB = fromClashTermClosed (bindingTerm bb)
+          let tA = bindingTerm ba
+              tB = bindingTerm bb
               gsA = globalsOf tA
               gsB = globalsOf tB
-              -- Match the globals by the order in which they occur, after
-              -- normalizing the known differences away, e.g. the order of
-              -- let-bindings
-              ka = globalsOf (applyKnownDifferences kds emptyScope tA)
-              kb = globalsOf (applyKnownDifferences kds emptyScope tB)
+              -- Match the globals by the order in which they occur
               pairs
-                | length ka == length kb = zip ka kb
                 | length gsA == length gsB = zip gsA gsB
                 | otherwise = []
               ren' = List.foldl'
-                       (\m (ga, gb) -> Map.insertWith (\_ old -> old) (globalIdUniq gb) (globalIdLegacy ga) m)
+                       (\m (ga, gb) -> Map.insertWith (\_ old -> old) (globalIdUniq gb) ga m)
                        ren pairs
               tB' = substGlobals
                       (globalEnvFromList
-                         [ (gb, GlobalVar (mkGlobalIdFromClash a'))
+                         [ (gb, GlobalVar a')
                          | gb <- List.nub gsB
                          , Just a' <- [Map.lookup (globalIdUniq gb) ren'] ])
                       tB
-          r <- attempt "comparing" (evaluate (compareResults kds emptyScope tA tB'))
+          r <- attempt "comparing" (evaluate (compareTerms tA tB'))
           let res = case r of
                 Left m -> RDifferent a m
                 Right Equal -> REqual
-                Right (KnownDifferent nms) -> RKnown nms
                 Right (Different m) -> RDifferent a (withLetBinders m)
               -- The names of the let-binders of the bodies of both, that the
               -- other doesn't have, as 'firstDiff' doesn't look into
               -- let-expressions with different numbers of bindings
               withLetBinders m = case m of
                 Mismatch d c s ->
-                  let bsA = letBinders (applyKnownDifferences kds emptyScope tA)
-                      bsB = letBinders (applyKnownDifferences kds emptyScope tB')
+                  let bsA = letBinders tA
+                      bsB = letBinders tB'
                       onlyA = bsA List.\\ bsB
                       onlyB = bsB List.\\ bsA
                       note = "let-binders only in the first run: " <> show onlyA
@@ -187,24 +160,27 @@ compareNormalizedWith opts kds design top fileA fileB = do
                   in if null onlyA && null onlyB then m
                      else Mismatch (fmap (\x -> x {diffPath = diffPath x <> [note]}) d) c s
                 _ -> m
-              new = [ (globalIdUniq ga, globalIdLegacy ga, globalIdLegacy gb)
+              new = [ (ga, gb)
                     | (ga, gb) <- pairs
                     , not (globalIdUniq ga `Set.member` seen) ]
               -- The types of the binders, which normalization gives the
               -- binders it normalizes
+              tyA = globalIdType (bindingId ba)
+              tyB = globalIdType (bindingId bb)
               tyRes
-                | C.aeqType (C.varType (globalIdLegacy (bindingId ba))) (C.varType (globalIdLegacy (bindingId bb))) = []
-                | otherwise =
-                    [RTypeDifferent a (C.varType (globalIdLegacy (bindingId ba))) (C.varType (globalIdLegacy (bindingId bb)))]
-          go bmA bmB (rest ++ new) (Set.insert u seen) ren' (tyRes ++ res : acc)
-        (Nothing, Nothing) -> go bmA bmB rest (Set.insert u seen) ren acc
+                | aeqTy tyA tyB = []
+                | otherwise = [RTypeDifferent a tyA tyB]
+          go bmA bmB (rest ++ new) (Set.insert (globalIdUniq a) seen) ren' (tyRes ++ res : acc)
+        (Nothing, Nothing) -> go bmA bmB rest (Set.insert (globalIdUniq a) seen) ren acc
         (Nothing, Just _) ->
-          go bmA bmB rest (Set.insert u seen) ren (RMissing a "no binding in the first run" : acc)
+          go bmA bmB rest (Set.insert (globalIdUniq a) seen) ren
+            (RMissing a "no binding in the first run" : acc)
         (Just _, Nothing) ->
-          go bmA bmB rest (Set.insert u seen) ren (RMissing a "no binding in the second run" : acc)
+          go bmA bmB rest (Set.insert (globalIdUniq a) seen) ren
+            (RMissing a "no binding in the second run" : acc)
 
-  -- The occurrence names and types of the let-binders under the lambdas of a
-  -- term, as text
+  -- The occurrence names of the let-binders under the lambdas of a term, as
+  -- text
   letBinders :: Term n -> [String]
   letBinders = \case
     Lam _ e -> letBinders e

@@ -1,11 +1,11 @@
 cabal-version:       2.2
 name:                clash-differential
 version:             0.0.0
-synopsis:            Differential tests of ports to scoped Clash Core on serialized designs
+synopsis:            Compare serialized designs of scoped Clash Core
 description:
-  Runs a current Clash function and its port to scoped Clash Core on the
-  bindings of serialized designs, and compares their results up to
-  alpha-equivalence. See README.md.
+  Compares the normalized bindings of serialized designs from two runs, and
+  checks the round trip through the Binary instances of scoped Clash Core.
+  See README.md.
 homepage:            https://clash-lang.org/
 license:             BSD-2-Clause
 author:              QBayLogic B.V.
@@ -14,43 +14,17 @@ build-type:          Simple
 
 executable clash-differential
   main-is:             clash-differential.hs
-  -- The harness itself is shared with clash-lib's unit tests
-  hs-source-dirs:      ., ../../../clash-lib/tests
-  other-modules:       Comparisons
-                       Current
-                       Demo
-                       Legacy
+  hs-source-dirs:      .
+  other-modules:       Compare
                        Normalized
-                       Pretty
-                       Prims
-                       Registry
-                       Test.Clash.Differential
-                       Test.Clash.Differential.Sites
-                       Test.Clash.Scoped.Evaluator.Differential
-                       Test.Clash.Scoped.Evaluator.Adapter
-                       Test.Clash.Scoped.ViaFoil
-                       WhnfReplay
+                       RoundTrip
   default-language:    Haskell2010
   ghc-options:         -O2 -Wall -Wcompat -rtsopts "-with-rtsopts=-A64m"
   build-depends:       base,
                        binary,
-                       bytestring,
                        containers,
-                       deepseq,
-                       hashable,
-                       directory,
                        filepath,
-                       lens,
-                       mtl,
-                       ordered-containers,
-                       process,
-                       QuickCheck,
-                       tasty-quickcheck,
                        text,
-                       transformers,
-                       unordered-containers,
 
-                       clash-ghc,
                        clash-lib,
-                       clash-prelude,
                        clash-profiling-prepare
