@@ -67,19 +67,23 @@ import           Clash.Core.Name         (mkUnsafeInternalName, nameOcc)
 import           Clash.Core.Subst        (extendGblSubstList, mkSubst, substTm)
 import           Clash.Core.Term         (Term (..), mkLams, mkTyLams)
 import           Clash.Core.Type         (Type (..), TypeView (..), mkFunTy, splitFunForallTy, tyView)
-import           Clash.Core.DataCon      (dcExtTyVars)
-import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc, tyConDataCons, tyConName)
+import           Clash.Core.TyCon        (TyConMap, TyConName, isNewTypeTc, tyConName)
 import           Clash.Core.Scoped.TysPrim (tysPrimMap)
-import           Clash.Core.Util         (dataConInstArgTys, mkInternalVar, mkSelectorCase)
+import           Clash.Core.Util         (mkInternalVar, mkSelectorCase)
 import           Clash.Core.Var          (Var (..), Id, IdScope (..), setIdScope)
 import           Clash.Core.VarEnv
   (InScopeSet, VarEnv, emptyInScopeSet, extendInScopeSet, mkInScopeSet
   ,mkVarEnv, unionVarEnv)
 import           Clash.Core.Scoped.Convert (fromClashTermClosed)
 import           Clash.Core.Scoped.NameMap (globalEnvFromList)
-import           Clash.Core.Scoped.Syntax (S (VoidS), globalIdLegacy, globalIdName, globalIdType)
+import           Clash.Core.Scoped.Syntax
+  (GlobalId, S (VoidS), globalIdLegacy, globalIdName, globalIdType)
 import           Clash.Core.Scoped.Convert (mkGlobalIdFromClash)
-import qualified Clash.Core.Scoped.Syntax as S (Term)
+import           Clash.Core.Scoped.Subst (openTyBinder, withFreshIdBinder)
+import qualified Clash.Core.Scoped.Syntax as S
+import qualified Clash.Core.Scoped.Type as S (TypeView (..), tyView)
+import           Clash.Core.Scoped.TypeEnv (lookupTyCon, mkTypeEnv)
+import qualified Clash.Core.Scoped.Util as S (mkSelectorCase)
 import qualified Clash.Data.UniqMap as UniqMap
 import           Clash.Driver            (compilePrimitives)
 import           Clash.Driver.Bool       (toGhcOverridingBool)
@@ -91,7 +95,7 @@ import           Clash.GHC.GHC2Core
    srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
 import           Clash.Core.Scoped.Builder
-  (TmB, caseB, clashTyB, dataAltB, lamB, letrecB, runClosedTerm, tyLamClashB, varB)
+  (TmB, letrecB, runClosedTerm, varB)
 import           Clash.GHC.Scoped.Check
   (Outcome (..), compareTerms, compareTyCons, compareTypes, primAtTypeShape)
 import           Clash.GHC.Scoped.GHC2Core (coreToTermB, coreToTypeB, varKey)
@@ -177,8 +181,8 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
   let hintArgs = maybe [] hintPackageArgs dflagsM
   primMapC <- compilePrimitives importDirs hintArgs tdir primMapR
   let c2cEnv = GHC2CoreEnv GHC.noSrcSpan fiEnvs opts
-      ((bindingsMap,clsVMap),tcMap,_) =
-        RWS.runRWS (mkBindings (processBind primMapC unlocatable) bindings clsOps)
+      ((bindingsMap,clsOps'),tcMap,_) =
+        RWS.runRWS (mkBindings (processBind primMapC unlocatable) processClsOp bindings clsOps)
                    c2cEnv
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons opts tcMap
@@ -187,10 +191,10 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
                                     -- Recursion info is always False for class
                                     -- selectors, no need to check free vars.
       clsMap =
-        fmap (\(v,i) ->
-               (Binding (mkGlobalIdFromClash v) GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
-                  (mkClassSelector allTcCache (varType v) i) False))
-             clsVMap
+        UniqMap.fromList
+          [ (globalIdName v, Binding v GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
+                               (mkClassSelector allTcCache (globalIdType v) i) False)
+          | (v, i) <- clsOps' ]
       -- Build the bodies lazily: most bindings are never looked at
       allBindings                   = fmap (fmap runClosedTerm) bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
@@ -261,18 +265,20 @@ setNoInlineTopEntities bm tes =
 -- mkRecInfo for an explanation of these).
 --
 -- | Convert the bindings with the given conversion of a binder group, see
--- 'processBind', and the class operations.
+-- 'processBind', and the class operations with the given conversion, see
+-- 'processClsOp'.
 mkBindings
-  :: NFData a
+  :: (NFData a, NFData c)
   => (GHC.CoreBind -> C2C [Binding a])
+  -> ((GHC.CoreBndr,Int) -> C2C c)
   -> [GHC.CoreBind]
   -- Binders
   -> [(GHC.CoreBndr,Int)]
   -- Class operations
   -> C2C ( VarEnv (Binding a)
-         , VarEnv (Id,Int)
+         , [c]
          )
-mkBindings convBind bindings clsOps = do
+mkBindings convBind convClsOp bindings clsOps = do
   -- Converting each binder is independent: 'GHC2CoreState' only accumulates a
   -- 'TyCon' map and a name cache, both of which are pure (deterministic per
   -- key) memo tables. We therefore convert every binder from a fresh state in
@@ -280,7 +286,7 @@ mkBindings convBind bindings clsOps = do
   env <- RWS.ask
   let
     bindingsList = parRunC2C env (map convBind bindings)
-    clsOpList    = parRunC2C env (map processClsOp clsOps)
+    clsOpList    = parRunC2C env (map convClsOp clsOps)
     states       = map snd bindingsList ++ map snd clsOpList
   -- Merge the 'TyCon' maps discovered while converting, and collect the
   -- warnings the conversions reported; the name caches are not used after this
@@ -291,7 +297,7 @@ mkBindings convBind bindings clsOps = do
     & pendingWarnings %~ (<> foldMap (^. pendingWarnings) states)
 
   return ( UniqMap.fromList [ (globalIdName (bindingId b), b) | b <- concatMap fst bindingsList ]
-         , mkVarEnv (map fst clsOpList) )
+         , map fst clsOpList )
 
 -- | Convert a single (possibly recursive) binder group to bindings of scoped
 -- Core. See 'mkBindings' for how these conversions are run in parallel.
@@ -368,11 +374,18 @@ processBindClash primMap unlocatable = \case
                tms1  = zipWith (\b (i, _) -> b { bindingTerm = Letrec lbs (Var i), bindingRecursive = False }) tms lbs
            in  return tms1
 
--- | Convert a single class operation. See 'processBind'.
-processClsOp :: (GHC.CoreBndr, Int) -> C2C (Id, (Id, Int))
+-- | Convert a single class operation: its binder and the index of its method.
+-- See 'processBind'.
+processClsOp :: (GHC.CoreBndr, Int) -> C2C (GlobalId, Int)
 processClsOp (v,i) = do
+  v' <- coreToGlobalIdB v
+  return (v',i)
+
+-- | 'processClsOp' through Clash Core, for 'checkGHC2Core'
+processClsOpClash :: (GHC.CoreBndr, Int) -> C2C (Id, Int)
+processClsOpClash (v,i) = do
   v' <- coreToId v
-  return (v', (v',i))
+  return (v',i)
 
 -- | Compare the bindings that "Clash.Core.Scoped.GHC2Core" gives with the
 -- conversion of the bindings of 'Clash.GHC.GHC2Core.coreToTerm' to scoped
@@ -398,17 +411,17 @@ checkGHC2Core
   -> IO ()
 checkGHC2Core logFile modName env primMap bindings clsOps unlocatable tcm tcCache st new = do
   let
-    ((bindingsMap, clsVMap), stClash, _) =
-      RWS.runRWS (mkBindings (processBindClash primMap unlocatable) bindings clsOps)
+    ((bindingsMap, clsOps'), stClash, _) =
+      RWS.runRWS (mkBindings (processBindClash primMap unlocatable) processClsOpClash bindings clsOps)
                  env emptyGHC2CoreState
     inScope0 = mkInScopeSet (
                     (fmap (coerce . globalIdLegacy . bindingId) bindingsMap) <>
                     (fmap (coerce . globalIdLegacy . bindingId) clsMap))
     clsMap =
-      fmap (\(v,i) ->
-             (Binding (mkGlobalIdFromClash v) GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
-                (mkClassSelectorClash inScope0 tcm (varType v) i) False))
-           clsVMap
+      mkVarEnv
+        [ (v, Binding (mkGlobalIdFromClash v) GHC.noSrcSpan (GHC.Inline GHC.NoSourceText) IsFun
+                (mkClassSelectorClash inScope0 tcm (varType v) i) False)
+        | (v, i) <- clsOps' ]
     old = bindingsMap `unionVarEnv` clsMap
 
     outcome b1 b2
@@ -586,45 +599,34 @@ checkPrimitive primMap v = do
 --
 -- > /\tvs. \dict -> case dict of C:Class .. sel .. -> sel
 --
--- or, for a class that is a newtype, @/\tvs. \dict -> dict@.
---
--- The selector is a closed term, built like the conversion of the term of
--- 'Clash.Core.Util.mkSelectorCase' to scoped Core would be, so with the same
--- names.
+-- or, for a class that is a newtype, @/\tvs. \dict -> dict@. See
+-- 'mkClassSelectorClash'.
 mkClassSelector
   :: TyConMap
-  -> Type
+  -> S.Type 'VoidS
   -> Int
   -> S.Term 'VoidS
-mkClassSelector tcm ty sel = runClosedTerm newExpr
+mkClassSelector tcm ty0 sel = go S.emptyScope ty0
   where
-    -- TODO: why can't we just use partitionEithers here?
-    (tvs,dicts) = (lefts *** rights)
-                . span (\l -> case l of {Left _ -> True; _ -> False})
-                $ fst (splitFunForallTy ty)
-    lams dictTy body =
-      foldr tyLamClashB (lamB 0 (mkUnsafeInternalName "dict" 0) (clashTyB dictTy) body) tvs
-    newExpr = case listToMaybe dicts of
-      Just dictTy@(tyView -> TyConApp tcNm args)
-        | Just tc <- UniqMap.lookup tcNm tcm
+    tenv = mkTypeEnv tcm
+
+    go :: S.Distinct n => S.Scope n -> S.Type n -> S.Term n
+    go sc (S.ForAllTy b ty) = openTyBinder sc b ty $ \sc1 b1 ty1 -> S.TyLam b1 (go sc1 ty1)
+    go sc ty = case S.tyView ty of
+      S.FunTy dictTy _ ->
+        withFreshIdBinder sc (mkUnsafeInternalName "dict" 0) dictTy $ \sc1 b ->
+          S.Lam b (selector sc1 (S.sink dictTy) (S.idBinderVar b))
+      _ -> error "mkClassSelector: expected at least one dictionary argument"
+
+    selector :: S.Distinct n => S.Scope n -> S.Type n -> S.Term n -> S.Term n
+    selector sc dictTy dict = case S.tyView dictTy of
+      S.TyConApp tcNm _
+        | Just tc <- lookupTyCon tenv tcNm
         , not (isNewTypeTc tc)
-        -> lams dictTy (selectorCase tcNm tc args)
-      Just (tyView -> FunTy arg res) -> lams (mkFunTy arg res) (varB 0)
-      Just dictTy -> lams dictTy (varB 0)
-      Nothing -> error "mkClassSelector: expected at least one dictionary argument"
+        -> S.mkSelectorCase "mkClassSelector" sc tenv dict 1 sel
+      _ -> dict
 
-    -- The case-expression of 'Clash.Core.Util.mkSelectorCase', on the variable
-    -- with key 0. The fields get keys from 1.
-    selectorCase tcNm tc args = case tyConDataCons tc of
-      [dc] | null (dcExtTyVars dc)
-           , Just fieldTys <- dataConInstArgTys dc args
-           , sel < length fieldTys
-           -> let fields = [ (i + 1, mkUnsafeInternalName (if i == sel then "sel" else "wild") 0, clashTyB fTy)
-                           | (i, fTy) <- zip [0..] fieldTys ]
-              in caseB (varB 0) (clashTyB (fieldTys !! sel))
-                   [dataAltB dc [] fields (varB (sel + 1))]
-      _ -> error ("mkClassSelector: can't select field " ++ show sel ++ " of " ++ show tcNm)
-
+-- | 'mkClassSelector' in Clash Core, for 'checkGHC2Core'
 mkClassSelectorClash
   :: InScopeSet
   -> TyConMap
