@@ -25,7 +25,12 @@ package clash-ghc
   executable-dynamic: True
 
 package clash-prelude
-  ghc-options: +RTS -qn4 -A128M -RTS -j4
+  -- Clash translates the unfoldings in clash-prelude's interface files, so
+  -- these must not depend on how clash-prelude was built. With '-jN', N > 1,
+  -- GHC's inlining decisions depend on the order in which modules happen to be
+  -- compiled, so two builds of the same source can yield different HDL. Hence
+  -- '-j1', which also overrides any '-jN' from the user's cabal config.
+  ghc-options: +RTS -qn4 -A128M -RTS -j1
   -- workaround for plugins not loading in Haddock with GHC-8.6
   haddock-options: --optghc=-fdefer-type-errors
   -- Workaround for Haddock/CPP #if issues https://github.com/haskell/haddock/issues/1382
