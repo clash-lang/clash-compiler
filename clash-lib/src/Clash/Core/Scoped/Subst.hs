@@ -26,7 +26,9 @@
   Substitution renames a binder only if it may clash with the output scope: if
   it is at or below the watermark of the scope (see 'Scope'). When a binder's
   type changes or the binder is renamed, its occurrences are mapped to the
-  updated variable.
+  updated variable. A binder that keeps its name and type is kept as it is,
+  rather than rebuilt: so are all the binders of a pattern or a recursive
+  let-binding that keep theirs.
 
   = Going under binders
 
@@ -54,7 +56,10 @@
     and there are no type entries; then the variable of @i'@ is the new binder
     of @o'@. (Without type entries its kind or type is unchanged, except in
     'freshenDistinct', where it is alpha-equivalent.) When the old binder shadows a variable that has an entry,
-    that entry is removed or overwritten. 'freshen' only sets a flag.
+    that entry is removed or overwritten. Their fast paths, and those of
+    'substPat' and 'substIdTele', give the same substitution as going under
+    the binders one by one would, see "Keeping binders" below. 'freshen'
+    only sets a flag.
     'freshenDistinct' only raises the watermark of the output scope (with
     'raiseWatermark'), which keeps its names.
 
@@ -91,6 +96,20 @@
     @l@ in which none of the other variables of the telescope occur free,
     which is checked, only mentions names of @n@ and the given variables:
     names of @l'@. So it is a value of @l'@ as it is.
+
+  * __Keeping binders__ ('unsafeCoerce' in 'substTyBinder', 'substIdBinder',
+    'substPat' and 'substIdTele'): without type entries, and without the
+    flag of 'freshen', 'substTyBinderK' and 'substIdBinderK' keep a binder
+    whose name is fresh for the output scope: it keeps its name, and its kind
+    or type, which only mentions type variables, is kept as it is (see
+    "Substitution"). That gives the binder as it was, the output scope
+    extended with its name, which is fresh as 'withFreshRaw' checks, and the
+    term map without an entry for its name. The fast paths give these
+    directly. For a pattern or a telescope of term variable binders,
+    'withFreshRaws' checks that every name is fresh for the output scope
+    extended by the names before it, which is what going under the binders
+    one by one checks; no binder gets a type entry, so the kinds and types of
+    the binders after it are kept as they are too.
 
   * __Unsinking__ ('unsafeCoerce' in 'unsinkTerm' and friends): a value in
     scope @l@ in which none of the names bound between @n@ and @l@ occur free
@@ -401,14 +420,24 @@ refresh sc b fr cont
 {-# INLINE refresh #-}
 
 -- | Go under a type binder: substitute in its kind, and rename it if it
--- clashes with the output scope
+-- clashes with the output scope. Without type entries, a binder that doesn't
+-- clash is kept as it is.
 substTyBinder
   :: Distinct o
   => Subst i o
   -> TyBinder i i'
   -> (forall o'. DExt o o' => Subst i' o' -> TyBinder o o' -> r)
   -> r
-substTyBinder s@(UnsafeSubst _ _ _ fr) b = substTyBinderK fr s b (substTy s (tyBinderKind b))
+substTyBinder s@(UnsafeSubst sc tys tms fr) b cont
+  | not fr && IntMap.null tys =
+      withFreshRaw sc k
+        -- Trusted: see the module header
+        (\sc' -> cont (UnsafeSubst sc' IntMap.empty (IntMap.delete k (sink1 tms)) fr) (unsafeCoerce b))
+        slow
+  | otherwise = slow
+ where
+  k = tyNameRaw (tyNameOf b)
+  slow = substTyBinderK fr s b (substTy s (tyBinderKind b)) cont
 
 -- | 'substTyBinder', given the kind of the binder, substituted. Renames the
 -- binder if it clashes with the output scope, or always when asked to.
@@ -439,14 +468,24 @@ substTyBinderK always (UnsafeSubst sc tys tms fr) (TyBinder occ _ b) k' cont =
   old = tyNameBinderRaw b
 
 -- | Go under a term binder: substitute in its type, and rename it if it
--- clashes with the output scope
+-- clashes with the output scope. Without type entries, a binder that doesn't
+-- clash is kept as it is.
 substIdBinder
   :: Distinct o
   => Subst i o
   -> IdBinder i i'
   -> (forall o'. DExt o o' => Subst i' o' -> IdBinder o o' -> r)
   -> r
-substIdBinder s@(UnsafeSubst _ _ _ fr) b = substIdBinderK fr s b (substTy s (idBinderType b))
+substIdBinder s@(UnsafeSubst sc tys tms fr) b cont
+  | not fr && IntMap.null tys =
+      withFreshRaw sc k
+        -- Trusted: see the module header
+        (\sc' -> cont (UnsafeSubst sc' IntMap.empty (IntMap.delete k (sink1 tms)) fr) (unsafeCoerce b))
+        slow
+  | otherwise = slow
+ where
+  k = tmNameRaw (tmNameOf b)
+  slow = substIdBinderK fr s b (substTy s (idBinderType b)) cont
 
 -- | 'substIdBinder', given the type of the binder, substituted. Renames the
 -- binder if it clashes with the output scope, or always when asked to.
@@ -491,20 +530,67 @@ substTele substB s (TCons b bs) cont =
     substTele substB s1 bs $ \s2 bs' ->
       cont s2 (TCons b' bs')
 
--- | Go under a pattern
+-- | Go under a pattern. Without type entries, a pattern whose binders don't
+-- clash is kept as it is.
 substPat
   :: Distinct o
   => Subst i o
   -> Pat i i'
   -> (forall o'. DExt o o' => Subst i' o' -> Pat o o' -> r)
   -> r
-substPat s p cont = case p of
+substPat s@(UnsafeSubst sc tys tms fr) p cont = case p of
+  DataPat _ tvs ids
+    | not fr && IntMap.null tys ->
+        withFreshRaws sc
+          (\step done ->
+             teleRawsF tyNameBinderRaw tyBinderName tvs step
+               (teleRawsF tmNameBinderRaw idBinderName ids step done))
+          -- Trusted: see the module header
+          (\sc' ->
+             cont (UnsafeSubst sc' IntMap.empty (withoutBound (patNameBinders p) (sink1 tms)) fr)
+               (unsafeCoerce p))
+          (substPatSlow s p cont)
+  _ -> substPatSlow s p cont
+
+-- 'substPat', going under the binders one by one
+substPatSlow
+  :: Distinct o
+  => Subst i o
+  -> Pat i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> Pat o o' -> r)
+  -> r
+substPatSlow s p cont = case p of
   DataPat dc tvs ids ->
     substTele substTyBinder s tvs $ \s1 tvs' ->
       substTele substIdBinder s1 ids $ \s2 ids' ->
         cont s2 (DataPat dc tvs' ids')
   LitPat l -> cont s (LitPat l)
   DefaultPat -> cont s DefaultPat
+
+-- Remove the entries for the names that binders bind
+withoutBound :: NameBinders n l -> IntMap a -> IntMap a
+withoutBound bs m
+  | IntMap.null m = m
+  | otherwise = IntMap.withoutKeys m (nameBindersRaw bs)
+{-# INLINE withoutBound #-}
+
+-- | Go under a telescope of term variable binders, see 'substTele'. Without
+-- type entries, a telescope whose binders don't clash is kept as it is.
+substIdTele
+  :: Distinct o
+  => Subst i o
+  -> Tele IdBinder i i'
+  -> (forall o'. DExt o o' => Subst i' o' -> Tele IdBinder o o' -> r)
+  -> r
+substIdTele s@(UnsafeSubst sc tys tms fr) bs cont
+  | not fr && IntMap.null tys =
+      withFreshRaws sc (teleRawsF tmNameBinderRaw idBinderName bs)
+        -- Trusted: see the module header
+        (\sc' ->
+           cont (UnsafeSubst sc' IntMap.empty (withoutBound (teleNameBinders bs) (sink1 tms)) fr)
+             (unsafeCoerce bs))
+        (substTele substIdBinder s bs cont)
+  | otherwise = substTele substIdBinder s bs cont
 
 -- | Go under let-bindings, substituting in their right-hand sides
 substBind
@@ -518,7 +604,7 @@ substBind s bs cont = case bs of
     let e' = substTm s e in
     substIdBinder s b $ \s' b' -> cont s' (NonRec b' e')
   Rec bndrs es ->
-    substTele substIdBinder s bndrs $ \s' bndrs' ->
+    substIdTele s bndrs $ \s' bndrs' ->
       cont s' (Rec bndrs' (map (substTm s') es))
 
 -- | Rename every binder in a value to the name just above the watermark of
