@@ -11,6 +11,7 @@
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Scoped.Transformations.Letrec (tests) where
@@ -24,12 +25,12 @@ import qualified Clash.Core.Term as C
 import qualified Clash.Core.Type as C
 import Clash.Core.DataCon (DataCon (..))
 import Clash.Core.Var (Id)
-import Clash.Core.VarEnv (emptyInScopeSet)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as S
 import qualified Clash.Normalize.Transformations.Letrec as Current
 import Clash.Normalize.Types (NormRewrite, NormalizeState)
-import Clash.Rewrite.Combinators (bottomupR)
-import Clash.Rewrite.Scoped (ScopedTransform (..))
+import Clash.Core.Scoped.Syntax (Distinct, Term)
+import qualified Clash.Rewrite.Scoped.Combinators as SC (bottomupR)
+import Clash.Rewrite.Scoped (ScopedRewrite, ScopedTransform (..))
 import Test.Clash.Scoped.ViaFoil (viaFoil)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..), TransformContext (..))
@@ -40,7 +41,9 @@ import Test.Clash.Rewrite
   ( assertAlphaEq, consDc, globalId, globalIntVar, inScopeOf, intFunTy, intId
   , intLit, intTy, localId, nilDc, pairDataCon, pairTy, rewriteEnvWithTyCons
   , runRewriteTest, showPprU, vecTy )
-import Test.Clash.Scoped (assertRewritesAgree, runViaFoil)
+import Test.Clash.Scoped
+  ( TestScope, assertClashes, assertLintClean, assertRewritesAgree, assertTermAlphaEq
+  , assertTermIs, runScopedIn, termQQ, varD, withClashing, withTerm )
 
 -- * Running the transformations
 
@@ -87,64 +90,71 @@ tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.Letrec"
 
 -- * deadCode
 
--- | Run 'deadCode' on a closed term, at its root. Gives the result and
+-- | Run 'deadCode' at the root of a term, in its scope. Gives the result and
 -- whether a change was signaled.
-deadCodeAt :: C.Term -> IO (C.Term, Bool)
-deadCodeAt e = do
-  (t, _, ch) <- runViaFoil def st (TransformContext emptyInScopeSet [])
-                  $(asScopedRewriteQ S.deadCode) e
+deadCodeAt :: Distinct n => TestScope n -> Term n -> IO (Term n, Bool)
+deadCodeAt ts e = do
+  (t, _, ch) <- runScopedIn def st ts $(asScopedRewriteQ S.deadCode) e
   pure (t, ch)
  where
   st :: RewriteState NormalizeState
   st = def
 
--- | 'deadCode' in a bottom-up traversal of Clash Core, as the normalizer runs
--- it: through 'Test.Clash.Scoped.ViaFoil.viaFoil'
-deadCodeBottomup :: C.Term -> IO C.Term
-deadCodeBottomup e = do
-  (t, _, _) <- runRewriteTest def st (rw (TransformContext emptyInScopeSet []) e)
+-- | 'deadCode' in a bottom-up traversal
+deadCodeBottomup :: Distinct n => TestScope n -> Term n -> IO (Term n)
+deadCodeBottomup ts e = do
+  (t, _, _) <- runScopedIn def st ts (SC.bottomupR $(asScopedRewriteQ S.deadCode)) e
   pure t
  where
-  rw :: NormRewrite
-  rw = bottomupR (apply "deadCode" (viaFoil "deadCode" $(asScopedRewriteQ S.deadCode)))
   st :: RewriteState NormalizeState
   st = def
 
 deadCodeTests :: TestTree
 deadCodeTests = testGroup "deadCode"
-      [ testCase "removes an unused non-recursive binding" $ do
-          (t, ch) <- deadCodeAt (C.Let (C.NonRec x (intLit 1)) (intLit 2))
-          assertAlphaEq (intLit 2) t
-          ch @?= True
-      , testCase "keeps a used non-recursive binding" $ do
-          let e = C.Let (C.NonRec x (intLit 1)) (C.Var x)
-          (t, ch) <- deadCodeAt e
-          show t @?= show e
-          ch @?= False
-      , testCase "removes a recursive let-binding without used bindings" $ do
-          (t, ch) <- deadCodeAt (C.Letrec [(a, C.Var b), (b, C.Var a)] (intLit 2))
-          assertAlphaEq (intLit 2) t
-          ch @?= True
-      , testCase "keeps the bindings the used ones refer to, in order" $ do
-          (t, ch) <- deadCodeAt
-            (C.Letrec [(a, C.App f (C.Var b)), (c, intLit 3), (b, intLit 1)] (C.Var a))
-          assertAlphaEq (C.Letrec [(a, C.App f (C.Var b)), (b, intLit 1)] (C.Var a)) t
-          ch @?= True
-      , testCase "keeps a recursive let-binding whose bindings are all used" $ do
-          let e = C.Letrec [(a, C.App f (C.Var b)), (b, C.Var a)] (C.Var a)
-          (t, ch) <- deadCodeAt e
-          show t @?= show e
-          ch @?= False
-      , testCase "a NonRec binder doesn't keep the binding it shadows alive" $ do
-          -- let x = 1 in let x = x in x: the outer binding is used by the
-          -- right-hand side of the inner one
-          let e = C.Let (C.NonRec x (intLit 1)) (C.Let (C.NonRec x (C.Var x)) (C.Var x))
-          deadCodeBottomup e >>= assertAlphaEq e
-      , testCase "in a bottom-up traversal of Clash Core" $
-          deadCodeBottomup
-            (C.Lam x (C.Let (C.NonRec a (C.Var x))
-              (C.Letrec [(b, intLit 1), (c, C.Var a)] (C.App f (C.Var x)))))
-            >>= assertAlphaEq (C.Lam x (C.App f (C.Var x)))
+      [ testCase "removes an unused non-recursive binding" $
+          withTerm "let { !(x :: Int) = 1 } in 2" $ \ts e -> do
+            (t, ch) <- deadCodeAt ts e
+            assertTermIs ts "2" t
+            ch @?= True
+      , testCase "keeps a used non-recursive binding" $
+          withTerm "let { !(x :: Int) = 1 } in x" $ \ts e -> do
+            (t, ch) <- deadCodeAt ts e
+            assertTermAlphaEq e t
+            ch @?= False
+      , testCase "removes a recursive let-binding without used bindings" $
+          withTerm "let { (a :: Int) = b; (b :: Int) = a } in 2" $ \ts e -> do
+            (t, ch) <- deadCodeAt ts e
+            assertTermIs ts "2" t
+            ch @?= True
+      , testCase "keeps the bindings the used ones refer to, in order" $
+          withTerm "let { (a :: Int) = f_G5 b; (c :: Int) = 3; (b :: Int) = 1 } in a" $ \ts e -> do
+            (t, ch) <- deadCodeAt ts e
+            assertTermIs ts "let { (a :: Int) = f_G5 b; (b :: Int) = 1 } in a" t
+            ch @?= True
+      , testCase "keeps a recursive let-binding whose bindings are all used" $
+          withTerm "let { (a :: Int) = f_G5 b; (b :: Int) = a } in a" $ \ts e -> do
+            (t, ch) <- deadCodeAt ts e
+            assertTermAlphaEq e t
+            ch @?= False
+        -- The outer binding is used by the right-hand side of the inner one,
+        -- which shadowed it in Clash Core. Here the binders clash with a
+        -- variable of the scope instead.
+      , testCase "a NonRec binder doesn't keep the binding it shadows alive" $
+          withTerm "let { !(x :: Int) = 1 } in let { !(x :: Int) = x } in x" $ \ts0 e0 ->
+            withClashing ts0 [varD "z" "Int"] e0 $ \ts e -> do
+              assertClashes ts e
+              t <- deadCodeBottomup ts e
+              assertLintClean ts t
+              assertTermAlphaEq e t
+      , testCase "in a bottom-up traversal" $
+          withTerm [termQQ|
+            \(x :: Int) ->
+              let { !(a :: Int) = x } in
+              let { (b :: Int) = 1; (c :: Int) = a } in
+              f_G5 x
+          |] $ \ts e -> do
+            t <- deadCodeBottomup ts e
+            assertTermIs ts "\\(x :: Int) -> f_G5 x" t
       ]
 
 -- * removeUnusedExpr
@@ -201,7 +211,11 @@ srcTick = C.SrcSpan noSrcSpan
 
 flattenLetC, flattenLetS :: NormRewrite
 flattenLetC = apply "flattenLet" Current.flattenLetWorker
-flattenLetS = (viaFoil "flattenLet" $(asScopedRewriteQ S.flattenLet))
+flattenLetS = (viaFoil "flattenLet" flattenLetSc)
+
+-- | The scoped 'S.flattenLet'
+flattenLetSc :: ScopedRewrite NormalizeState
+flattenLetSc = $(asScopedRewriteQ S.flattenLet)
 
 flattenLetTests :: TestTree
 flattenLetTests = testGroup "flattenLet"
@@ -247,13 +261,19 @@ flattenLetTests = testGroup "flattenLet"
         -- The Clash Core version deshadows the let-expression in the
         -- right-hand side as a recursive one, which turns @x = g x@ into the
         -- loop @x' = g x'@. In scoped Core, the right-hand side of a 'NonRec'
-        -- binding can't refer to its binder.
-      , testCase "doesn't make a shadowing NonRec binding in a right-hand side recursive" $ do
-          (t, ch) <- runIn def (rootCtx [x]) flattenLetS
-            (C.Let (C.NonRec y (C.Let (C.NonRec x (app "g" 10 [C.Var x])) (C.Var x)))
-              (C.Var y))
-          assertAlphaEq (app "g" 10 [C.Var x]) t
-          ch @?= True
+        -- binding can't refer to its binder. The binder of @x@ also clashes
+        -- with a variable of the scope.
+      , testCase "doesn't make a shadowing NonRec binding in a right-hand side recursive" $
+          withTerm [termQQ|
+            let { !(y :: Int) =
+              let { !(x_1 :: Int) = (g_G10 :: Int -> Int) (x_1 :: Int) } in x_1 }
+            in y
+          |] $ \ts0 e0 -> withClashing ts0 [varD "z" "Int"] e0 $ \ts e -> do
+            assertClashes ts e
+            (t, _, ch) <- runScopedIn rewriteEnvWithTyCons def ts flattenLetSc e
+            assertLintClean ts t
+            assertTermIs ts "g_G10 x_1" t
+            ch @?= True
       , testCase "doesn't fire on a let-expression without let-expressions" $
           agrees def (rootCtx [x]) flattenLetC flattenLetS
             (C.Letrec [(a, app "g" 10 [C.Var x]), (b, app "h" 11 [C.Var a])]
