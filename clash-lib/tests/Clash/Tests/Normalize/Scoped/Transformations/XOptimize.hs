@@ -3,163 +3,216 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Normalize.Scoped.Transformations.XOptimize": the tests of
-  'Clash.Normalize.Transformations.XOptimize.xOptimize' of Clash Core, run on
-  the port through 'Test.Clash.Scoped.ViaFoil.viaFoil', and agreement of
-  the port with 'xOptimize' of Clash Core.
-
-  The regression tests are about pattern binders that capture the free
-  variables of the subject, and the binder of the subject clashing with a
-  pattern binder. In scoped Clash Core, the port creates new binders for them
-  in the scope of the case-expression, so those bugs can't be written there.
-  'xOptimize' only runs with aggressive X-optimization, and never fired while
-  capturing the corpus of the differential harness, so the tests construct
-  its inputs.
+  Tests for "Clash.Normalize.Scoped.Transformations.XOptimize". The expected
+  results of the tests that compared the port with 'xOptimize' of Clash Core
+  are the results of the port, which agreed with Clash Core up to the known
+  difference in the form of the type of @errorX@ at an open type. 'assertRewritesTo'
+  runs every test in the scope of the free variables of its input, and in a
+  scope that the binders of the input clash with.
 -}
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Tests.Normalize.Scoped.Transformations.XOptimize (tests) where
 
 import Data.Default (def)
+import qualified Data.HashMap.Strict as HashMap
 
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import Clash.Core.Literal (Literal (IntLiteral))
-import Clash.Core.Name (NameSort (User))
-import Clash.Core.Term (Pat (..), Term (..))
-import Clash.Core.TyCon (TyCon (tyConName), TyConMap)
-import Clash.Core.Type (Type (VarTy))
-import Clash.Core.Var (Id, TyVar)
-import Clash.Core.VarEnv (extendInScopeSet)
+import Clash.Annotations.Primitive (PrimitiveGuard (HasBlackBox))
+import qualified Clash.Core.DataCon as C
+import qualified Clash.Core.Term as C (IsMultiPrim (SingleResult), WorkInfo (WorkNever))
+import qualified Clash.Core.TyCon as C
+import Clash.Core.Scoped.Convert (mkPrimInfo)
+import Clash.Core.Scoped.Syntax (GlobalId, PrimInfo, PrimUnfolding (NoUnfolding), Term (Case))
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Driver.Types (ClashEnv (..), ClashOpts (..))
+import Clash.Netlist.BlackBox.Types
+import Clash.Netlist.Types (BlackBox (BBTemplate), Usage (Cont))
 import qualified Clash.Normalize.Scoped.Transformations.XOptimize as Scoped
-import Clash.Normalize.Types (NormRewrite, NormalizeState)
+import Clash.Normalize.Types (NormalizeState)
+import Clash.Primitives.Types (Primitive (..))
+import Clash.Rewrite.Scoped (ScopedRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asScopedRewriteQ)
-import Clash.Rewrite.Types
-  (RewriteEnv (..), RewriteState (..), TransformContext (..))
-import Clash.Util.Supply (newSupply)
+import Clash.Rewrite.Types (RewriteEnv (..), RewriteState)
 
-import Clash.Tests.Normalize.Transformations.XOptimize
-  ( envXOpt, errPrim, fId, mkTDc, tN, tTy, xOptimizeCurrent, xOptimizeTests )
-import Test.Clash.Differential (KnownDifference, Outcome (..), primTypeForm)
 import Test.Clash.Rewrite
-  ( assertFires, globalId, inScopeOf, intFunTy, intId, intTy, justDataCon, localId
-  , maybeTy, nothingDataCon, pairDataCon, pairTy, testTyConMap, tyVar
-  , withTyConMap )
-import Test.Clash.Scoped (assertRewritesAgreeUpTo)
-import Test.Clash.Scoped.ViaFoil (viaFoil)
+  ( TestDefs (..), TestTerm, kindedTyVarD, parseTestTermWith, strQQ, testAlgTyCon
+  , testDataCon, testGlobalId, testTyConMap, withTyConMap )
+import Test.Clash.Scoped
+  ( ScopeDecl, assertCaptureRewritesTo, assertNoRewrite, assertRewritesTo, closedType, termIn
+  , varD )
 
--- | The port, on terms of Clash Core: through
--- 'Test.Clash.Scoped.ViaFoil.viaFoil'
-xOptimizeScoped :: NormRewrite
-xOptimizeScoped = (viaFoil "xOptimize" $(asScopedRewriteQ Scoped.xOptimize))
+-- * Definitions
 
--- | 'envXOpt', with the type constructors of 'testTyConMap' too
+-- | @MkT :: forall n. n -> T@
+mkTDc :: C.DataCon
+mkTDc = testDataCon "MkT" 101 1 [] [kindedTyVarD "n" "Type"] ["n"] "T"
+
+-- | A primitive that 'xOptimize' considers to be undefined: its template is an
+-- error
+errPrim :: PrimInfo
+errPrim = mkPrimInfo "err" (closedType "Int") C.WorkNever C.SingleResult NoUnfolding
+
+-- | Global functions @f, g :: Int -> Int@ and @h :: forall a. a -> Int@
+globals :: [GlobalId]
+globals =
+  [ testGlobalId "f_G10" "Int -> Int"
+  , testGlobalId "g_G40" "Int -> Int"
+  , testGlobalId "h_G46" "forall (a :: Type). a -> Int" ]
+
+tm :: String -> TestTerm
+tm = parseTestTermWith (TestDefs [mkTDc] [errPrim] globals)
+
+-- | The default rewrite environment, with aggressive X-optimization enabled,
+-- the primitive of 'errPrim', and the type constructors of 'testTyConMap' and
+-- @T@
 env :: RewriteEnv
-env = withTyConMap tcm envXOpt
+env = withTyConMap tcm def{_clashEnv = cenv}
  where
-  tcm :: TyConMap
-  tcm = foldr (\tc -> UniqMap.insert (tyConName tc) tc) testTyConMap
-          (UniqMap.elems (envTyConMap (_clashEnv envXOpt)))
+  cenv0 = _clashEnv def
+  cenv = cenv0
+    { envOpts = (envOpts cenv0){opt_aggressiveXOpt = True}
+    , envPrimitives = HashMap.singleton "err" (HasBlackBox [] errBB)
+    }
+  tcm = UniqMap.insert (C.tyConName tTc) tTc testTyConMap
+  tTc = testAlgTyCon "T" [] [mkTDc]
+  errBB = BlackBox
+    { name = "err"
+    , workInfo = C.WorkNever
+    , renderVoid = NoRenderVoid
+    , multiResult = False
+    , kind = TExpr
+    , warning = ()
+    , outputUsage = Cont
+    , libraries = []
+    , imports = []
+    , functionPlurality = []
+    , includes = []
+    , resultNames = []
+    , resultInits = []
+    , template = BBTemplate [Err Nothing]
+    }
 
--- | Assert that 'xOptimize' and its port agree on a term, with the given
--- variables in scope, up to the given known differences. Gives the outcome.
-agreeUpTo :: Bool -> [KnownDifference] -> RewriteEnv -> [Id] -> [TyVar] -> Term -> IO Outcome
-agreeUpTo fires kds e ids tvs tm = do
-  supply <- newSupply
-  let st = def{_uniqSupply = supply} :: RewriteState NormalizeState
-      ctx = TransformContext (foldl extendInScopeSet (inScopeOf ids) tvs) []
-  assertFires fires e st ctx xOptimizeCurrent tm
-  assertRewritesAgreeUpTo kds e st ctx xOptimizeCurrent xOptimizeScoped tm
+st :: RewriteState NormalizeState
+st = def
 
--- | Assert that 'xOptimize' and its port agree on a term, and whether they
--- fire
-agree :: Bool -> [Id] -> [TyVar] -> Term -> Assertion
-agree fires ids tvs tm = agreeUpTo fires [] env ids tvs tm >>= \case
-  Equal -> pure ()
-  KnownDifferent kds -> assertFailure ("known differences: " <> show kds)
-  Different _ -> assertFailure "different"
+xOptS :: ScopedRewrite NormalizeState
+xOptS = $(asScopedRewriteQ Scoped.xOptimize)
 
--- * Variables
-
-s, m, t :: Id
-s = localId User "s" 30 pairTy
-m = localId User "m" 31 (maybeTy intTy)
-t = localId User "t" 32 tTy
-
-x, y, z :: Id
-x = intId User "x" 33
-y = intId User "y" 34
-z = intId User "z" 35
-
--- | Global function @g :: Int -> Int@
-g :: Term
-g = Var (globalId User "g" 40 (intFunTy 1))
-
-f :: Term
-f = Var fId
-
-lit :: Integer -> Pat
-lit = LitPat . IntLiteral
-
--- | A free type variable @a@
-a :: TyVar
-a = tyVar User "a" 50
-
-agreementTests :: TestTree
-agreementTests = testGroup "Agreement"
-  [ testCase "no defined alternatives" $
-      agree True [x] [] (Case (Var x) intTy [(lit 1, errPrim), (DefaultPat, errPrim)])
-  , testCase "no defined alternatives, at an open type" $
-      agreeUpTo True [primTypeForm] env [x] [a] (Case (Var x) (VarTy a) [(DefaultPat, errPrim)])
-        >>= \case
-          KnownDifferent ["prim-type-form"] -> pure ()
-          o -> assertFailure ("expected the prim-type-form known difference: " <> showOutcome o)
-  , testCase "one defined alternative with a pattern" $
-      agree True [s] [] $
-        Case (Var s) intTy
-          [ (DataPat pairDataCon [] [x, y], App f (Var y))
-          , (DefaultPat, errPrim) ]
-  , testCase "one defined alternative with a literal" $
-      agree True [x] [] (Case (Var x) intTy [(lit 1, App f (Var x)), (DefaultPat, errPrim)])
-  , testCase "one defined default alternative" $
-      agree True [x] [] (Case (Var x) intTy [(lit 1, errPrim), (DefaultPat, App g (Var x))])
-  , testCase "one defined alternative whose pattern binds a type variable" $ do
-      let v = localId User "v" 36 (VarTy tN)
-      agree True [t] [] $
-        Case (Var t) intTy [(DefaultPat, errPrim), (DataPat mkTDc [tN] [v], intLitT 3)]
-  , testCase "many defined alternatives, without a default" $
-      agree True [m] [] $
-        Case (Var m) intTy
-          [ (DataPat nothingDataCon [] [], intLitT 3)
-          , (DataPat justDataCon [] [z], App f (Var z))
-          , (DefaultPat, errPrim) ]
-  , testCase "many defined alternatives, with a default" $
-      agree True [x] [] $
-        Case (Var x) intTy
-          [ (lit 1, errPrim), (lit 2, App f (Var x)), (DefaultPat, App g (Var x)) ]
-  , testCase "all alternatives defined" $
-      agree False [x] [] (Case (Var x) intTy [(lit 1, App f (Var x)), (DefaultPat, App g (Var x))])
-  , testCase "doesn't fire without aggressive X-optimization" $ do
-      let envNoXOpt = env{_clashEnv = clashEnv{envOpts = (envOpts clashEnv){opt_aggressiveXOpt = False}}}
-          clashEnv = _clashEnv env
-      _ <- agreeUpTo False [] envNoXOpt [x] [] (Case (Var x) intTy [(DefaultPat, errPrim)])
-      pure ()
-  ]
- where
-  intLitT = Literal . IntLiteral
-  showOutcome = \case
-    Equal -> "equal"
-    KnownDifferent kds -> "known differences " <> show kds
-    Different _ -> "different"
+-- | Assert that 'Scoped.xOptimize' rewrites a term to the expected one
+xOptTo :: [ScopeDecl] -> TestTerm -> TestTerm -> Assertion
+xOptTo = assertRewritesTo env st xOptS
 
 tests :: TestTree
 tests = testGroup "Clash.Tests.Normalize.Scoped.Transformations.XOptimize"
-  [ testGroup "Regression tests" (xOptimizeTests xOptimizeScoped)
-  , agreementTests
+  [ testGroup "regression tests"
+      [ -- @case p of { DEFAULT -> err; MkPair p z -> f p }@, where the pattern
+        -- binder @p@ shadows the subject @p@ in Clash Core. 'xOptimize'
+        -- replaces a case-expression with a single defined alternative by
+        -- let-bindings for its pattern binders, alongside a let-binding for the
+        -- subject. It used to do so without renaming the pattern binders, so
+        -- they could capture the free variables of the subject:
+        --
+        -- > letrec subj = p; p = case subj of MkPair a _ -> a; ... in f p
+        testCase "xOptimize: pattern binders do not capture the subject" $ do
+          xOptTo [varD "p_47" "Pair"]
+            (tm "(case p_47 of { _ -> Prim.err; MkPair (p :: Int) (z :: Int) -> f_G10 p }) :: Int")
+            expected
+          -- The pattern binder @p@ has the name of the subject @p@
+          assertCaptureRewritesTo env st xOptS [varD "d" "Pair"]
+            (tm "(case d of { _ -> Prim.err; MkPair (p :: Int) (z :: Int) -> f_G10 p }) :: Int")
+            [varD "p_47" "Pair"]
+            (\ts -> \case
+              Case _ ty alts -> Case (termIn ts (tm "p_47")) ty alts
+              e -> e)
+            expected
+        -- @case s of { DEFAULT -> err; MkPair a z -> f a }@, where @a@ had the
+        -- unique 'xOptimize' picks for the let-binder of the subject. It used
+        -- to pick that unique avoiding only the variables in scope of the
+        -- case-expression, not the pattern binders, which it let-binds
+        -- alongside it. In scoped Core, the new binder is fresh by
+        -- construction.
+      , testCase "xOptimize: subject binder is not a pattern binder" $
+          xOptTo [varD "s_30" "Pair"]
+            (tm "(case s_30 of { _ -> Prim.err; MkPair (a :: Int) (z :: Int) -> f_G10 a }) :: Int")
+            (tm [strQQ|
+              let
+                { (subj :: Pair) = s_30
+                ; (a :: Int) = (case subj of { MkPair (f0 :: Int) (f1 :: Int) -> f0 }) :: Int
+                ; (z :: Int) = (case subj of { MkPair (f0 :: Int) (f1 :: Int) -> f1 }) :: Int
+                } in f_G10 a
+            |])
+        -- @case t of { DEFAULT -> err; MkT \@n (v :: n) -> h \@n v }@, where
+        -- @MkT@ has an existential type variable @n@. 'xOptimize' used to
+        -- let-bind @v@ outside of the case-expression, leaving the existential
+        -- type variable @n@ free.
+      , testCase "xOptimize: existential type variables stay bound" $
+          xOptTo [varD "t_42" "T"]
+            (tm "(case t_42 of { _ -> Prim.err; MkT (n :: Type) (v :: n) -> h_G46 @n v }) :: Int")
+            (tm "(case t_42 of { MkT (n :: Type) (v :: n) -> h_G46 @n v }) :: Int")
+      ]
+  , testGroup "cases"
+      [ testCase "no defined alternatives" $
+          xOptTo [varD "x_33" "Int"]
+            (tm "(case x_33 of { 1 -> Prim.err; _ -> Prim.err }) :: Int")
+            (tm "Clash.XException.errorX")
+        -- Clash Core gives @errorX@ the type @a@, rather than applying it to
+        -- @a@ (the known difference "prim-type-form")
+      , testCase "no defined alternatives, at an open type" $
+          xOptTo [kindedTyVarD "a_50" "Type", varD "x_33" "Int"]
+            (tm "(case x_33 of { _ -> Prim.err }) :: a_50")
+            (tm "Clash.XException.errorX @a_50")
+      , testCase "one defined alternative with a pattern" $
+          xOptTo [varD "s_30" "Pair"]
+            (tm "(case s_30 of { MkPair (x :: Int) (y :: Int) -> f_G10 y; _ -> Prim.err }) :: Int")
+            (tm [strQQ|
+              let
+                { (subj :: Pair) = s_30
+                ; (x :: Int) = (case subj of { MkPair (f0 :: Int) (f1 :: Int) -> f0 }) :: Int
+                ; (y :: Int) = (case subj of { MkPair (f0 :: Int) (f1 :: Int) -> f1 }) :: Int
+                } in f_G10 y
+            |])
+      , testCase "one defined alternative with a literal" $
+          xOptTo [varD "x_33" "Int"]
+            (tm "(case x_33 of { 1 -> f_G10 x_33; _ -> Prim.err }) :: Int")
+            (tm "f_G10 x_33")
+      , testCase "one defined default alternative" $
+          xOptTo [varD "x_33" "Int"]
+            (tm "(case x_33 of { 1 -> Prim.err; _ -> g_G40 x_33 }) :: Int")
+            (tm "g_G40 x_33")
+      , testCase "one defined alternative whose pattern binds a type variable" $
+          xOptTo [varD "t_32" "T"]
+            (tm "(case t_32 of { _ -> Prim.err; MkT (n :: Type) (v :: n) -> 3 }) :: Int")
+            (tm "(case t_32 of { MkT (n :: Type) (v :: n) -> 3 }) :: Int")
+      , testCase "many defined alternatives, without a default" $
+          xOptTo [varD "m_31" "Maybe Int"]
+            (tm "(case m_31 of { Nothing -> 3; Just (z :: Int) -> f_G10 z; _ -> Prim.err }) :: Int")
+            (tm "(case m_31 of { Just (z :: Int) -> f_G10 z; _ -> let { (subj :: Maybe Int) = m_31 } in 3 }) :: Int")
+      , testCase "many defined alternatives, with a default" $
+          xOptTo [varD "x_33" "Int"]
+            (tm "(case x_33 of { 1 -> Prim.err; 2 -> f_G10 x_33; _ -> g_G40 x_33 }) :: Int")
+            (tm "(case x_33 of { 2 -> f_G10 x_33; _ -> g_G40 x_33 }) :: Int")
+      , testCase "all alternatives defined" $
+          assertNoRewrite env st xOptS [varD "x_33" "Int"]
+            (tm "(case x_33 of { 1 -> f_G10 x_33; _ -> g_G40 x_33 }) :: Int")
+      , testCase "doesn't fire without aggressive X-optimization" $ do
+          let cenv = _clashEnv env
+              envNoXOpt = env{_clashEnv = cenv{envOpts = (envOpts cenv){opt_aggressiveXOpt = False}}}
+          assertNoRewrite envNoXOpt st xOptS [varD "x_33" "Int"]
+            (tm "(case x_33 of { _ -> Prim.err }) :: Int")
+      ]
   ]
+ where
+  expected = tm [strQQ|
+    let
+      { (subj :: Pair) = p_47
+      ; (p :: Int) = (case subj of { MkPair (f0 :: Int) (f1 :: Int) -> f0 }) :: Int
+      ; (z :: Int) = (case subj of { MkPair (f0 :: Int) (f1 :: Int) -> f1 }) :: Int
+      } in f_G10 p
+  |]
