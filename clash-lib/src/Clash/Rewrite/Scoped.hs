@@ -76,7 +76,7 @@
   = Utilities
 
   The utilities on terms (creating binders, inlining, lifting and removing
-  let-bindings, ...) are in "Clash.Rewrite.Scoped.Util". Read and create
+  let-bindings, ...) are in "Clash.Rewrite.Util". Read and create
   global bindings, which are closed terms, with
   "Clash.Rewrite.Scoped.Globals".
 
@@ -115,7 +115,7 @@
       Nothing -> return e
   @
 
-  where 'Clash.Rewrite.Scoped.Util.removeUnusedBinders' moves the body out of
+  where 'Clash.Rewrite.Util.removeUnusedBinders' moves the body out of
   the scope of unused binders with 'Clash.Core.Scoped.Subst.unsinkIdBinder',
   and opens a recursive let-binding ('Clash.Core.Scoped.Subst.openBind')
   before it looks at its variables.

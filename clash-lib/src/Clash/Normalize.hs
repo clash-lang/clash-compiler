@@ -74,8 +74,8 @@ import           Clash.Rewrite.StrategyDSL.TH     (compileStrategy)
 import           Clash.Rewrite.Types
   (RewriteEnv (..), RewriteState (..), debugOpts, extra, bindings,
    topEntities, newInlineStrategy, typeEnv)
-import           Clash.Rewrite.Util               (runRewriteSession)
-import           Clash.Rewrite.Scoped.Util        (isUntranslatableType)
+import           Clash.Rewrite.Util
+  (runRewriteSession, isUntranslatableType)
 import           Clash.Util
 import           Clash.Util.Interpolate           (i)
 import           Clash.Util.Supply                (Supply)

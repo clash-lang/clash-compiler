@@ -36,7 +36,8 @@ import           Clash.Core.Pretty           (showPpr)
 import           Clash.Debug                 (traceIf, traceM)
 import           Clash.Driver.Types
   (DebugOpts (..), TransformationInfo (..), hasDebugInfo, isDebugging)
-import           Clash.Rewrite.Util          (bumpCounter)
+import           Clash.Rewrite.Util
+  (bumpCounter, closeOverOrError, dependencySortTyVars)
 import           Clash.Util                  (curLoc)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
@@ -47,7 +48,6 @@ import           Clash.Core.Scoped.Type      (normalizeType)
 import           Clash.Core.Scoped.TypeEnv   (TypeEnv)
 import           Clash.Rewrite.Scoped.History (recordRewriteStep)
 import           Clash.Rewrite.Types
-import           Clash.Rewrite.Scoped.Util   (closeOverOrError, dependencySortTyVars)
 
 -- | Record if a transformation is successfully applied
 apply

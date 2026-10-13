@@ -138,7 +138,7 @@ import Clash.Core.Scoped.Util (internalName, mkSelectorCase)
 import qualified Clash.Normalize.Scoped.Transformations.Letrec as Letrec
 import Clash.Rewrite.Scoped
   (Transform (..), TransformContext, bottomupR, changed, tfScope)
-import Clash.Rewrite.Scoped.Util (isFromInt, isUntranslatableType)
+import Clash.Rewrite.Util (isFromInt, isUntranslatableType)
 import Clash.Rewrite.Scoped.Whnf (evaluatorEnv)
 import Clash.Rewrite.Scoped.WorkFree (isConstant)
 

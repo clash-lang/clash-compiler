@@ -3,7 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Rewrite.Scoped.Util": regression tests, and the results of
+  Tests for "Clash.Rewrite.Util": regression tests, and the results of
   its functions on a range of inputs.
 -}
 
@@ -42,7 +42,7 @@ import Clash.Core.Scoped.Term (AbsBinder (..), collectArgs)
 import Clash.Rewrite.Scoped (rootContext, whnfRW)
 import Clash.Rewrite.Scoped.Apply (applyDebug)
 import qualified Clash.Rewrite.Scoped as Scoped
-import Clash.Rewrite.Scoped.Util
+import Clash.Rewrite.Util
 
 import Test.Clash.Rewrite
   ( addTyConName, assertErrorContainsIO, firstUniques, rewriteEnvWithDebug, runRewriteTest

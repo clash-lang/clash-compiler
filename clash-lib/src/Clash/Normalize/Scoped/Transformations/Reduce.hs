@@ -80,7 +80,7 @@ import Clash.Normalize.Scoped.Util (shouldReduce)
 import Clash.Rewrite.Scoped
   ( FrameKind (..), TransformContext, Under (LamBody)
   , changed, ctxFrames, pushUnder, setChanged, tfScope, whnfRW )
-import Clash.Rewrite.Scoped.Util
+import Clash.Rewrite.Util
   (LetBinding (..), isUntranslatableType, letBindingVar, substVars)
 
 -- | Remove the bindings whose right-hand side is alpha-equivalent to that of
@@ -88,7 +88,7 @@ import Clash.Rewrite.Scoped.Util
 -- theirs.
 --
 -- Is given the bindings of a let-expression in inverse topological order,
--- e.g. opened with 'Clash.Rewrite.Scoped.Util.openLetBindings', and returns
+-- e.g. opened with 'Clash.Rewrite.Util.openLetBindings', and returns
 -- the remaining ones in topological order, with the substitution applied to
 -- their right-hand sides, together with the substitution, which the caller
 -- applies to the body (and to the right-hand sides, if the bindings were not

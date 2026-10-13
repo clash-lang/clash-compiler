@@ -34,7 +34,7 @@ import Clash.Rewrite.Types (RewriteEnv, RewriteState (..))
 import Clash.Core.Scoped.FreeVars (freeTmVarOccurrences)
 import Clash.Core.Scoped.NameMap (GlobalEnv, emptyNameMap, globalEnvFromList, nameMapFromList)
 import Clash.Core.Scoped.Syntax
-import Clash.Rewrite.Scoped.Util (LetBinding (..), keepBindings, openLetBindings)
+import Clash.Rewrite.Util (LetBinding (..), keepBindings, openLetBindings)
 
 import Test.Clash.Rewrite
   ( TestDefs (..), TestTerm, mkGlobalBinding, parseTestTermWith

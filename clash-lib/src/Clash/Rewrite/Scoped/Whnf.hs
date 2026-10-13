@@ -13,7 +13,7 @@
 
   When the transformation changed something, the work-free ones among those
   bindings are inlined and the unused ones removed, see
-  'Clash.Rewrite.Scoped.Util.bindPureHeap'.
+  'Clash.Rewrite.Util.bindPureHeap'.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -34,7 +34,7 @@ import Clash.Core.Scoped.Evaluator.Types
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.TypeEnv (TypeEnv)
 import Clash.Rewrite.Types
-import Clash.Rewrite.Scoped.Util (bindPureHeap)
+import Clash.Rewrite.Util (bindPureHeap)
 
 -- | The environment of the scoped evaluator: the primitive reductions of
 -- "Clash.Core.Scoped.Evaluator.Primitives". A primitive without one doesn't
@@ -48,7 +48,7 @@ evaluatorEnv te = Env te (PrimReductions primReductionMap Nothing)
 --
 -- If the transformation signals a change, its result is bound by those
 -- bindings, of which the work-free ones are inlined, and the unused ones
--- removed ('Clash.Rewrite.Scoped.Util.bindPureHeap'). Otherwise the result
+-- removed ('Clash.Rewrite.Util.bindPureHeap'). Otherwise the result
 -- is the one of the transformation, bound by those bindings only if it
 -- mentions them: return (the 'sink' of) the original term when nothing
 -- changes.

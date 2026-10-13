@@ -108,7 +108,7 @@ import Clash.Rewrite.Scoped
   ( FrameKind (..), TransformContext, changed, ctxFrames, isLambdaBodyKind
   , isTickKind, setChanged, tfScope )
 import Clash.Rewrite.Scoped.Globals (isWorkFreeTerm)
-import Clash.Rewrite.Scoped.Util
+import Clash.Rewrite.Util
   ( LetBinding (..), isFromInt, isUntranslatable, keepBindings, mkTmBinderFor
   , openLetBindings, removeUnusedBinders, substVars )
 
