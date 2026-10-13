@@ -8,8 +8,8 @@
 -- lambda-bound @x@ of 'topEntity'), the evaluator must still create a heap
 -- binding for it. Otherwise, when evaluation gets stuck (here: on the
 -- lambda-bound @b@) and the stack is unwound, the @Apply x@ frame refers to a
--- variable that cannot be found on the heap, and Clash crashes with
--- "Clash.Core.Evaluator.unwindStack".
+-- variable that cannot be found on the heap, and Clash crashes while
+-- unwinding the stack.
 module FreeVarHeapBinding where
 
 import Clash.Prelude

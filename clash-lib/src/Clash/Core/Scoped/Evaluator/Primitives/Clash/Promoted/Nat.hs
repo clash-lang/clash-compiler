@@ -7,8 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of "Clash.Promoted.Nat" in the scoped
-  evaluator: ports of @Clash.GHC.Evaluator.Primitives.Clash.Promoted.Nat@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  evaluator. See "Clash.Core.Scoped.Evaluator.Primitives" for how to write
+  them.
 -}
 
 {-# LANGUAGE LambdaCase #-}

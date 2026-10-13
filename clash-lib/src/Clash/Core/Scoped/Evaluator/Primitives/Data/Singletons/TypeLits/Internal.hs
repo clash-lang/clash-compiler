@@ -7,9 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of "Data.Singletons.TypeLits.Internal" in the
-  scoped evaluator: ports of
-  @Clash.GHC.Evaluator.Primitives.Data.Singletons.TypeLits.Internal@. See
-  "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  scoped evaluator. See "Clash.Core.Scoped.Evaluator.Primitives" for how to
+  write them.
 -}
 
 {-# LANGUAGE LambdaCase #-}

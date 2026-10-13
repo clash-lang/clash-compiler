@@ -7,8 +7,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Reductions of the primitives of "Clash.Sized.Vector" in the scoped
-  evaluator: ports of @Clash.GHC.Evaluator.Primitives.Clash.Sized.Vector@.
-  See "Clash.Core.Scoped.Evaluator.Primitives" for how to port them.
+  evaluator. See "Clash.Core.Scoped.Evaluator.Primitives" for how to write
+  them.
 
   Most reductions only need the names of the type constructors in the type of
   their primitive (e.g. that of @Vec@). They take them from its declared type
@@ -791,8 +791,7 @@ primitives =
                           [ Right (numTy k2), Right (numTy k2), Right aTy
                           , Left (snatTerm snatDc k2), Left (valToTerm xs) ]
                       -- @dtfold@ of one half. The binders of the pattern have
-                      -- the type of the halves, where the reduction of Clash
-                      -- Core gives them the type @2^(k-1)@ itself.
+                      -- the type of the halves.
                       dtfoldHalf first =
                         mkApps (Prim pInfo)
                           [ Right pTy
