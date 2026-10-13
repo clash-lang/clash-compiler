@@ -8,7 +8,7 @@
   terms from strings.
 
   'parseTestTerm' parses a term of scoped Clash Core, see the section
-  "Parsing scoped Core" and "Test.Clash.Scoped" for the test scopes that
+  "Parsing scoped Core" and "Test.Clash.Core" for the test scopes that
   build its terms.
 -}
 
@@ -326,7 +326,7 @@ termParseMode = defaultParseMode
 -- The parser of scoped Clash Core. It parses very simple Haskell expressions,
 -- with the identifiers of 'parseNameScope', into builders
 -- ("Clash.Core.Builder") rather than terms, so that a test can build
--- the term in a scope of its choice. See "Test.Clash.Scoped" for how tests
+-- the term in a scope of its choice. See "Test.Clash.Core" for how tests
 -- use it.
 --
 -- Every binder needs an explicit type annotation, as there is no type
@@ -395,18 +395,18 @@ termParseMode = defaultParseMode
 -- Global variables (@f_G1@) are not scoped. Their type is their annotation,
 -- which must be closed, or 'freeVarType'. Local variables that no binder
 -- binds are free: the scope that the term is built in must have them (see
--- 'Test.Clash.Scoped.termIn'), or the test declares them from the term (see
--- 'Test.Clash.Scoped.withTerm', and 'testTermFree').
+-- 'Test.Clash.Core.termIn'), or the test declares them from the term (see
+-- 'Test.Clash.Core.withTerm', and 'testTermFree').
 
 -- | A term of scoped Clash Core to build in the scope of a test, see
--- 'Test.Clash.Scoped.termIn'. Parse it from a string with 'parseTestTerm',
+-- 'Test.Clash.Core.termIn'. Parse it from a string with 'parseTestTerm',
 -- the quasiquoter 'termQQ', or a string literal (with @OverloadedStrings@).
 data TestTerm = TestTerm
   { testTermB :: TmB
   -- ^ The term
   , testTermFree :: [ScopeDecl]
   -- ^ The free local variables it mentions, in the order in which
-  -- 'Test.Clash.Scoped.withTerm' declares them: the type variables (of kind
+  -- 'Test.Clash.Core.withTerm' declares them: the type variables (of kind
   -- @Type@) by key, then the term variables by key, with the type of their
   -- first annotated occurrence, or 'freeVarType'.
   }
@@ -415,7 +415,7 @@ instance IsString TestTerm where
   fromString = parseTestTerm
 
 -- | A type of scoped Clash Core to build in the scope of a test, see
--- 'TestTerm' and 'Test.Clash.Scoped.typeIn'
+-- 'TestTerm' and 'Test.Clash.Core.typeIn'
 data TestType = TestType
   { testTypeB :: TyB
   , testTypeFree :: [ScopeDecl]
@@ -436,7 +436,7 @@ builtTerm b = TestTerm b []
 builtType :: TyB -> TestType
 builtType b = TestType b []
 
--- | A variable of the scope of a test, see 'Test.Clash.Scoped.withTestScope'
+-- | A variable of the scope of a test, see 'Test.Clash.Core.withTestScope'
 data ScopeDecl = ScopeDecl
   { declRaw :: !(Maybe Int)
   -- ^ The raw name it must get, see 'atRaw'
@@ -468,7 +468,7 @@ varD s ty = ScopeDecl Nothing (DeclId (nameKey nm) nm (Just ty))
 
 -- | Give a variable a raw name above those of the variables before it,
 -- rather than the next one. E.g. a variable with a raw name above the names of
--- all binders of a term, see 'Test.Clash.Scoped.sunkD'.
+-- all binders of a term, see 'Test.Clash.Core.sunkD'.
 atRaw :: Int -> ScopeDecl -> ScopeDecl
 atRaw r d = d {declRaw = Just r}
 

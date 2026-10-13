@@ -111,7 +111,7 @@
   = Testing a reduction
 
   Unit tests check reductions on fixed inputs against expected results, see
-  "Clash.Tests.Core.Scoped.Evaluator.Primitives" in the unit tests of
+  "Clash.Tests.Core.Evaluator.Primitives" in the unit tests of
   @clash-lib@.
 -}
 

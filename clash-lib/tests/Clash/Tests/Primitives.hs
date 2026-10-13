@@ -32,7 +32,7 @@ import Clash.Primitives.Sized.Vector (foldBBF, iterateBBF)
 import Clash.Primitives.Verification (bindMaybe)
 
 import Test.Clash.Rewrite (addTyConName, runNetlistTest)
-import Test.Clash.Scoped
+import Test.Clash.Core
   ( TestType (..), builtType, termIn, testScope, testTypeEnv, tyVarD, typeIn, varD
   , withTestScope )
 

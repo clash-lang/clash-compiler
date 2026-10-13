@@ -51,7 +51,7 @@ import Clash.Core.DataCon (mkDataCon)
 import Clash.Core.Syntax (mkPrimInfo)
 import qualified Clash.Core.Syntax as S
 
-import Test.Clash.Scoped (closedType)
+import Test.Clash.Core (closedType)
 
 -- | Encode a value as a closed term of scoped Clash Core, of the shape
 -- "Clash.GHC.GHC2Core" makes for it, as far as the decoders of
