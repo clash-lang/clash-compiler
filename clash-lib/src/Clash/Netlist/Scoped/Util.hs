@@ -73,8 +73,7 @@ import           Clash.Core.Pretty           (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Scoped.Pretty    ()
 import qualified Clash.Core.Term             as C
 import qualified Clash.Core.Type             as C (LitTy (..), Type)
-import           Clash.Core.Term             (MultiPrimInfo (..))
-import           Clash.Core.Scoped.TermInfo  (multiPrimInfo')
+import           Clash.Core.Scoped.TermInfo  (MultiPrimInfo (..), multiPrimInfo')
 import           Clash.Util                  (ClashException (..), curLoc)
 
 import           Clash.Core.Scoped.Alpha     (aeqTm, aeqTy)
@@ -514,8 +513,8 @@ renameBinder ctx binds (i, collectArgsTicks -> (k, args, ticks)) =
   goMulti :: PrimInfo -> CompiledPrimitive -> NetlistMonad [(TmName n, C.Name C.Term)]
   goMulti pInfo (BlackBoxHaskell{function=(_, function)}) = do
     tcm <- Lens.view tcCache
-    let MultiPrimInfo{mpi_resultTypes} = multiPrimInfo' tcm pInfo
-        (args1, resArgs) = splitAt (length args - length mpi_resultTypes) args
+    let MultiPrimInfo{mpi_resultCount} = multiPrimInfo' tcm pInfo
+        (args1, resArgs) = splitAt (length args - mpi_resultCount) args
         resIds = [ LocalId o ty n | Left (Var o ty n) <- resArgs ]
     -- The result types of 'MultiPrimInfo' are those of the type of the
     -- primitive, whose type variables are not in scope: those of the result

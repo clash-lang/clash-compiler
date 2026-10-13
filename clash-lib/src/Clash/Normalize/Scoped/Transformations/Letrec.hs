@@ -78,10 +78,8 @@ import Clash.Sized.Vector as Vec (Vec (Cons), splitAt)
 
 import Clash.Annotations.Primitive (extractPrim)
 import Clash.Core.DataCon (DataCon (..))
-import qualified Clash.Core.HasType as C (coreTypeOf)
 import qualified Clash.Core.Name as C
 import Clash.Core.TyCon (tyConDataCons)
-import qualified Clash.Core.Type as C
 import qualified Clash.Core.Var as C (Id)
 import Clash.Netlist.BlackBox.Types ()
 import Clash.Netlist.BlackBox.Util (getUsedArguments)
@@ -97,7 +95,7 @@ import Clash.Rewrite.Types (curFun, primitives, scopedTypeEnv)
 import Clash.Core.Scoped.Alpha (aeqTm, aeqTy)
 import Clash.Core.Scoped.FreeVars
   (freeTmVarOccurrences, teleNameBinders, tmNameOccursIn)
-import Clash.Core.Scoped.HasType (inferCoreTypeOf)
+import Clash.Core.Scoped.HasType (inferCoreTypeOf, primInfoType)
 import Clash.Core.Scoped.NameMap
   (emptyNameMap, lookupNameMap, nameMapFromList, singletonNameMap)
 import Clash.Core.Scoped.Subst
@@ -108,7 +106,7 @@ import Clash.Core.Scoped.Term
   , mkApps, mkLams, mkTicks, openBndrs, partitionTicks, stripAllTicks, stripTicks )
 import Clash.Core.Scoped.TermInfo (isCon, isLocalVar)
 import Clash.Core.Scoped.Type
-  (TypeView (..), isClassTy, normalizeType, tyNatSize, tyView)
+  (SplitFunForall (..), TypeView (..), isClassTy, normalizeType, piTeleTmArity, splitFunForallTy, tyNatSize, tyView)
 import Clash.Core.Scoped.TypeEnv (TypeEnv, lookupTyCon)
 import Clash.Core.Scoped.Util
   (LetGroup (..), inverseTopSortOrder, mkLets, mkVec, regroupLetBindings)
@@ -247,8 +245,8 @@ removeUnusedPrimArgs sc e p pInfo args ticks = do
       else
         return e
  where
-  -- The type of a primitive is closed, so this uses the one of Clash Core
-  arity = length . Either.rights . fst $ C.splitFunForallTy (C.coreTypeOf (primLegacy pInfo))
+  arity = case splitFunForallTy (primInfoType pInfo :: Type 'VoidS) of
+    SplitFunForall tele _ -> piTeleTmArity tele
 
   go :: TypeEnv -> Int -> [Int] -> [Either (Term n) (Type n)]
      -> NormalizeSession [Either (Term n) (Type n)]

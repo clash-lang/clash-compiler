@@ -96,7 +96,7 @@ import qualified Clash.Sized.Internal.Signed
 import qualified Clash.Sized.Internal.Unsigned
 import qualified Clash.Sized.Vector
 
-import Clash.Core.DataCon (DataCon (..), dcLegacyType, dcUnivTyVars)
+import Clash.Core.DataCon (DataCon (..), dcUnivTyVars)
 import Clash.Core.Literal (Literal (..))
 import qualified Clash.Core.Name as C
 import Clash.Core.Pretty (showPpr)
@@ -117,7 +117,8 @@ import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (collectArgs, collectArgsTicks, mkApps, stripTicks)
-import Clash.Core.Scoped.Type (TypeView (..), tyView)
+import Clash.Core.Scoped.Type
+  (SplitFunForall (..), TypeView (..), piTeleTmArity, piTeleTyArity, splitFunForallTy, tyView)
 
 -- * Running the machine
 
@@ -363,25 +364,26 @@ nameModTick occ = NameMod C.PrefixName (LitTy (C.SymTy (toStr occ)))
   unQualName = snd . Text.breakOnEnd "."
   toStr = Text.unpack . unQualName . flip Text.snoc '_' . C.nameOcc
 
--- | The number of arguments of a closed type: type and term arguments
-closedArity :: C.Type -> Int
-closedArity = length . fst . C.splitFunForallTy
+-- | The number of arguments of a type: type and term arguments
+closedArity :: Type n -> Int
+closedArity ty = case splitFunForallTy ty of
+  SplitFunForall tele _ -> piTeleTyArity tele + piTeleTmArity tele
 
 stepPrim :: Distinct n => Env -> PrimInfo -> Machine o n -> Maybe (Next o n)
 stepPrim env p m
   | primName p == showt 'GHC.Prim.realWorld# = unwind env (PrimVal p [] []) m
-  | closedArity (C.primType (primLegacy p)) == 0 = primStep env (forcePrims m) p [] [] m
+  | closedArity (primType p) == 0 = primStep env (forcePrims m) p [] [] m
   | otherwise = newBinder env m (Prim p)
 
 stepApp
   :: forall o n. Distinct n
   => Env -> Term n -> Term n -> Machine o n -> Maybe (Next o n)
 stepApp env x y m = case collectArgsTicks (App x y) of
-  (Data dc, args, _) -> case compare (length args) (closedArity (dcLegacyType dc)) of
+  (Data dc, args, _) -> case compare (length args) (closedArity (dcType dc)) of
     EQ -> unwind env (DC dc args) m
     LT -> newBinder env m (App x y)
     GT -> error "Overapplied DC"
-  (Prim p, args, _) -> case compare (length args) (closedArity (C.primType (primLegacy p))) of
+  (Prim p, args, _) -> case compare (length args) (closedArity (primType p)) of
     EQ -> case Either.lefts args of
       -- We make boolean conjunction and disjunction extra lazy by deferring
       -- the evaluation of the arguments during the evaluation of the primop
@@ -414,11 +416,11 @@ stepApp env x y m = case collectArgsTicks (App x y) of
 stepTyApp
   :: Distinct n => Env -> Term n -> Type n -> Machine o n -> Maybe (Next o n)
 stepTyApp env x ty m = case collectArgsTicks (TyApp x ty) of
-  (Data dc, args, _) -> case compare (length args) (closedArity (dcLegacyType dc)) of
+  (Data dc, args, _) -> case compare (length args) (closedArity (dcType dc)) of
     EQ -> unwind env (DC dc args) m
     LT -> newBinder env m (TyApp x ty)
     GT -> error "Overapplied DC"
-  (Prim p, args, _) -> case compare (length args) (closedArity (C.primType (primLegacy p))) of
+  (Prim p, args, _) -> case compare (length args) (closedArity (primType p)) of
     EQ -> case Either.lefts args of
       []
         | primName p `elem` map primName [NP.removedArg, NP.undefined, NP.undefinedX]
@@ -488,7 +490,7 @@ apply env v hv@(HeapVar _ hvTy _) m = case v of
   sc = mScope m
   te = envTypeEnv env
   resTy p tys vs =
-    piResultTys te sc (primInfoType sc p)
+    piResultTys te sc (primInfoType p)
       (tys ++ map (inferCoreTypeOf te sc . valToTerm) vs ++ [hvTy])
 
 -- | Instantiate a type abstraction. See 'Clash.GHC.Evaluator.instantiate'.
@@ -506,7 +508,7 @@ instantiate env v ty m = case v of
   sc = mScope m
   te = envTypeEnv env
   resTy p tys es =
-    piResultTys te sc (primInfoType sc p)
+    piResultTys te sc (primInfoType p)
       (tys ++ map (inferCoreTypeOf te sc . valToTerm) es ++ [ty])
 
 -- | Select the alternative of a case-expression. See
@@ -661,7 +663,7 @@ undefinedResult
 undefinedResult undef env p tys vs es m =
   let sc = mScope m
       args = map Right tys ++ map (Left . valToTerm) vs ++ map Left es
-      ty = applyTypeToArgs (Prim p) (envTypeEnv env) sc (primInfoType sc p) args
+      ty = applyTypeToArgs (Prim p) (envTypeEnv env) sc (primInfoType p) args
   in Just (stay m {mTerm = TyApp (Prim undef) ty})
 
 -- | Primitives that are values, not operations
@@ -701,7 +703,7 @@ isUndefinedXPrimVal _ = False
 -- | The result type of a fully applied primitive
 primResultType :: Distinct n => Env -> Scope n -> PrimInfo -> [Type n] -> Type n
 primResultType env sc p tys =
-  dropFuns (piResultTys (envTypeEnv env) sc (primInfoType sc p) tys)
+  dropFuns (piResultTys (envTypeEnv env) sc (primInfoType p) tys)
  where
   dropFuns ty = case tyView ty of
     FunTy _ r -> dropFuns r

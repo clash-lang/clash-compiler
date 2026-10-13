@@ -10,8 +10,8 @@
   case-expressions and casts, and global variables ('globalIdType'). Data
   constructors and primitives have closed Clash types. 'dataConType' looks
   them up in a t'TypeEnv', which converts them at most once, see
-  "Clash.Core.Scoped.TypeEnv". 'primInfoType' converts the type of a primitive
-  for every use.
+  "Clash.Core.Scoped.TypeEnv". Primitives have closed types ('primType'), which
+  'primInfoType' moves into any scope.
 
   = Inferring types under binders
 
@@ -48,16 +48,16 @@ module Clash.Core.Scoped.HasType
 import Data.Maybe (fromMaybe)
 import GHC.Stack (HasCallStack)
 
-import qualified Clash.Core.HasType as C
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Pretty (showPpr)
+import qualified Clash.Core.Term as C (IsMultiPrim (..))
+import Clash.Core.TyCon (isTupleTyConLike)
 import qualified Clash.Core.Type as C
 import Clash.Debug (debugIsOn)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
 
 import Clash.Core.Scoped.Alpha (aeqTy)
-import Clash.Core.Scoped.Convert (fromClashTypeClosed)
 import Clash.Core.Scoped.NameMap (tyBinderNameBinders)
 import Clash.Core.Scoped.Pretty ()
 import Clash.Core.Scoped.Subst
@@ -93,9 +93,27 @@ literalType = \case
 -- | The type of a primitive, in any scope. The type of a multi-result
 -- primitive returns its results as separate arguments, see Note [MultiResult
 -- type] in "Clash.Normalize.Transformations.MultiPrim".
-primInfoType :: (HasCallStack, Distinct n) => Scope n -> PrimInfo -> Type n
--- TODO(D4): the type of a 'PrimInfo' is a Clash Core type
-primInfoType sc p = fromClashTypeClosed sc (C.coreTypeOf (primLegacy p))
+primInfoType :: (HasCallStack, Distinct n) => PrimInfo -> Type n
+primInfoType p = case primMultiResult p of
+  C.SingleResult -> sinkClosed (primType p)
+  C.MultiResult -> sinkClosed (multiResultType (primType p))
+{-# INLINE primInfoType #-}
+
+-- | The type of a multi-result primitive, from the type of the primitive that
+-- returns a tuple: its results become arguments, see 'primInfoType'
+multiResultType :: HasCallStack => Type n -> Type n
+multiResultType ty = case splitFunForallTy ty of
+  SplitFunForall tele res
+    | TyConApp tupTcNm tupArgs <- tyView res
+    , isTupleTyConLike tupTcNm
+    -> mkPolyFunTy (appendArgs tele tupArgs) res
+  _ -> error "primInfoType: MultiResult primitive without tuple type"
+ where
+  appendArgs :: PiTele x l -> [Type l] -> PiTele x l
+  appendArgs tele args = case tele of
+    PiNil -> foldr PiArg PiNil args
+    PiForall b rest -> PiForall b (appendArgs rest args)
+    PiArg a rest -> PiArg a (appendArgs rest args)
 
 -- | The type of a term. See 'C.inferCoreTypeOf', and the module header.
 inferCoreTypeOf :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Term n -> Type n
@@ -144,7 +162,7 @@ inferTypeSubst tenv = go
     GlobalVar g -> sinkClosed (globalIdType g)
     Data dc -> dataConType tenv (substScope s) dc
     Literal l -> literalType l
-    Prim p -> primInfoType (substScope s) p
+    Prim p -> primInfoType p
     Lam b e -> substIdBinder s b $ \s' b' ->
       mkFunTy (idBinderType b') (strengthenTyId b' (go s' e))
     TyLam b e -> substTyBinder s b $ \s' b' ->

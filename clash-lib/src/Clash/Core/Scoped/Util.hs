@@ -86,7 +86,7 @@ import qualified Clash.Core.Type as C
 import qualified Clash.Core.Util as C
 import Clash.Util (curLoc, indexNote)
 
-import Clash.Core.Scoped.Convert (toClashType, mkPrimInfoFromClash)
+import Clash.Core.Scoped.Convert (mkPrimInfo)
 import Clash.Core.Scoped.DataCon (dataConInstArgTys, dataConInstExtTyVars)
 import Clash.Core.Scoped.EqSolver (dataConInstArgTysE)
 import Clash.Core.Scoped.FreeVars (freeTmVars, teleNameBinders)
@@ -100,7 +100,7 @@ import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (appendTele, mkApps, splitTele)
 import Clash.Core.Scoped.Type
 import Clash.Core.Scoped.TypeEnv (TypeEnv, findTyCon, lookupTyCon)
-import Clash.Core.Scoped.TysPrim (typeNatKind)
+import Clash.Core.Scoped.TysPrim (typeNatKind, undefinedTy, unsafeCoerceTy)
 
 -- * Let-bindings
 
@@ -711,7 +711,12 @@ mkSelectorCase caller sc tenv scrut dcI fieldI = go (inferCoreTypeOf tenv sc scr
 -- argument of the primitive, as "Clash.GHC.GHC2Core" makes them: the type of
 -- a primitive is closed.
 primCo :: Type n -> Term n
-primCo = TyApp (Prim (mkPrimInfoFromClash (C.PrimInfo "_CO_" C.undefinedTy C.WorkNever C.SingleResult C.NoUnfolding)))
+primCo = TyApp (Prim coPrimInfo)
+
+-- | The primitive of 'primCo'
+coPrimInfo :: PrimInfo
+coPrimInfo = mkPrimInfo "_CO_" undefinedTy C.WorkNever C.SingleResult NoUnfolding
+{-# NOINLINE coPrimInfo #-}
 
 -- | A primitive whose type is that of a term it replaces, e.g. @errorX@ for a
 -- case-expression without defined alternatives. The type of a primitive is
@@ -720,15 +725,21 @@ primCo = TyApp (Prim (mkPrimInfoFromClash (C.PrimInfo "_CO_" C.undefinedTy C.Wor
 -- the primitive with the given type, as Clash Core makes it.
 primAtType :: PrimInfo -> Type n -> Term n
 primAtType p ty = case closeType ty of
-  -- TODO(D4): set the scoped type
-  Just closed -> Prim (mkPrimInfoFromClash (primLegacy p) {C.primType = toClashType closed})
-  Nothing -> TyApp (Prim (mkPrimInfoFromClash (primLegacy p) {C.primType = C.undefinedTy})) ty
+  Just closed -> Prim (withType closed)
+  Nothing -> TyApp (Prim (withType undefinedTy)) ty
+ where
+  withType t =
+    mkPrimInfo (primName p) t (primWorkInfo p) (primMultiResult p) (primUnfolding p)
 
 -- | An unsafe coercion, see 'C.primUCo'
 primUCo :: Term n
-primUCo = case C.primUCo of
-  C.Prim p -> Prim (mkPrimInfoFromClash p)
-  _ -> error "primUCo: not a primitive"
+primUCo = Prim uCoPrimInfo
+
+-- | The primitive of 'primUCo'
+uCoPrimInfo :: PrimInfo
+uCoPrimInfo =
+  mkPrimInfo "GHC.Prim.unsafeCoerce#" unsafeCoerceTy C.WorkNever C.SingleResult NoUnfolding
+{-# NOINLINE uCoPrimInfo #-}
 
 -- * Types
 

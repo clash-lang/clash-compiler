@@ -61,6 +61,7 @@ module Clash.Core.Scoped.Type
   , piTeleNameBinders
   , piTeleTyArity
   , piTeleTmArity
+  , anyPiArg
   , SplitFunForall (..)
   , splitFunForallTy
   , SplitCoreFunForall (..)
@@ -324,6 +325,13 @@ piTeleTmArity = go 0
     PiNil -> acc
     PiForall _ rest -> go acc rest
     PiArg _ rest -> go (acc + 1) rest
+
+-- | Does any argument type of a telescope satisfy the predicate?
+anyPiArg :: (forall x. Type x -> Bool) -> PiTele n l -> Bool
+anyPiArg f = \case
+  PiNil -> False
+  PiForall _ rest -> anyPiArg f rest
+  PiArg a rest -> f a || anyPiArg f rest
 
 -- | A polymorphic function type, split into its quantified type variables and
 -- argument types, and its result type, see 'splitFunForallTy'
