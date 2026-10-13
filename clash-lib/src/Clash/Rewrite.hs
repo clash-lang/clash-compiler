@@ -125,7 +125,7 @@
   ("Clash.Rewrite.StrategyDSL.TH", 'Clash.Rewrite.StrategyDSL.TH.compileStrategy')
   compiles them into fused traversals that open the binders they go under.
 
-  Tests: "Test.Clash.Scoped" has test scopes to write the inputs and the
+  Tests: "Test.Clash.Core" has test scopes to write the inputs and the
   expected results, and runs scoped transformations in them (@runRewriteIn@,
   @runRewriteClosed@).
 

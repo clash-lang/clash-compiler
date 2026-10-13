@@ -26,7 +26,7 @@ import Clash.Netlist.Types
 import Clash.Netlist.Util (SplitNormalized (..), coreTypeToHWType, splitNormalized)
 
 import Test.Clash.Rewrite (TestDefs (..), TestTerm, parseTestTermWith)
-import Test.Clash.Scoped
+import Test.Clash.Core
   ( TestScope (..), closedTerm, closedType, testGlobalId, testTypeEnv, tyVarD, typeIn
   , withTestScope )
 

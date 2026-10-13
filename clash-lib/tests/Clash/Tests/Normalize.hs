@@ -30,7 +30,7 @@ import Clash.Core.Syntax (GlobalId)
 
 import Test.Clash.Rewrite
   ( TestDefs (..), parseTestTermWith, runRewriteTest, testGlobalId )
-import Test.Clash.Scoped
+import Test.Clash.Core
   (assertLintClean, assertTermIs, emptyTestScope, mkGlobalBindings)
 
 -- | Run 'cleanupGraph' with the given top entity and (normalized) binders,

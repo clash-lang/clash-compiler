@@ -25,7 +25,7 @@
   or type arguments refer to a variable bound inside the alternatives can't be
   lifted, and an argument that refers to one can't be shared: the types
   enforce this (see the regression tests in
-  "Clash.Tests.Normalize.Scoped.Transformations.DEC"). The arguments that
+  "Clash.Tests.Normalize.Transformations.DEC"). The arguments that
   aren't shared stay where they are, in the case-trees that select them.
 
   = Heads
