@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -26,9 +26,9 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Gen.Faker as Gen
 
 import Clash.Core.DataCon (DcName)
-import Clash.Core.Term (TmName)
+import qualified Clash.Core.Term as C (Term)
 import Clash.Core.TyCon (TyConName)
-import Clash.Core.Type (KiName, TyName)
+import qualified Clash.Core.Type as C (Type)
 import Clash.Core.Name
 import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
@@ -52,16 +52,19 @@ genName genOccName =
     <*> genUnique
     <*> pure noSrcSpan
 
-genKindName :: forall m. MonadGen m => m KiName
+-- | The human readable name of a kind variable. Its unique is not used.
+genKindName :: forall m. MonadGen m => m (Name C.Type)
 genKindName = genName (genOccNameWith Text.toTitle)
 
-genTypeName :: forall m. MonadGen m => m TyName
+-- | The human readable name of a type variable. Its unique is not used.
+genTypeName :: forall m. MonadGen m => m (Name C.Type)
 genTypeName = genName (genOccNameWith Text.toTitle)
 
 genTyConName :: forall m. MonadGen m => m TyConName
 genTyConName = genName (genOccNameWith Text.toTitle)
 
-genTermName :: forall m. MonadGen m => m TmName
+-- | The human readable name of a term variable. Its unique is not used.
+genTermName :: forall m. MonadGen m => m (Name C.Term)
 genTermName = genName (genOccNameWith Text.toLower)
 
 genDataConName :: forall m. MonadGen m => m DcName

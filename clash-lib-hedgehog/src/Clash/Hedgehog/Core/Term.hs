@@ -1,32 +1,46 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random, type-directed generation of Term.
+
+Terms are generated in an environment ('Env'): the scope they live in, and the
+type variables and term variables in it that they may mention. Binders get
+fresh names in that scope, so generated terms are well-scoped by construction.
+'genClosedTerm' generates closed terms.
 -}
 
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Clash.Hedgehog.Core.Term
   ( genTermFrom
+  , genClosedTerm
   ) where
 
-import Control.Monad (forM)
+import Control.Monad (forM, replicateM)
+import Data.Maybe (catMaybes)
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+import Clash.Core.Basic (NameMod(..))
 import Clash.Core.DataCon
-import Clash.Core.HasType
 import Clash.Core.Pretty (showPpr)
-import Clash.Core.Term
 import Clash.Core.TyCon
-import Clash.Core.Type
-import Clash.Core.TysPrim (liftedTypeKind, typeSymbolKind)
-import Clash.Core.Util (listToLets)
-import Clash.Core.Var
-import Clash.Data.UniqMap (UniqMap)
 import qualified Clash.Data.UniqMap as UniqMap
+
+import Clash.Core.Scoped.DataCon (withDataConPat)
+import Clash.Core.Scoped.Pretty ()
+import Clash.Core.Scoped.Sig (DataConSig(..))
+import Clash.Core.Scoped.Subst (openTyBinder, patVars)
+import Clash.Core.Scoped.Syntax hiding (Name)
+import Clash.Core.Scoped.Term (mkTmApps)
+import Clash.Core.Scoped.Type (TypeView(..), normalizeType, splitTyConAppM, tyView)
+import Clash.Core.Scoped.TypeEnv (mkTypeEnv)
+import Clash.Core.Scoped.TysPrim (liftedTypeKind, typeSymbolKind)
+import Clash.Core.Scoped.Util (listToLets)
 
 import Clash.Hedgehog.Core.Literal
 import Clash.Hedgehog.Core.Monad
@@ -39,31 +53,30 @@ import Clash.Hedgehog.Unique
 -- applying it so that the type fits the hole. If there are no possible fits
 -- for the hole in the environment, an alternative generator is used instead.
 sampleDataConOr
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m n
+   . (Alternative m, MonadGen m, Distinct n)
   => TyConMap
   -- ^ The types in scope while generating
-  -> Type
+  -> Type n
   -- ^ The hole to generate a fit for
-  -> (Type -> CoreGenT m Term)
+  -> (Type n -> CoreGenT m (Term n))
   -- ^ A generator for sub-holes (used when partially applying a fit)
-  -> CoreGenT m Term
+  -> CoreGenT m (Term n)
   -- ^ A generator to use if there are no hole fits
-  -> CoreGenT m Term
+  -> CoreGenT m (Term n)
 sampleDataConOr tcm hole genSub genOr =
   sampleDataCon <|> genOr
  where
   sampleDataCon = do
     -- TODO We cannot fill in any datacon where the type is polymorphic. This
-    -- is because sampleUniqMap will never pick one because it cannot see the
+    -- is because sampleList will never pick one because it cannot see the
     -- fit is valid without unification. See the TODO by sampleUniqMap.
     --
     -- We mitigate this by not generating algebraic type constructors with
     -- kinds other than Type, i.e. no type params / poly kinds. See the
     -- 'genAlgTyCon' function and NOTE [finding more complex fits].
-    let dcs = concatMap tyConDataCons tcm
-    let dcm = UniqMap.fromList (zip dcs dcs)
-    (dc, holes) <- sampleUniqMap (const True) hole dcm
+    let dcs = concatMap tyConDataCons (UniqMap.elems tcm)
+    (dc, holes) <- sampleList (sinkClosed . dcType) (const True) hole dcs
     holeFills <- traverse genSub holes
 
     pure (mkTmApps (Data dc) holeFills)
@@ -73,41 +86,60 @@ sampleDataConOr tcm hole genSub genOr =
 -- matching) then the given alternative generator is used instead.
 --
 sampleIdOr
-  :: forall m
+  :: forall m n
    . (Alternative m, MonadGen m)
-  => UniqMap (Either TyVar Id)
+  => Env n
   -- ^ The currently bound type and term variables
-  -> Type
+  -> Type n
   -- ^ The hole to generate a fit for
-  -> (Type -> CoreGenT m Term)
+  -> (Type n -> CoreGenT m (Term n))
   -- ^ A generator for sub-holes (used when partially applying a fit)
-  -> CoreGenT m Term
+  -> CoreGenT m (Term n)
   -- ^ A generator to use if there are no hole fits
-  -> CoreGenT m Term
+  -> CoreGenT m (Term n)
 sampleIdOr env hole genSub genOr =
   sampleId <|> genOr
  where
   sampleId = do
-    let tmEnv = UniqMap.mapMaybe (either (const Nothing) Just) env
-    (i, holes) <- sampleUniqMap (const True) hole tmEnv
+    (i, holes) <- sampleList typeOfId (const True) hole (envTmVars env)
     holeFills <- traverse genSub holes
 
-    pure (mkTmApps (Var i) holeFills)
+    pure (mkTmApps i holeFills)
+
+-- | The type of a term variable
+typeOfId :: Term n -> Type n
+typeOfId = \case
+  Var _ ty _ -> ty
+  tm -> error ("typeOfId: not a variable: " <> showPpr tm)
+
+-- | Generate a closed term that is valid for the given type constructor map.
+-- The term generated must have the specified type.
+--
+genClosedTerm
+  :: forall m
+   . (Alternative m, MonadGen m)
+  => TyConMap
+  -- ^ The types in scope while generating
+  -> Type 'VoidS
+  -- ^ The type of the term being generated
+  -> CoreGenT m (Term 'VoidS)
+genClosedTerm tcm =
+  genTermFrom tcm emptyEnv
 
 -- | Generate a term that is valid for the given type constructor map and
 -- environment of free type and term variables. The term generated must have
 -- the specified type.
 --
 genTermFrom
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m n
+   . (Alternative m, MonadGen m, Distinct n)
   => TyConMap
   -- ^ The types in scope while generating
-  -> UniqMap (Either TyVar Id)
+  -> Env n
   -- ^ The currently bound type and term variables
-  -> Type
+  -> Type n
   -- ^ The type of the term being generated
-  -> CoreGenT m Term
+  -> CoreGenT m (Term n)
 genTermFrom tcm env hole =
   let genSub = genTermFrom tcm env
       genOr = genFreshTerm tcm env hole
@@ -141,22 +173,24 @@ reason other than to make the generator easier to understand. For example
 -- This generator will fail if there are no values for the given hole.
 --
 genFreshTerm
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m n
+   . (Alternative m, MonadGen m, Distinct n)
   => TyConMap
-  -> UniqMap (Either TyVar Id)
-  -> Type
-  -> CoreGenT m Term
+  -> Env n
+  -> Type n
+  -> CoreGenT m (Term n)
 genFreshTerm tcm env hole =
   -- We need to normalize in case the hole is a type family.
   --
   -- TODO When casts are supported, this will need a cast between the
   -- normalized type and the given type.
-  case normalizeType tcm hole of
+  case normalizeType (mkTypeEnv tcm) (envScope env) hole of
     -- Hole: forall i. a
     normHole@(ForAllTy i a) ->
       Gen.recursive Gen.choice
-        [TyLam i <$> genTermFrom tcm (UniqMap.insert i (Left i) env) a]
+        [ openTyBinder (envScope env) i a $ \sc i' a' ->
+            TyLam i' <$> genTermFrom tcm (extendEnv sc [tyBinderVar i'] [] env) a'
+        ]
         [Tick <$> genTickInfo tcm <*> genFreshTerm tcm env normHole]
 
     AnnType _ a ->
@@ -167,8 +201,8 @@ genFreshTerm tcm env hole =
         -- Hole: a -> b
         FunTy a b ->
           Gen.recursive Gen.choice
-            [do i <- genLocalId a (genFreshName env genVarName)
-                Gen.subterm (genTermFrom tcm (UniqMap.insert i (Right i) env) b) (Lam i)
+            [ genLocalId env a genVarName $ \env' i ->
+                Lam i <$> genTermFrom tcm env' (sink b)
             ]
             [Tick <$> genTickInfo tcm <*> genFreshTerm tcm env normHole]
 
@@ -210,41 +244,33 @@ genFreshTerm tcm env hole =
 -- genMultiPrimInfo
 -- genWorkInfo
 
+-- | Generate recursive let-bindings, split into strongly connected
+-- components, around a term of the given type
 genLet
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m n
+   . (Alternative m, MonadGen m, Distinct n)
   => TyConMap
-  -> UniqMap (Either TyVar Id)
-  -> Type
-  -> CoreGenT m Term
+  -> Env n
+  -> Type n
+  -> CoreGenT m (Term n)
 genLet tcm env hole = do
-  binds <- genLetBindings tcm env
-  let vars = fmap fst binds
-  let env' = UniqMap.insertMany (zip vars (fmap Right vars)) env
-
-  body <- genTermFrom tcm env' hole
-
-  pure (listToLets binds body)
-
-genLetBindings
-  :: forall m
-   . (Alternative m, MonadGen m)
-  => TyConMap
-  -> UniqMap (Either TyVar Id)
-  -> CoreGenT m [LetBinding]
-genLetBindings tcm env = do
-  let tyEnv = UniqMap.mapMaybe (either Just (const Nothing)) env
   -- Limit the number of new bindings to 8 to prevent an explosion in the
   -- number of sub-holes to generate.
-  types <- Gen.list (Range.linear 1 8) (genMonoTypeFrom tcm tyEnv liftedTypeKind)
-  vars <- genVars genLocalId types genVarName
+  types <- Gen.list (Range.linear 1 8) (genMonoTypeFrom tcm env liftedTypeKind)
 
-  forM (zip vars types) $ \(v, ty) ->
-    -- Bindings can be indirectly recursive, but not directly recursive. This
-    -- stops the generator from generating let x = x in ...
-    let vars' = filter (/= v) vars
-        env' = UniqMap.insertMany (zip vars' (fmap Right vars')) env
-     in (v,) <$> genTermFrom tcm env' ty
+  genLocalIds env types genVarName $ \env' bs vars -> do
+    rhss <- forM (zip vars (fmap sink types)) $ \(v, ty) ->
+      -- Bindings can be indirectly recursive, but not directly recursive. This
+      -- stops the generator from generating let x = x in ...
+      let vars' = filter (not . sameVar v) vars
+       in genTermFrom tcm (extendEnv (envScope env') [] vars' env) ty
+
+    body <- genTermFrom tcm env' (sink hole)
+
+    pure (listToLets (envScope env) bs rhss body)
+ where
+  sameVar (Var _ _ x) (Var _ _ y) = x == y
+  sameVar _ _ = False
 
 {-
 NOTE [generating useful case expressions]
@@ -276,34 +302,32 @@ This means the failure will happen at most once when generating.
 -}
 
 genCase
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m n
+   . (Alternative m, MonadGen m, Distinct n)
   => TyConMap
-  -> UniqMap (Either TyVar Id)
-  -> Type
-  -> CoreGenT m Term
+  -> Env n
+  -> Type n
+  -> CoreGenT m (Term n)
 genCase tcm env altTy = do
   -- I need to select something as the subject. It can be any type, but should
   -- bias towards something from the environment where possible. It may not be
   -- possible though, so I should be able to fallback to just building a term.
-  let tmEnv = UniqMap.mapMaybe (either (const Nothing) Just) env
-  subj <- sampleSubjFrom tmEnv
-  let subjTy = inferCoreTypeOf tcm subj
+  (subj, subjTy) <- sampleSubj
 
-  case fmap fst (splitTyConAppM subjTy) of
-    Just tcn ->
+  case splitTyConAppM subjTy of
+    Just (tcn, tyArgs) ->
       case UniqMap.lookup tcn tcm of
         Just tc@AlgTyCon{} -> do
           dcs <- Gen.subsequence (tyConDataCons tc)
-          dcPats <- traverse genDataPatFrom dcs
-          alts <- traverse genAltFrom (DefaultPat : dcPats)
+          dcAlts <- catMaybes <$> traverse (genDataAltFrom tyArgs) dcs
+          defAlt <- genAltFrom DefaultPat
 
-          pure (Case subj altTy alts)
+          pure (Case subj altTy (defAlt : dcAlts))
 
         Just PrimTyCon{} -> do
           -- Upper bound is 8 to prevent explosion in number of sub-holes.
-          litPats <- Gen.list (Range.linear 0 8) (LitPat <$> genLiteralFrom subjTy)
-          alts <- traverse genAltFrom (DefaultPat : litPats)
+          lits <- Gen.list (Range.linear 0 8) (genLiteralFrom subjTy)
+          alts <- traverse genAltFrom (DefaultPat : fmap LitPat lits)
 
           pure (Case subj altTy alts)
 
@@ -315,42 +339,42 @@ genCase tcm env altTy = do
       alt <- genAltFrom DefaultPat
       pure (Case subj altTy [alt])
  where
+  sc = envScope env
+
   -- Subjects are applications on variables in the environment.
   -- See NOTE [generating useful case expressions].
-  sampleSubjFrom :: UniqMap Id -> CoreGenT m Term
-  sampleSubjFrom tmEnv = do
-    (v, holes) <- sampleAnyUniqMap tmEnv
+  sampleSubj :: CoreGenT m (Term n, Type n)
+  sampleSubj = do
+    (v, holes) <- sampleAnyList typeOfId (envTmVars env)
     holeFills <- traverse (genTermFrom tcm env) holes
 
-    pure (mkTmApps (Var v) holeFills)
+    pure (mkTmApps v holeFills, snd (splitMonoFunTy (typeOfId v)))
 
-  genDataPatFrom :: DataCon -> CoreGenT m Pat
-  genDataPatFrom dc = do
-    ids <- genVars genLocalId (dcArgTys dc) genVarName
-    pure (DataPat dc (dcExtTyVars dc) ids)
+  -- An alternative for a data constructor, instantiated at the type arguments
+  -- of the subject. 'Nothing' if the data constructor can't be instantiated
+  -- at them.
+  genDataAltFrom :: [Type n] -> DataCon -> CoreGenT m (Maybe (Alt n))
+  genDataAltFrom tyArgs dc = do
+    names <- case dcSig dc of
+      DataConSig _ _ argTys -> replicateM (length argTys) genVarName
+    sequenceA $ withDataConPat (mkTypeEnv tcm) sc dc tyArgs names $ \sc' pat _ ->
+      let (tvs, ids) = patVars pat
+       in Alt pat <$> genTermFrom tcm (extendEnv sc' tvs ids env) (sink altTy)
 
-  genAltFrom :: Pat -> CoreGenT m Alt
-  genAltFrom pat = do
-    let (tvs, ids) = patIds pat
-    let toTvBind x = (varUniq x, Left x)
-    let toIdBind x = (varUniq x, Right x)
-
-    -- Generate the terms in alternatives with the newly bound vars in scope.
-    let env' = UniqMap.insertMany (fmap toTvBind tvs <> fmap toIdBind ids) env
-    term <- genTermFrom tcm env' altTy
-
-    pure (pat, term)
+  -- Generate the terms in alternatives with the newly bound vars in scope.
+  genAltFrom :: Pat n n -> CoreGenT m (Alt n)
+  genAltFrom pat = Alt pat <$> genTermFrom tcm env altTy
 
 -- TODO genCast
 
 genTickInfo
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m n
+   . (Alternative m, MonadGen m, Distinct n)
   => TyConMap
-  -> CoreGenT m TickInfo
+  -> CoreGenT m (TickInfo n)
 genTickInfo tcm =
   Gen.choice
-    [ NameMod <$> genNameMod <*> genClosedKindFrom tcm typeSymbolKind
+    [ NameMod <$> genNameMod <*> (sinkClosed <$> genClosedKindFrom tcm typeSymbolKind)
     , Gen.constant DeDup
     , Gen.constant NoDeDup
     ]

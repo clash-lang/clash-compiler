@@ -1,10 +1,15 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random type-directed generation of data constructors.
 -}
+
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Clash.Hedgehog.Core.DataCon
   ( genDataConsFrom
@@ -12,7 +17,6 @@ module Clash.Hedgehog.Core.DataCon
 
 import Control.Monad (replicateM, zipWithM)
 import Control.Monad.Morph (hoist)
-import Data.Either (partitionEithers)
 import Data.Functor.Identity (Identity(runIdentity))
 import Data.Text (Text)
 import qualified Faker.Lorem as Fake
@@ -21,17 +25,21 @@ import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Gen.Faker as Gen
 
 import Clash.Core.DataCon
-import Clash.Core.Scoped.Convert (mkDataConFromClash)
-import Clash.Core.Name
 import Clash.Core.TyCon
-import Clash.Core.Type
-import Clash.Core.TysPrim (liftedTypeKind)
 import qualified Clash.Data.UniqMap as UniqMap
+
+import Clash.Core.Scoped.Convert (mkDataCon)
+import Clash.Core.Scoped.Sig (DataConSig(..))
+import Clash.Core.Scoped.Subst (openTyBinder)
+import Clash.Core.Scoped.Syntax hiding (Name)
+import Clash.Core.Scoped.Type (TypeView(..), mkTyConApp, tyView)
+import Clash.Core.Scoped.TysPrim (liftedTypeKind)
 
 import Clash.Hedgehog.Core.Monad
 import Clash.Hedgehog.Core.Name
 import Clash.Hedgehog.Core.Type
 import Clash.Hedgehog.Core.Var
+import Clash.Hedgehog.Unique (splitMonoFunTy)
 
 -- | Generate a list of data constructors for a type. This biases towards
 -- creating constructors which match some common form seen in code, such as
@@ -46,7 +54,7 @@ genDataConsFrom
   -- ^ The types already in scope when defining this type
   -> TyConName
   -- ^ The name of the @AlgTyCon@ the constructors belong to
-  -> Kind
+  -> Kind 'VoidS
   -- ^ The kind of the @AlgTyCon@ the constructors belong to
   -> CoreGenT m [DataCon]
 genDataConsFrom range tcm tcn kn = do
@@ -57,14 +65,42 @@ genDataConsFrom range tcm tcn kn = do
 
   -- Universal tyvars are generated now so they can be shared between each
   -- data constructor. This matches what GHC would produce.
-  let (knTvs, knTys) = partitionEithers $ fst (splitFunForallTy kn)
-  univTvs <- mappend knTvs <$> genVars genTyVar knTys genVarName
+  withUnivTyVars emptyEnv kn $ \env univ univVars ->
+    Gen.choice
+      [ genSimpleDataCons tcn univ univVars names
+      , genRecordDataCons tcm tcn env univ univVars names
+      , genAnyDataCons tcm tcn env univ univVars names
+      ]
 
-  Gen.choice
-    [ genSimpleDataCons tcn univTvs names
-    , genRecordDataCons tcm tcn univTvs names
-    , genAnyDataCons tcm tcn univTvs names
-    ]
+-- | Bind the universally quantified type variables of the data constructors
+-- of a type constructor with the given kind: the quantified variables of the
+-- kind, and a fresh one for every argument of the kind.
+withUnivTyVars
+  :: forall m n r
+   . (MonadGen m, Distinct n)
+  => Env n
+  -> Kind n
+  -> (forall l. DExt n l => Env l -> Tele TyBinder n l -> [Type l] -> m r)
+  -> m r
+withUnivTyVars env kn k = case kn of
+  ForAllTy b kn' ->
+    openTyBinder (envScope env) b kn' $ \(sc :: Scope i) b' kn'' ->
+      let v = tyBinderVar b'
+       in withUnivTyVars (extendEnv sc [v] [] env) kn'' $ \(env2 :: Env l) bs vs ->
+            withExtTrans @n @i @l (k env2 (TCons b' bs) (sink v : vs))
+
+  (tyView -> FunTy a kn') ->
+    genTyVar env a genVarName $ \(env1 :: Env i) b ->
+      withUnivTyVars env1 (sink kn') $ \(env2 :: Env l) bs vs ->
+        withExtTrans @n @i @l (k env2 (TCons b bs) (sink (tyBinderVar b) : vs))
+
+  _ -> k env TNil []
+
+-- | The type of a data constructor: its universally quantified type
+-- variables, over the given type
+forAllTys :: Tele TyBinder n l -> Type l -> Type n
+forAllTys TNil ty = ty
+forAllTys (TCons b bs) ty = ForAllTy b (forAllTys bs ty)
 
 -- | Generate data constructors for a type
 --
@@ -74,24 +110,22 @@ genDataConsFrom range tcm tcn kn = do
 -- arbitrary number of phantom type parameters.
 --
 genSimpleDataCons
-  :: forall m
-   . Applicative m
+  :: forall m u
+   . (Applicative m, DExt 'VoidS u)
   => TyConName
-  -> [TyVar]
+  -> Tele TyBinder 'VoidS u
+  -> [Type u]
   -> [DcName]
   -> CoreGenT m [DataCon]
-genSimpleDataCons tcn univTvs =
+genSimpleDataCons tcn univ univVars =
   pure . zipWith go [1..]
  where
   go :: ConTag -> DcName -> DataCon
-  go tag name = mkDataConFromClash
+  go tag name = mkDataCon
     name
-    (nameUniq name)
     tag
-    (mkTyConApp tcn (fmap VarTy univTvs))
-    univTvs
-    []
-    []
+    (forAllTys univ (mkTyConApp tcn univVars))
+    (DataConSig univ TNil [])
     []
     []
 
@@ -103,77 +137,74 @@ genSimpleDataCons tcn univTvs =
 --     | ...
 --     | CK { ... }
 --
--- where every constructor is either nullary, or a record.
+-- where every constructor is a record.
 --
 genRecordDataCons
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m u
+   . (Alternative m, MonadGen m, DExt 'VoidS u)
   => TyConMap
   -> TyConName
-  -> [TyVar]
+  -> Env u
+  -> Tele TyBinder 'VoidS u
+  -> [Type u]
   -> [DcName]
   -> CoreGenT m [DataCon]
-genRecordDataCons tcm tcn univTvs =
+genRecordDataCons tcm tcn env univ univVars =
   zipWithM go [1..]
  where
   go :: ConTag -> DcName -> CoreGenT m DataCon
   go tag name = do
-    let resTy = mkTyConApp tcn (fmap VarTy univTvs)
-    let bound = UniqMap.fromList (zip univTvs univTvs)
-    let argGen = genMonoTypeFrom tcm bound liftedTypeKind -- TODO Make polymorphic
-    ty <- genWithCodomain resTy argGen
+    let resTy = mkTyConApp tcn univVars
+    let argGen = genMonoTypeFrom tcm env liftedTypeKind -- TODO Make polymorphic
+    ty <- genWithCodomain env resTy argGen
 
-    let argTys = case partitionEithers $ fst (splitFunForallTy ty) of
-          ([],_) -> error "getMonoTypeFrom is wrong, there are type variables"
-          (_,vs) -> vs
+    let argTys = fst (splitMonoFunTy ty)
     bangs <- traverse (genStrictness tcm) argTys
     fields <- replicateM (length argTys) genFieldLabel
 
-    pure $ mkDataConFromClash
+    pure $ mkDataCon
       name
-      (nameUniq name)
       tag
-      ty
-      univTvs
-      []
-      argTys
+      (forAllTys univ ty)
+      (DataConSig univ TNil argTys)
       bangs
       fields
 
 -- | Generate data constructors for a type which does not match any common
 -- idiom. Since this can generate any possible data constructor, it can
 -- sometimes produce less representative results.
+--
+-- TODO The argument types are monomorphic, so these constructors have no
+-- existentially quantified type variables yet.
 genAnyDataCons
-  :: forall m
-   . (Alternative m, MonadGen m)
+  :: forall m u
+   . (Alternative m, MonadGen m, DExt 'VoidS u)
   => TyConMap
   -> TyConName
-  -> [TyVar]
+  -> Env u
+  -> Tele TyBinder 'VoidS u
+  -> [Type u]
   -> [DcName]
   -> CoreGenT m [DataCon]
-genAnyDataCons tcm tcn univTvs =
+genAnyDataCons tcm tcn env univ univVars =
   zipWithM go [1..]
  where
   go :: ConTag -> DcName -> CoreGenT m DataCon
   go tag name = do
-    let resTy = mkTyConApp tcn (fmap VarTy univTvs)
-    let bound = UniqMap.fromList (zip univTvs univTvs)
-    let argGen = genMonoTypeFrom tcm bound liftedTypeKind -- TODO Make polymorphic.
-    ty <- genWithCodomain resTy argGen
+    let resTy = mkTyConApp tcn univVars
+    let argGen = genMonoTypeFrom tcm env liftedTypeKind -- TODO Make polymorphic.
+    ty <- genWithCodomain env resTy argGen
 
     -- Determine the argument types from the data constructor type
-    -- Generate strictness and field labels from the argument types
-    let (extTvs, argTys) = partitionEithers $ fst (splitFunForallTy ty)
+    -- Generate strictness from the argument types
+    let argTys = fst (splitMonoFunTy ty)
     bangs <- traverse (genStrictness tcm) argTys
 
-    pure $ mkDataConFromClash
+    pure $ mkDataCon
       name
-      (nameUniq name)
       tag
-      ty
-      univTvs
-      extTvs
-      argTys
+      (forAllTys univ ty)
+      (DataConSig univ TNil argTys)
       bangs
       []
 
@@ -188,11 +219,11 @@ genAnyDataCons tcm tcn univTvs =
 -- This generator shrinks towards choosing lazy by default for types where it
 -- is possible.
 genStrictness
-  :: forall m. MonadGen m => TyConMap -> Kind -> m DcStrictness
-genStrictness tcm kn
+  :: forall m n. MonadGen m => TyConMap -> Type n -> m DcStrictness
+genStrictness tcm ty
   -- Assume that any primitive type constructor is always strict. This may
   -- overapproximate strictness, as it means Type, Nat and Symbol are strict.
-  | TyConApp tc [] <- tyView kn
+  | TyConApp tc [] <- tyView ty
   , Just PrimTyCon{} <- UniqMap.lookup tc tcm
   = pure Strict
 
