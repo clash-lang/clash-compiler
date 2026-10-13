@@ -56,7 +56,7 @@ import qualified Data.List as List
 import qualified Data.Text as T
 
 -- Internal Imports
-import Clash.Core.DataCon                     (DataCon)
+import {-# SOURCE #-} Clash.Core.DataCon       (DataCon)
 import Clash.Core.Name
 import Clash.Core.Scoped.Sig
 import Clash.Core.Scoped.Subst
