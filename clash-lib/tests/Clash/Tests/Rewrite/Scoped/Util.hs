@@ -26,7 +26,7 @@ import qualified Clash.Core.Literal as C
 import Clash.Core.Name (nameOcc)
 import qualified Clash.Core.Basic as C (ConstTy (TyCon), LitTy (NumTy))
 import Clash.Core.Pretty (PrettyOptions (..), PrettyPrec, showPpr')
-import Clash.Driver.Types (Binding (..))
+import Clash.Driver.Types (Binding (..), DebugOpts (..), debugNone)
 import Clash.Normalize.Types (NormalizeSession, NormalizeState)
 import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Util.Supply (newSupply)
@@ -40,10 +40,13 @@ import Clash.Core.Scoped.Subst (unsinkTerm)
 import Clash.Core.Scoped.Syntax
 import Clash.Core.Scoped.Term (AbsBinder (..), collectArgs)
 import Clash.Rewrite.Scoped (rootContext, whnfRW)
+import Clash.Rewrite.Scoped.Apply (applyDebug)
 import qualified Clash.Rewrite.Scoped as Scoped
 import Clash.Rewrite.Scoped.Util
 
-import Test.Clash.Rewrite (addTyConName, firstUniques, runRewriteTest, showPprU)
+import Test.Clash.Rewrite
+  ( addTyConName, assertErrorContainsIO, firstUniques, rewriteEnvWithDebug, runRewriteTest
+  , showPprU )
 import Test.Clash.Scoped
 
 -- | Render a term as text, with types
@@ -391,6 +394,23 @@ normalizeTermTypesTests =
       (appTyB (appTyB (constTyB (C.TyCon addTyConName)) (litTyB (C.NumTy 2))) (litTyB (C.NumTy 3))))
       (testTypeB "Int"))
 
+-- | Debug a transformation that signals a change, with the given number of
+-- transformations applied before it, under
+-- @-fclash-debug-transformations-from=10@ and
+-- @-fclash-debug-transformations-limit=5@.
+applyDebugWithLimitFrom :: Word -> IO (Term 'VoidS)
+applyDebugWithLimitFrom nApplied = do
+  (e, _, _) <- runRewriteTest env st (applyDebug "t" (closedTerm "0") True (closedTerm "1"))
+  pure e
+ where
+  -- 'applyWith' counts the transformation before debugging it
+  st :: RewriteState NormalizeState
+  st = def{_transformCounter = nApplied + 1}
+  env = rewriteEnvWithDebug debugNone
+    { dbg_transformationsFrom = Just 10
+    , dbg_transformationsLimit = Just 5
+    }
+
 tests :: TestTree
 tests =
   testGroup "Clash.Tests.Rewrite.Scoped.Util"
@@ -402,6 +422,20 @@ tests =
             liftBindingLocalSharesUniqueWithGlobal
         ]
     , testGroup "whnfRW uses the let-bindings of a scoped context" whnfScopedContextTests
+
+    -- @-fclash-debug-transformations-limit@ counts from
+    -- @-fclash-debug-transformations-from@. 'applyDebug' used to subtract the
+    -- latter from the number of applied transformations as a 'Word', which
+    -- wrapped around before reaching it, exceeding the limit straight away.
+    , testGroup "applyDebug transformation limit counts from the first debugged transformation"
+        [ testCase "no limit before the first debugged transformation" $
+            applyDebugWithLimitFrom 0 >>= assertBool "result" . aeqTm (closedTerm "1")
+        , testCase "limit not yet exceeded" $
+            applyDebugWithLimitFrom 14 >>= assertBool "result" . aeqTm (closedTerm "1")
+        , testCase "limit exceeded" $
+            assertErrorContainsIO "-fclash-debug-transformations-limit exceeded" $
+              applyDebugWithLimitFrom 15
+        ]
     , testGroup "inlineBinders"
         [ testCase (show i) $
             runLetHandler liftStateFixed (inlineBinders (\_ lb -> pure (litOrVar (lbRhs lb)))) tm
