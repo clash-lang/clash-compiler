@@ -122,7 +122,7 @@ tests = testGroup "Clash.Tests.Rewrite.Scoped.Combinators"
   , testCase "the argument's context comes from the rewritten function" $ do
       -- The function becomes a primitive; the argument then sees the AppArg
       -- frame of that primitive, applied to no arguments (like
-      -- 'Clash.Core.Term.primArg' of the function)
+      -- 'Clash.Core.Scoped.Term.primArg' of the function)
       let tm = closedTerm "(f_G2 :: Int -> Int) 3"
           toPrim = ScopedTransform $ \ctx e -> case (ctxFrames ctx, e) of
             (KAppFun : _, GlobalVar _) -> pure (Prim (testPrim "somePrim" "Int -> Int"))

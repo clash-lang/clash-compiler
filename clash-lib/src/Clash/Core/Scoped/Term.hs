@@ -3,8 +3,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Smart constructors and destructors for scoped Clash Core: ports of the
-  helpers of "Clash.Core.Term".
+  Smart constructors and destructors for scoped Clash Core.
 
   Lists of binders become telescopes: e.g. 'mkLams' abstracts a term in scope
   @l@ over a @'Tele' t'IdBinder' n l@, giving a term in scope @n@. Collecting
@@ -12,8 +11,8 @@
   they are ('collectBndrs'), or opened, i.e. renamed where they clash with the
   scope ('openBndrs'), which is needed to go under them.
 
-  The rewrite contexts ('Clash.Core.Term.CoreContext') are not here: they are
-  part of the rewrite system.
+  The rewrite contexts are not here: they are part of the rewrite system
+  ("Clash.Rewrite.Scoped.Types").
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -172,7 +171,7 @@ mkTicks :: Term n -> [TickInfo n] -> Term n
 mkTicks tm ticks = List.foldl' (\e s -> Tick s e) tm (List.nubBy eqTickInfo ticks)
 
 -- | Whether two ticks are equal, comparing their types and terms up to
--- alpha-equivalence, like the 'Eq' instance of 'C.TickInfo'
+-- alpha-equivalence
 eqTickInfo :: TickInfo n -> TickInfo n -> Bool
 eqTickInfo t1 t2 = case (t1, t2) of
   (SrcSpan s1, SrcSpan s2) -> s1 == s2

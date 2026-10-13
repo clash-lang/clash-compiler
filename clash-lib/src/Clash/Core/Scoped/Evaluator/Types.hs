@@ -34,8 +34,8 @@
   primitives (like byte arrays), one of global bindings, the top-level
   bindings in scope, and one of local ones, the local bindings in scope.
   The local heap is keyed by the local names of the machine's scope
-  ('TmName'), the global one by 'GlobalId' (decision D5 of the port), so the
-  heap of one can't be consulted for the other. As the names of a
+  ('TmName'), the global one by 'GlobalId', so the heap of one can't be
+  consulted for the other. As the names of a
   t'Distinct' scope are distinct, a local key identifies one binder: a
   binding can't be found under a variable that merely has the same name as
   its binder.

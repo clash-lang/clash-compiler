@@ -38,14 +38,13 @@ import Clash.Core.Scoped.Internal.Scope (nameId, nameOf)
 import Clash.Core.Scoped.Subst (unsinkAlt)
 import Clash.Core.Scoped.Syntax
 
--- | Alpha-equivalence of types. Like 'Clash.Core.Subst.aeqType', the kinds of
--- binders are compared, but not the kinds of variable occurrences.
+-- | Alpha-equivalence of types. The kinds of binders are compared, but not the
+-- kinds of variable occurrences.
 aeqTy :: Type n -> Type n -> Bool
 aeqTy = aeqTyLevels emptyEnv
 
--- | Alpha-equivalence of terms. Like 'Clash.Core.Subst.aeqTerm', the types of
--- binders are compared, but not those of variable occurrences, nor the result
--- types of case-expressions.
+-- | Alpha-equivalence of terms. The types of binders are compared, but not
+-- those of variable occurrences, nor the result types of case-expressions.
 aeqTm :: Term n -> Term n -> Bool
 aeqTm = aeqTmLevels emptyEnv
 
@@ -184,15 +183,13 @@ aeqTele _ _ _ _ = False
 -- * Ordering
 
 -- | A total order on types, up to alpha-equivalence: @'acmpTy' t1 t2 == EQ@
--- if and only if @'aeqTy' t1 t2@. Like 'Clash.Core.Subst.acmpType'.
+-- if and only if @'aeqTy' t1 t2@.
 acmpTy :: Type n -> Type n -> Ordering
 acmpTy = acmpTyLevels emptyEnv
 
--- | A total order on terms, up to alpha-equivalence, like
--- 'Clash.Core.Subst.acmpTerm'. @'acmpTm' t1 t2 == EQ@ if and only if
--- @'aeqTm' t1 t2@, except that it compares the source spans of ticks with
--- 'leftmost_smallest', which treats all unhelpful spans alike, like
--- 'Clash.Core.Subst.acmpTerm' does.
+-- | A total order on terms, up to alpha-equivalence: @'acmpTm' t1 t2 == EQ@
+-- if and only if @'aeqTm' t1 t2@, except that it compares the source spans of
+-- ticks with 'leftmost_smallest', which treats all unhelpful spans alike.
 acmpTm :: Term n -> Term n -> Ordering
 acmpTm = acmpTmLevels emptyEnv
 

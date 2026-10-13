@@ -6,9 +6,8 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Pretty printing of scoped Clash Core: the 'PrettyPrec' instances of its
-  types, terms, binders, global variables and type constructors. A port of the printer of Clash
-  Core ("Clash.Core.Pretty"), which prints the same text as printing the
-  conversion to Clash Core ('Clash.Core.Scoped.Convert.toClashTerm') does:
+  types, terms, binders, global variables and type constructors. The class and
+  the printing options are those of "Clash.Core.Pretty". Notably:
 
   * The unique of a local variable is its raw name.
 
@@ -17,9 +16,7 @@
 
   * Subterms are annotated with their position in their parent term
     ('Clash.Core.Pretty.AnnSubterm', see 'Clash.Core.Pretty.SubtermPos'), for
-    navigation, where the printer of Clash Core annotates them with their
-    context ('Clash.Core.Pretty.AnnContext'). The bodies of ticks are
-    annotated too.
+    navigation. The bodies of ticks are annotated too.
 -}
 
 {-# LANGUAGE PolyKinds #-}
@@ -348,7 +345,7 @@ tyView = go []
     ConstTy Arrow -> case args of
       [arg, res] -> FunTyView arg res
       -- With the kinds of the argument and the result, see Note [Arrow
-      -- arguments] in "Clash.Core.Type"
+      -- arguments] in "Clash.Core.Scoped.Type"
       [_, _, arg, res] -> FunTyView arg res
       _ -> OtherTypeView
     AppTy l r -> go (r : args) l

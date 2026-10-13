@@ -3,12 +3,10 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Predicates on and measures of scoped Clash Core terms: ports of
-  "Clash.Core.TermInfo".
+  Predicates on and measures of scoped Clash Core terms.
 
-  Note that 'isVar' holds for local and global variables alike, like its
-  counterpart on Clash Core, while 'isLocalVar' and 'isGlobalVar' tell them
-  apart.
+  Note that 'isVar' holds for local and global variables alike, while
+  'isLocalVar' and 'isGlobalVar' tell them apart.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -61,7 +59,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 -- * Multi-result primitives
 
--- | A multi-result primitive, see 'Clash.Core.TermInfo.multiPrimInfo'
+-- | A multi-result primitive, see 'multiPrimInfo'
 data MultiPrimInfo = MultiPrimInfo
   { mpi_primInfo :: PrimInfo
   , mpi_resultDc :: DataCon
@@ -71,8 +69,7 @@ data MultiPrimInfo = MultiPrimInfo
   }
 
 -- | The multi-result primitive, if the result type of the type of the
--- primitive (its 'primType') is a tuple. See
--- 'Clash.Core.TermInfo.multiPrimInfo'.
+-- primitive (its 'primType') is a tuple.
 multiPrimInfo :: TyConMap -> PrimInfo -> Maybe MultiPrimInfo
 multiPrimInfo tcm p
   | SplitFunForall _ res <- splitFunForallTy (primType p)
@@ -113,7 +110,7 @@ withMultiPrimResultTypes p k = go emptyScope (primType p)
 
 -- * Measures
 
--- | The size of a term, see 'Clash.Core.TermInfo.termSize'
+-- | The size of a term
 termSize :: Term n -> Word
 termSize = \case
   Var {} -> 1
@@ -136,7 +133,7 @@ data SomeTerm where
   SomeTerm :: Term n -> SomeTerm
 
 -- | @termSizeSmallerThan n t@ is @'termSize' t < n@, but stops traversing @t@
--- as soon as the size reaches @n@, see 'Clash.Core.TermInfo.termSizeSmallerThan'
+-- as soon as the size reaches @n@
 termSizeSmallerThan :: Word -> Term n -> Bool
 termSizeSmallerThan n t0
   | n == 0 = False
@@ -207,7 +204,7 @@ isPrim Prim {} = True
 isPrim _ = False
 
 -- | Is a term a literal, or a data constructor or primitive applied to
--- literals and types? See 'Clash.Netlist.BlackBox.isLiteral'.
+-- literals and types?
 isLiteral :: Term n -> Bool
 isLiteral e = case collectArgs e of
   (Data _, args) -> all (either isLiteral (const True)) args
@@ -233,8 +230,8 @@ isClosed = not . hasFreeVars
 -- * Multi-result primitives
 
 -- | Split the arguments of a multi-result primitive in its normal arguments,
--- and the variables it assigns its results to, see 'Clash.Core.TermInfo.splitMultiPrimArgs'.
--- The latter are the arguments that are local variables ('Var').
+-- and the variables it assigns its results to. The latter are the arguments
+-- that are local variables ('Var').
 splitMultiPrimArgs
   :: MultiPrimInfo
   -> [Either (Term n) (Type n)]

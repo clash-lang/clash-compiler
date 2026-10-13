@@ -109,7 +109,7 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
       Load modules from either their interface file (`*.hi`) or their source (`*.hs`). Modules and their dependencies are loaded as GHC core, which is parsed, typechecked and simplified by GHC. In addition, loading modules also finds annotation on loaded definitions, such as `Synthesize` annotations on top entitiies and test benches.
 
-    * `Clash.GHC.GHC2Core.coreToTerm`
+    * `Clash.GHC.Scoped.GHC2Core.coreToTermB`
 
       This translates between GHC core and Clash core. This translation discards information in the GHC core which is not useful to Clash, such as coercions and call stack types. Additionally, this conversion removes most functions on `Signal`, which is treated as transparent in Clash.
 
@@ -144,23 +144,23 @@ The directories `clash-ghc/src-ghc` and `clash-ghc/src-bin-common` are where cod
 
 ### Clash Core to Netlist
 
-  * `Clash.Netlist.genNetlist`
+  * `Clash.Netlist.Scoped.genNetlist`
 
     Convert the normalized core to a netlist. This representation is closer to a hardware description, specifying components and their connections.
 
-  * `Clash.Netlist.genComponentT`
+  * `Clash.Netlist.Scoped.genComponentT`
 
     Convert a single component to a netlist. This corresponds to an individual entity in VHDL, or a module in Verilog/SystemVerilog. For each component the following is performed:
 
-    * `Clash.Netlist.Util.mkUniqueNormalized`
+    * `Clash.Netlist.Scoped.Util.mkUniqueNormalized`
 
       Create wrappers / unwrappers for the arguments and results of top entities. Additionally, this ensures that there are no naming conflicts between the identifiers in the generated HDL.
 
-    * `Clash.Netlist.mkNetDecl`
+    * `Clash.Netlist.Scoped.mkNetDecl`
 
       Create net declarations for all let bindings in the normalized core.
 
-    * `Clash.Netlist.mkDeclarations`
+    * `Clash.Netlist.Scoped.mkDeclarations`
 
       Create net assignements for all let bindings in the normalized core.
 

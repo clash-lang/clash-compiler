@@ -227,7 +227,7 @@ data Primitive a b c d
   }
   -- | A primitive that carries additional information. These are "real"
   -- primitives, hardcoded in the compiler. For example: 'mapSignal' in
-  -- @GHC2Core.coreToTerm@.
+  -- @Clash.GHC.Scoped.GHC2Core.coreToTermB@.
   | Primitive
   { name     :: !S.Text
     -- ^ Name of the primitive

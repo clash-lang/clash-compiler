@@ -6,9 +6,7 @@
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Views on, and utilities for, the types of scoped Clash Core. Ports of the
-  functions of "Clash.Core.Type", and of the functions on types of
-  "Clash.Core.Util".
+  Views on, and utilities for, the types of scoped Clash Core.
 
   = Scopes
 
@@ -18,9 +16,9 @@
   rename binders (see "Clash.Core.Scoped.TyCon"). Closed types, such as the
   types of globals, are in the empty scope 'emptyScope'.
 
-  Where the functions of "Clash.Core.Type" take a 'Clash.Core.TyCon.TyConMap',
-  these take a t'TypeEnv', which caches the signatures of the type
-  constructors as scoped types (see "Clash.Core.Scoped.TypeEnv").
+  Rather than a 'Clash.Core.TyCon.TyConMap', these functions take a
+  t'TypeEnv', which caches the signatures of the type constructors as scoped
+  types (see "Clash.Core.Scoped.TypeEnv").
 
   = Function types
 
@@ -143,7 +141,7 @@ import Clash.Core.Scoped.TypeEnv
 
 -- * Views
 
--- | An easier view on types. See 'C.TypeView'.
+-- | An easier view on types, see 'tyView'
 data TypeView n
   = FunTy !(Type n) !(Type n)
   -- ^ Function type
@@ -154,9 +152,20 @@ data TypeView n
 
 deriving instance Show (TypeView n)
 
--- | An easier view on types. See 'C.tyView', and its Note [Arrow arguments].
+-- | An easier view on types
+--
+-- Note [Arrow arguments]
+--
+-- Clash' Arrow type can either have 2 or 4 arguments, depending on who created it.
+-- By default it has two arguments: the argument type of a function, and the result
+-- type of a function.
+--
+-- So when do we have 4 arguments? When in Haskell/GHC land the arrow was
+-- unsaturated. This can happen in instance heads, or in the eta-reduced
+-- representation of newtypes. So what are those additional 2 arguments compared to
+-- the "normal" function type? They're the kinds of argument and result type.
 tyView :: Type n -> TypeView n
--- Manually unrolled, like 'C.tyView', because it is called so often
+-- Manually unrolled, because it is called so often
 tyView tOrig = case tOrig of
   ConstTy c -> case c of
     TyCon tc -> TyConApp tc []
@@ -183,8 +192,7 @@ tyView tOrig = case tOrig of
   go args t1 = (t1, args)
 
 -- | A view on types in which newtypes are transparent, the Signal type is
--- transparent, and type functions are evaluated to WHNF (when possible). See
--- 'C.coreView'.
+-- transparent, and type functions are evaluated to WHNF (when possible).
 --
 -- Strips away all layers. If no layers are found it returns the given type.
 coreView :: Distinct n => TypeEnv -> Scope n -> Type n -> Type n
@@ -193,8 +201,7 @@ coreView tenv sc ty = case coreView1 tenv sc ty of
   Just ty' -> coreView tenv sc ty'
 
 -- | A view on types in which newtypes are transparent, the Signal type is
--- transparent, and type functions are evaluated to WHNF (when possible). See
--- 'C.coreView1'.
+-- transparent, and type functions are evaluated to WHNF (when possible).
 --
 -- Only strips away one layer.
 coreView1 :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n)
@@ -216,8 +223,7 @@ coreView1 tenv sc ty = case tyView ty of
   OtherType (AnnType _ ty') -> coreView1 tenv sc ty'
   _ -> Nothing
 
--- | Normalize a type, looking through Signals and newtypes. See
--- 'C.normalizeType'.
+-- | Normalize a type, looking through Signals and newtypes.
 --
 -- For example: @Signal a (Vec (6-1) (Unsigned (3+1)))@ normalizes to
 -- @Vec 5 (Unsigned 4)@
@@ -288,7 +294,7 @@ data PiTele (n :: S) (l :: S) where
 deriving instance Show (PiTele n l)
 
 -- | Make a polymorphic function type out of its quantified type variables and
--- argument types, and its result type. See 'C.mkPolyFunTy'.
+-- argument types, and its result type.
 mkPolyFunTy :: PiTele n l -> Type l -> Type n
 mkPolyFunTy tele res = case tele of
   PiNil -> res
@@ -341,7 +347,7 @@ data SplitFunForall n where
 deriving instance Show (SplitFunForall n)
 
 -- | Split a polymorphic function type into its quantified type variables and
--- argument types, and its result type. See 'C.splitFunForallTy'.
+-- argument types, and its result type.
 splitFunForallTy :: Type n -> SplitFunForall n
 splitFunForallTy ty = case ty of
   ForAllTy b res -> case splitFunForallTy res of
@@ -359,7 +365,7 @@ data SplitCoreFunForall n where
 -- | Split a polymorphic function type into its quantified type variables and
 -- argument types, and its result type, looking through Signals, newtypes and
 -- type families ('coreView1'). The result type is as it was before looking
--- through it. See 'C.splitCoreFunForallTy'.
+-- through it.
 --
 -- Gives the scope of the result type: this goes under the quantified type
 -- variables, renaming them if they clash with the scope.
@@ -376,7 +382,7 @@ splitCoreFunForallTy tenv sc0 ty0 = go sc0 ty0 ty0
         SplitCoreFunForall scR tele r -> SplitCoreFunForall scR (PiArg arg tele) r
     | otherwise = SplitCoreFunForall sc PiNil origTy
 
--- | Split a function type in an argument and result type. See 'C.splitFunTy'.
+-- | Split a function type in an argument and result type.
 splitFunTy :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n, Type n)
 splitFunTy tenv sc ty
   | Just ty' <- coreView1 tenv sc ty = splitFunTy tenv sc ty'
@@ -384,7 +390,6 @@ splitFunTy tenv sc ty
   | otherwise = Nothing
 
 -- | Split a (monomorphic) function type in its argument types and result type.
--- See 'C.splitFunTys'.
 splitFunTys :: Distinct n => TypeEnv -> Scope n -> Type n -> ([Type n], Type n)
 splitFunTys tenv sc ty0 = go [] ty0 ty0
  where
@@ -393,34 +398,32 @@ splitFunTys tenv sc ty0 = go [] ty0 ty0
     | FunTy arg res <- tyView ty = go (arg:args) res res
     | otherwise = (reverse args, origTy)
 
--- | Apply a function type to an argument type and get the result type. See
--- 'C.applyFunTy'.
+-- | Apply a function type to an argument type and get the result type.
 applyFunTy :: (HasCallStack, Distinct n) => TypeEnv -> Scope n -> Type n -> Type n -> Type n
 applyFunTy tenv sc ty arg
   | Just ty' <- coreView1 tenv sc ty = applyFunTy tenv sc ty' arg
   | FunTy _ resTy <- tyView ty = resTy
   | otherwise = error $ $(curLoc) ++ "Report as bug: not a FunTy"
 
--- | Is a type a function type? See 'C.isFunTy'.
+-- | Is a type a function type?
 isFunTy :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
 isFunTy tenv sc = isJust . splitFunTy tenv sc
 
--- | Is a type polymorphic? See 'C.isPolyTy'.
+-- | Is a type polymorphic?
 isPolyTy :: Type n -> Bool
 isPolyTy = \case
   ForAllTy {} -> True
   (tyView -> FunTy _ res) -> isPolyTy res
   _ -> False
 
--- | Is a type a polymorphic or function type? See 'C.isPolyFunTy'.
+-- | Is a type a polymorphic or function type?
 isPolyFunTy :: Type n -> Bool
 isPolyFunTy = \case
   ForAllTy {} -> True
   (tyView -> FunTy {}) -> True
   _ -> False
 
--- | Is a type a polymorphic or function type under 'coreView1'? See
--- 'C.isPolyFunCoreTy'.
+-- | Is a type a polymorphic or function type under 'coreView1'?
 isPolyFunCoreTy :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
 isPolyFunCoreTy tenv sc ty
   | Just ty' <- coreView1 tenv sc ty = isPolyFunCoreTy tenv sc ty'
@@ -431,13 +434,19 @@ isPolyFunCoreTy tenv sc ty
 
 -- * Type families
 
--- | Reduce a type family application, by one step. See 'C.reduceTypeFamily'.
+{- [Note: Eager type families]
+
+I don't know whether type families are evaluated strictly or lazily, but since
+type families do not reduce on stuck argument, we assume strictly.
+-}
+
+-- | Reduce a type family application, by one step.
 --
 -- The arguments of an equation are reduced to WHNF before they are matched
--- against its patterns (see [Note: Eager type families] in "Clash.Core.Type").
--- Unlike 'C.reduceTypeFamily', this does not reduce with an equation whose
--- right-hand side mentions a pattern variable that its left-hand side doesn't
--- bind: that would give a type with a free type variable.
+-- against its patterns (see [Note: Eager type families]). This does not reduce
+-- with an equation whose right-hand side mentions a pattern variable that its
+-- left-hand side doesn't bind: that would give a type with a free type
+-- variable.
 reduceTypeFamily :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n)
 reduceTypeFamily tenv sc (tyView -> TyConApp tc tys) = reduceTyConApp tenv sc tc tys
 reduceTypeFamily _ _ _ = Nothing
@@ -590,7 +599,7 @@ reduceTyConApp tenv sc tc tys
       _ -> Nothing
 
   | Just eqns <- tyFamEqnsOf tenv tc
-  = let -- See [Note: Eager type families] in "Clash.Core.Type"
+  = let -- See [Note: Eager type families]
         tysR = map (argView tenv sc) tys
      in findFunSubst tenv sc eqns tysR
 
@@ -605,7 +614,7 @@ orderingTy o = ConstTy $ TyCon $ case o of
   GT -> Name User (showt 'GT) (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
 
 -- | The right-hand side of the first equation whose patterns match the given
--- types. See 'C.findFunSubst'.
+-- types
 findFunSubst :: Distinct n => TypeEnv -> Scope n -> [TyFamEqn] -> [Type n] -> Maybe (Type n)
 findFunSubst _ _ [] _ = Nothing
 findFunSubst tenv sc (eqn:rest) args = case funSubsts tenv sc eqn args of
@@ -644,7 +653,7 @@ matchedSubst sc tvs matched = go (closedSubst sc) tvs
     Nothing -> Nothing
 
 -- | Match a pattern against a type, extending the matched types of the pattern
--- variables, by their raw names. See @funSubst@ in "Clash.Core.Type".
+-- variables, by their raw names.
 --
 -- A pattern variable that occurs more than once must match alpha-equivalent
 -- types. E.g. given
@@ -685,18 +694,34 @@ funSubst tenv sc = go
     -- matched types keep their annotations
     (_, AnnType _ t) -> go s pat t
 
-    -- See [Note] funSubst FunTy in "Clash.Core.Type"
+    -- [Note] funSubst FunTy
+    --
+    -- Whenever type classes have associated types whose instances 'map' to
+    -- functions, we try to find substitutions in the LHS and RHS of these
+    -- (type-level) functions. Because we use @funSubst@ recursively, we
+    -- implicitly check if these functions are of the same arity and match
+    -- in the first place. An example of such a construct:
+    --
+    --   class Example p where
+    --     type AB p
+    --
+    --   instance Example (a -> a) where
+    --     type AB (a -> a) = a
+    --
+    -- In the given example, we would find two substitutions. For example, when
+    -- matching against `Char -> Char` we'd find a duplicate `a -> Char`. We
+    -- can't think of any (type-checking) cases where these mappings would map
+    -- to different types, so this is OK for our purposes.
     (AppTy p1 r1, AppTy t1 r2) -> do
       s1 <- go s p1 t1
-      -- See [Note: Eager type families] in "Clash.Core.Type"
+      -- See [Note: Eager type families]
       go s1 r1 (argView tenv sc r2)
 
     (ConstTy c1, ConstTy c2) | c1 == c2 -> Just s
     (LitTy l1, LitTy l2) | l1 == l2 -> Just s
     _ -> Nothing
 
--- | Is the type an application of a type family? See
--- 'C.isTypeFamilyApplication'.
+-- | Is the type an application of a type family?
 isTypeFamilyApplication :: TypeEnv -> Type n -> Bool
 isTypeFamilyApplication tenv (tyView -> TyConApp tcNm _args)
   | Just (FunTyCon {}) <- lookupTyCon tenv tcNm = True
@@ -728,15 +753,14 @@ charLitView _ _ (LitTy (CharTy c)) = Just c
 charLitView tenv sc (reduceTypeFamily tenv sc -> Just ty') = charLitView tenv sc ty'
 charLitView _ _ _ = Nothing
 
--- | The number a type reduces to under 'coreView1'. See
--- 'Clash.Core.Util.tyNatSize'.
+-- | The number a type reduces to under 'coreView1'
 tyNatSize :: Distinct n => TypeEnv -> Scope n -> Type n -> Except String Integer
 tyNatSize tenv sc (coreView1 tenv sc -> Just ty) = tyNatSize tenv sc ty
 tyNatSize _ _ (LitTy (NumTy i)) = return i
 tyNatSize _ _ ty = throwE $ $(curLoc) ++ "Cannot reduce to an integer:\n" ++ showPpr ty
 
 -- | The string representation of the symbol or number a type reduces to under
--- 'coreView1'. See 'Clash.Core.Util.tyLitShow'.
+-- 'coreView1'
 tyLitShow :: Distinct n => TypeEnv -> Scope n -> Type n -> Except String String
 tyLitShow tenv sc (coreView1 tenv sc -> Just ty) = tyLitShow tenv sc ty
 tyLitShow _ _ (LitTy (SymTy s)) = return s
@@ -745,7 +769,7 @@ tyLitShow _ _ ty = throwE $ $(curLoc) ++ "Cannot reduce to a string:\n" ++ showP
 
 -- * Predicates
 
--- | Is the type a class dictionary? See 'C.isClassTy'.
+-- | Is the type a class dictionary?
 isClassTy :: TypeEnv -> Type n -> Bool
 isClassTy tenv (tyView -> TyConApp tcNm _) =
   case lookupTyCon tenv tcNm of
@@ -753,13 +777,13 @@ isClassTy tenv (tyView -> TyConApp tcNm _) =
     _ -> False
 isClassTy _ _ = False
 
--- | Is the type @Integer@? See 'C.isIntegerTy'.
+-- | Is the type @Integer@?
 isIntegerTy :: Type n -> Bool
 isIntegerTy (ConstTy (TyCon nm)) = nameUniq nm == fromGhcUnique integerTyConKey
 isIntegerTy _ = False
 
 -- | Determine whether a type is isomorphic to "Clash.Signal.Internal.Signal",
--- or contains one. See 'Clash.Core.Util.isSignalType'.
+-- or contains one.
 isSignalType :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
 isSignalType tenv sc = go HashSet.empty
  where
@@ -778,16 +802,14 @@ isSignalType tenv sc = go HashSet.empty
                                    ++ " not found.") False
   go _ _ = False
 
--- | Determines whether a type is (an alias of) an Enable line. See
--- 'Clash.Core.Util.isEnable'.
+-- | Determines whether a type is (an alias of) an Enable line.
 isEnable :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
 isEnable tenv sc ty0
   | TyConApp (nameOcc -> "Clash.Signal.Internal.Enable") _ <- tyView ty0 = True
   | Just ty1 <- coreView1 tenv sc ty0 = isEnable tenv sc ty1
   | otherwise = False
 
--- | Determines whether a type is (an alias of) a Clock or Reset line. See
--- 'Clash.Core.Util.isClockOrReset'.
+-- | Determines whether a type is (an alias of) a Clock or Reset line.
 isClockOrReset :: Distinct n => TypeEnv -> Scope n -> Type n -> Bool
 isClockOrReset tenv sc (coreView1 tenv sc -> Just ty) = isClockOrReset tenv sc ty
 isClockOrReset _ _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
@@ -800,17 +822,16 @@ isClockOrReset _ _ _ = False
 -- * Annotations
 
 -- | The attributes of an annotated type. Empty if the type is not annotated.
--- See 'C.typeAttrs'.
 typeAttrs :: Type n -> [Attr Text]
 typeAttrs (AnnType attrs _) = attrs
 typeAttrs _ = []
 
--- | Remove all 'AnnType' wrappers from a type. See 'C.stripAnnTypes'.
+-- | Remove all 'AnnType' wrappers from a type.
 stripAnnTypes :: Type n -> Type n
 stripAnnTypes (AnnType _ ty) = stripAnnTypes ty
 stripAnnTypes ty = ty
 
--- | Strip implicit parameter wrappers (IP). See 'Clash.Core.Util.stripIP'.
+-- | Strip implicit parameter wrappers (IP).
 stripIP :: Type n -> Type n
 stripIP t@(tyView -> TyConApp tcNm [_a1, a2]) =
   if nameUniq tcNm == fromGhcUnique ipClassKey then a2 else t

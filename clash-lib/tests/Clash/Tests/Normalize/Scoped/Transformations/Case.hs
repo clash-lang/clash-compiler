@@ -5,9 +5,9 @@
 
   Tests for "Clash.Normalize.Scoped.Transformations.Case".
 
-  The regression tests guard against bugs that the case transformations had
-  on Clash Core. The capture bugs among them can't be written in scoped Core:
-  they are type errors. Instead, 'assertRewritesTo' also runs each test in a scope
+  The regression tests guard against bugs that the case transformations had.
+  The capture bugs among them can't be written in scoped Core: they are type
+  errors. Instead, 'assertRewritesTo' also runs each test in a scope
   whose variables clash with the binders of its input, where a transformation
   that moves a term under one of them has to rename it. The tests in a sunk
   scope ('sunkD') check that the new binders are fresh for that scope.
@@ -189,7 +189,7 @@ regressionTests =
     -- equal by its first alternative, only checking whether the variables
     -- bound by the first pattern occur in it. Here the alternatives are alpha
     -- equivalent, but only the first returns the free variable @z@: the
-    -- pattern binder @z'@ shadowed it in Clash Core.
+    -- pattern binder @z'@ used to shadow it.
   , testCase "caseOneAlt checks the pattern of every alternative" $ do
       rewrites caseConS [varD "z_5" "Int", varD "w_7" "Int"]
         "(case MkU w_7 of { MkT (y :: Int) -> z_5; MkU (z' :: Int) -> z' }) :: Int"

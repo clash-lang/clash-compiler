@@ -271,8 +271,7 @@ genNetlist env isTb globals tops topNames typeTrans ite be seen0 dir prefixM top
 
 -- | The number of arguments of the type of a top entity, after splitting off
 -- clocks and stuff from product types that contain them (see
--- 'splitShouldSplit'). Its quantified type variables are skipped, like
--- 'Clash.Core.Type.splitFunForallTy' does.
+-- 'splitShouldSplit'). Its quantified type variables are skipped.
 topArgCount :: Distinct n => TypeEnv -> Scope n -> Type n -> Int
 topArgCount te sc ty = case ty of
   ForAllTy b res -> openTyBinder sc b res $ \sc' _ res' -> topArgCount te sc' res'
@@ -293,8 +292,7 @@ topHWTypes te sc ty = case ty of
   _ -> ([],) <$> unsafeCoreTypeToHWTypeM $(curLoc) sc ty
 
 -- | The result type of the type of a top entity, see
--- 'Clash.Core.Type.splitCoreFunForallTy'. Errors if it mentions quantified type
--- variables.
+-- 'splitCoreFunForallTy'. Errors if it mentions quantified type variables.
 topResultType :: HasCallStack => TypeEnv -> Type 'VoidS -> Type 'VoidS
 topResultType te ty = case splitCoreFunForallTy te emptyScope ty of
   SplitCoreFunForall _ _ res ->
@@ -696,10 +694,23 @@ mkFunApp ctx declType dstId (Right fun) args tickDecls = do
 
         let dstHWty = stripFiltered resTy
 
-        -- TODO: The port names of the component are not available, see
-        -- 'Clash.Netlist.mkFunApp'. The current workaround is to not rely on
-        -- named arguments, using positional ones instead when instantiating a
-        -- top entity.
+        -- TODO: The port names of the component are not available: they
+        --       would come from its normalized binding, which isn't
+        --       necessarily present in the binding map, as only the current
+        --       top entity (and its dependencies, stopping at other top
+        --       entities) are present. We can't add the non-normalized
+        --       version, as the port names rely on 'splitArguments' having
+        --       fired. Adding normalized versions would create a dependency
+        --       between two top entities, defeating the ability to compile in
+        --       parallel.
+        --
+        --       One option is to split the normalization process into two
+        --       chunks: preprocessing (e.g., 'splitArguments') and actually
+        --       normalizing. This would ensure only minimal work is being done
+        --       serially.
+        --
+        --       The current workaround is to not rely on named arguments, using
+        --       positional ones instead when instantiating a top entity.
         argTys <- mapM (unsafeCoreTypeToHWTypeM $(curLoc) sc . argTyOf) args
         let
           ettArgs = (Nothing,) <$> argTys
@@ -1298,9 +1309,9 @@ mkDcApplication _ _ _ _ _ _ = error "internal error"
 -- * Utilities
 
 -- | Open a case alternative, and give the variables its pattern binds their
--- human readable names as HDL identifiers: those of Clash Core, see
--- 'Clash.Netlist.Id.unsafeFromCoreId'. Netlist only refers to the field
--- binders of projections ('mkProjection').
+-- occurrence names as HDL identifiers, verbatim
+-- ('Clash.Netlist.Id.unsafeMake'). Netlist only refers to the field binders of
+-- projections ('mkProjection').
 withAlt
   :: Distinct n
   => CompCtx n

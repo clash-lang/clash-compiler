@@ -126,8 +126,7 @@ liftBindingTyVarCapture = do
 --
 -- > r = \z -> k (r z) x    where x :: a, a :: kk, and kk is free
 --
--- must give @/\\kk a -> ..@. In Clash Core, the unique of @a@ was smaller
--- than the unique of @kk@; in scoped Core, a type variable has a raw name
+-- must give @/\\kk a -> ..@. In scoped Core, a type variable has a raw name
 -- above those of the type variables in its kind.
 liftBindingTyVarOrder :: Assertion
 liftBindingTyVarOrder = do
@@ -194,8 +193,8 @@ whnfScopedContextTests =
   , testCase "let x = 3 in \\x -> x" $
       whnfAt [LetBodyStep, LamStep] "let { !(x :: Int) = 3 } in \\(x :: Int) -> x" "3"
         >>= assertBool "unchanged" . fst
-    -- Like for Clash Core, the bindings of a recursive let-binding are not
-    -- used in its right-hand sides
+    -- The bindings of a recursive let-binding are not used in its right-hand
+    -- sides
   , testCase "let x = 3 in letrec { x = 4; w = x } in w" $
       whnfAt [LetBodyStep, LetRhsStep 1]
         "let { !(x :: Int) = 3 } in let { (x :: Int) = 4; (w :: Int) = x } in w" "4"
@@ -205,7 +204,7 @@ whnfScopedContextTests =
         >>= assertBool "3" . snd
   ]
 
--- * The results of the functions of Clash Core
+-- * Expected results
 
 -- | The state for transformations that lift bindings, see 'liftState'
 liftStateFixed :: RewriteState NormalizeState
@@ -236,7 +235,8 @@ runLetHandler st h t = withTerm t $ \ts -> \case
   _ -> assertFailure "not a let-expression"
 
 -- | Let-expressions to inline literals and variables in. The free variables
--- have the uniques of those of Clash Core, so they get their order.
+-- spell out their uniques, which give their order in the scope (see
+-- 'withTerm').
 inlineInputs :: [TestTerm]
 inlineInputs =
   [ "let { (x_4 :: Int) = 1; (y_5 :: Int) = x_4; (z_6 :: Int) = (g_11 :: Int -> Int -> Int) y_5 z_6 } in z_6"
@@ -323,8 +323,7 @@ mkBinderForTests =
   fromStringTerm = parseTestTerm
 
 -- | 'dependencySortTyVars' sorts type variables after the ones in their
--- kinds, and keeps the order otherwise, as 'Clash.Core.Util.dependencySortTyVars'
--- did
+-- kinds, and keeps the order otherwise
 dependencySortTests :: [TestTree]
 dependencySortTests =
   [ testCase name $ withTestScope [tyVarD "kk", kindedTyVarD "a" "kk", tyVarD "b", tyVarD "c"] $ \ts ->
@@ -361,7 +360,7 @@ bindPureHeapTests =
     _ -> assertFailure "not a let-expression"
 
 -- | 'normalizeTermTypes' normalizes the types of variable occurrences and of
--- casts, as 'Clash.Core.Util.normalizeTermTypes' did
+-- casts
 normalizeTermTypesTests :: [TestTree]
 normalizeTermTypesTests =
   [ testCase "x :: Vec (2 + 3) Int" $ withVec $ \ts ->
@@ -459,7 +458,7 @@ tests =
   -- The inputs with a recursive let-expression, as the evaluator allocates them
   recursiveInputs = [ t | (i, t) <- zip [0 :: Int ..] (inlineInputs <> removeInputs), i `notElem` [4, 5, 6, 10, 11] ]
 
--- | The results of the handler of Clash Core on the inputs
+-- | The expected results of the handler on the inputs
 expectedInline :: [(String, Bool, [(String, String)])]
 expectedInline =
   [ ("letrec\n  z :: Int\n  = g 1# z\nin z",True,[])
@@ -472,7 +471,7 @@ expectedInline =
   , ("letrec\n  x :: Int\n  = f 1#\nin 2#",False,[])
   ]
 
--- | The results of the handler of Clash Core on the inputs
+-- | The expected results of the handler on the inputs
 expectedRemove :: [(String, Bool, [(String, String)])]
 expectedRemove =
   [ ("letrec\n  x :: Int\n  = 1#\n  y :: Int\n  = f x\nin y",True,[])
@@ -483,7 +482,7 @@ expectedRemove =
   , ("letrec\n  x :: Int\n  = f y\n  y :: Int\n  = f x\nin x",False,[])
   ]
 
--- | The results of the handler of Clash Core on the inputs
+-- | The expected results of the handler on the inputs
 expectedInlineOrLift :: [(String, Bool, [(String, String)])]
 expectedInlineOrLift =
   [ ("f (c$top_r s g 1#)",True,[("c$top_r","\955(s :: Int) ->\n\955(g :: Int -> Int -> Int) ->\n\955(z :: Int) ->\ng (c$top_r s g z) s")])
@@ -491,7 +490,7 @@ expectedInlineOrLift =
   , ("c$top_r s g 1#",True,[("c$top_r","\955(s :: Int) ->\n\955(g :: Int -> Int -> Int) ->\n\955(z :: Int) ->\ng z s")])
   ]
 
--- | The results of the handler of Clash Core on the inputs
+-- | The expected results of the handler on the inputs
 expectedCleanup :: [(String, Bool, [(String, String)])]
 expectedCleanup =
   [ ("letrec\n  z :: Int\n  = g 1# z\nin z",True,[])

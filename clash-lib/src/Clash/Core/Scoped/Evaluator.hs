@@ -322,7 +322,7 @@ newLetBinding env m e k
     in k m1 {mHeapLocal = insertNameMap (tmNameOf b) (sink e) (mHeapLocal m1)}
          (idBinderHeapVar b)
 
--- | The name of new heap binders, see 'Clash.Core.Util.mkUniqSystemId'
+-- | The name of new heap binders
 xName :: C.Name Term
 xName = C.mkUnsafeSystemName "x" 0
 

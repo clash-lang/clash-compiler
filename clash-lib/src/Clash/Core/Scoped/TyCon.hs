@@ -49,7 +49,7 @@ newTyConSig = \case
 -- ones are applied to the result. 'Nothing' if there are fewer types than
 -- type variables.
 --
--- See 'Clash.Core.Type.coreView1'.
+-- See 'Clash.Core.Scoped.Type.coreView1'.
 newTyConInstRhs :: Distinct n => Scope n -> NewTyConSig -> [Type n] -> Maybe (Type n)
 newTyConInstRhs sc (NewTyConSig tvs rhs) = instTele (closedSubst sc) tvs rhs
 

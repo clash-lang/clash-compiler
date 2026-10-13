@@ -164,15 +164,15 @@ tyConTy tc = ConstTy (TyCon tc)
 
 -- * Kinds
 
--- | See 'Clash.Core.TysPrim.liftedTypeKind'
+-- | The kind of lifted types, @Type@
 liftedTypeKind :: Kind n
 liftedTypeKind = tyConTy liftedTypeKindTyConName
 
--- | See 'Clash.Core.TysPrim.typeNatKind'
+-- | The kind of type-level naturals, @Nat@
 typeNatKind :: Kind n
 typeNatKind = tyConTy typeNatKindTyConName
 
--- | See 'Clash.Core.TysPrim.typeSymbolKind'
+-- | The kind of type-level symbols, @Symbol@
 typeSymbolKind :: Kind n
 typeSymbolKind = tyConTy typeSymbolKindTyConName
 
@@ -203,14 +203,13 @@ eqPrimTy = tyConTy eqPrimTyConName
 
 -- * Closed types
 
--- | The type @forall a. a@. See 'Clash.Core.Util.undefinedTy'.
+-- | The type @forall a. a@
 undefinedTy :: Type 'VoidS
 undefinedTy =
   withFreshTyBinder emptyScope (mkUnsafeSystemName "a" 0) liftedTypeKind $ \_ a ->
     ForAllTy a (tyBinderVar a)
 
--- | The type @forall a. forall b. a -> b@. See
--- 'Clash.Core.Util.unsafeCoerceTy'.
+-- | The type @forall a. forall b. a -> b@
 unsafeCoerceTy :: Type 'VoidS
 unsafeCoerceTy =
   withFreshTyBinder emptyScope (mkUnsafeSystemName "a" 0) liftedTypeKind $ \sc1 a ->

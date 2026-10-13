@@ -4,8 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Stub transformations of scoped Clash Core, test terms, and strategy
-  fragments for "Clash.Tests.Rewrite.Scoped.StrategyDSL": the scoped
-  counterparts of "Clash.Tests.Rewrite.StrategyDSL.Stubs". They live in their
+  fragments for "Clash.Tests.Rewrite.Scoped.StrategyDSL". They live in their
   own module because Template Haskell splices can only evaluate imported
   values.
 -}

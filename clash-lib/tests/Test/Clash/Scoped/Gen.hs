@@ -14,8 +14,7 @@
   type is generated at a kind, and a type variable is only used at its kind.
 
   Binders get fresh names, just above the watermark of the scope at them, as
-  'Clash.Core.Scoped.Subst.withFreshIdBinder' gives them. Names clash where the
-  generators of "Test.Clash.Scoped.Gen.Clash" made Clash Core shadow:
+  'Clash.Core.Scoped.Subst.withFreshIdBinder' gives them. Names clash where:
 
   * 'Sunk' terms are generated in a scope, and sunk into a larger one, whose
     new variables have the names of the first binders of the term;
@@ -24,7 +23,7 @@
     variables in scope, of either sort, and of other binders;
 
   * the global variables ('globals') have small uniques, which are the raw
-    names of the first free variables and binders too (D5).
+    names of the first free variables and binders too.
 
   The signatures of data constructors, globals and primitives are fixed, see
   'genCons', 'globals' and 'prims'.
@@ -272,7 +271,7 @@ typeEnv :: TypeEnv
 typeEnv = mkTypeEnv tyConMap
 
 -- | The global variables that generated terms use. Their uniques are small, so
--- that they are the raw names of local variables too (D5).
+-- that they are the raw names of local variables too.
 globals :: [GlobalId]
 globals =
   [ testGlobalId "f_G2" "Int -> Int"

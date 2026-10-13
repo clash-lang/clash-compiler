@@ -3,8 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Term". The expected results are those of the
-  functions of "Clash.Core.Term" that these replace.
+  Tests for "Clash.Core.Scoped.Term".
 -}
 
 {-# LANGUAGE GADTs #-}

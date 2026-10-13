@@ -4,8 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Helpers to test the scoped evaluator ("Clash.Core.Scoped.Evaluator") on
-  terms of scoped Clash Core. The helpers that compare it with the evaluator
-  of Clash Core are in "Test.Clash.Scoped.Evaluator.Differential".
+  terms of scoped Clash Core.
 
   = Results
 

@@ -10,18 +10,9 @@
   Globals are looked up by 'GlobalId', so a local variable never finds the
   binding of a global with the same unique. New globals get a unique from the
   unique supply that no global binding has, never one derived from a local
-  variable (decision D5 of the port). Note that a 'GlobalId' doesn't imply
-  that there is a binding for it: e.g. 'Clash.Rewrite.Types.curFun' is a
-  global without a binding during
+  variable. Note that a 'GlobalId' doesn't imply that there is a binding for
+  it: e.g. 'Clash.Rewrite.Types.curFun' is a global without a binding during
   'Clash.Normalize.Scoped.Util.normalizeWorkFreeApp'.
-
-  = The boundary with Clash Core
-
-  The pipeline converts no bindings: GHC2Core produces scoped Clash Core, and
-  Netlist generation consumes it. 'fromClashBindings' and 'toClashBindings'
-  convert bindings of Clash Core, e.g. for the comparisons of
-  @clash-differential@, and those of tests. TODO(Phase 7): remove, with Clash
-  Core.
 -}
 
 {-# LANGUAGE PolyKinds #-}
@@ -35,7 +26,6 @@ module Clash.Rewrite.Scoped.Globals
   , findAlphaEqBinding
   , isTopEntity
   , isWorkFreeTerm
-    -- * The boundary with Clash Core
   ) where
 
 import           Control.Lens                ((%=))
@@ -134,5 +124,3 @@ isWorkFreeTerm :: HasCallStack => Term n -> RewriteMonad extra Bool
 isWorkFreeTerm e = do
   bndrs <- Lens.use scopedBindings
   WorkFree.isWorkFree scopedWorkFreeBinders bndrs e
-
--- * The boundary with Clash Core

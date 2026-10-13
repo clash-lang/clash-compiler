@@ -4,8 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vector", on
-  fixed inputs. @clash-differential prims --open@ compares the reductions with
-  those of Clash Core on generated calls.
+  fixed inputs.
 -}
 
 {-# LANGUAGE DataKinds #-}
@@ -90,9 +89,7 @@ tests = testGroup "Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Sized.Vect
       --   -> Vec (2^k) a -> p @@ k
       --
       -- with every @p \@\@ _@ an @Int@, and @Vec k a@ for @Vec (2^k) a@: the
-      -- types of arguments aren't checked. The reduction of Clash Core gives
-      -- the binders of the patterns that select the halves the type
-      -- @2^(k-1)@ itself.
+      -- types of arguments aren't checked.
       let gTy = forAll "l_9107" natKind $ \l ->
                   snatTy l ~> boxedIntTy ~> boxedIntTy ~> boxedIntTy
           primTy =

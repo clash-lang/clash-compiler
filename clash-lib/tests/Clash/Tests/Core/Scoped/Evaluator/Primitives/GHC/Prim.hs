@@ -5,8 +5,7 @@
 
   Tests for "Clash.Core.Scoped.Evaluator.Primitives.GHC.Prim" on fixed inputs:
   reductions with unboxed tuples as results, the reductions that combinators
-  build, and the byte arrays on the primitive heap, which
-  @clash-differential prims@ can't generate.
+  build, and the byte arrays on the primitive heap.
 
   The unboxed tuples of "GHC.Prim" are 'T2' here: the reductions only look at
   the only constructor of the result type.

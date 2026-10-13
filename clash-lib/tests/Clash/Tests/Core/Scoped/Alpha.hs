@@ -3,8 +3,7 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for alpha-equivalence of scoped Clash Core. Includes the examples of
-  "Clash.Tests.Core.AlphaEquivalence".
+  Tests for alpha-equivalence of scoped Clash Core.
 -}
 
 {-# LANGUAGE GADTs #-}

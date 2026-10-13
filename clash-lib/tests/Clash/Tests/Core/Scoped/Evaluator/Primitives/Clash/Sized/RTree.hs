@@ -4,8 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Sized.RTree", on
-  fixed inputs. @clash-differential prims --open@ compares the reductions with
-  those of Clash Core on generated calls.
+  fixed inputs.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}

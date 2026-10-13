@@ -14,9 +14,8 @@
   = Binders
 
   Binders get fresh names from the scope, so the functions that create them
-  ('mkTmBinderFor', 'mkBinderFor') take a 'Scope' and a continuation, rather
-  than an 'Clash.Core.VarEnv.InScopeSet' and a unique supply. The unique of a
-  given name is not used, only its human readable part.
+  ('mkTmBinderFor', 'mkBinderFor') take a 'Scope' and a continuation. The
+  unique of a given name is not used, only its human readable part.
 
   = Let-bindings
 
@@ -191,8 +190,7 @@ normalizeTermTypes te sc e = case e of
 
 -- | Order type variable occurrences such that every type variable comes
 -- after the type variables in its kind, keeping their order otherwise, e.g.
--- to bind them with 'Clash.Core.Scoped.Subst.closeOver'. See
--- 'Clash.Core.FreeVars.dependencySortTyVars'.
+-- to bind them with 'Clash.Core.Scoped.Subst.closeOver'.
 --
 -- Only the dependencies between the given type variables are taken into
 -- account. Elements that are not type variables are left in place.

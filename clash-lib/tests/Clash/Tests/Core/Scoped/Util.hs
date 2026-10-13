@@ -3,8 +3,8 @@
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
-  Tests for "Clash.Core.Scoped.Util". Most expected results are those of the
-  functions of "Clash.Core.Util" that these replace, rendered as text.
+  Tests for "Clash.Core.Scoped.Util". Most expected results are rendered as
+  text.
 -}
 
 {-# LANGUAGE GADTs #-}
@@ -281,9 +281,8 @@ tests = testGroup "Clash.Tests.Core.Scoped.Util"
   , primTests
   ]
 
--- | The results of the functions of "Clash.Core.Util" that the functions
--- of "Clash.Core.Scoped.Util" replace, rendered as text ('pp'), by test, as
--- lines
+-- | The expected results of the functions of "Clash.Core.Scoped.Util",
+-- rendered as text ('pp'), by test, as lines
 expected :: [(String, [String])]
 expected =
   [ ("listToLets#1",

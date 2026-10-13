@@ -4,8 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Solving the type equations of the fields of data constructors, for their
-  existentially quantified type variables, in scoped Clash Core. Ports of
-  "Clash.Core.EqSolver".
+  existentially quantified type variables, in scoped Clash Core.
 
   A solution gives a type variable a closed type: a type constructor or a
   number (see 'solveEq' and 'solveAdd'). Substituting a solution for an
@@ -60,7 +59,7 @@ import Clash.Core.Scoped.TypeEnv (TypeEnv)
 
 -- * Solving equations
 
--- | What kind of solution (if any) was found. See 'Clash.Core.EqSolver.TypeEqSolution'.
+-- | What kind of solution (if any) was found
 data TypeEqSolution n
   = Solution !(TyName n) !(Type 'VoidS)
   -- ^ A solution was found: the variable equals a closed type
@@ -79,7 +78,7 @@ catSolutions = mapMaybe getSol
   getSol _ = Nothing
 
 -- | Solve the given equations for the given type variables, and return all
--- non-absurd solutions. See 'Clash.Core.EqSolver.solveNonAbsurds'.
+-- non-absurd solutions.
 solveNonAbsurds
   :: Distinct n
   => TypeEnv
@@ -98,8 +97,6 @@ solveNonAbsurds tenv sc solveSet = concatMap $ \eq ->
 --   * SomeType a b ~ SomeType Int Bool
 --   * SomeType Int Bool ~ SomeType a b
 --   * SomeType a Bool ~ SomeType Int b
---
--- See 'Clash.Core.EqSolver.solveEq'.
 solveEq
   :: Distinct n
   => TypeEnv
@@ -139,8 +136,7 @@ solveEq tenv sc solveSet (coreView tenv sc -> left, coreView tenv sc -> right) =
           _ ->
             []
 
--- | Solve equations supported by 'normalizeAdd'. See
--- 'Clash.Core.EqSolver.solveAdd'.
+-- | Solve equations supported by 'normalizeAdd'.
 solveAdd
   :: NameSet TyName n
   -- ^ The type variables to solve for
@@ -164,7 +160,7 @@ solveAdd solveSet ab =
 --     * n + 2 ~ 5
 --     * 2 + n ~ 5
 --
--- are returned as (5, 2, n). See 'Clash.Core.EqSolver.normalizeAdd'.
+-- are returned as (5, 2, n).
 normalizeAdd :: (Type n, Type n) -> Maybe (Integer, Integer, Type n)
 normalizeAdd (a, b) = do
   (n, rhs) <- lhsLit a b
@@ -180,8 +176,7 @@ normalizeAdd (a, b) = do
   lhsLit (LitTy (NumTy n)) y = Just (n, y)
   lhsLit _ _ = Nothing
 
--- | If the type is an equation, its left-hand and right-hand side. See
--- 'Clash.Core.EqSolver.typeEq'.
+-- | If the type is an equation, its left-hand and right-hand side.
 typeEq :: Distinct n => TypeEnv -> Scope n -> Type n -> Maybe (Type n, Type n)
 typeEq tenv sc ty =
   case tyView (coreView tenv sc ty) of
@@ -189,7 +184,11 @@ typeEq tenv sc ty =
       | nameUniq tc == fromGhcUnique eqPrimTyConKey ->
       Just (coreView tenv sc left, coreView tenv sc right)
     TyConApp tc [_, left, right]
-      -- Lifted equality (~), see 'Clash.Core.EqSolver.typeEq'
+      -- Lifted equality (~): @(~) :: forall k. k -> k -> Constraint@
+      --
+      -- Note that lifted equality exists to house "bogus" types, i.e. a
+      -- deferred type error. Clash doesn't support that, so we can treat lifted
+      -- equality (~) the same as unlifted equality (~#).
       | nameUniq tc == fromGhcUnique eqTyConKey ->
       Just (coreView tenv sc left, coreView tenv sc right)
     _ ->
@@ -197,7 +196,7 @@ typeEq tenv sc ty =
 
 -- | Whether an equation is absurd: it equates types that are definitely not
 -- equal, or the solution involves an absurd (intermediate) result, such as
--- -1. See 'Clash.Core.EqSolver.isAbsurdEq'.
+-- -1.
 isAbsurdEq
   :: Distinct n
   => TypeEnv
@@ -219,8 +218,7 @@ isAbsurdEq tenv sc exts (left0, right0) =
 -- * Patterns
 
 -- | The equations of the field types of a pattern, in the scope of its
--- existentially quantified type variables, which are also given. See
--- 'Clash.Core.EqSolver.patEqs'.
+-- existentially quantified type variables, which are also given.
 --
 -- Goes under the existentially quantified type variables, renaming them if they
 -- clash with the scope.
@@ -240,8 +238,7 @@ withPatEqs tenv sc pat k = case pat of
   LitPat _ -> k sc emptyNameSet []
   DefaultPat -> k sc emptyNameSet []
 
--- | Whether a pattern can never match, because its equations are absurd. See
--- 'Clash.Core.EqSolver.isAbsurdPat'.
+-- | Whether a pattern can never match, because its equations are absurd.
 isAbsurdPat :: Distinct n => TypeEnv -> Scope n -> Pat n l -> Bool
 isAbsurdPat _ _ (DataPat dc _ _)
   -- unsafeCoerce is not absurd in the way intended by 'isAbsurdPat'
@@ -289,10 +286,6 @@ solvePatExistentials tenv sc pat k = case pat of
 -- 'solveNonAbsurds'), until no more solutions are found, and substitutes the
 -- solutions. 'Nothing' if there are more or fewer types than universally
 -- quantified type variables.
---
--- See 'Clash.Core.Util.dataConInstArgTysE', which gives the field types
--- without the binders of the existentially quantified type variables they may
--- mention.
 dataConInstArgTysE
   :: forall n r
    . (HasCallStack, Distinct n)
@@ -322,7 +315,7 @@ dataConInstArgTysE tenv sc dc univTys k = case dcSig dc of
 -- * Substituting solutions
 
 -- | The solutions, by the position of their type variable in the given list.
--- Later solutions win, like they do in 'Clash.Core.Subst.extendTvSubstList'.
+-- Later solutions win.
 solutionPositions :: [TyName n] -> [(TyName n, Type 'VoidS)] -> IntMap (Type 'VoidS)
 solutionPositions names sols = IntMap.fromList
   [ (pos, ty)

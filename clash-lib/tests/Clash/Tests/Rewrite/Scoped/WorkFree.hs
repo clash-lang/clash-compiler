@@ -43,7 +43,7 @@ prim wi = primB (mkPrimInfo "p" (closedType "Int -> Int") wi C.SingleResult NoUn
 wrapB :: (TmB -> TmB) -> TestTerm -> TestTerm
 wrapB f t = t {testTermB = f (testTermB t)}
 
--- | @removedArg@ of "Clash.Normalize.Primitives"
+-- | The @removedArg@ primitive, see 'Clash.Core.Basic.removedArgName'
 removedArg :: PrimInfo
 removedArg =
   mkPrimInfo "Clash.Normalize.Primitives.removedArg" P.undefinedTy C.WorkNever C.SingleResult NoUnfolding

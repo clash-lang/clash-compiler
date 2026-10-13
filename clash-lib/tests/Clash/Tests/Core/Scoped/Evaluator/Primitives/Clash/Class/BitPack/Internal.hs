@@ -4,8 +4,7 @@
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal"
-  on fixed inputs. The designs of @clash-differential prims@ have none of
-  these primitives.
+  on fixed inputs.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
@@ -112,7 +111,7 @@ floatBits = toInteger (castFloatToWord32 2.25)
 tests :: TestTree
 tests = testGroup "Clash.Tests.Core.Scoped.Evaluator.Primitives.Clash.Class.BitPack.Internal"
   [ testGroup "pack"
-      -- The reductions don't wrap negative numbers, like those of Clash Core
+      -- The reductions don't wrap negative numbers
       [ packTest "packInt8#" int8B 8 (-3) (-3)
       , packTest "packInt16#" int16B 16 300 300
       , packTest "packInt32#" int32B 32 70000 70000

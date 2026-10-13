@@ -6,11 +6,11 @@
   Sorted local names, and sets and maps of them. The public interface is
   "Clash.Core.Scoped.Syntax" and "Clash.Core.Scoped.NameMap".
 
-  Type variables and term variables live in a single scope index @n :: S@,
-  just like Clash's 'Clash.Core.VarEnv.InScopeSet' contains both. The newtypes
-  'TyName' and 'TmName' keep the sorts apart. A 'TyName' can only be obtained
-  from a type variable binder, a 'TmName' only from a term variable binder (see
-  "Clash.Core.Scoped.Syntax"), so a type never mentions a term variable.
+  Type variables and term variables live in a single scope index @n :: S@.
+  The newtypes 'TyName' and 'TmName' keep the sorts apart. A 'TyName' can only
+  be obtained from a type variable binder, a 'TmName' only from a term
+  variable binder (see "Clash.Core.Scoped.Syntax"), so a type never mentions a
+  term variable.
 
   In a scope, a raw name identifies at most one variable that can be referred
   to: binders in distinct scopes are distinct, and a binder that shadows a

@@ -4,8 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for substitution, going under binders, and moving values out of the
-  scope of binders, in scoped Clash Core. Includes ports of the
-  capture-avoidance tests in "Clash.Tests.Core.Subst".
+  scope of binders, in scoped Clash Core.
 
   Most tests sink a term built in a small scope into a scope with a free
   variable that has the same name as one of its binders, which therefore has

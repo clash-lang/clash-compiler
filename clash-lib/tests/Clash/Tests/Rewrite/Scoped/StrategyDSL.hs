@@ -4,8 +4,7 @@
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Tests for "Clash.Rewrite.StrategyDSL.TH" compiling strategies of scoped
-  transformations: the scoped counterparts of the tests in
-  "Clash.Tests.Rewrite.StrategyDSL".
+  transformations.
 -}
 
 {-# LANGUAGE OverloadedStrings #-}
