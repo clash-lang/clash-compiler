@@ -100,6 +100,27 @@ tests =
               (Unit, Unit) :- ((Unit, Unit) :- _) -> () @?= ()
         ]
     , testGroup
+        "SignalEnsureSpine"
+        [ testCase "Undefined function stream uses the sample instance" $ do
+            -- For functions, ensureSpine = id, but deepErrorX returns a
+            -- function with a structured undefined result. Stream recovery
+            -- must not substitute deepErrorX for the sample's ensureSpine.
+            let expected = hasUndefined (ensureSpine @(Bool -> Unit) undef False)
+            case ensureSpine @(Signal System (Bool -> Unit)) undef of
+              f :- (g :- _) -> do
+                hasUndefined (f False) @?= expected
+                hasUndefined (g False) @?= expected
+        , testCase "Undefined samples in a defined stream" $
+            case ensureSpine @(Signal System (Unit, Unit)) (pure undef) of
+              (Unit, Unit) :- ((Unit, Unit) :- _) -> pure ()
+        , testCase "Defined prefix and undefined tail" $
+            case ensureSpine @(Signal System (Int, Unit)) ((42, Unit) :- undef) of
+              (x, Unit) :- ((y, Unit) :- ((z, Unit) :- _)) -> do
+                x @?= 42
+                hasUndefined y @?= True
+                hasUndefined z @?= True
+        ]
+    , testGroup
         "ManualRnf"
         [ testCase "List1"     $ rnfX (undef :: [Int])                @?= ()
         , testCase "List2"     $ rnfX ([undef] :: [Int])              @?= ()
