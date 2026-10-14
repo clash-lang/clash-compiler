@@ -41,6 +41,7 @@ import qualified GHC.STRef
 import qualified GHC.Stack.Types
 import GHC.Word                         (Word8, Word16, Word32, Word64)
 import Language.Haskell.TH.Syntax       (showName)
+import qualified Type.Reflection
 
 import Clash.Driver.Types               (KnownDomainTyConUniques(..))
 import Clash.Core.DataCon               (DataCon (..))
@@ -313,7 +314,7 @@ ghcTypeToHWType mkdtcus iw = go
              ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m a0
 
          -- Similarly, discard runtime type representations.
-         | occ == "GHC.Internal.Data.Typeable.Internal.TypeRep" -> returnN (Void Nothing)
+         | occ == showt ''Type.Reflection.TypeRep -> returnN (Void Nothing)
 
          | occ == "Clash.Explicit.SimIO.File" -> returnN FileType
 
@@ -357,7 +358,7 @@ domPeriodFraction ::
   ExceptT String (MaybeT m) Period
 domPeriodFraction m (coreView1 m -> Just ty) = domPeriodFraction m ty
 domPeriodFraction _ (tyView -> TyConApp tc [_, nTy, dTy])
-  | nameOcc tc == "GHC.Internal.Real.:%"
+  | (nameOcc tc == "GHC.Internal.Real.:%" || nameOcc tc == "GHC.Real.:%")
   , LitTy (NumTy n) <- nTy, n >= 0
   , LitTy (NumTy d) <- dTy, d >  0
   = pure $ Period $ fromInteger n % fromInteger d
