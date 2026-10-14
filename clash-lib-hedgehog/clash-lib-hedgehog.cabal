@@ -1,7 +1,7 @@
 cabal-version:      2.2
 
 name:               clash-lib-hedgehog
-version:            1.10.2
+version:            1.10.3
 synopsis:           Hedgehog Generators for clash-lib
 description:        Hedgehog Generators for clash-lib
 bug-reports:        https://github.com/clash-lang/clash-compiler/issues
@@ -15,7 +15,8 @@ build-type:         Simple
 tested-with:        GHC == 9.6.7,
                     GHC == 9.8.4,
                     GHC == 9.10.3,
-                    GHC == 9.12.4
+                    GHC == 9.12.4,
+                    GHC == 9.14.1
 
 common basic-config
   default-language: Haskell2010
@@ -66,4 +67,4 @@ library
     transformers              >= 0.5.2.0 && < 0.7,
     ghc                       >= 9.6.0   && < 9.15,
 
-    clash-lib                 == 1.10.2,
+    clash-lib                 == 1.10.3,

@@ -1,7 +1,7 @@
 cabal-version:      2.2
 
 name:               clash-prelude-hedgehog
-version:            1.10.2
+version:            1.10.3
 synopsis:           Hedgehog Generators for clash-prelude
 description:        Hedgehog Generators for clash-prelude
 bug-reports:        https://github.com/clash-lang/clash-compiler/issues
@@ -15,7 +15,8 @@ build-type:         Simple
 tested-with:        GHC == 9.6.7,
                     GHC == 9.8.4,
                     GHC == 9.10.3,
-                    GHC == 9.12.4
+                    GHC == 9.12.4,
+                    GHC == 9.14.1
 
 Extra-source-files: CHANGELOG.md
 
@@ -59,4 +60,4 @@ library
     text                      >= 1.2.2   && < 2.2,
     string-interpolate        >= 0.3     && < 1.1,
 
-    clash-prelude             == 1.10.2,
+    clash-prelude             == 1.10.3,
