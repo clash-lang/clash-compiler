@@ -1,23 +1,7 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE DeriveAnyClass #-}
-
-module Clash.Signal.Simulation.DataType where
-
 {-
+Module for comparing (binary) compatibility between different types.
 
-Module to handle data types in a dynamic way, where some coercions are possible
-
-Basic data type representation is:
-
-```
-data DataType = DT{type::String, subtypes::[DataType]}
-```
-
-and is derived from the TypeRep.
-
-Some examples of compatible types:
+Some examples:
 
 ```
 (a,(b,(c,d))) ~ (a,b,c,d)
@@ -42,42 +26,35 @@ Nil = ()
 This cannot be done through a coercible class, as the values exist in runtime only.
 
 -}
-import Data.Aeson
+
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+module Clash.Signal.Internal.Trace.CompatibleTypes (
+  module Clash.Signal.Internal.Trace.DataType,
+  compatible,
+  constructRecord, constructLabel
+) where
+
 import Data.List (stripPrefix)
-import Data.Typeable
-import GHC.Generics
-import Type.Reflection
-import Data.Char (isAlphaNum)
+import Language.Haskell.TH.Syntax
+import Language.Haskell.TH.Lib
 
-data DataType = DT String [DataType] deriving (Show,Generic,ToJSON,FromJSON)
+import Data.AnonRecords
+import Clash.Signal.Internal.Trace.DataType
 
--- | Get a @DataType@ representation of a type.
--- This amounts to the toplevel type, and a list of all its type arguments.
--- Note that this does not directly specify anything about the data type.
-simpleTypeRep :: forall a. Typeable a => DataType
-simpleTypeRep = pretty $ Data.Typeable.typeRep $ Proxy @a
- where
-  pretty :: SomeTypeRep -> DataType
-  pretty (SomeTypeRep tr) =
-    case splitApps tr of
-      (tc, args) ->
-        DT (name tc) (map pretty args)
-   where
-    name tc = tyConModule tc <> "." <>
-      (if isAlphaNum c || c `elem` "'\"" then tcn else "(" <> tcn <> ")")
-     where
-      tcn = tyConName tc
-      c = tcn !! 0
-
-simpleTyConName :: forall a. Typeable a -> String
-simpleTyConName = let DT n _ = simpleTypeRep @a in n
-
-pattern LABEL       = $(litE $ StringL $              simpleTyConName @(:=)   )
-pattern JOIN        = $(litE $ StringL $              simpleTyConName @(:&:)  )
-pattern UNIT        = $(litE $ StringL $              simpleTyConName @()     )
-pattern TUP2        = $(litE $ StringL $              simpleTyConName @((),()))
-pattern TUP_BASE    = $(litE $ StringL $ init       $ simpleTyConName @((),()))
-pattern SYMBOL_BASE = $(litE $ StringL $ init .init $ simpleTyConName @""     )
+pattern LABEL       :: String
+pattern LABEL       = $(litP $ StringL $              simpleTyConName @(:=)   )
+pattern JOIN        :: String
+pattern JOIN        = $(litP $ StringL $              simpleTyConName @(:&:)  )
+pattern UNIT        :: String
+pattern UNIT        = $(litP $ StringL $              simpleTyConName @()     )
+pattern TUP2        :: String
+pattern TUP2        = $(litP $ StringL $              simpleTyConName @((),()))
+pattern TUP_BASE    :: String
+pattern TUP_BASE    = $(litP $ StringL $ init       $ simpleTyConName @((),()))
+pattern SYMBOL_BASE :: String
+pattern SYMBOL_BASE = $(litP $ StringL $ init .init $ simpleTyConName @""     )
 
 -- | Check whether two data types are compatible.
 -- This occurs when both types are the same,

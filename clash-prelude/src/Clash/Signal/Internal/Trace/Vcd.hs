@@ -4,7 +4,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Clash.Signal.Simulation.Internal.Vcd (
+module Clash.Signal.Internal.Trace.Vcd (
   VcdFile(..),
   DeclarationCommand(..), SimulationCommand(..),
   Var(..),
@@ -16,6 +16,7 @@ module Clash.Signal.Simulation.Internal.Vcd (
   renderVcd, renderDecl, renderSim, renderChange,
   vcdCommand,
   iso8601Format,
+  printable,
 ) where
 
 import Control.Exception.Extra (errorIO)
@@ -35,7 +36,7 @@ import qualified Data.Version
 import GHC.Exts (groupWith)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
-import           Clash.Signal.Simulation
+import           Clash.Signal.Internal.Trace
 import           Clash.Time            (timeInFS, absTime)
 
 import qualified Paths_clash_prelude
