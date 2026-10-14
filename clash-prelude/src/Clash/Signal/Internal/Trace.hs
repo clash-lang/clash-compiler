@@ -8,11 +8,56 @@
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
-module Clash.Signal.Simulation where
+module Clash.Signal.Internal.Trace (
+  -- * Helper types
+  Period, Width, Value,
+  TraceMap,
+
+  -- * Traces
+  Trace,
+  toTrace,fromTrace,
+
+  -- * Tracing
+  trace,
+  traceVec,
+  traceReset,traceEnable,
+
+  -- * Simulation
+  Traceable,
+  Simulation(..),
+  Config(..),
+  simulate, simulateWith,
+  emptySim,
+
+  ClockWave,
+  clockWave,
+
+  setStartStop,setClockStart,
+  addTrace,
+  fetchTrace, fetch,
+
+  -- * Internal
+  GlobalData(..),
+  globalDataRef,
+
+  simulate0,
+  forceEvaluateSignal,
+
+  registerTrace,
+  registerFound,
+  registerMsg,
+
+  trace0,
+  traceVec0,
+
+  -- * Helpers
+  simulationTimeRangeToCycles,
+  clockTrace,clockTrace0,
+  domainName, replaceDollar,
+) where
 
 import Control.Exception (evaluate)
 import Control.Monad (foldM, when)
-import Data.Bifunctor (second)
 import Data.Default (Default(..))
 import Data.Either.Extra (maybeToEither)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
@@ -31,14 +76,16 @@ import Clash.Class.BitPack (BitPack(..), BitSize)
 import Clash.XException (NFDataX(rnfX), deepseqX)
 import Clash.Signal
   (KnownDomain, SDomainConfiguration(..), knownDomain,
+  ActiveEdge(..),
   Signal, sample, sampleN_lazy, fromList,
-  Clock, Reset, Enable, fromEnable, unsafeFromReset,
+  Reset, Enable, fromEnable, unsafeFromReset,
   unbundle)
-import Clash.Sized.Internal.BitVector (BitVector(BV))
+import Clash.Signal.Internal (VDomainConfiguration(..), vDomain)
+import Clash.Sized.Internal.BitVector (Bit, BitVector(BV))
 import Clash.Sized.Vector (Vec, toList)
 import Clash.Time (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
 
-import Clash.Signal.Simulation.DataType (DataType, compatible, simpleTypeRep)
+import Clash.Signal.Internal.Trace.CompatibleTypes (DataType, compatible, simpleTypeRep)
 
 type Period = Time
 type Width = Int
@@ -50,7 +97,7 @@ type Traceable a = (NFDataX a, BitPack a, Typeable a)
 
 -- | (/name/, /period/): Name of the clock wave in the VCD output, and period of
 -- the clock wave. The clock will have 50% duty cycle.
-type ClockWave = (String, Time)
+type ClockWave = (String, Time, ActiveEdge)
 
 -- | Object containing the simulation configuration
 -- and the traces captured during simulation.
@@ -179,7 +226,9 @@ simulate0 ref simConfig@Config{..} clockWaves signals sig = do
 
   -- create Simulation
   GlobalData{globTraces} <- readIORef ref
-  let simTraces = Map.union (Map.fromList $ L.map (second clockTrace) clockWaves) globTraces
+  let simTraces = Map.union
+        (Map.fromList $ L.map (\(n,p,a) -> (n,clockTrace0 p a)) clockWaves)
+        globTraces
   pure $ Simulation{simConfig, simTraces, simTimestamp} <$ evalResult
 
 simulationTimeRangeToCycles :: Config -> Time -> (Int,Int)
@@ -253,7 +302,7 @@ forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   -- For implementation simplicity, does not check for signals that appear after
   -- evalutating the last value.
   lookFor :: [a] -> [String] -> IO (Either String ())
-  lookFor xs0 ss0 = lookFor0 (xs0 <> [undefined]) ss0 [] True
+  lookFor xs1 ss0 = lookFor0 (xs1 <> [undefined]) ss0 [] True
    where
     lookFor0 :: [a] -> [String] -> [String] -> Bool -> IO (Either String ())
     lookFor0 _ [] _ _ = pure $ Right ()
@@ -295,8 +344,9 @@ clockWave ::
   KnownDomain dom =>
   String ->
   ClockWave
-clockWave name = (name, clockPeriodTime @dom)
-
+clockWave name = (name, clockPeriodTime @dom, vActiveEdge)
+ where
+  VDomainConfiguration{vActiveEdge} = vDomain (knownDomain @dom)
 
 ----------------------------------------------
 --                 TRACING                  --
@@ -381,8 +431,8 @@ traceVec0 name sig =
  where
   traces = toList $ toTrace <$> unbundle sig
   fullName = replaceDollar (domainName @dom) name
-  names = map (\i -> name <> '.' : show i) [0..length traces-1]
-  fullNames = map (\i -> fullName <> "." <> show i) [0..length traces-1]
+  names = map (\i -> name <> ('.' : show i)) [0..length traces-1]
+  fullNames = map (\i -> fullName <> ('.' : show i)) [0..length traces-1]
   found = if fullName == name then name:names else [name, fullName]<>names<>fullNames
   registerTraces g = right $ foldM (flip ($)) g $ zipWith registerTrace fullNames traces
 
@@ -413,29 +463,40 @@ traceEnable name en = trace name (fromEnable en) `seq` en
 {-# OPAQUE traceEnable #-}
 
 -- Like traceReset for enables
-traceClock ::
-  forall dom.
-  KnownDomain dom =>
-  String ->
-  Clock dom ->
-  Clock dom
-traceClock name clk =
-  unsafePerformIO (atomicModifyIORef' globalDataRef ((,clk) . trace0 @dom name trc))
- where
-  trc = clockTrace (clockPeriodTime @dom)
-{-# OPAQUE traceClock #-}
+-- traceClock ::
+--   forall dom.
+--   KnownDomain dom =>
+--   String ->
+--   Clock dom ->
+--   Clock dom
+-- traceClock name clk =
+--   unsafePerformIO (atomicModifyIORef' globalDataRef ((,clk) . trace0 @dom name trc))
+--  where
+--   trc = clockTrace (clockPeriodTime @dom) (activeEdge @dom)
+-- {-# OPAQUE traceClock #-}
 
--- Create a trace from a clock period. The period *must* be an even number of fs.
-clockTrace :: Time -> Trace
-clockTrace (TimeFS t)
+-- | Create a clock trace from a domain.
+clockTrace :: forall dom. KnownDomain dom => Trace
+clockTrace = clockTrace0 (clockPeriodTime @dom) vActiveEdge
+ where
+  VDomainConfiguration{vActiveEdge} = vDomain (knownDomain @dom)
+
+-- | Create a trace from a clock period and active edge. The period *must* be an even number of fs.
+clockTrace0 :: Time -> ActiveEdge -> Trace
+clockTrace0 (TimeFS t) edge
   | (halfPeriod,0) <- t `divMod` 2 =
     ( simpleTypeRep @Bit
     , TimeFS halfPeriod
     , 1
-    , L.cycle $ L.map (unsafeToTup . pack) [False,True] )
+    , L.cycle $ L.map (unsafeToTup . pack) bits )
   | otherwise = error "Cannot create clock trace for odd periods (in fs)"
  where
   unsafeToTup (BV mask value) = (mask, value)
+  bits = case edge of
+    Rising  -> [0,1]
+    Falling -> [1,0] :: [Bit]
+
+
 
 
 ----------------------------------------------
@@ -511,8 +572,7 @@ domainName =
   case knownDomain @dom of
     SDomainConfiguration{sName} -> symbolVal sName
 
--- TODO: fix this, probably introduces bugs when function names include $
--- | Internal: function removing $ from names
+-- | Internal: function to replace $ in signal names with the domain name
 replaceDollar :: String -> String -> String
 replaceDollar _ "" = ""
 replaceDollar n ('$':rest) = n <> replaceDollar n rest

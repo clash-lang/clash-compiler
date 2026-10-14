@@ -265,11 +265,12 @@ Library
                       Clash.Signal.Internal
                       Clash.Signal.Internal.Ambiguous
                       Clash.Signal.Trace
-                      Clash.Signal.Simulation
-                      Clash.Signal.Simulation.Vcd
-                      Clash.Signal.Simulation.Internal.Vcd
-                      Clash.Signal.Simulation.DataType
-                      Clash.Signal.Simulation.Store
+                      Clash.Signal.Internal.Trace
+                      Clash.Signal.Internal.Trace.DataType
+                      Clash.Signal.Internal.Trace.CompatibleTypes
+                      Clash.Signal.Internal.Trace.OldTrace
+                      Clash.Signal.Internal.Trace.Store
+                      Clash.Signal.Internal.Trace.Vcd
 
                       Clash.Sized.BitVector
                       Clash.Sized.Fixed

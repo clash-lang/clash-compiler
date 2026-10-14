@@ -1,3 +1,9 @@
+{-
+
+Module for storing traces in files.
+
+-}
+
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DuplicateRecordFields #-}
@@ -6,7 +12,29 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Clash.Signal.Simulation.Store where
+module Clash.Signal.Internal.Trace.Store (
+  FileHeader(..),
+  SignalDescr(..),
+
+  -- * Storing
+  storeTrace0,
+  storeTrace,
+  storeTraces,
+  store,
+  stores,
+  storeSignal,
+  storeSignals,
+
+  -- * Loading
+  loadHeader,
+  loadTrace0,
+  loadTrace,
+  loadTraces,
+  load,
+  loads,
+  loadSignal,
+  loadSignals,
+) where
 
 import Control.Monad (foldM, when)
 import Data.Aeson (encode,eitherDecode,ToJSON,FromJSON)
@@ -24,8 +52,8 @@ import Clash.Class.BitPack
 import Clash.Signal (KnownDomain, Signal, Bundle, Unbundled, bundle, unbundle)
 import Clash.Time (clockPeriodTime)
 
-import Clash.Signal.Simulation
-import Clash.Signal.Simulation.DataType
+import Clash.Signal.Internal.Trace
+import Clash.Signal.Internal.Trace.CompatibleTypes
 
 
 {-
@@ -212,7 +240,7 @@ instance (StoreSignals a, StoreSignals b) => StoreSignals (a :&: b) where
 loadHeader ::
   ByteString ->
   Either String FileHeader
-loadHeader = do
+loadHeader bs = do
   let (header0,_) = B.span (/=0) bs
   eitherDecode header0
 
