@@ -1,0 +1,332 @@
+{-|
+  Copyright   :  (C) 2026, QBayLogic B.V.
+  License     :  BSD2 (see the file LICENSE)
+  Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Tests for "Clash.Normalize.Transformations.Specialize"
+-}
+
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
+
+module Clash.Tests.Normalize.Transformations.Specialize (tests) where
+
+import qualified Control.Lens as Lens
+import Data.Default (def)
+import qualified Data.Map.Strict as Map
+
+import Test.Tasty
+import Test.Tasty.HUnit
+
+import Clash.Core.Name (NameSort (User), noSrcSpan)
+import Clash.Core.Term (Bind (..), Pat (..), Term (..), collectArgs, mkApps)
+import Clash.Core.Var (Id, Var (varUniq))
+import Clash.Core.VarEnv (lookupVarEnv)
+import Clash.Driver.Types (Binding (..))
+import Clash.Normalize.Transformations.Inline (bindConstantVar)
+import Clash.Normalize.Transformations.Specialize (appProp, specialize)
+import Clash.Normalize.Types (NormRewrite, NormalizeState, specialisationCache)
+import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
+import Clash.Rewrite.Types (RewriteState (..), extra)
+import Clash.Rewrite.Util (runRewrite)
+import Clash.Util.Supply (newSupply)
+
+import Test.Clash.Rewrite
+  ( argUniques, assertAlphaEq, assertNoFreeLocals, firstUniques, globalId, inScopeOf
+  , intFunTy, intId, intLit, intTy, localId, mkBindingMap, pairDataCon, pairTy
+  , parseToTerm, parseToTermQQ, runRewriteTest, runSingleTransformation
+  , showPprU )
+
+appPropR :: NormRewrite
+appPropR = $(asRewriteQ appProp)
+
+bindConstantVarR :: NormRewrite
+bindConstantVarR = $(asRewriteQ bindConstantVar)
+
+-- | Run 'appProp' on a term, with the given variables in scope
+runAppProp :: [Id] -> Term -> IO Term
+runAppProp inScope = runSingleTransformation def def (inScopeOf inScope) appPropR
+
+-- | Run 'bindConstantVar' on @let a = .. in \\x -> e@, and 'appProp' on the
+-- body of the resulting lambda
+bindConstantVarThenAppProp :: [Id] -> Term -> IO Term
+bindConstantVarThenAppProp inScope term = do
+  inlined <- runSingleTransformation def st (inScopeOf inScope) bindConstantVarR term
+  case inlined of
+    Lam x body -> runAppProp (x : inScope) body
+    _ -> assertFailure ("Unexpected result of bindConstantVar: " <> showPprU inlined)
+ where
+  -- 'bindConstantVar' looks at the function being normalized
+  st = def { _curFun = (globalId User "top" 200 intTy, noSrcSpan) }
+
+-- * appProp (#492, #1040, #1035, #3479)
+--
+-- Up to #1040, 'appProp' relied on its input being deshadowed. Several passes
+-- broke that invariant: the flattening stage (fixed in #492 by deshadowing
+-- there), and 'bindConstantVar' (#1035). #1040 made 'appProp' deshadow the
+-- function part of the application itself, see Note [AppProp no shadowing],
+-- and removed the deshadowing from the flattening stage and the inlining
+-- transformations again. The tests below run 'appProp' on terms in which a
+-- binder in the function part has the same unique as a free variable of an
+-- argument.
+
+-- | Case 3 of Note [AppProp no shadowing]:
+--
+-- > (let x = w in \y -> y) x  ==>  let x' = w in x
+--
+-- Without deshadowing, the let-binding captures the argument: @let x = w in x@.
+-- https://github.com/clash-lang/clash-compiler/pull/492
+-- https://github.com/clash-lang/clash-compiler/pull/1040
+appPropLetCapture :: IO Term
+appPropLetCapture = runAppProp [intId User "x" 1, intId User "w" 3] [parseToTermQQ|
+  (let { (x_1 :: Int) = (w_3 :: Int) } in \(y_4 :: Int) -> y_4) (x_1 :: Int)
+|]
+
+-- | Case 2 of Note [AppProp no shadowing]: a lambda applied to an argument that
+-- performs work becomes a let-binding, so its binder must not capture the free
+-- variables of the remaining arguments:
+--
+-- > (\x -> \y -> y) (f x) (f x)  ==>  let x' = f x in let y = f x in y
+--
+-- https://github.com/clash-lang/clash-compiler/pull/1040
+appPropLamCapture :: IO Term
+appPropLamCapture = runAppProp [x, f] (mkApps fun [Left fx, Left fx])
+ where
+  x = intId User "x" 1
+  y = intId User "y" 2
+  f = localId User "f" 3 (intFunTy 1)
+  fx = App (Var f) (Var x)
+  fun = Lam x (Lam y (Var y))
+
+-- | The expected result of 'appPropLamCapture'
+appPropLamCaptureExpected :: Term
+appPropLamCaptureExpected = Let (NonRec x9 fx) (Let (NonRec y fx) (Var y))
+ where
+  x9 = intId User "x" 9
+  y = intId User "y" 2
+  f = localId User "f" 3 (intFunTy 1)
+  fx = App (Var f) (Var (intId User "x" 1))
+
+-- | Case 1 of Note [AppProp no shadowing]: arguments are pushed into case
+-- alternatives, so pattern binders must not capture their free variables:
+--
+-- > (case s of MkPair a b -> \k -> k) b  ==>  case s of MkPair a b' -> b
+--
+-- https://github.com/clash-lang/clash-compiler/pull/1040
+appPropCaseCapture :: IO Term
+appPropCaseCapture = runAppProp [s, b] (App fun (Var b))
+ where
+  s = localId User "s" 5 pairTy
+  a = intId User "a" 1
+  b = intId User "b" 2
+  k = intId User "k" 6
+  fun = Case (Var s) (intFunTy 1) [(DataPat pairDataCon [] [a, b], Lam k (Var k))]
+
+-- | The expected result of 'appPropCaseCapture'
+appPropCaseCaptureExpected :: Term
+appPropCaseCaptureExpected =
+  Case (Var s) intTy
+    [(DataPat pairDataCon [] [intId User "a" 1, intId User "b" 9], Var b)]
+ where
+  s = localId User "s" 5 pairTy
+  b = intId User "b" 2
+
+-- | Issue #1035: 'bindConstantVar' inlines a let-bound lambda without
+-- deshadowing it, so the result shadows:
+--
+-- > let a = \k x -> k in \x -> a x p  ==>  \x -> (\k x -> k) x p
+--
+-- This broke the no-shadowing invariant 'appProp' relied on. #1036 (and #1037,
+-- which absorbed it) made substitution deshadow, but were closed in favour of
+-- #1040, which made 'appProp' deshadow instead. 'appProp' should reduce the
+-- body of the resulting lambda to the outer @x@, not to @p@.
+--
+-- https://github.com/clash-lang/clash-compiler/issues/1035
+bindConstantVarAppProp :: IO Term
+bindConstantVarAppProp = bindConstantVarThenAppProp [p] term
+ where
+  k = intId User "k" 6
+  x = intId User "x" 1
+  p = intId User "p" 5
+  a = localId User "a" 3 (intFunTy 2)
+  term =
+    Let (NonRec a (Lam k (Lam x (Var k))))
+      (Lam x (mkApps (Var a) [Left (Var x), Left (Var p)]))
+
+-- | Issue #990: inlining let-bindings ('inlineBinders', used by
+-- 'bindConstantVar') introduced shadowing, after which 'appProp' let-bound an
+-- argument with a binder that captured the free variables of the other
+-- arguments. The resulting HDL contained a signal assigned to itself. #991
+-- deshadowed after inlining let-bindings; #1040 replaced that by deshadowing
+-- in 'appProp'.
+--
+-- > let a = \x y -> y in \x -> a (f x) (f x)
+-- >   ==> (bindConstantVar)  \x -> (\x y -> y) (f x) (f x)
+-- >   ==> (appProp)          \x -> let x' = f x in let y = f x in y
+--
+-- https://github.com/clash-lang/clash-compiler/issues/990
+-- https://github.com/clash-lang/clash-compiler/pull/991
+bindConstantVarAppPropLet :: IO Term
+bindConstantVarAppPropLet = bindConstantVarThenAppProp [f] term
+ where
+  x = intId User "x" 1
+  y = intId User "y" 2
+  f = localId User "f" 3 (intFunTy 1)
+  a = localId User "a" 4 (intFunTy 2)
+  fx = App (Var f) (Var x)
+  term =
+    Let (NonRec a (Lam x (Lam y (Var y))))
+      (Lam x (mkApps (Var a) [Left fx, Left fx]))
+
+-- | @(\\f -> f) (\\k x -> k) x y@ reduces to the free variable @x@. The first
+-- argument binds @x_2@, which is also free in the second argument. 'appProp'
+-- substitutes work-free arguments using 'unsafeSubstTm', which does not avoid
+-- capture: after substituting the first argument for @f_1@, that argument is
+-- the head of the application, and substituting @x_2@ for @k_4@ puts it under
+-- the binder @x_2@.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/3479
+appPropCapture :: IO Term
+appPropCapture = runAppProp [intId User "x" 2, intId User "y" 5] [parseToTermQQ|
+  (\(f_1 :: Int) -> f_1) (\(k_4 :: Int) (x_2 :: Int) -> k_4) (x_2 :: Int) (y_5 :: Int)
+|]
+
+-- * specialize
+
+-- | Global function @f :: Int -> Int@ with body @\\a -> a@
+fId :: Id
+fId = globalId User "f" 10 (intFunTy 1)
+
+fBinding :: (Id, Term)
+fBinding = (fId, Lam a (Var a))
+ where
+  a = intId User "a" 20
+
+-- | Global function @g :: Int -> Int -> Int@. It has no binding: we only
+-- specialize on applications of it.
+gId :: Id
+gId = globalId User "g" 11 (intFunTy 2)
+
+-- | Specialize @f@ on @g x y@. Returns the result, the body of the specialized
+-- function, and the final state.
+specializeF
+  :: RewriteState NormalizeState
+  -> Id
+  -> Id
+  -> IO (Term, Maybe Term, RewriteState NormalizeState)
+specializeF st x y = do
+  let tm = App (Var fId) (mkApps (Var gId) [Left (Var x), Left (Var y)])
+  (res, st1, _) <-
+    runRewriteTest def st (runRewrite "specialize" (inScopeOf [x, y]) specialize tm)
+  let newBody = case collectArgs res of
+        (Var fSpec, _) -> bindingTerm <$> lookupVarEnv fSpec (_bindings st1)
+        _ -> Nothing
+  pure (res, newBody, st1)
+
+-- | 'specArgBndrsAndVars' used to determine whether a free variable of the
+-- argument specialized on is global by looking up its unique in the global
+-- bindings. A local variable with the same unique as a global binder was
+-- therefore not abstracted over, and ended up free in the specialized function.
+-- Clash creates such variables when it turns a group of mutually recursive
+-- global binders into a let-expression.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/712
+specializeLocalShadowingGlobal :: Assertion
+specializeLocalShadowingGlobal = do
+  supply <- newSupply
+  let xGlobal = globalId User "x" 12 intTy
+      xLocal = intId User "x" 12
+      yLocal = intId User "y" 13
+      bs = mkBindingMap [fBinding, (xGlobal, intLit 1)]
+  (res, newBody, _) <- specializeF def{_bindings = bs, _uniqSupply = supply} xLocal yLocal
+  case (collectArgs res, newBody) of
+    ((Var fSpec, args), Just body) -> do
+      assertBool ("Expected a new specialized function, but got:\n" <> showPprU res)
+        (varUniq fSpec `notElem` [varUniq fId, varUniq xGlobal])
+      assertEqual ("Arguments of the specialized function in:\n" <> showPprU res)
+        (map (Just . varUniq) [xLocal, yLocal])
+        (argUniques args)
+      assertNoFreeLocals body
+    _ -> assertFailure ("Expected an application of a new global, but got:\n" <> showPprU res)
+
+-- | 'specArgBndrsAndVars' used to collect the free variables of the argument
+-- specialized on in a set ordered by unique. Specializing @f (g x_123 y_456)@
+-- and @f (g x_456 y_123)@ then yielded the binders @[x, y]@ and @[y, x]@, so the
+-- second specialization missed the specialization cache.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/1087
+specializeCacheFreeVarOrder :: Assertion
+specializeCacheFreeVarOrder = do
+  supply <- newSupply
+  let st0 = def{_bindings = mkBindingMap [fBinding], _uniqSupply = supply}
+      x123 = intId User "x" 123
+      y456 = intId User "y" 456
+      x456 = intId User "x" 456
+      y123 = intId User "y" 123
+  (res1, _, st1) <- specializeF st0 x123 y456
+  (res2, _, st2) <- specializeF st1 x456 y123
+  let cacheSize = Map.size (Lens.view (extra . specialisationCache) st2)
+  assertEqual "Number of specializations" 1 cacheSize
+  case (collectArgs res1, collectArgs res2) of
+    ((Var f1, _), (Var f2, args2)) -> do
+      assertEqual "Specialized functions" (showPprU f1) (showPprU f2)
+      assertEqual "Arguments of the second specialization"
+        (map (Just . varUniq) [x456, y123])
+        (argUniques args2)
+    _ -> assertFailure
+      ("Expected applications of globals, but got:\n" <> showPprU res1
+        <> "\nand:\n" <> showPprU res2)
+
+-- | 'mkFunction', used by 'specialize' to create the specialized function, used
+-- to give the new function a fresh unique without checking whether a global
+-- binder with that unique already exists, overwriting it.
+--
+-- https://github.com/clash-lang/clash-compiler/pull/790
+specializeDoesNotOverwriteBinders :: Assertion
+specializeDoesNotOverwriteBinders = do
+  supply <- newSupply
+  let -- Global binders occupying the uniques the supply hands out first
+      victims =
+        [ (globalId User "victim" u intTy, intLit (toInteger n))
+        | (n, u) <- zip [0 :: Int ..] (firstUniques 8 supply) ]
+      x = intId User "x" 12
+      y = intId User "y" 13
+      bs = mkBindingMap (fBinding : victims)
+  (res, _, st1) <- specializeF def{_bindings = bs, _uniqSupply = supply} x y
+  case collectArgs res of
+    (Var fSpec, _) ->
+      assertBool ("Specialized function reuses a unique of an existing binder:\n" <> showPprU res)
+        (varUniq fSpec `notElem` map (varUniq . fst) (fBinding : victims))
+    _ -> assertFailure ("Expected an application of a global, but got:\n" <> showPprU res)
+  mapM_
+    (\(v, t) -> case lookupVarEnv v (_bindings st1) of
+        Just b | showPprU (bindingId b) == showPprU v, bindingTerm b == t -> pure ()
+        b -> assertFailure
+          ("Binder " <> showPprU v <> " was overwritten by: " <> maybe "nothing" (showPprU . bindingId) b))
+    victims
+
+tests :: TestTree
+tests =
+  testGroup
+    "Clash.Tests.Normalize.Transformations.Specialize"
+    [ testCase "appProp deshadows let-bindings in the function part (#492, #1040)" $
+        appPropLetCapture >>= assertAlphaEq [parseToTermQQ|
+          let { (z_9 :: Int) = (w_3 :: Int) } in (x_1 :: Int)
+        |]
+    , testCase "appProp let-binds lambda arguments without capture (#1040)" $
+        appPropLamCapture >>= assertAlphaEq appPropLamCaptureExpected
+    , testCase "appProp pushes arguments into alternatives without capture (#1040)" $
+        appPropCaseCapture >>= assertAlphaEq appPropCaseCaptureExpected
+    , testCase "appProp handles shadowing introduced by bindConstantVar (#1035)" $
+        bindConstantVarAppProp >>= assertAlphaEq (parseToTerm "x_1 :: Int")
+    , testCase "appProp does not let-bind a captured argument after inlining (#991)" $
+        bindConstantVarAppPropLet >>= assertAlphaEq appPropLamCaptureExpected
+    , testCase "appProp does not capture free variables (#3479)" $
+        appPropCapture >>= assertAlphaEq (parseToTerm "x_2 :: Int")
+    , testCase "specialize abstracts over locals that shadow a global (#712)"
+        specializeLocalShadowingGlobal
+    , testCase "specialize orders free variables by occurrence (#1087)"
+        specializeCacheFreeVarOrder
+    , testCase "specialize does not overwrite existing binders (#790)"
+        specializeDoesNotOverwriteBinders
+    ]

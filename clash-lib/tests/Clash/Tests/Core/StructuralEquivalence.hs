@@ -12,38 +12,30 @@
 
 module Clash.Tests.Core.StructuralEquivalence (tests) where
 
-import Data.Text (Text)
-
 import Test.Tasty
 import Test.Tasty.HUnit
 import Test.Tasty.TH (testGroupGenerator)
 
-import Clash.Core.Name (NameSort (..), mkUnsafeName)
+import Clash.Core.Name (NameSort (..))
 import Clash.Core.Subst (eqType, eqVar, ordType)
-import Clash.Core.Type (Kind, LitTy (..), Type (..))
+import Clash.Core.Type (LitTy (..), Type (..))
 import Clash.Core.TysPrim (liftedTypeKind)
-import Clash.Core.Var (TyVar, Var (..))
-import Clash.Unique (Unique)
+import Clash.Core.Var (TyVar)
 
-import Test.Clash.Rewrite (intTy, parseTyConTy)
-
--- | A 'TyVar' with the given human readable name, unique and kind. Unlike
--- 'Test.Clash.Rewrite.tyVar', whose kind is always 'liftedTypeKind'.
-kindedTyVar :: Text -> Unique -> Kind -> TyVar
-kindedTyVar nm uniq kind = TyVar (mkUnsafeName User nm uniq) uniq kind
+import Test.Clash.Rewrite (intTy, kindedTyVar, parseTyConTy)
 
 -- | The kind variable @(~)@ and @Coercible@ bind, i.e. @mkAlphaTyVarUnique 0@
 kindVarK :: TyVar
-kindVarK = kindedTyVar "k" 0 liftedTypeKind
+kindVarK = kindedTyVar User "k" 0 liftedTypeKind
 
 -- | @(,)@'s second type variable, @b :: Type@
 bLifted :: TyVar
-bLifted = kindedTyVar "b" 2 liftedTypeKind
+bLifted = kindedTyVar User "b" 2 liftedTypeKind
 
 -- | @(~)@'s second type variable, @b :: k@. GHC gives it the same unique as
 -- 'bLifted': both are @mkAlphaTyVarUnique 2@.
 bKinded :: TyVar
-bKinded = kindedTyVar "b" 2 (VarTy kindVarK)
+bKinded = kindedTyVar User "b" 2 (VarTy kindVarK)
 
 boolTy :: Type
 boolTy = parseTyConTy "Bool"
@@ -94,7 +86,7 @@ case_nestedTyVarKindSignificant =
 -- | Type variables agreeing on unique /and/ kind are structurally equal.
 case_tyVarSameKindEqual :: Assertion
 case_tyVarSameKindEqual =
-  assertEqualTy (VarTy bLifted) (VarTy (kindedTyVar "b" 2 liftedTypeKind))
+  assertEqualTy (VarTy bLifted) (VarTy (kindedTyVar User "b" 2 liftedTypeKind))
 
 -- | Type variables that differ only in their human readable name are not
 -- structurally equal either.
@@ -105,7 +97,7 @@ case_tyVarSameKindEqual =
 -- and differ in nothing but their name.
 case_tyVarNameSignificant :: Assertion
 case_tyVarNameSignificant =
-  assertNotEqualTy (VarTy kindVarK) (VarTy (kindedTyVar "k0" 0 liftedTypeKind))
+  assertNotEqualTy (VarTy kindVarK) (VarTy (kindedTyVar User "k0" 0 liftedTypeKind))
 
 -- | Structural equality is finer than alpha equivalence: alpha-equivalent
 -- types whose binders have different uniques are not structurally equal.
@@ -117,8 +109,8 @@ case_structuralIsFinerThanAlpha = do
  where
   t1 = ForAllTy a (VarTy a)
   t2 = ForAllTy b (VarTy b)
-  a = kindedTyVar "a" 1 liftedTypeKind
-  b = kindedTyVar "b" 2 liftedTypeKind
+  a = kindedTyVar User "a" 1 liftedTypeKind
+  b = kindedTyVar User "b" 2 liftedTypeKind
 
 -- | At least one type per 'Type' constructor, plus the pairs that only differ
 -- in a nested detail, so that the 'ordType' laws below are exercised on
@@ -127,8 +119,8 @@ representativeTypes :: [Type]
 representativeTypes =
   [ VarTy bLifted
   , VarTy bKinded
-  , VarTy (kindedTyVar "b'" 2 liftedTypeKind)
-  , VarTy (kindedTyVar "c" 3 liftedTypeKind)
+  , VarTy (kindedTyVar User "b'" 2 liftedTypeKind)
+  , VarTy (kindedTyVar User "c" 3 liftedTypeKind)
   , intTy
   , boolTy
   , LitTy (NumTy 5)
