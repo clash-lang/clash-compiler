@@ -5,6 +5,8 @@ include:
 
 workflow:
   rules:
+    # Temporary exception for manually completing the v1.10.3 release.
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "rowan/v1.10.3-fix-failed-hackage-upload"'
     - if: $CI_PIPELINE_SOURCE == "schedule"
     - if: $CI_COMMIT_BRANCH                  # Pushes
       when: never
@@ -117,7 +119,18 @@ hackage-release:
   variables:
     HACKAGE_RELEASE: "yes"
 
+  # Temporary v1.10.3 recovery: remove this override after completing the release.
+  script:
+    # These source packages and the first three documentation archives are uploaded.
+    # - .ci/publish_sdist.sh clash-prelude || exit $?
+    # - .ci/publish_sdist.sh clash-prelude-hedgehog || exit $?
+    # - .ci/publish_sdist.sh clash-lib || exit $?
+    # - .ci/publish_sdist.sh clash-lib-hedgehog || exit $?
+    - cabal upload --publish --documentation --token="${HACKAGE_TOKEN}" ./clash-lib-hedgehog-1.10.3-docs.tar.gz || exit $?
+    - .ci/publish_sdist.sh clash-ghc || exit $?
+
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "rowan/v1.10.3-fix-failed-hackage-upload"'
     - if: '$CI_COMMIT_TAG != null' # tags
 
 # We manually report status to GitHub to work around
