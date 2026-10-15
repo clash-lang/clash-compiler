@@ -964,7 +964,7 @@ tests = testGroup "Test.Clash.Rewrite"
                 C.AppTy
                   (C.ConstTy
                     (C.TyCon
-                      (C.Name C.User (Text.pack "Maybe") 9 C.noSrcSpan (Text.pack "Maybe"))))
+                      (C.mkUnsafeName C.User (Text.pack "Maybe") 9)))
                   intTy
           in assertStructurallyEqual
                (C.Lam
