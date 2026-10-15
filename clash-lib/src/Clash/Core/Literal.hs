@@ -1,3 +1,8 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
@@ -8,23 +13,18 @@
 
   Term Literal
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 module Clash.Core.Literal
-  ( Literal (..)
-  ) where
+  ( Literal (..),
+  )
+where
 
-import Control.DeepSeq                        (NFData (..))
-import Data.Binary                            (Binary)
-import Data.Hashable                          (Hashable)
-import Data.Primitive.ByteArray               (ByteArray)
-import Data.Primitive.ByteArray.Extra         ()
-import Data.Word                              (Word32, Word64)
-import GHC.Generics                           (Generic)
+import Control.DeepSeq (NFData (..))
+import Data.Binary (Binary)
+import Data.Hashable (Hashable)
+import Data.Primitive.ByteArray (ByteArray)
+import Data.Primitive.ByteArray.Extra ()
+import Data.Word (Word32, Word64)
+import GHC.Generics (Generic)
 
 {-
 Note [Storage of floating point in Literal]
@@ -46,21 +46,21 @@ and 'Word64' and get the 'Eq' and hashing properties we require.
 
 -- | Term Literal
 data Literal
-  = IntegerLiteral  !Integer
-  | IntLiteral      !Integer
-  | WordLiteral     !Integer
-  | Int64Literal    !Integer
-  | Word64Literal   !Integer
-  | Int8Literal     !Integer
-  | Int16Literal    !Integer
-  | Int32Literal    !Integer
-  | Word8Literal    !Integer
-  | Word16Literal   !Integer
-  | Word32Literal   !Integer
-  | StringLiteral   !String
-  | FloatLiteral    !Word32  -- See Note [Storage of floating point in Literal]
-  | DoubleLiteral   !Word64  -- See Note [Storage of floating point in Literal]
-  | CharLiteral     !Char
-  | NaturalLiteral  !Integer
+  = IntegerLiteral !Integer
+  | IntLiteral !Integer
+  | WordLiteral !Integer
+  | Int64Literal !Integer
+  | Word64Literal !Integer
+  | Int8Literal !Integer
+  | Int16Literal !Integer
+  | Int32Literal !Integer
+  | Word8Literal !Integer
+  | Word16Literal !Integer
+  | Word32Literal !Integer
+  | StringLiteral !String
+  | FloatLiteral !Word32 -- See Note [Storage of floating point in Literal]
+  | DoubleLiteral !Word64 -- See Note [Storage of floating point in Literal]
+  | CharLiteral !Char
+  | NaturalLiteral !Integer
   | ByteArrayLiteral !ByteArray
-  deriving (Eq,Ord,Show,Generic,NFData,Hashable,Binary)
+  deriving (Eq, Ord, Show, Generic, NFData, Hashable, Binary)

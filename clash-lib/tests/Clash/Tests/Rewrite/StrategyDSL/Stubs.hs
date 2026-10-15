@@ -1,3 +1,11 @@
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE NoFieldSelectors #-}
+
 {-|
   Copyright  :  (C) 2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
@@ -9,24 +17,20 @@
   splices 'Clash.Rewrite.StrategyDSL.TH.compileStrategy' over the 'Step's and
   helpers defined here.
 -}
-
-{-# LANGUAGE DisambiguateRecordFields #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE NoFieldSelectors #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
 module Clash.Tests.Rewrite.StrategyDSL.Stubs where
-
-import Language.Haskell.TH (Exp, Name, Q, listE, stringE)
 
 import Clash.Core.Literal (Literal (..))
 import Clash.Core.Name (mkUnsafeSystemName)
 import Clash.Core.Term
-  (Bind (..), IsMultiPrim (..), Pat (..), PrimInfo (..), PrimUnfolding (..),
-   Term (..), TickInfo (..), WorkInfo (..))
+  ( Bind (..),
+    IsMultiPrim (..),
+    Pat (..),
+    PrimInfo (..),
+    PrimUnfolding (..),
+    Term (..),
+    TickInfo (..),
+    WorkInfo (..),
+  )
 import Clash.Core.Type (ConstTy (..), Type (..))
 import Clash.Core.Var (Id, mkLocalId, mkTyVar)
 import Clash.Rewrite.StrategyDSL
@@ -34,6 +38,7 @@ import Clash.Rewrite.StrategyDSL.TH (compileStrategy, compileStrategyReference)
 import Clash.Rewrite.Types (Rewrite, RewriteMonad, TransformContext (..))
 import Clash.Rewrite.Util (changed)
 import Clash.Unique (Unique)
+import Language.Haskell.TH (Exp, Name, Q, listE, stringE)
 
 -- * Term construction helpers
 
@@ -44,13 +49,14 @@ someId :: Unique -> Id
 someId unique = mkLocalId someType (mkUnsafeSystemName "x" unique)
 
 somePrim :: PrimInfo
-somePrim = PrimInfo
-  { primName = "somePrim"
-  , primType = someType
-  , primWorkInfo = WorkConstant
-  , primMultiResult = SingleResult
-  , primUnfolding = NoUnfolding
-  }
+somePrim =
+  PrimInfo
+    { primName = "somePrim",
+      primType = someType,
+      primWorkInfo = WorkConstant,
+      primMultiResult = SingleResult,
+      primUnfolding = NoUnfolding
+    }
 
 integer :: Integer -> Term
 integer = Literal . IntLiteral
@@ -63,8 +69,8 @@ integer = Literal . IntLiteral
 
 -- | @f 3@ becomes @3@: fires on an application whose argument is an integer
 -- literal, changing the node's constructor.
-collapseApplicationWorker
-  :: TransformContext -> Term -> Term -> Term -> RewriteMonad () Term
+collapseApplicationWorker ::
+  TransformContext -> Term -> Term -> Term -> RewriteMonad () Term
 collapseApplicationWorker _ctx _node _function argument@(Literal IntLiteral{}) =
   changed argument
 collapseApplicationWorker _ctx node _function _argument = pure node
@@ -91,8 +97,8 @@ collapseSpine =
 
 -- | Increments odd integer literals (even results keep repeated traversals
 -- terminating).
-incrementOddWorker
-  :: TransformContext -> Term -> Literal -> RewriteMonad () Term
+incrementOddWorker ::
+  TransformContext -> Term -> Literal -> RewriteMonad () Term
 incrementOddWorker _ctx _node (IntLiteral i) | odd i = changed (integer (i + 1))
 incrementOddWorker _ctx node _literal = pure node
 
@@ -112,21 +118,23 @@ incrementOddAny = anyConstructor "incrementOddAny" 'incrementOddAnyWorker
 -- | Multi-constructor: increments an odd integer literal, either as the
 -- argument of an application or bare. Registered for App and Literal, to
 -- observe the guarded suffix.
-incrementBothAppWorker
-  :: TransformContext -> Term -> Term -> Term -> RewriteMonad () Term
+incrementBothAppWorker ::
+  TransformContext -> Term -> Term -> Term -> RewriteMonad () Term
 incrementBothAppWorker _ctx _node function (Literal (IntLiteral i))
   | odd i = changed (App function (integer (i + 1)))
 incrementBothAppWorker _ctx node _function _argument = pure node
 
-incrementBothLiteralWorker
-  :: TransformContext -> Term -> Literal -> RewriteMonad () Term
+incrementBothLiteralWorker ::
+  TransformContext -> Term -> Literal -> RewriteMonad () Term
 incrementBothLiteralWorker _ctx _node (IntLiteral i)
   | odd i = changed (integer (i + 1))
 incrementBothLiteralWorker _ctx node _literal = pure node
 
 incrementBoth :: Transformation
-incrementBoth = toTransformation "incrementBoth"
-  (onApp 'incrementBothAppWorker <> onLiteral 'incrementBothLiteralWorker)
+incrementBoth =
+  toTransformation
+    "incrementBoth"
+    (onApp 'incrementBothAppWorker <> onLiteral 'incrementBothLiteralWorker)
 
 incrementBothRewrite :: Rewrite ()
 incrementBothRewrite _ctx (App function (Literal (IntLiteral i)))
@@ -137,8 +145,8 @@ incrementBothRewrite _ctx term = pure term
 
 -- | Inlines a let binder into its body when the body is exactly that
 -- variable: @let x = e in x@ becomes @e@. Fires on 'Let'.
-inlineTrivialLetWorker
-  :: TransformContext -> Term -> Bind Term -> Term -> RewriteMonad () Term
+inlineTrivialLetWorker ::
+  TransformContext -> Term -> Bind Term -> Term -> RewriteMonad () Term
 inlineTrivialLetWorker _ctx node bind body = case (bind, body) of
   (NonRec i boundTerm, Var v) | v == i -> changed boundTerm
   (Rec [(i, boundTerm)], Var v) | v == i -> changed boundTerm
@@ -158,8 +166,8 @@ inlineTrivialLetRewrite _ctx term = pure term
 -- | Replaces variable references with a string literal spelling out the full
 -- 'Clash.Core.Term.CoreContext' path, exposing every context push of the
 -- descent arms to the equivalence tests.
-reifyContextWorker
-  :: TransformContext -> Term -> Id -> RewriteMonad () Term
+reifyContextWorker ::
+  TransformContext -> Term -> Id -> RewriteMonad () Term
 reifyContextWorker ctx _node _i =
   changed (Literal (StringLiteral (show (tfContext ctx))))
 
@@ -169,8 +177,8 @@ reifyContext = toTransformation "reifyContext" (onVar 'reifyContextWorker)
 -- | Rewrites references to one specific variable to a primitive, so the
 -- 'Clash.Core.Term.AppArg' context a sibling argument sees is computed from
 -- an already rewritten function.
-functionToPrimWorker
-  :: TransformContext -> Term -> Id -> RewriteMonad () Term
+functionToPrimWorker ::
+  TransformContext -> Term -> Id -> RewriteMonad () Term
 functionToPrimWorker _ctx node i
   | i == someId 2 = changed (Prim somePrim)
   | otherwise = pure node
@@ -187,28 +195,34 @@ nestedTerm =
   App
     (Let (NonRec x (App (Var f) (integer 3))) (Var x))
     (Let (Rec [(y, integer 5)]) (Var y))
- where
-  x = someId 0
-  y = someId 1
-  f = someId 2
+  where
+    x = someId 0
+    y = someId 1
+    f = someId 2
 
 -- | A term covering every recursive constructor: Lam, TyLam, App, TyApp,
 -- Let, Case (subject and alternatives), Cast, and Tick.
 allConstructorsTerm :: Term
 allConstructorsTerm =
-  Lam lamBinder
-    (TyLam tyVariable
-      (Tick DeDup
-        (Case
-          (Cast (App (Var lamBinder) subject) someType someType)
-          someType
-          [ (DefaultPat, integer 3)
-          , (LitPat (IntLiteral 0), TyApp (Var lamBinder) someType)
-          ])))
- where
-  lamBinder = someId 3
-  tyVariable = mkTyVar someType (mkUnsafeSystemName "a" 100)
-  subject = Let (NonRec (someId 5) (integer 7)) (Var (someId 5))
+  Lam
+    lamBinder
+    ( TyLam
+        tyVariable
+        ( Tick
+            DeDup
+            ( Case
+                (Cast (App (Var lamBinder) subject) someType someType)
+                someType
+                [ (DefaultPat, integer 3),
+                  (LitPat (IntLiteral 0), TyApp (Var lamBinder) someType)
+                ]
+            )
+        )
+    )
+  where
+    lamBinder = someId 3
+    tyVariable = mkTyVar someType (mkUnsafeSystemName "a" 100)
+    subject = Let (NonRec (someId 5) (integer 7)) (Var (someId 5))
 
 simpleApplication :: Term
 simpleApplication = App (Var (someId 6)) (integer 3)
@@ -253,7 +267,7 @@ conditionalStep =
 nestedTraversalStep :: Step
 nestedTraversalStep =
   (one collapseApplication !-> nested (bottomup incrementOdd))
-  >-! one incrementBoth
+    >-! one incrementBoth
 
 -- | A strategy calling another compiled strategy, parameterized over the
 -- callee so the test module can point it at either compilation of it.
@@ -263,13 +277,14 @@ callStrategyStrat callee = callStrategy callee >-> topdown collapseApplication
 -- | Every fused traversal of a 'Step' next to its unfused reference:
 -- @[(name, fast, reference)]@. Spliced by the test module.
 allTraversals :: Step -> Q Exp
-allTraversals step = listE
-  [ [| ($(stringE name), $(compileStrategy strat), $(compileStrategyReference strat)) |]
-  | (name, strat) <-
-      [ ("topdown", topdown step)
-      , ("bottomup", bottomup step)
-      , ("topdownFix", topdownFix step)
-      , ("topdownSuc", topdownSuc step)
-      , ("innerMost", innerMost step)
-      ]
-  ]
+allTraversals step =
+  listE
+    [ [|($(stringE name), $(compileStrategy strat), $(compileStrategyReference strat))|]
+    | (name, strat) <-
+        [ ("topdown", topdown step),
+          ("bottomup", bottomup step),
+          ("topdownFix", topdownFix step),
+          ("topdownSuc", topdownSuc step),
+          ("innerMost", innerMost step)
+        ]
+    ]

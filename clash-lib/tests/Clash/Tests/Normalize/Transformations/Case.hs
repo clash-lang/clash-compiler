@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -5,15 +7,7 @@
 
   Tests for "Clash.Normalize.Transformations.Case"
 -}
-
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Tests.Normalize.Transformations.Case (tests) where
-
-import Data.Default (def)
-
-import Test.Tasty
-import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Name (NameSort (User))
@@ -23,10 +17,22 @@ import Clash.Core.Var (Id)
 import Clash.Normalize.Transformations.Case (caseCase, caseCon, caseLet)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
-
+import Data.Default (def)
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertStructurallyEqual, inScopeOf, intFunTy, intId, intTy
-  , localId, mkDataCon, pairDataCon, parseTyConTy, runSingleTransformation )
+  ( assertAlphaEq,
+    assertStructurallyEqual,
+    inScopeOf,
+    intFunTy,
+    intId,
+    intTy,
+    localId,
+    mkDataCon,
+    pairDataCon,
+    parseTyConTy,
+    runSingleTransformation,
+  )
+import Test.Tasty
+import Test.Tasty.HUnit
 
 caseCaseR, caseConR, caseLetR :: NormRewrite
 caseCaseR = $(asRewriteQ caseCase)
@@ -57,13 +63,15 @@ mkT = mkDataCon "MkT" 1000 [] [] [intTy] tTy
 caseConShadowedFreeVar :: IO Term
 caseConShadowedFreeVar =
   runSingleTransformation def def (inScopeOf [c, aOuter]) caseConR term
- where
-  c = intId User "c" 3
-  b = intId User "b" 2
-  aPat = intId User "pat" 1
-  term =
-    Case (mkApps (Data pairDataCon) [Left (Var c), Left (Var aOuter)]) intTy
-      [(DataPat pairDataCon [] [aPat, b], Var b)]
+  where
+    c = intId User "c" 3
+    b = intId User "b" 2
+    aPat = intId User "pat" 1
+    term =
+      Case
+        (mkApps (Data pairDataCon) [Left (Var c), Left (Var aOuter)])
+        intTy
+        [(DataPat pairDataCon [] [aPat, b], Var b)]
 
 -- | See 'caseConShadowedFreeVar'
 aOuter :: Id
@@ -79,21 +87,23 @@ caseCaseCapture =
       (Case (Var a) (intFunTy 1) [(DataPat mkT [] [x], Var f)])
       intTy
       [(DefaultPat, Var x)]
- where
-  a = localId User "a" 1 tTy
-  f = localId User "f" 2 (intFunTy 1)
-  x = intId User "x" 3
+  where
+    a = localId User "a" 1 tTy
+    f = localId User "f" 2 (intFunTy 1)
+    x = intId User "x" 3
 
 -- | The expected result of 'caseCaseCapture'
 caseCaseCaptureExpected :: Term
 caseCaseCaptureExpected =
-  Case (Var a) intTy
+  Case
+    (Var a)
+    intTy
     [(DataPat mkT [] [x1], Case (Var f) intTy [(DefaultPat, Var x)])]
- where
-  a = localId User "a" 1 tTy
-  f = localId User "f" 2 (intFunTy 1)
-  x = intId User "x" 3
-  x1 = intId User "x" 4
+  where
+    a = localId User "a" 1 tTy
+    f = localId User "f" 2 (intFunTy 1)
+    x = intId User "x" 3
+    x1 = intId User "x" 4
 
 -- | @case (let x = u in x) of {_ -> x}@, with @x@ free in the alternative.
 -- 'caseLet' must not move the alternative under the let-binder @x@.
@@ -101,36 +111,36 @@ caseLetCapture :: IO Term
 caseLetCapture =
   runSingleTransformation def def (inScopeOf [u, x]) caseLetR $
     Case (Let (NonRec x (Var u)) (Var x)) intTy [(DefaultPat, Var x)]
- where
-  u = intId User "u" 1
-  x = intId User "x" 2
+  where
+    u = intId User "u" 1
+    x = intId User "x" 2
 
 -- | The expected result of 'caseLetCapture'
 caseLetCaptureExpected :: Term
 caseLetCaptureExpected =
   Let (NonRec x1 (Var u)) (Case (Var x1) intTy [(DefaultPat, Var x)])
- where
-  u = intId User "u" 1
-  x = intId User "x" 2
-  x1 = intId User "x" 3
+  where
+    u = intId User "u" 1
+    x = intId User "x" 2
+    x1 = intId User "x" 3
 
 tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.Case"
     [ testCase "caseCon keeps free variables shadowed by the pattern (#1040)" $
-        caseConShadowedFreeVar >>= assertStructurallyEqual (Var aOuter)
+        caseConShadowedFreeVar >>= assertStructurallyEqual (Var aOuter),
 
-    -- 'caseCase' pushed the outer case-expression into the alternatives of
-    -- the inner one, without renaming the binders of the inner alternatives.
-    -- Those could then capture free variables of the outer alternatives.
-    -- https://github.com/clash-lang/clash-compiler/pull/1067
-    , testCase "caseCase deshadows alternatives (#1067)" $
-        caseCaseCapture >>= assertAlphaEq caseCaseCaptureExpected
+      -- 'caseCase' pushed the outer case-expression into the alternatives of
+      -- the inner one, without renaming the binders of the inner alternatives.
+      -- Those could then capture free variables of the outer alternatives.
+      -- https://github.com/clash-lang/clash-compiler/pull/1067
+      testCase "caseCase deshadows alternatives (#1067)" $
+        caseCaseCapture >>= assertAlphaEq caseCaseCaptureExpected,
 
-    -- 'caseLet' moved the let-bindings out of the subject of a case-expression
-    -- without renaming them. They could then capture free variables of the
-    -- alternatives. https://github.com/clash-lang/clash-compiler/pull/1071
-    , testCase "caseLet deshadows let-bindings (#1071)" $
+      -- 'caseLet' moved the let-bindings out of the subject of a case-expression
+      -- without renaming them. They could then capture free variables of the
+      -- alternatives. https://github.com/clash-lang/clash-compiler/pull/1071
+      testCase "caseLet deshadows let-bindings (#1071)" $
         caseLetCapture >>= assertAlphaEq caseLetCaptureExpected
     ]

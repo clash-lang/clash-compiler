@@ -3,41 +3,43 @@
 
 module Clash.Tests.Core.FreeVars (tests) where
 
-import           GHC.Types.SrcLoc        (noSrcSpan)
-import qualified Control.Lens            as Lens
-import qualified Data.List               as List
-
-import           Test.Tasty
-import           Test.Tasty.HUnit
-
-import           Clash.Core.FreeVars     (freeLocalVars, globalIds, typeFreeVars)
-import           Clash.Core.Name         (Name(..), NameSort(..))
-import           Clash.Core.Term         (Term(Var, App, Lam, TyLam))
-import           Clash.Core.Type         (ConstTy(..), Type(ConstTy, ForAllTy, VarTy))
-import           Clash.Core.Var          (IdScope(..), Var(..))
-
-import           Test.Clash.Rewrite      (kindedTyVar, localId, tyVar)
+import Clash.Core.FreeVars (freeLocalVars, globalIds, typeFreeVars)
+import Clash.Core.Name (Name (..), NameSort (..))
+import Clash.Core.Term (Term (App, Lam, TyLam, Var))
+import Clash.Core.Type (ConstTy (..), Type (ConstTy, ForAllTy, VarTy))
+import Clash.Core.Var (IdScope (..), Var (..))
+import qualified Control.Lens as Lens
+import qualified Data.List as List
+import GHC.Types.SrcLoc (noSrcSpan)
+import Test.Clash.Rewrite (kindedTyVar, localId, tyVar)
+import Test.Tasty
+import Test.Tasty.HUnit
 
 -- TODO: We need tooling to create these mock constructs
 fakeName :: Name a
 fakeName =
   Name
-    { nameSort=User
-    , nameOcc="fake"
-    , nameUniq=0
-    , nameLoc=noSrcSpan
+    { nameSort = User,
+      nameOcc = "fake",
+      nameUniq = 0,
+      nameLoc = noSrcSpan
     }
 
 f :: IdScope -> Var Term
 f scope =
-  let unique = 20 in
-  Id { varName = Name { nameSort=User
-                      , nameOcc="f"
-                      , nameUniq=unique
-                      , nameLoc=noSrcSpan }
-     , varUniq = unique
-     , varType = ConstTy (TyCon fakeName)
-     , idScope = scope }
+  let unique = 20
+   in Id
+        { varName =
+            Name
+              { nameSort = User,
+                nameOcc = "f",
+                nameUniq = unique,
+                nameLoc = noSrcSpan
+              },
+          varUniq = unique,
+          varType = ConstTy (TyCon fakeName),
+          idScope = scope
+        }
 
 fLocalId, fGlobalId :: Var Term
 fLocalId = f LocalId
@@ -66,10 +68,10 @@ term1 =
 typeFreeVarsClosesOverKinds :: Assertion
 typeFreeVarsClosesOverKinds =
   [1, 2] @=? List.sort (map varUniq (Lens.toListOf typeFreeVars ty))
- where
-  k = tyVar User "k" 1
-  b = kindedTyVar User "b" 2 (VarTy k)
-  ty = ForAllTy k (VarTy b)
+  where
+    k = tyVar User "k" 1
+    b = kindedTyVar User "b" 2 (VarTy k)
+    ty = ForAllTy k (VarTy b)
 
 -- | The term level equivalent of 'typeFreeVarsClosesOverKinds': in
 -- @/\\k -> a@ with @a :: k@, the @k@ in the type of the free @a@ is free.
@@ -78,23 +80,25 @@ typeFreeVarsClosesOverKinds =
 termFreeVarsClosesOverTypes :: Assertion
 termFreeVarsClosesOverTypes =
   [1, 2] @=? List.sort (map varUniq (Lens.toListOf freeLocalVars tm :: [Var ()]))
- where
-  k = tyVar User "k" 1
-  a = localId User "a" 2 (VarTy k)
-  tm = TyLam k (Var a)
+  where
+    k = tyVar User "k" 1
+    a = localId User "a" 2 (VarTy k)
+    tm = TyLam k (Var a)
 
 tests :: TestTree
 tests =
-  let globs1 = Lens.toListOf globalIds term1 in
-  testGroup
-    "Clash.Tests.Core.FreeVars"
-    [ testCase "globalIds1" $ globs1 @=? [fGlobalId]
-    , testCase "globalIds2" $
-        assertBool
-          "Global and local id can't BOTH be in globs1"
-          (fLocalId `notElem` globs1)
-    , testCase "typeFreeVars closes over kinds with an empty scope (#446)"
-        typeFreeVarsClosesOverKinds
-    , testCase "termFreeVars closes over types with an empty scope (#446)"
-        termFreeVarsClosesOverTypes
-    ]
+  let globs1 = Lens.toListOf globalIds term1
+   in testGroup
+        "Clash.Tests.Core.FreeVars"
+        [ testCase "globalIds1" $ globs1 @=? [fGlobalId],
+          testCase "globalIds2" $
+            assertBool
+              "Global and local id can't BOTH be in globs1"
+              (fLocalId `notElem` globs1),
+          testCase
+            "typeFreeVars closes over kinds with an empty scope (#446)"
+            typeFreeVarsClosesOverKinds,
+          testCase
+            "termFreeVars closes over types with an empty scope (#446)"
+            termFreeVarsClosesOverTypes
+        ]

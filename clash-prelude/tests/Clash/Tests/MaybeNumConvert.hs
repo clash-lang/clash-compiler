@@ -36,19 +36,17 @@ Test generation of 'MaybeNumConvert' instances:
 -}
 module Clash.Tests.MaybeNumConvert where
 
+import Clash.Prelude hiding (someNatVal, withSomeSNat)
 import Control.Monad (forM_)
 import Data.Data (Proxy (..))
 import Data.Int (Int64)
+import qualified Data.List as L
 import Data.Maybe (fromMaybe, isJust)
 import Data.Word (Word64)
 import GHC.TypeNats (someNatVal)
 import Test.Tasty (TestTree, defaultMain)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase)
 import Test.Tasty.TH (testGroupGenerator)
-
-import Clash.Prelude hiding (someNatVal, withSomeSNat)
-
-import qualified Data.List as L
 
 main :: IO ()
 main = defaultMain tests
@@ -112,10 +110,10 @@ maybeConvertLaw3 ::
   Bool
 maybeConvertLaw3 Proxy x =
   isJust (maybeNumConvert @_ @b x) `implies` isJust (maybeNumConvert @_ @a =<< maybeNumConvert @_ @b x)
- where
-  implies :: Bool -> Bool -> Bool
-  implies True False = False
-  implies _ _ = True
+  where
+    implies :: Bool -> Bool -> Bool
+    implies True False = False
+    implies _ _ = True
 
 maybeConvertLaw4 ::
   forall a b.
@@ -125,9 +123,9 @@ maybeConvertLaw4 ::
   Bool
 maybeConvertLaw4 Proxy x =
   isJust (maybeNumConvert @_ @b x) == (i x >= i (minBound @b) && i x <= i (maxBound @b))
- where
-  i :: (Integral c) => c -> Integer
-  i = toInteger
+  where
+    i :: (Integral c) => c -> Integer
+    i = toInteger
 
 -- | Checks whether an 'XException' in, means an 'XException' out
 convertXException :: forall a b. (MaybeNumConvert a b) => Proxy a -> Proxy b -> Bool

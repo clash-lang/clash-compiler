@@ -1,3 +1,5 @@
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
 
 {-|
 Copyright  :  (C) 2013-2016, University of Twente
@@ -6,36 +8,32 @@ Copyright  :  (C) 2013-2016, University of Twente
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-{-# LANGUAGE Safe #-}
-
 module Clash.Class.BitPack
-  ( BitPack (..)
-  , isLike
-  , bitCoerce
-  , bitCoerceMap
-  , boolToBV
-  , boolToBit
-  , bitToBool
-  , packXWith
+  ( BitPack (..),
+    isLike,
+    bitCoerce,
+    bitCoerceMap,
+    boolToBV,
+    boolToBit,
+    bitToBool,
+    packXWith,
 
-  -- * Bit Indexing
-  , (!)
-  , slice
-  , split
-  , replaceBit
-  , setSlice
-  , msb
-  , lsb
+    -- * Bit Indexing
+    (!),
+    slice,
+    split,
+    replaceBit,
+    setSlice,
+    msb,
+    lsb,
 
-  -- * Bit Reduction
-  , reduceAnd
-  , reduceOr
-  , reduceXor
+    -- * Bit Reduction
+    reduceAnd,
+    reduceOr,
+    reduceXor,
   )
 where
 
-import Clash.Class.BitPack.Internal
 import Clash.Class.BitPack.BitIndex
 import Clash.Class.BitPack.BitReduction
+import Clash.Class.BitPack.Internal

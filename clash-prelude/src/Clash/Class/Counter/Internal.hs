@@ -1,9 +1,3 @@
-{- |
-Copyright  :  (C) 2021-2026, QBayLogic B.V.
-License    :  BSD2 (see the file LICENSE)
-Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
--}
-
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -11,21 +5,24 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
+{- |
+Copyright  :  (C) 2021-2026, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+-}
 module Clash.Class.Counter.Internal where
 
 import Clash.CPP (maxTupleSize)
-
 import Clash.Class.Counter.TH (genTupleInstances)
-import Clash.Sized.BitVector (BitVector, Bit)
+import Clash.Sized.BitVector (Bit, BitVector)
 import Clash.Sized.Index (Index)
 import Clash.Sized.Signed (Signed)
 import Clash.Sized.Unsigned (Unsigned)
-import Clash.Sized.Vector as Vec (Vec, repeat, mapAccumR)
-
+import Clash.Sized.Vector as Vec (Vec, mapAccumR, repeat)
 import Data.Bifunctor (bimap)
-import Data.Functor.Identity (Identity(..))
-import Data.Int (Int8, Int16, Int32, Int64)
-import Data.Word (Word8, Word16, Word32, Word64)
+import Data.Functor.Identity (Identity (..))
+import Data.Int (Int16, Int32, Int64, Int8)
+import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeLits (KnownNat, type (<=))
 
 -- $setup
@@ -61,12 +58,12 @@ import GHC.TypeLits (KnownNat, type (<=))
 class Counter a where
   -- | Value counter wraps around to on a 'countSuccOverflow' overflow
   countMin :: a
-  default countMin :: Bounded a => a
+  default countMin :: (Bounded a) => a
   countMin = minBound
 
   -- | Value counter wraps around to on a 'countPredOverflow' overflow
   countMax :: a
-  default countMax :: Bounded a => a
+  default countMax :: (Bounded a) => a
   countMax = maxBound
 
   -- | Gets the successor of @a@. If it overflows, the first part of the tuple
@@ -86,43 +83,57 @@ class Counter a where
     | otherwise = (False, pred a)
 
 instance (1 <= n, KnownNat n) => Counter (Index n)
-instance KnownNat n => Counter (Unsigned n)
-instance KnownNat n => Counter (Signed n)
-instance KnownNat n => Counter (BitVector n)
+
+instance (KnownNat n) => Counter (Unsigned n)
+
+instance (KnownNat n) => Counter (Signed n)
+
+instance (KnownNat n) => Counter (BitVector n)
 
 -- | @since 1.8.2
 instance Counter Bool
+
 -- | @since 1.8.2
 instance Counter Bit
+
 -- | @since 1.8.2
 instance Counter Int
+
 -- | @since 1.8.2
 instance Counter Int8
+
 -- | @since 1.8.2
 instance Counter Int16
+
 -- | @since 1.8.2
 instance Counter Int32
+
 -- | @since 1.8.2
 instance Counter Int64
+
 -- | @since 1.8.2
 instance Counter Word
+
 -- | @since 1.8.2
 instance Counter Word8
+
 -- | @since 1.8.2
 instance Counter Word16
+
 -- | @since 1.8.2
 instance Counter Word32
+
 -- | @since 1.8.2
 instance Counter Word64
 
 -- | @since 1.8.2
-deriving newtype instance Counter a => Counter (Identity a)
+deriving newtype instance (Counter a) => Counter (Identity a)
 
 -- | 'Nothing' is considered the minimum value, while @'Just' 'countMax'@ is
 -- considered the maximum value.
 --
 -- @since 1.8.2
-instance Counter a => Counter (Maybe a) where
+instance (Counter a) => Counter (Maybe a) where
   countMin = Nothing
   countMax = Just countMax
 
@@ -155,12 +166,12 @@ instance (Counter a, Counter b) => Counter (Either a b) where
 
   countSuccOverflow e =
     case bimap countSuccOverflow countSuccOverflow e of
-      Left (overflow, a)  -> (False, if overflow then Right countMin else Left a)
+      Left (overflow, a) -> (False, if overflow then Right countMin else Left a)
       Right (overflow, b) -> (overflow, if overflow then Left countMin else Right b)
 
   countPredOverflow e =
     case bimap countPredOverflow countPredOverflow e of
-      Left (overflow, a)  -> (overflow, if overflow then Right countMax else Left a)
+      Left (overflow, a) -> (overflow, if overflow then Right countMax else Left a)
       Right (overflow, b) -> (False, if overflow then Left countMax else Right b)
 
 -- | Counters on tuples increment from right-to-left. This makes sense from the
@@ -188,19 +199,19 @@ instance (Counter a0, Counter a1) => Counter (a0, a1) where
 
   countSuccOverflow (a0, b0) =
     if overflowB
-    then (overflowA, (a1, b1))
-    else (overflowB, (a0, b1))
-   where
-    (overflowB, b1) = countSuccOverflow b0
-    (overflowA, a1) = countSuccOverflow a0
+      then (overflowA, (a1, b1))
+      else (overflowB, (a0, b1))
+    where
+      (overflowB, b1) = countSuccOverflow b0
+      (overflowA, a1) = countSuccOverflow a0
 
   countPredOverflow (a0, b0) =
     if overflowB
-    then (overflowA, (a1, b1))
-    else (overflowB, (a0, b1))
-   where
-    (overflowB, b1) = countPredOverflow b0
-    (overflowA, a1) = countPredOverflow a0
+      then (overflowA, (a1, b1))
+      else (overflowB, (a0, b1))
+    where
+      (overflowB, b1) = countPredOverflow b0
+      (overflowA, a1) = countPredOverflow a0
 
 genTupleInstances maxTupleSize
 
@@ -221,8 +232,8 @@ rippleR f = mapAccumR step True
 -- >>> iterate (SNat @5) (countSucc @T) (9 :> 8 :> Nil)
 -- (9 :> 8 :> Nil) :> (9 :> 9 :> Nil) :> (0 :> 0 :> Nil) :> (0 :> 1 :> Nil) :> (0 :> 2 :> Nil) :> Nil
 instance (Counter a, KnownNat n) => Counter (Vec n a) where
-    countMin = Vec.repeat countMin
-    countMax = Vec.repeat countMax
+  countMin = Vec.repeat countMin
+  countMax = Vec.repeat countMax
 
-    countSuccOverflow = rippleR countSuccOverflow
-    countPredOverflow = rippleR countPredOverflow
+  countSuccOverflow = rippleR countSuccOverflow
+  countPredOverflow = rippleR countPredOverflow

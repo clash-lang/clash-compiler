@@ -1,3 +1,10 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
+-- Purpose of this module
+{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+
 {-|
 Copyright  :  (C) 2024, Google LLC
 License    :  BSD2 (see the file LICENSE)
@@ -11,26 +18,16 @@ Note: This module has been added to make upgrading to GHC 9.2 easier. As of GHC
       previously warning-free code now produce warnings.
 -}
 
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilyDependencies #-}
-
--- Purpose of this module
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
-
 -- For debugging:
 -- {-# OPTIONS_GHC -ddump-splices #-}
 
-module Clash.Sized.Vector.ToTuple (VecToTuple(..)) where
+module Clash.Sized.Vector.ToTuple (VecToTuple (..)) where
 
 import Clash.CPP
 import Clash.Sized.Vector
 import Clash.Sized.Vector.ToTuple.TH (vecToTupleInstances)
-
-import Data.Tagged (Tagged(..))
-
-import Data.Tuple (Solo(MkSolo))
+import Data.Tagged (Tagged (..))
+import Data.Tuple (Solo (MkSolo))
 
 {- $setup
 >>> :set -XMonoLocalBinds -XGADTs
@@ -61,7 +58,7 @@ class VecToTuple a where
   --     • Couldn't match type: (a, b, c, d)
   --                      with: (Int, Int, Int)
   -- ...
-  vecToTuple ::  a -> TupType a
+  vecToTuple :: a -> TupType a
 
 instance VecToTuple (Vec 0 a) where
   type TupType (Vec 0 a) = Tagged a ()

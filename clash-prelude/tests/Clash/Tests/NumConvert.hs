@@ -60,19 +60,17 @@ Test generation of 'NumConvert' instances:
 -}
 module Clash.Tests.NumConvert where
 
+import Clash.Prelude hiding (someNatVal, withSomeSNat)
 import Control.Monad (forM_)
 import Data.Data (Proxy (..))
 import Data.Int (Int16, Int32, Int64, Int8)
+import qualified Data.List as L
 import Data.Maybe (isNothing)
 import Data.Word (Word16, Word32, Word64, Word8)
 import GHC.TypeNats (someNatVal)
 import Test.Tasty (TestTree, defaultMain)
 import Test.Tasty.HUnit (Assertion, assertBool, testCase)
 import Test.Tasty.TH (testGroupGenerator)
-
-import qualified Data.List as L
-
-import Clash.Prelude hiding (someNatVal, withSomeSNat)
 
 convertLaw1 :: forall a b. (NumConvert a b, MaybeNumConvert b a, Eq a) => Proxy b -> a -> Bool
 convertLaw1 _ x = Just x == maybeNumConvert (numConvert @a @b x)
@@ -88,8 +86,8 @@ empty, this law is considered satisfied too.
 -}
 convertLaw3 :: forall a b. (MaybeNumConvert a b, Bounded a, Enum a) => Proxy a -> Proxy b -> Bool
 convertLaw3 _ _ = L.any isNothing results
- where
-  results = L.map (maybeNumConvert @a @b) [minBound ..]
+  where
+    results = L.map (maybeNumConvert @a @b) [minBound ..]
 
 -- | Checks whether an 'XException' in, means an 'XException' out
 convertXException :: forall a b. (NumConvert a b) => Proxy a -> Proxy b -> Bool
@@ -195,8 +193,8 @@ case_convertIndexIndex =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Index (m + 1))) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Index (n + 1))) (Proxy @(Index (m + 1))))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertIndexUnsigned :: Assertion
 case_convertIndexUnsigned =
@@ -212,8 +210,8 @@ case_convertIndexUnsigned =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Unsigned m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Index (n + 1))) (Proxy @(Unsigned m)))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertIndexSigned :: Assertion
 case_convertIndexSigned =
@@ -229,8 +227,8 @@ case_convertIndexSigned =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Signed m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Index (n + 1))) (Proxy @(Signed m)))
- where
-  zeroWidthSkip = True
+  where
+    zeroWidthSkip = True
 
 case_convertIndexBitVector :: Assertion
 case_convertIndexBitVector =
@@ -246,8 +244,8 @@ case_convertIndexBitVector =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(BitVector m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Index (n + 1))) (Proxy @(BitVector m)))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertUnsignedIndex :: Assertion
 case_convertUnsignedIndex =
@@ -263,8 +261,8 @@ case_convertUnsignedIndex =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Index (m + 1))) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Unsigned n)) (Proxy @(Index (m + 1))))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertUnsignedUnsigned :: Assertion
 case_convertUnsignedUnsigned =
@@ -280,8 +278,8 @@ case_convertUnsignedUnsigned =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Unsigned m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Unsigned n)) (Proxy @(Unsigned m)))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertUnsignedSigned :: Assertion
 case_convertUnsignedSigned =
@@ -297,8 +295,8 @@ case_convertUnsignedSigned =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Signed m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Unsigned n)) (Proxy @(Signed m)))
- where
-  zeroWidthSkip = True
+  where
+    zeroWidthSkip = True
 
 case_convertUnsignedBitVector :: Assertion
 case_convertUnsignedBitVector =
@@ -314,8 +312,8 @@ case_convertUnsignedBitVector =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(BitVector m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Unsigned n)) (Proxy @(BitVector m)))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertSignedSigned :: Assertion
 case_convertSignedSigned =
@@ -331,8 +329,8 @@ case_convertSignedSigned =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Signed m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(Signed n)) (Proxy @(Signed m)))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertBitVectorIndex :: Assertion
 case_convertBitVectorIndex =
@@ -348,8 +346,8 @@ case_convertBitVectorIndex =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Index (m + 1))) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(BitVector n)) (Proxy @(Index (m + 1))))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertBitVectorUnsigned :: Assertion
 case_convertBitVectorUnsigned =
@@ -365,8 +363,8 @@ case_convertBitVectorUnsigned =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Unsigned m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(BitVector n)) (Proxy @(Unsigned m)))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False
 
 case_convertBitVectorSigned :: Assertion
 case_convertBitVectorSigned =
@@ -382,8 +380,8 @@ case_convertBitVectorSigned =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(Signed m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(BitVector n)) (Proxy @(Signed m)))
- where
-  zeroWidthSkip = True
+  where
+    zeroWidthSkip = True
 
 case_convertBitVectorBitVector :: Assertion
 case_convertBitVectorBitVector =
@@ -399,5 +397,5 @@ case_convertBitVectorBitVector =
                 assertBool (show (n, m, i)) (convertLaw2 (Proxy @(BitVector m)) i)
             _ | (n == 0 && m == 0 && zeroWidthSkip) -> pure ()
             _ -> assertBool (show (n, m)) (convertLaw3 (Proxy @(BitVector n)) (Proxy @(BitVector m)))
- where
-  zeroWidthSkip = False
+  where
+    zeroWidthSkip = False

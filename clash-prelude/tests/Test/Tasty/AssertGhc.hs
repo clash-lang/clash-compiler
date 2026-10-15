@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-|
 Copyright  :  (C) 2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -10,12 +12,7 @@ fails with the expected error substrings.
 Ported from
 <https://github.com/clash-lang/checked-literals/blob/main/tests/Test/Tasty/AssertGhc.hs>.
 -}
-
-{-# LANGUAGE CPP #-}
-
 module Test.Tasty.AssertGhc where
-
-import Prelude
 
 import Data.List (isInfixOf)
 import Data.Maybe (fromMaybe)
@@ -28,6 +25,7 @@ import Test.Tasty (TestTree, askOption)
 import Test.Tasty.HUnit
 import Test.Tasty.Options
 import Text.Read (readMaybe)
+import Prelude
 
 data Expected = ExpectFailure [String] | ExpectSuccess
 
@@ -73,24 +71,26 @@ assertGhc source expected = do
     (exitCode, _, stderrOutput) <-
       readProcessWithExitCode
         hc
-        [ "-XCPP"
-        , "-XDataKinds"
-        , "-XTypeOperators"
-        , "-XTypeApplications"
-        , "-XTypeFamilies"
-        , "-XFlexibleContexts"
-        , "-XUndecidableInstances"
-        , "-XNoStarIsType"
-        , "-XViewPatterns"
-        , "-XNoImplicitPrelude"
-        , "-fno-code"
-        , "-package", "clash-prelude"
-        , "-package", "checked-literals"
-        , "-fplugin=GHC.TypeLits.KnownNat.Solver"
-        , "-fplugin=GHC.TypeLits.Normalise"
-        , "-fplugin=GHC.TypeLits.Extra.Solver"
-        , "-fplugin=CheckedLiterals"
-        , tempFile
+        [ "-XCPP",
+          "-XDataKinds",
+          "-XTypeOperators",
+          "-XTypeApplications",
+          "-XTypeFamilies",
+          "-XFlexibleContexts",
+          "-XUndecidableInstances",
+          "-XNoStarIsType",
+          "-XViewPatterns",
+          "-XNoImplicitPrelude",
+          "-fno-code",
+          "-package",
+          "clash-prelude",
+          "-package",
+          "checked-literals",
+          "-fplugin=GHC.TypeLits.KnownNat.Solver",
+          "-fplugin=GHC.TypeLits.Normalise",
+          "-fplugin=GHC.TypeLits.Extra.Solver",
+          "-fplugin=CheckedLiterals",
+          tempFile
         ]
         ""
     case (exitCode, expected) of
@@ -123,5 +123,5 @@ whether or not our locale supports unicode.
 -}
 removeProblemChars :: String -> String
 removeProblemChars = filter (`notElem` problemChars)
- where
-  problemChars = "\x2018\x2019`'"
+  where
+    problemChars = "\x2018\x2019`'"

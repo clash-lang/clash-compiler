@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -5,15 +7,7 @@
 
   Tests for "Clash.Normalize.Transformations.Inline"
 -}
-
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Tests.Normalize.Transformations.Inline (tests) where
-
-import Data.Default (def)
-
-import Test.Tasty
-import Test.Tasty.HUnit
 
 import Clash.Core.Name (NameSort (User))
 import Clash.Core.Term (Term (..))
@@ -22,10 +16,19 @@ import Clash.Normalize.Transformations.Inline (inlineSmall, inlineWorkFree)
 import Clash.Normalize.Types (NormRewrite)
 import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
-
+import Data.Default (def)
 import Test.Clash.Rewrite
-  ( assertStructurallyEqual, globalId, inScopeOf, intId, intLit, intTy
-  , mkBindingMap, runSingleTransformation )
+  ( assertStructurallyEqual,
+    globalId,
+    inScopeOf,
+    intId,
+    intLit,
+    intTy,
+    mkBindingMap,
+    runSingleTransformation,
+  )
+import Test.Tasty
+import Test.Tasty.HUnit
 
 inlineSmallR, inlineWorkFreeR :: NormRewrite
 inlineSmallR = $(asRewriteQ inlineSmall)
@@ -41,8 +44,8 @@ inlineWorkFreeR = $(asRewriteQ inlineWorkFree)
 -- https://github.com/clash-lang/clash-compiler/commit/16e65951c40b36ce64861819ff14e1a5b6cc0486
 inlineLocalVar :: NormRewrite -> IO Term
 inlineLocalVar rw = runSingleTransformation def st (inScopeOf [fLocal]) rw (Var fLocal)
- where
-  st = def { _bindings = mkBindingMap [(globalId User "f" 7 intTy, intLit 42)] }
+  where
+    st = def{_bindings = mkBindingMap [(globalId User "f" 7 intTy, intLit 42)]}
 
 -- | See 'inlineLocalVar'
 fLocal :: Id
@@ -53,7 +56,7 @@ tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.Inline"
     [ testCase "inlineSmall does not inline a local variable (#405)" $
-        inlineLocalVar inlineSmallR >>= assertStructurallyEqual (Var fLocal)
-    , testCase "inlineWorkFree does not inline a local variable (#405)" $
+        inlineLocalVar inlineSmallR >>= assertStructurallyEqual (Var fLocal),
+      testCase "inlineWorkFree does not inline a local variable (#405)" $
         inlineLocalVar inlineWorkFreeR >>= assertStructurallyEqual (Var fLocal)
     ]

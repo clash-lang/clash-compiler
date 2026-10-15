@@ -1,3 +1,10 @@
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE NoFieldSelectors #-}
+
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                 (C) 2021-2026, QBayLogic B.V.
@@ -10,24 +17,16 @@
   and 'Clash.Normalize.Strategy.constantPropagation'; "Clash.Normalize"
   compiles 'flattenSpec' into the flattening strategy of @flattenCallTree@.
 -}
-
-{-# LANGUAGE DisambiguateRecordFields #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE NoFieldSelectors #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
 module Clash.Normalize.Strategy.Spec
-  ( normalizationSpec
-  , constantPropagationSpec
-  , flattenSpec
-  ) where
-
-import Language.Haskell.TH.Syntax (Name)
+  ( normalizationSpec,
+    constantPropagationSpec,
+    flattenSpec,
+  )
+where
 
 import Clash.Normalize.Transformations
 import Clash.Rewrite.StrategyDSL
+import Language.Haskell.TH.Syntax (Name)
 
 -- [Note: bottomup traversal reduceConst]
 --
@@ -45,50 +44,65 @@ import Clash.Rewrite.StrategyDSL
 -- 'Clash.Normalize.Strategy.constantPropagation' binding.
 normalizationSpec :: Name -> Strat
 normalizationSpec constantPropagationName =
-  rmDeadcode >-> multPrim >-> callStrategy constantPropagationName >->
-  rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
-  bindConst >-> letTL
-  >-> evalConst
-  >-!-> cse >-!-> cleanup >->
-  elimCaseBigNum >->  -- see [Note] late elimCaseBigNum
-  xOptim >-> rmDeadcode >->
-  cleanup >-> bindSimIO >-> recLetRec >-> splitArgs
+  rmDeadcode
+    >-> multPrim
+    >-> callStrategy constantPropagationName
+    >-> rmUnusedExpr
+    >-!-> anf
+    >-!-> rmDeadcode
+    >-> bindConst
+    >-> letTL
+    >-> evalConst
+    >-!-> cse
+    >-!-> cleanup
+    >-> elimCaseBigNum -- see [Note] late elimCaseBigNum
+    >-> xOptim
+    >-> rmDeadcode
+    >-> cleanup
+    >-> bindSimIO
+    >-> recLetRec
+    >-> splitArgs
   where
-    multPrim   = topdown setupMultiResultPrim
-    anf        = topdown nonRepANF >-> pass "ANF" 'makeANF >-> topdown caseCon
-    letTL      = topdownSuc topLet
-    recLetRec  = pass "recToLetRec" 'recToLetRec
+    multPrim = topdown setupMultiResultPrim
+    anf = topdown nonRepANF >-> pass "ANF" 'makeANF >-> topdown caseCon
+    letTL = topdownSuc topLet
+    recLetRec = pass "recToLetRec" 'recToLetRec
     rmUnusedExpr = bottomup removeUnusedExpr
     rmDeadcode = bottomup (named "deadcode" deadCode)
-    bindConst  = topdown bindConstantVar
+    bindConst = topdown bindConstantVar
     -- See [Note] bottomup traversal reduceConst:
-    evalConst  = bottomup reduceConst
-    cse        = topdown simpleCSE
+    evalConst = bottomup reduceConst
+    cse = topdown simpleCSE
     elimCaseBigNum = topdown elimCaseBigNumInternals
-    xOptim     = bottomup xOptimize
-    cleanup    = topdown etaExpandSyn >->
-                 topdownSuc inlineCleanup !->
-                 innerMost (chain [ caseCon
-                                  , bindConstantVar
-                                  , named "letFlat" flattenLet
-                                  ])
-                 >-> rmDeadcode >-> letTL
-    splitArgs  = topdown separateArguments !->
-                 bottomup caseCon
-    bindSimIO  = topdown inlineSimIO
-
+    xOptim = bottomup xOptimize
+    cleanup =
+      topdown etaExpandSyn
+        >-> topdownSuc inlineCleanup
+        !-> innerMost
+          ( chain
+              [ caseCon,
+                bindConstantVar,
+                named "letFlat" flattenLet
+              ]
+          )
+          >-> rmDeadcode
+          >-> letTL
+    splitArgs =
+      topdown separateArguments
+        !-> bottomup caseCon
+    bindSimIO = topdown inlineSimIO
 
 constantPropagationSpec :: Strat
 constantPropagationSpec =
-  inlineAndPropagate >->
-  caseFlattening >->
-  etaTL >->
-  dec >->
-  spec >->
-  dec >->
-  conSpec
+  inlineAndPropagate
+    >-> caseFlattening
+    >-> etaTL
+    >-> dec
+    >-> spec
+    >-> dec
+    >-> conSpec
   where
-    etaTL              = pass "etaTL" 'etaExpansionTL !-> topdown appProp
+    etaTL = pass "etaTL" 'etaExpansionTL !-> topdown appProp
     -- The outer repeatR is still needed: inlineNR is a full traversal whose
     -- results can only be processed by re-running the top-down chain from the
     -- new root.
@@ -96,38 +110,42 @@ constantPropagationSpec =
     -- NB: 'topdownFix' is deliberately _not_ used here, see
     -- Note [topdownFixR is not for inlining bundles].
     inlineAndPropagate = repeatR (topdown transPropagateAndInline >-> inlineNR)
-    spec               = bottomup specTransformations
-    caseFlattening     = topdownFix caseFlat
-    dec                = topdownFix disjointExpressionConsolidation
-    conSpec            = bottomup ((one (named "appPropCS" appProp) !->
-                                    nested (bottomup constantSpec)) >-!
-                                   one constantSpec)
+    spec = bottomup specTransformations
+    caseFlattening = topdownFix caseFlat
+    dec = topdownFix disjointExpressionConsolidation
+    conSpec =
+      bottomup
+        ( ( one (named "appPropCS" appProp)
+              !-> nested (bottomup constantSpec)
+          )
+            >-! one constantSpec
+        )
 
     transPropagateAndInline :: Step
-    transPropagateAndInline = chain
-      [ appProp
-      , bindConstantVar
-      , caseLet
-      , caseCase
-      , caseCon
-      , elimExistentials
-      , caseEliminateNonReachable
-      , removeUnusedExpr
-      -- These transformations can safely be applied in a top-down traversal as
-      -- they themselves check whether the to-be-inlined binder is recursive or not.
-      , inlineWorkFree
-      , inlineSmall
-      , inlineOrLiftNonRep -- See: [Note] bindNonRep before liftNonRep
-                           -- See: [Note] bottom-up traversal for liftNonRep
-      , reducePrim
-
-      , caseCast
-      , letCast
-      , splitCastWork
-      , argCastSpec
-      , inlineCast
-      , elimCastCast
-      ]
+    transPropagateAndInline =
+      chain
+        [ appProp,
+          bindConstantVar,
+          caseLet,
+          caseCase,
+          caseCon,
+          elimExistentials,
+          caseEliminateNonReachable,
+          removeUnusedExpr,
+          -- These transformations can safely be applied in a top-down traversal as
+          -- they themselves check whether the to-be-inlined binder is recursive or not.
+          inlineWorkFree,
+          inlineSmall,
+          inlineOrLiftNonRep, -- See: [Note] bindNonRep before liftNonRep
+                              -- See: [Note] bottom-up traversal for liftNonRep
+          reducePrim,
+          caseCast,
+          letCast,
+          splitCastWork,
+          argCastSpec,
+          inlineCast,
+          elimCastCast
+        ]
 
     -- InlineNonRep cannot be applied in a top-down traversal, as the non-representable
     -- binder might be recursive. The idea is, is that if the recursive
@@ -147,16 +165,17 @@ constantPropagationSpec =
     --
     inlineNR :: Strat
     inlineNR =
-          bottomup deadCode
-      >-! pass "inlineNonRep" 'inlineNonRep
+      bottomup deadCode
+        >-! pass "inlineNonRep" 'inlineNonRep
 
     specTransformations :: Step
-    specTransformations = chain
-      [ typeSpec
-      , nonRepSpec
-      , zeroWidthSpec
-        -- See Note [zeroWidthSpec enabling transformations]
-      ]
+    specTransformations =
+      chain
+        [ typeSpec,
+          nonRepSpec,
+          zeroWidthSpec
+          -- See Note [zeroWidthSpec enabling transformations]
+        ]
 
 {-
 Note [flatten pass structure]
@@ -193,26 +212,34 @@ If you touch code related to this, please make sure to run benchmarks.
 flattenSpec :: Strat
 flattenSpec =
   -- See Note [flatten pass structure].
-  repeatR (bottomup (one flattenLet >->
-                     (one reduceConst !-> one deadCode) >->
-                     chain [ reducePrim
-                           , removeUnusedExpr
-                           ]) >->
-           topdownFix (chain [ named "appProp" appProp
-                             , bindConstantVar
-                             , caseCon
-                             ])) !->
-  bottomup deadCode >-> -- See #3407
-  letTL >->
-  -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
-  -- Note that we do this as the very last step, after all constant propagation
-  -- has been done to avoid #3036.
-  topdownSuc collapseRHSNoops >->
-  topdownSuc inlineCleanup >->
-  bottomup caseCon >-> -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
-  bottomup flattenLet >-> -- https://github.com/clash-lang/clash-compiler/issues/3185
-  bottomup bindConstantVar >-> -- https://github.com/clash-lang/clash-compiler/issues/3041
-  letTL
+  repeatR
+    ( bottomup
+        ( one flattenLet
+            >-> (one reduceConst !-> one deadCode)
+            >-> chain
+              [ reducePrim,
+                removeUnusedExpr
+              ]
+        )
+        >-> topdownFix
+          ( chain
+              [ named "appProp" appProp,
+                bindConstantVar,
+                caseCon
+              ]
+          )
+    )
+    !-> bottomup deadCode -- See #3407
+      >-> letTL
+      -- See [Note] relation `collapseRHSNoops` and `inlineCleanup`
+      -- Note that we do this as the very last step, after all constant propagation
+      -- has been done to avoid #3036.
+      >-> topdownSuc collapseRHSNoops
+      >-> topdownSuc inlineCleanup
+      >-> bottomup caseCon -- https://github.com/clash-lang/clash-compiler/issues/3159 / #3204
+      >-> bottomup flattenLet -- https://github.com/clash-lang/clash-compiler/issues/3185
+      >-> bottomup bindConstantVar -- https://github.com/clash-lang/clash-compiler/issues/3041
+      >-> letTL
   where
     letTL = topdownSuc topLet
 

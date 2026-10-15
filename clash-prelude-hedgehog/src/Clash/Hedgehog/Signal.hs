@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 {-|
 Copyright   : (C) 2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
@@ -5,21 +7,18 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
 Random generation of types from "Clash.Signal.Internal".
 -}
-
-{-# LANGUAGE CPP #-}
-
 module Clash.Hedgehog.Signal
-  ( genSignal
-  , genActiveEdge
-  , genInitBehavior
-  , genResetKind
-  , genResetPolarity
-  ) where
-
-import Hedgehog (MonadGen)
-import qualified Hedgehog.Gen as Gen
+  ( genSignal,
+    genActiveEdge,
+    genInitBehavior,
+    genResetKind,
+    genResetPolarity,
+  )
+where
 
 import Clash.Signal.Internal
+import Hedgehog (MonadGen)
+import qualified Hedgehog.Gen as Gen
 
 genSignal :: forall a dom m. (MonadGen m) => m a -> m (Signal dom a)
 genSignal genElem = liftA2 (:-) genElem (genSignal genElem)

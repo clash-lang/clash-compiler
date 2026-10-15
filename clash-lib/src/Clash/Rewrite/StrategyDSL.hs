@@ -1,3 +1,9 @@
+{-# LANGUAGE DisambiguateRecordFields #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE NoFieldSelectors #-}
+
 {-|
   Copyright  :  (C) 2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
@@ -19,68 +25,77 @@
     passes, and the usual combinators ('>->', '!->', '>-!', '>-!->',
     'repeatR') between them.
 -}
-
-{-# LANGUAGE DisambiguateRecordFields #-}
-{-# LANGUAGE DuplicateRecordFields #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE NoFieldSelectors #-}
-{-# LANGUAGE OverloadedRecordDot #-}
-
 module Clash.Rewrite.StrategyDSL
   ( -- * Transformation metadata
-    Constructor (..)
-  , TransformationWorker (..)
-  , Transformation (..)
-  , toTransformation
-  , anyConstructor
-  , named
+    Constructor (..),
+    TransformationWorker (..),
+    Transformation (..),
+    toTransformation,
+    anyConstructor,
+    named,
+
     -- ** Worker builders: workers receiving the constructor's fields
-  , onVar
-  , onData
-  , onLiteral
-  , onPrim
-  , onLam
-  , onTyLam
-  , onApp
-  , onTyApp
-  , onLet
-  , onCase
-  , onCast
-  , onTick
+    onVar,
+    onData,
+    onLiteral,
+    onPrim,
+    onLam,
+    onTyLam,
+    onApp,
+    onTyApp,
+    onLet,
+    onCase,
+    onCast,
+    onTick,
+
     -- ** Worker builders: workers receiving the node itself
-  , onVarNode
-  , onPrimNode
-  , onAppNode
-  , onTyAppNode
-  , onLetNode
-  , onTickNode
+    onVarNode,
+    onPrimNode,
+    onAppNode,
+    onTyAppNode,
+    onLetNode,
+    onTickNode,
+
     -- * Node layer
-  , Step (..)
-  , chain
-  , one
-  , nested
+    Step (..),
+    chain,
+    one,
+    nested,
+
     -- * Strategy layer
-  , Strat (..)
-  , topdown
-  , bottomup
-  , topdownFix
-  , topdownSuc
-  , innerMost
-  , pass
-  , callStrategy
-  , repeatR
+    Strat (..),
+    topdown,
+    bottomup,
+    topdownFix,
+    topdownSuc,
+    innerMost,
+    pass,
+    callStrategy,
+    repeatR,
+
     -- * Combinators
-  , Strategic (..)
-  , (>-!->)
-  , ToStep (..)
-  ) where
+    Strategic (..),
+    (>-!->),
+    ToStep (..),
+  )
+where
 
 import Language.Haskell.TH.Syntax (Name)
 
 -- | One 'Clash.Core.Term.Term' constructor.
 data Constructor
-  = CVar | CData | CLiteral | CPrim | CLam | CTyLam
-  | CApp | CTyApp | CLet | CCase | CCast | CTick
+  = CVar
+  | CData
+  | CLiteral
+  | CPrim
+  | CLam
+  | CTyLam
+  | CApp
+  | CTyApp
+  | CLet
+  | CCase
+  | CCast
+  | CTick
   deriving (Eq, Ord, Show, Enum, Bounded)
 
 -- | A single function separated by the constructor it fires on. Note that this
@@ -95,32 +110,33 @@ data Constructor
 -- with 'Clash.Rewrite.Util.changed': a 'chain' hands the fields it matched to
 -- the next member as long as no change was signaled.
 data TransformationWorker
-  = FieldWorker !Constructor !Name
-  -- ^ @worker :: TransformContext -> Term -> \<fields of the constructor\>
-  -- -> RewriteMonad extra Term@. The worker receives the matched node (to
-  -- return on the unchanged path with sharing intact) followed by the
-  -- constructor's fields.
-  | Worker !Constructor !Name
-  -- ^ @worker :: Rewrite extra@. A worker that fires only at the given
-  -- constructor, like the per-constructor worker above, but receives the
-  -- whole node instead of its deconstructed fields. For transformations that
-  -- decompose the node themselves, e.g. by collecting the entire application
-  -- spine rather than one @App@ layer.
-  | AnyWorker !Name
-  -- ^ @worker :: Rewrite extra@, applied at all constructors. For a
-  -- transformation whose firing condition lives in the
-  -- 'Clash.Rewrite.Types.TransformContext' rather than the constructor
-  -- (@topLet@).
+  = -- | @worker :: TransformContext -> Term -> \<fields of the constructor\>
+    -- -> RewriteMonad extra Term@. The worker receives the matched node (to
+    -- return on the unchanged path with sharing intact) followed by the
+    -- constructor's fields.
+    FieldWorker !Constructor !Name
+  | -- | @worker :: Rewrite extra@. A worker that fires only at the given
+    -- constructor, like the per-constructor worker above, but receives the
+    -- whole node instead of its deconstructed fields. For transformations that
+    -- decompose the node themselves, e.g. by collecting the entire application
+    -- spine rather than one @App@ layer.
+    Worker !Constructor !Name
+  | -- | @worker :: Rewrite extra@, applied at all constructors. For a
+    -- transformation whose firing condition lives in the
+    -- 'Clash.Rewrite.Types.TransformContext' rather than the constructor
+    -- (@topLet@).
+    AnyWorker !Name
   deriving (Eq, Show)
 
 -- | Single, named transformation. Can consist of multiple workers (see
 -- 'TransformationWorker').
 data Transformation = Transformation
-  { name :: !String
-  -- ^ Canonical name, used for debug tracing, transformation counters, and
-  -- the rewrite history.
-  , workers :: ![TransformationWorker]
-  } deriving (Eq, Show)
+  { -- | Canonical name, used for debug tracing, transformation counters, and
+    -- the rewrite history.
+    name :: !String,
+    workers :: ![TransformationWorker]
+  }
+  deriving (Eq, Show)
 
 -- | Declare a transformation's workers: at most one per constructor, and
 -- either an 'AnyWorker' or per-constructor workers, never both. Checked when
@@ -136,78 +152,99 @@ anyConstructor name worker = Transformation name [AnyWorker worker]
 -- aliases of a transformation that runs at several strategy positions (the
 -- transformation counters and rewrite history key on the name).
 named :: String -> Transformation -> Transformation
-named alias transformation = transformation { name = alias }
+named alias transformation = transformation{name = alias}
 
-onVar, onData, onLiteral, onPrim, onLam, onTyLam, onApp, onTyApp, onLet,
-  onCase, onCast, onTick :: Name -> [TransformationWorker]
-onVar     = pure . FieldWorker CVar
-onData    = pure . FieldWorker CData
+onVar,
+  onData,
+  onLiteral,
+  onPrim,
+  onLam,
+  onTyLam,
+  onApp,
+  onTyApp,
+  onLet,
+  onCase,
+  onCast,
+  onTick ::
+    Name -> [TransformationWorker]
+onVar = pure . FieldWorker CVar
+onData = pure . FieldWorker CData
 onLiteral = pure . FieldWorker CLiteral
-onPrim    = pure . FieldWorker CPrim
-onLam     = pure . FieldWorker CLam
-onTyLam   = pure . FieldWorker CTyLam
-onApp     = pure . FieldWorker CApp
-onTyApp   = pure . FieldWorker CTyApp
-onLet     = pure . FieldWorker CLet
-onCase    = pure . FieldWorker CCase
-onCast    = pure . FieldWorker CCast
-onTick    = pure . FieldWorker CTick
+onPrim = pure . FieldWorker CPrim
+onLam = pure . FieldWorker CLam
+onTyLam = pure . FieldWorker CTyLam
+onApp = pure . FieldWorker CApp
+onTyApp = pure . FieldWorker CTyApp
+onLet = pure . FieldWorker CLet
+onCase = pure . FieldWorker CCase
+onCast = pure . FieldWorker CCast
+onTick = pure . FieldWorker CTick
 
-onVarNode, onPrimNode, onAppNode, onTyAppNode, onLetNode,
-  onTickNode :: Name -> [TransformationWorker]
-onVarNode   = pure . Worker CVar
-onPrimNode  = pure . Worker CPrim
-onAppNode   = pure . Worker CApp
+onVarNode,
+  onPrimNode,
+  onAppNode,
+  onTyAppNode,
+  onLetNode,
+  onTickNode ::
+    Name -> [TransformationWorker]
+onVarNode = pure . Worker CVar
+onPrimNode = pure . Worker CPrim
+onAppNode = pure . Worker CApp
 onTyAppNode = pure . Worker CTyApp
-onLetNode   = pure . Worker CLet
-onTickNode  = pure . Worker CTick
+onLetNode = pure . Worker CLet
+onTickNode = pure . Worker CTick
 
 -- | What runs at a single node inside a fused traversal.
 data Step
-  = Chain [Transformation]
-  -- ^ One constructor match dispatches the members registered for that
-  -- constructor, in list order. Equivalent to the sequential
-  -- @apply n1 t1 '>->' apply n2 t2 …@ chain over all members.
-  | SeqS Step Step
-  -- ^ '>->' at the node: the right side re-dispatches on the left side's
-  -- result.
-  | OnChangeS Step Step
-  -- ^ '!->' at the node: the right side runs only when the left side
-  -- signaled change.
-  | OnNoChangeS Step Step
-  -- ^ '>-!' at the node: the right side runs only when the left side did
-  -- not signal change.
-  | EmbedS Strat
-  -- ^ A whole strategy as one node action.
+  = -- | One constructor match dispatches the members registered for that
+    -- constructor, in list order. Equivalent to the sequential
+    -- @apply n1 t1 '>->' apply n2 t2 …@ chain over all members.
+    Chain [Transformation]
+  | -- | '>->' at the node: the right side re-dispatches on the left side's
+    -- result.
+    SeqS Step Step
+  | -- | '!->' at the node: the right side runs only when the left side
+    -- signaled change.
+    OnChangeS Step Step
+  | -- | '>-!' at the node: the right side runs only when the left side did
+    -- not signal change.
+    OnNoChangeS Step Step
+  | -- | A whole strategy as one node action.
+    EmbedS Strat
   deriving (Eq, Show)
 
 -- | A complete rewriting strategy.
 data Strat
-  = TopDown Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.topdownR': repeat the step at each
-  -- node until it no longer fires, then descend.
-  | BottomUp Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.bottomupR': descend first, run the
-  -- step once on the rebuilt node.
-  | TopDownFix Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.topdownFixR'. Mind its soundness
-  -- precondition (Note [topdownFixR] in "Clash.Rewrite.Combinators").
-  | TopDownSuc Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.topdownSucR': stop at the first
-  -- success, neither repeating nor descending below it.
-  | InnerMost Step
-  -- ^ Fused 'Clash.Rewrite.Combinators.innerMost': bottom-up; when the step
-  -- fires, re-traverse the result until the innermost fixpoint is reached.
-  | Pass String Name
-  -- ^ A whole-term pass: @apply \<name\> \<rewrite\>@, for transformations
-  -- that traverse the term themselves (@makeANF@, @etaExpansionTL@, …).
-  | CallStrategy Name
-  -- ^ Reference to another compiled strategy binding.
-  | Seq Strat Strat            -- ^ '>->'
-  | DeepSeqS Strat Strat       -- ^ '>-!->'
-  | OnChange Strat Strat       -- ^ '!->'
-  | OnNoChange Strat Strat     -- ^ '>-!'
-  | Repeat Strat               -- ^ 'repeatR'
+  = -- | Fused 'Clash.Rewrite.Combinators.topdownR': repeat the step at each
+    -- node until it no longer fires, then descend.
+    TopDown Step
+  | -- | Fused 'Clash.Rewrite.Combinators.bottomupR': descend first, run the
+    -- step once on the rebuilt node.
+    BottomUp Step
+  | -- | Fused 'Clash.Rewrite.Combinators.topdownFixR'. Mind its soundness
+    -- precondition (Note [topdownFixR] in "Clash.Rewrite.Combinators").
+    TopDownFix Step
+  | -- | Fused 'Clash.Rewrite.Combinators.topdownSucR': stop at the first
+    -- success, neither repeating nor descending below it.
+    TopDownSuc Step
+  | -- | Fused 'Clash.Rewrite.Combinators.innerMost': bottom-up; when the step
+    -- fires, re-traverse the result until the innermost fixpoint is reached.
+    InnerMost Step
+  | -- | A whole-term pass: @apply \<name\> \<rewrite\>@, for transformations
+    -- that traverse the term themselves (@makeANF@, @etaExpansionTL@, …).
+    Pass String Name
+  | -- | Reference to another compiled strategy binding.
+    CallStrategy Name
+  | -- | '>->'
+    Seq Strat Strat
+  | -- | '>-!->'
+    DeepSeqS Strat Strat
+  | -- | '!->'
+    OnChange Strat Strat
+  | -- | '>-!'
+    OnNoChange Strat Strat
+  | -- | 'repeatR'
+    Repeat Strat
   deriving (Eq, Show)
 
 -- | Things that can be used where a 'Step' is expected; a bare
@@ -234,12 +271,12 @@ one = Chain . pure
 nested :: Strat -> Step
 nested = EmbedS
 
-topdown, bottomup, topdownFix, topdownSuc, innerMost :: ToStep s => s -> Strat
-topdown    = TopDown . toStep
-bottomup   = BottomUp . toStep
+topdown, bottomup, topdownFix, topdownSuc, innerMost :: (ToStep s) => s -> Strat
+topdown = TopDown . toStep
+bottomup = BottomUp . toStep
 topdownFix = TopDownFix . toStep
 topdownSuc = TopDownSuc . toStep
-innerMost  = InnerMost . toStep
+innerMost = InnerMost . toStep
 
 -- | A whole-term pass, run as @apply \<name\> \<rewrite\>@.
 pass :: String -> Name -> Strat
@@ -254,7 +291,9 @@ repeatR :: Strat -> Strat
 repeatR = Repeat
 
 infixr 6 >->
+
 infixr 5 !->
+
 infixr 5 >-!
 
 -- | The combinators shared by both DSL layers. Fixities match
@@ -263,8 +302,10 @@ infixr 5 >-!
 class Strategic a where
   -- | Apply two strategies in succession.
   (>->) :: a -> a -> a
+
   -- | Only apply the second strategy if the first one succeeds.
   (!->) :: a -> a -> a
+
   -- | Only apply the second strategy if the first one fails.
   (>-!) :: a -> a -> a
 

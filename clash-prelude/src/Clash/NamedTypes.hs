@@ -1,3 +1,7 @@
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {- |
 Copyright  :  (C) 2017, Myrtle Software Ltd, QBayLogic, Google Inc.
 License    :  BSD2 (see the file LICENSE)
@@ -32,16 +36,7 @@ fifo @System
          "full" ::: Signal System Bool, "empty" ::: Signal System Bool)
 
 -}
-
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
-module Clash.NamedTypes
-  ((:::))
-where
+module Clash.NamedTypes ((:::)) where
 
 type (name :: k) ::: a = a
 -- ^ Annotate a type with a name

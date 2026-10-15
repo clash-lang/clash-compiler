@@ -1,3 +1,5 @@
+{-# LANGUAGE QuasiQuotes #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -12,15 +14,7 @@
   only, whose replacements are closed terms, so its in-scope set no longer
   matters for correctness.
 -}
-
-{-# LANGUAGE QuasiQuotes #-}
-
 module Clash.Tests.Normalize (tests) where
-
-import Data.Default (def)
-
-import Test.Tasty
-import Test.Tasty.HUnit
 
 import Clash.Core.Name (NameSort (User))
 import Clash.Core.Subst (unsafeSubstTm)
@@ -30,10 +24,19 @@ import Clash.Core.VarEnv (emptyVarEnv, lookupVarEnv, mkVarEnv)
 import Clash.Driver.Types (Binding (..))
 import Clash.Normalize (cleanupGraph)
 import Clash.Rewrite.Types (RewriteState (..))
-
+import Data.Default (def)
 import Test.Clash.Rewrite
-  ( assertWellScoped, globalId, intFunTy, mkBindingMap, nameToUnique
-  , parseToTermQQ, runRewriteTest, showPprU )
+  ( assertWellScoped,
+    globalId,
+    intFunTy,
+    mkBindingMap,
+    nameToUnique,
+    parseToTermQQ,
+    runRewriteTest,
+    showPprU,
+  )
+import Test.Tasty
+import Test.Tasty.HUnit
 
 -- | A global binder, as parsed from @<nm>_G@, of type @Int -> .. -> Int@ with
 -- the given number of arguments
@@ -57,60 +60,72 @@ cleanup globals top bndrs = do
     Nothing -> assertFailure ("cleanupGraph dropped " <> showPprU top)
 
 tests :: TestTree
-tests = testGroup "Clash.Tests.Normalize"
-  [ -- #445: when inlining a wrapper @f@ into its caller, 'flattenNode' strips
-    -- the arguments @f@ passes on to the function it wraps. It did not check
-    -- that the result binder of @f@ was not used in that application, so
-    -- @f = \x y -> let r0 = g r0 x y in r0@ became @g r0@, with @r0@ free.
-    -- https://github.com/clash-lang/clash-compiler/pull/445
-    testCase "flattenNode keeps LHS of recursive binders (#445)" $ do
-      let f = globalFun "f" 2
-          g = globalFun "g" 3
-          h = globalFun "h" 2
-      actual <- cleanup [f, g, h] h
-        [ ( h
-          , [parseToTermQQ|
+tests =
+  testGroup
+    "Clash.Tests.Normalize"
+    [ -- #445: when inlining a wrapper @f@ into its caller, 'flattenNode' strips
+      -- the arguments @f@ passes on to the function it wraps. It did not check
+      -- that the result binder of @f@ was not used in that application, so
+      -- @f = \x y -> let r0 = g r0 x y in r0@ became @g r0@, with @r0@ free.
+      -- https://github.com/clash-lang/clash-compiler/pull/445
+      testCase "flattenNode keeps LHS of recursive binders (#445)" $ do
+        let f = globalFun "f" 2
+            g = globalFun "g" 3
+            h = globalFun "h" 2
+        actual <-
+          cleanup
+            [f, g, h]
+            h
+            [ ( h,
+                [parseToTermQQ|
               \(a_10 :: Int) (b_11 :: Int) ->
                 let r1_12 :: Int
                     r1_12 = f_G a_10 b_11
                 in r1_12
-            |] )
-        , ( f
-          , [parseToTermQQ|
+            |]
+              ),
+              ( f,
+                [parseToTermQQ|
               \(x_20 :: Int) (y_21 :: Int) ->
                 let r0_22 :: Int
                     r0_22 = g_G r0_22 x_20 y_21
                 in r0_22
-            |] )
-        ]
-      assertWellScoped actual
+            |]
+              )
+            ]
+        assertWellScoped actual,
 
-    -- 'stripArgs' used to only check whether the remaining (unstripped)
-    -- arguments were /equal/ to one of the lambda-bound variables, not whether
-    -- they /mentioned/ one. So @f = \x -> let r = g (p x) x in r@ became
-    -- @g (p x)@, with @x@ free. Such non-ANF arguments occur for higher-order
-    -- primitives.
-    -- https://github.com/clash-lang/clash-compiler/commit/bb1ea69be69d5497bb9fb01a287adb607844a70d
-  , testCase "flattenNode doesn't strip args when they are mentioned" $ do
-      let f = globalFun "f" 1
-          g = globalFun "g" 2
-          h = globalFun "h" 1
-          p = globalFun "p" 1
-      actual <- cleanup [f, g, h, p] h
-        [ ( h
-          , [parseToTermQQ|
+      -- 'stripArgs' used to only check whether the remaining (unstripped)
+      -- arguments were /equal/ to one of the lambda-bound variables, not whether
+      -- they /mentioned/ one. So @f = \x -> let r = g (p x) x in r@ became
+      -- @g (p x)@, with @x@ free. Such non-ANF arguments occur for higher-order
+      -- primitives.
+      -- https://github.com/clash-lang/clash-compiler/commit/bb1ea69be69d5497bb9fb01a287adb607844a70d
+      testCase "flattenNode doesn't strip args when they are mentioned" $ do
+        let f = globalFun "f" 1
+            g = globalFun "g" 2
+            h = globalFun "h" 1
+            p = globalFun "p" 1
+        actual <-
+          cleanup
+            [f, g, h, p]
+            h
+            [ ( h,
+                [parseToTermQQ|
               \(a_10 :: Int) ->
                 let r1_12 :: Int
                     r1_12 = f_G a_10
                 in r1_12
-            |] )
-        , ( f
-          , [parseToTermQQ|
+            |]
+              ),
+              ( f,
+                [parseToTermQQ|
               \(x_20 :: Int) ->
                 let r0_22 :: Int
                     r0_22 = g_G (p_G x_20) x_20
                 in r0_22
-            |] )
-        ]
-      assertWellScoped actual
-  ]
+            |]
+              )
+            ]
+        assertWellScoped actual
+    ]

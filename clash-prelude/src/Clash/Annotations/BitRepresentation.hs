@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE RankNTypes #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
+
 {-|
 Copyright  :  (C) 2018, Google Inc.
 License    :  BSD2 (see the file LICENSE)
@@ -7,45 +11,42 @@ Using /ANN/ pragma's you can tell the Clash compiler to use a custom
 bit representation for a data type. See @DataReprAnn@ for documentation.
 
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
-
-{-# OPTIONS_GHC -Wno-orphans #-}
-
 module Clash.Annotations.BitRepresentation
- (
- -- * Data structures to express a custom bit representation
-   DataReprAnn(..)
- , ConstrRepr(..)
- -- * Convenience type synonyms for Integer
- , BitMask
- , Value
- , Size
- , FieldAnn
+  ( -- * Data structures to express a custom bit representation
+    DataReprAnn (..),
+    ConstrRepr (..),
 
- -- * Functions
- , liftQ
- ) where
+    -- * Convenience type synonyms for Integer
+    BitMask,
+    Value,
+    Size,
+    FieldAnn,
 
-import           Data.Data                  (Data)
+    -- * Functions
+    liftQ,
+  )
+where
+
+import Data.Data (Data)
 #if __GLASGOW_HASKELL__ <= 910
-import           Data.Typeable              (Typeable)
+import Data.Typeable (Typeable)
 #endif
-import           Language.Haskell.TH.Instances ()
-import qualified Language.Haskell.TH.Lift   ()
+import GHC.Generics (Generic)
+import Language.Haskell.TH.Instances ()
+import qualified Language.Haskell.TH.Lift ()
 import qualified Language.Haskell.TH.Syntax as TH
-import           GHC.Generics               (Generic)
 
-type BitMask  = Integer
-type Value    = Integer
-type Size     = Int
+type BitMask = Integer
+
+type Value = Integer
+
+type Size = Int
 
 -- | BitMask used to mask fields
 type FieldAnn = BitMask
 
 -- | Lift values inside of 'TH.Q' to a Template Haskell expression
-liftQ :: TH.Lift a => TH.Q a -> TH.Q TH.Exp
+liftQ :: (TH.Lift a) => TH.Q a -> TH.Q TH.Exp
 liftQ = (>>= TH.lift)
 
 -- NOTE: The following instances are imported from Language.Haskell.TH.Lift.
@@ -53,13 +54,12 @@ liftQ = (>>= TH.lift)
 -- template haskell more difficult. Please uncomment these instances and the
 -- import of TH.Lift whenever it suits you.
 --
---deriving instance TH.Lift TH.Name
---deriving instance TH.Lift TH.OccName
---deriving instance TH.Lift TH.NameFlavour
---deriving instance TH.Lift TH.ModName
---deriving instance TH.Lift TH.NameSpace
---deriving instance TH.Lift TH.PkgName
-
+-- deriving instance TH.Lift TH.Name
+-- deriving instance TH.Lift TH.OccName
+-- deriving instance TH.Lift TH.NameFlavour
+-- deriving instance TH.Lift TH.ModName
+-- deriving instance TH.Lift TH.NameSpace
+-- deriving instance TH.Lift TH.PkgName
 
 -- | Annotation for custom bit representations of data types
 --
@@ -107,32 +107,32 @@ liftQ = (>>= TH.lift)
 --
 -- __NB__: BitPack for a custom encoding can be derived using
 -- 'Clash.Annotations.BitRepresentation.Deriving.deriveBitPack'.
-data DataReprAnn =
-  DataReprAnn
-    -- Type this annotation is for:
-    TH.Type
-    -- Size of type:
-    Size
-    -- Constructors:
-    [ConstrRepr]
-      deriving (Show, Data, Eq, Generic, TH.Lift)
+data DataReprAnn
+  = DataReprAnn
+      -- Type this annotation is for:
+      TH.Type
+      -- Size of type:
+      Size
+      -- Constructors:
+      [ConstrRepr]
+  deriving (Show, Data, Eq, Generic, TH.Lift)
 #if __GLASGOW_HASKELL__ <= 910
-      deriving Typeable
+  deriving (Typeable)
 #endif
 
 -- | Annotation for constructors. Indicates how to match this constructor based
 -- off of the whole datatype.
-data ConstrRepr =
-  ConstrRepr
-    -- Constructor name:
-    TH.Name
-    -- Bits relevant for this constructor:
-    BitMask
-    -- data & mask should be equal to..:
-    Value
-    -- Masks for fields. Indicates where fields are stored:
-    [FieldAnn]
-      deriving (Show, Data, Eq, Generic, TH.Lift)
+data ConstrRepr
+  = ConstrRepr
+      -- Constructor name:
+      TH.Name
+      -- Bits relevant for this constructor:
+      BitMask
+      -- data & mask should be equal to..:
+      Value
+      -- Masks for fields. Indicates where fields are stored:
+      [FieldAnn]
+  deriving (Show, Data, Eq, Generic, TH.Lift)
 #if __GLASGOW_HASKELL__ <= 910
-      deriving Typeable
+  deriving (Typeable)
 #endif

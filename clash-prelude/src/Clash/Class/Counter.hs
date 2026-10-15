@@ -5,12 +5,12 @@
 
   Utilities for wrapping counters consisting of multiple individual counters
 -}
-
 module Clash.Class.Counter
-  ( Counter(countMin, countMax, countSuccOverflow, countPredOverflow)
-  , countSucc
-  , countPred
-  ) where
+  ( Counter (countMin, countMax, countSuccOverflow, countPredOverflow),
+    countSucc,
+    countPred,
+  )
+where
 
 import Clash.Class.Counter.Internal
 
@@ -38,7 +38,7 @@ import Clash.Class.Counter.Internal
 -- (1,0)
 -- >>> countSucc @(Either (Index 9) (Index 9)) (Left 8)
 -- Right 0
-countSucc :: Counter a => a -> a
+countSucc :: (Counter a) => a -> a
 countSucc = snd . countSuccOverflow
 
 -- | Predecessor of a counter
@@ -58,5 +58,5 @@ countSucc = snd . countSuccOverflow
 -- (0,1)
 -- >>> countPred @(Either (Index 9) (Index 9)) (Right 0)
 -- Left 8
-countPred :: Counter a => a -> a
+countPred :: (Counter a) => a -> a
 countPred = snd . countPredOverflow

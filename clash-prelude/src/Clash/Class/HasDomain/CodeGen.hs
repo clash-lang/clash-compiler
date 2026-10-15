@@ -3,16 +3,15 @@ Copyright  :  (C) 2019, Myrtle Software Ltd
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
-
 module Clash.Class.HasDomain.CodeGen
-  ( mkTryDomainTuples
-  , mkHasDomainTuples
-  ) where
+  ( mkTryDomainTuples,
+    mkHasDomainTuples,
+  )
+where
 
-import           Language.Haskell.TH.Syntax
-import           Clash.CPP                    (maxTupleSize)
-import           Language.Haskell.TH.Compat   (mkTySynInstD)
-
+import Clash.CPP (maxTupleSize)
+import Language.Haskell.TH.Compat (mkTySynInstD)
+import Language.Haskell.TH.Syntax
 
 mkTup :: [Type] -> Type
 mkTup names@(length -> n) =
@@ -26,21 +25,20 @@ mkTup names@(length -> n) =
 mkTryDomainTupleInstance :: Name -> Name -> Int -> Dec
 mkTryDomainTupleInstance tryDomainName mergeName n =
   mkTySynInstD tryDomainName [t, tupPat] tupBody
- where
-  bcde = map (VarT . mkName . ("a"++) . show) [1..n-1]
-  a    = VarT (mkName "a0")
-  t    = VarT (mkName "t")
+  where
+    bcde = map (VarT . mkName . ("a" ++) . show) [1 .. n - 1]
+    a = VarT (mkName "a0")
+    t = VarT (mkName "t")
 
-  -- Merge t a (b, c, d, e)
-  tupBody = ConT mergeName `AppT` t `AppT` a `AppT` (mkTup bcde)
+    -- Merge t a (b, c, d, e)
+    tupBody = ConT mergeName `AppT` t `AppT` a `AppT` (mkTup bcde)
 
-  -- (a, b, c, d, e)
-  tupPat = mkTup (a : bcde)
+    -- (a, b, c, d, e)
+    tupPat = mkTup (a : bcde)
 
 mkTryDomainTuples :: Name -> Name -> Q [Dec]
 mkTryDomainTuples tryDomainName mergeName =
-  pure (map (mkTryDomainTupleInstance tryDomainName mergeName) [3..maxTupleSize])
-
+  pure (map (mkTryDomainTupleInstance tryDomainName mergeName) [3 .. maxTupleSize])
 
 -- | Creates an instance of the form:
 --
@@ -51,17 +49,17 @@ mkTryDomainTuples tryDomainName mergeName =
 mkHasDomainTupleInstance :: Name -> Name -> Int -> Dec
 mkHasDomainTupleInstance hasDomainName mergeName n =
   mkTySynInstD hasDomainName [dom, tupPat] merge
- where
-  bcde = map (VarT . mkName . ("a"++) . show) [1..n-1]
-  a    = VarT (mkName "a0")
-  dom  = VarT (mkName "dom")
+  where
+    bcde = map (VarT . mkName . ("a" ++) . show) [1 .. n - 1]
+    a = VarT (mkName "a0")
+    dom = VarT (mkName "dom")
 
-  -- Merge dom a (b, c, d, e)
-  merge = ConT mergeName `AppT` dom `AppT` a `AppT` mkTup bcde
+    -- Merge dom a (b, c, d, e)
+    merge = ConT mergeName `AppT` dom `AppT` a `AppT` mkTup bcde
 
-  -- (a, b, c, d, e)
-  tupPat = mkTup (a : bcde)
+    -- (a, b, c, d, e)
+    tupPat = mkTup (a : bcde)
 
 mkHasDomainTuples :: Name -> Name -> Q [Dec]
 mkHasDomainTuples hasDomainName mergeName =
-  pure (map (mkHasDomainTupleInstance hasDomainName mergeName) [3..maxTupleSize])
+  pure (map (mkHasDomainTupleInstance hasDomainName mergeName) [3 .. maxTupleSize])
