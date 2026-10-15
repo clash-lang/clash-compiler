@@ -32,7 +32,7 @@ import Clash.Core.VarEnv
 import Clash.Driver.Types
   ( Binding (..), BindingMap, ClashEnv (..), ClashOpts (..), IsPrim (IsFun)
   , defClashOpts, debugSilent )
-import Clash.Netlist.Types (FilteredHWType (..), HWMap, HWType (Signed))
+import Clash.Netlist.Types (FilteredHWType (..), TTState, HWType (Signed))
 import Clash.Rewrite.Types
 import Clash.Rewrite.Util (runRewrite)
 import Clash.Normalize.Strategy (constantPropagation, normalization)
@@ -110,7 +110,7 @@ testTypeTranslator
   :: CustomReprs
   -> C.TyConMap
   -> C.Type
-  -> State HWMap (Maybe (Either String FilteredHWType))
+  -> State TTState (Maybe (Either String FilteredHWType))
 testTypeTranslator _reprs _tcm ty = pure $ Just $ case C.tyView ty of
   C.FunTy {} -> Left "function types are not representable"
   _ -> Right (FilteredHWType (Signed 64) [])
@@ -712,14 +712,15 @@ firstUniques n = take n . go
   go s0 = let (u, s1) = freshId s0 in u : go s1
 
 -- | Pretty print, always showing uniques (regardless of @CLASH_PPR_UNIQUES@)
--- but no types. Tests on scoping are about binders that share a name but not a
--- unique, or vice versa.
+-- but no types, qualifiers, ticks or stable names. Tests on scoping are about
+-- binders that share a name but not a unique, or vice versa.
 showPprU :: PrettyPrec p => p -> String
 showPprU = showPpr' PrettyOptions
   { displayUniques = True
   , displayTypes = False
   , displayQualifiers = False
   , displayTicks = False
+  , useStableNames = False
   }
 
 -- | Assert that two terms, or two types, are alpha equivalent: 'Eq' on
