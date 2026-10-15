@@ -358,7 +358,7 @@ domPeriodFraction ::
   ExceptT String (MaybeT m) Period
 domPeriodFraction m (coreView1 m -> Just ty) = domPeriodFraction m ty
 domPeriodFraction _ (tyView -> TyConApp tc [_, nTy, dTy])
-  | (nameOcc tc == "GHC.Internal.Real.:%" || nameOcc tc == "GHC.Real.:%")
+  | (nameOcc tc `elem` ["GHC.Internal.Real.:%","GHC.Real.:%"])
   , LitTy (NumTy n) <- nTy, n >= 0
   , LitTy (NumTy d) <- dTy, d >  0
   = pure $ Period $ fromInteger n % fromInteger d
