@@ -212,6 +212,7 @@
     workInfo: Never
 - BlackBoxHaskell:
     name: Clash.Sized.Vector.index_int
+    type: 'index_int :: KnownNat n => Vec n a -> Int -> a'
     templateFunction: Clash.Primitives.Sized.Vector.indexIntVerilog
 - BlackBox:
     name: Clash.Sized.Vector.replace_int
