@@ -52,7 +52,7 @@ doHDL Proxy opts src = do
   let backend = initBackend @s opts
   pd      <- primDirs backend
   (clashEnv, clashDesign) <-
-    generateBindings opts (return ()) pd ["."] [] (hdlKind backend) src Nothing
+    generateBindings opts (return ()) pd ["."] (hdlKind backend) src Nothing
   prepTime <- startTime `deepseq` designBindings clashDesign `deepseq` envTyConMap clashEnv `deepseq` envCustomReprs clashEnv `deepseq` Clock.getCurrentTime
   let prepStartDiff = reportTimeDiff prepTime startTime
   putStrLn $ "Loading dependencies took " ++ prepStartDiff
