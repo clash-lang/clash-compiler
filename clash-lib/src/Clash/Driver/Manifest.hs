@@ -230,16 +230,15 @@ instance ToJSON Manifest where
             -- TODO: Add Edam like fields
           ]
         | (fName, fHash) <- fileNames]
-      , "domains" .= Map.fromList
-        [ ( vName
-          , Aeson.object
-            [ "period" .= ((\(Period p) -> p) vPeriod)
-            , "active_edge" .= show vActiveEdge
-            , "reset_kind" .= show vResetKind
-            , "init_behavior" .= show vInitBehavior
-            , "reset_polarity" .= show vResetPolarity
-            ]
-          )
+      , "domains" .=
+        [ Aeson.object
+          [ "name" .= vName
+          , "period" .= ((\(Period p) -> p) vPeriod)
+          , "active_edge" .= show vActiveEdge
+          , "reset_kind" .= show vResetKind
+          , "init_behavior" .= show vInitBehavior
+          , "reset_polarity" .= show vResetPolarity
+          ]
         | VDomainConfiguration{..} <- domains ]
       , "dependencies" .= Aeson.object
         [ "transitive" .= transitiveDependencies ]
@@ -290,13 +289,13 @@ instance FromJSON Manifest where
         <*> v .: "components"
         <*> (topComponent >>= (.: "name"))
         <*> parseFiles v
-        <*> (Map.elems <$> (v .: "domains" >>= Map.traverseWithKey parseDomain))
+        <*> (v .: "domains" >>= mapM parseDomain)
         <*> (v .: "dependencies" >>= (.: "transitive"))
    where
-    parseDomain :: Text -> Aeson.Object -> Parser VDomainConfiguration
-    parseDomain nm v =
+    parseDomain :: Aeson.Object -> Parser VDomainConfiguration
+    parseDomain v =
       VDomainConfiguration
-        <$> pure (Text.unpack nm)
+        <$> v .: "name"
         <*> (Period <$> (v .: "period"))
         <*> parseWithRead "active_edge" v
         <*> parseWithRead "reset_kind" v
