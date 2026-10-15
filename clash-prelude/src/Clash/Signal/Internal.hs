@@ -54,6 +54,11 @@ module Clash.Signal.Internal
   , KnownConf
   , KnownConfiguration
   , knownDomain
+  , KnownResetPolarity(..)
+  , KnownInitBehavior(..)
+  , KnownResetKind(..)
+  , KnownActiveEdge(..)
+  , KnownFraction(..)
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
@@ -62,6 +67,7 @@ module Clash.Signal.Internal
   , SResetKind(..)
   , ResetPolarity(..)
   , SResetPolarity(..)
+  , SRatioNat(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
   , SupportsSwitchingTo
