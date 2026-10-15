@@ -95,6 +95,42 @@ indexMaybe [] _     = Nothing
 indexMaybe (x:_)  0 = Just x
 indexMaybe (_:xs) n = indexMaybe xs (n-1)
 
+-- | Render the package database and package visibility flags of a session as
+-- command line arguments for the Hint session that loads blackbox functions.
+-- This way, blackbox functions can be loaded from exactly the packages the
+-- design itself is loaded from. For example, from a hidden package exposed
+-- with @-package-id@ (see issue #3105).
+--
+-- The package environment file (if any) is already merged into these flags by
+-- GHC, so we tell Hint not to load one again with @-package-env -@.
+hintPackageArgs :: GHC.DynFlags -> [String]
+hintPackageArgs dflags = concat
+  -- NB: GHC stores these flags in reverse order
+  [ ["-package-env", "-"]
+  , concatMap dbArgs (reverse (GHC.packageDBFlags dflags))
+  , ["-hide-all-packages" | GHC.gopt GHC.Opt_HideAllPackages dflags]
+  , concatMap ignoreArgs (reverse (GHC.ignorePackageFlags dflags))
+  , concatMap pkgArgs (reverse (GHC.packageFlags dflags))
+  ]
+ where
+  dbArgs = \case
+    GHC.PackageDB GHC.GlobalPkgDb -> ["-global-package-db"]
+    GHC.PackageDB GHC.UserPkgDb -> ["-user-package-db"]
+    GHC.PackageDB (GHC.PkgDbPath p) -> ["-package-db", p]
+    GHC.NoUserPackageDB -> ["-no-user-package-db"]
+    GHC.NoGlobalPackageDB -> ["-no-global-package-db"]
+    GHC.ClearPackageDBs -> ["-clear-package-db"]
+
+  ignoreArgs (GHC.IgnorePackage p) = ["-ignore-package", p]
+
+  pkgArgs = \case
+    -- GHC keeps the original flag, e.g. @-package-id foo@ or
+    -- @-package foo (Foo as Bar)@, which we split at the first space.
+    GHC.ExposePackage flag _ _ -> case break (== ' ') flag of
+      (f, _:arg) -> [f, arg]
+      (f, []) -> [f]
+    GHC.HidePackage p -> ["-hide-package", p]
+
 generateBindings
   :: ClashOpts
   -> GHC.Ghc ()
@@ -105,14 +141,12 @@ generateBindings
   -- ^ primitives (blackbox) directories
   -> [FilePath]
   -- ^ import directories (-i flag)
-  -> [FilePath]
-  -- ^ Package database
   -> HDL
   -- ^ HDL target
   -> String
   -> Maybe GHC.DynFlags
   -> IO (ClashEnv, ClashDesign)
-generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = do
+generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
   (  bindings
    , clsOps
    , unlocatable
@@ -125,7 +159,8 @@ generateBindings opts startAction primDirs importDirs dbs hdl modName dflagsM = 
   startTime <- Clock.getCurrentTime
   primMapR <- generatePrimMap unresolvedPrims primGuards (concat [pFP, primDirs, importDirs])
   tdir <- maybe ghcLibDir (pure . GHC.topDir) dflagsM
-  primMapC <- compilePrimitives importDirs dbs tdir primMapR
+  let hintArgs = maybe [] hintPackageArgs dflagsM
+  primMapC <- compilePrimitives importDirs hintArgs tdir primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
                    (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
