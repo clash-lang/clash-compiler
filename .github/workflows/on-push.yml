@@ -359,6 +359,20 @@ jobs:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_SECRET }}
         run: nix path-info .#devShells.x86_64-linux.${{matrix.ghc}} | cachix push clash-lang
 
+  formatting:
+    name: Check Haskell formatting
+    runs-on: self-hosted
+    needs: developer_shells
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      # Tilia needs Cabal's build plan to discover modules and their extensions.
+      - name: Update Cabal package index
+        run: nix develop --command bash .ci/retry.sh cabal update
+
+      - name: Check formatting
+        run: nix develop --command tilia check all --check-ast --check-idempotence --must-not-decline
+
   packages_testsuite:
     name: Packaging clash-testsuite (${{matrix.packageSet}})
     runs-on: self-hosted
@@ -430,6 +444,7 @@ jobs:
     name: All on-push jobs finished
     if: ${{ !cancelled() }}
     needs: [
+      formatting,
       cabal,
       cabal-haddock,
       stack,
