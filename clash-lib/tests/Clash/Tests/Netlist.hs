@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -5,15 +7,7 @@
 
   Tests for "Clash.Netlist"
 -}
-
-{-# LANGUAGE OverloadedStrings #-}
-
 module Clash.Tests.Netlist (tests) where
-
-import Data.Default (def)
-
-import Test.Tasty
-import Test.Tasty.HUnit
 
 import Clash.Annotations.Primitive (HDL (VHDL))
 import Clash.Backend (initBackend)
@@ -24,11 +18,17 @@ import Clash.Driver.Types (ClashEnv (..))
 import Clash.Netlist (mkFunApp, runNetlistMonad)
 import qualified Clash.Netlist.Id as Id
 import Clash.Netlist.Types
-  ( Declaration (Assignment), DeclarationType (Concurrent), Expr (Identifier)
-  , PreserveCase (PreserveCase), SomeBackend (..) )
+  ( Declaration (Assignment),
+    DeclarationType (Concurrent),
+    Expr (Identifier),
+    PreserveCase (PreserveCase),
+    SomeBackend (..),
+  )
 import Clash.Rewrite.Types (RewriteEnv (..))
-
+import Data.Default (def)
 import Test.Clash.Rewrite (globalId, intFunTy, intId, mkBindingMap)
+import Test.Tasty
+import Test.Tasty.HUnit
 
 -- | When 'mkFunApp' encountered a function application, it determined whether
 -- the function was a top entity or a normalized global binder by looking up its
@@ -54,21 +54,34 @@ mkFunAppLocalShadowingGlobal = do
       dst = Id.unsafeMake "result"
   (decls, _) <-
     runNetlistMonad
-      (_clashEnv env) (error "evaluator") False bs mempty
-      (_typeTranslator env) True be ids "" mempty
+      (_clashEnv env)
+      (error "evaluator")
+      False
+      bs
+      mempty
+      (_typeTranslator env)
+      True
+      be
+      ids
+      ""
+      mempty
       (mkFunApp Concurrent dst xLocal [] [])
   case decls of
     [Assignment lhs _ (Identifier rhs Nothing)] -> do
       assertEqual "Assigned identifier" "result" (Id.toText lhs)
       assertEqual "Assigned expression" "x" (Id.toText rhs)
-    _ -> assertFailure
-      ("Expected a single assignment, but got " <> show (length decls)
-        <> " declarations")
+    _ ->
+      assertFailure
+        ( "Expected a single assignment, but got "
+            <> show (length decls)
+            <> " declarations"
+        )
 
 tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Netlist"
-    [ testCase "mkFunApp does not instantiate locals that shadow a global (#1087)"
+    [ testCase
+        "mkFunApp does not instantiate locals that shadow a global (#1087)"
         mkFunAppLocalShadowingGlobal
     ]

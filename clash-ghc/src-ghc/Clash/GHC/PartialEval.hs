@@ -7,11 +7,9 @@ The partial evalautor for the GHC front-end. This can be used to evaluate
 terms in Clash core to WHNF or NF, using knowledge of GHC primitives and types.
 For functions which can use this evaluator, see Clash.Core.PartialEval.
 -}
-
 module Clash.GHC.PartialEval where
 
 import Clash.Core.PartialEval
-
 import Clash.GHC.PartialEval.Eval
 import Clash.GHC.PartialEval.Quote
 
@@ -21,4 +19,3 @@ import Clash.GHC.PartialEval.Quote
 --
 ghcEvaluator :: Evaluator
 ghcEvaluator = Evaluator eval quote
-

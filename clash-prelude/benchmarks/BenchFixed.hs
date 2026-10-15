@@ -1,5 +1,8 @@
-{-# LANGUAGE CPP, DataKinds, MagicHash, TypeOperators, TemplateHaskell #-}
-
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -ddump-simpl -ddump-splices -ddump-to-file #-}
 
 #define WORD_SIZE_IN_BITS 64
@@ -9,17 +12,19 @@ module BenchFixed (fixedBench) where
 import Clash.Class.Num
 import Clash.Sized.Fixed
 import Clash.Sized.Unsigned
-import Criterion                   (Benchmark, env, bench, nf, bgroup)
-import Language.Haskell.TH.Syntax  (lift)
+import Criterion (Benchmark, bench, bgroup, env, nf)
+import Language.Haskell.TH.Syntax (lift)
 
 fixedBench :: Benchmark
-fixedBench = bgroup "Fixed"
-  [ fromRationalBench
-  , addBench
-  , subBench
-  , multBench
-  , multBench_wrap
-  ]
+fixedBench =
+  bgroup
+    "Fixed"
+    [ fromRationalBench,
+      addBench,
+      subBench,
+      multBench,
+      multBench_wrap
+    ]
 
 smallValueR_pos :: Rational
 smallValueR_pos = $(lift (5126.889117 :: Rational))
@@ -43,22 +48,22 @@ addBench :: Benchmark
 addBench = env setup $ \m ->
   bench "+" $ nf (uncurry (+)) m
   where
-    setup = return (smallValueU1,smallValueU2)
+    setup = return (smallValueU1, smallValueU2)
 
 subBench :: Benchmark
 subBench = env setup $ \m ->
   bench "-" $ nf (uncurry (-)) m
   where
-    setup = return (smallValueU1,smallValueU2)
+    setup = return (smallValueU1, smallValueU2)
 
 multBench :: Benchmark
 multBench = env setup $ \m ->
   bench "*" $ nf (uncurry (*)) m
   where
-    setup = return (smallValueU1,smallValueU2)
+    setup = return (smallValueU1, smallValueU2)
 
 multBench_wrap :: Benchmark
 multBench_wrap = env setup $ \m ->
   bench "satMult SatWrap" $ nf (uncurry (satMul SatWrap)) m
   where
-    setup = return (smallValueU1,smallValueU2)
+    setup = return (smallValueU1, smallValueU2)

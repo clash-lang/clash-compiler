@@ -1,3 +1,7 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE PatternSynonyms #-}
+
 {-|
 Copyright  :  (C) 2022, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -9,47 +13,41 @@ properly in blackbox models or tests. Note that none of these operations can be
 translated to HDL.
 
 -}
-
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PatternSynonyms #-}
-
 module Clash.XException.MaybeX
-  ( MaybeX(IsX, IsDefined)
+  ( MaybeX (IsX, IsDefined),
 
     -- * Construction
-  , toMaybeX
-  , hasXToMaybeX
+    toMaybeX,
+    hasXToMaybeX,
 
     -- * Deconstruction
-  , fromMaybeX
+    fromMaybeX,
 
     -- * Operations
-  , andX
-  , orX
-  , maybeX
-  ) where
+    andX,
+    orX,
+    maybeX,
+  )
+where
 
-import Prelude
-
+import Clash.XException (NFDataX, XException (..), hasX, isX)
 import Control.DeepSeq (NFData)
 import Control.Exception (throw)
-
-import Clash.XException (XException(..), NFDataX, isX, hasX)
+import Prelude
 
 -- | Structure helping programmers to deal with 'Clash.XException.XException'
 -- values. For safety reasons it can't be constructed directly, but should be
 -- constructed using either 'pure' or 'toMaybeX'. After construction, it can be
 -- deconstructed using either 'IsX' or 'IsDefined'.
 data MaybeX a
-  = IsX_ String
-  -- ^ Upon construction, @a@ evaluated to 'Clash.XException.XException'
-  | IsDefined_ !a
-  -- ^ Upon construction, @a@ evaluated to a non-bottom WHNF
+  = -- | Upon construction, @a@ evaluated to 'Clash.XException.XException'
+    IsX_ String
+  | -- | Upon construction, @a@ evaluated to a non-bottom WHNF
+    IsDefined_ !a
 
-instance Show a => Show (MaybeX a) where
+instance (Show a) => Show (MaybeX a) where
   showsPrec d = \case
-    IsX_ msg     -> showParen (d > 10) $ showString "IsX "       . showsPrec 11 msg
+    IsX_ msg -> showParen (d > 10) $ showString "IsX " . showsPrec 11 msg
     IsDefined_ a -> showParen (d > 10) $ showString "IsDefined " . showsPrec 11 a
 
 -- | Upon construction, @a@ evaluated to 'Clash.XException.XException'
@@ -59,13 +57,14 @@ pattern IsX msg <- IsX_ msg
 -- | Upon construction, @a@ evaluated to a non-bottom WHNF
 pattern IsDefined :: forall a. a -> MaybeX a
 pattern IsDefined a <- IsDefined_ a
+
 {-# COMPLETE IsX, IsDefined #-}
 
 -- | Note that 'fmap' is X-strict in its argument. That is, if its input is 'IsX',
 -- its output will be too.
 instance Functor MaybeX where
   fmap _f (IsX_ msg) = IsX_ msg
-  fmap f  (IsDefined_ a) = pure (f a)
+  fmap f (IsDefined_ a) = pure (f a)
 
 -- | Note that '<*>' and 'liftA2' are X-strict in their arguments. That is, if
 -- any of their inputs are 'IsX', their outputs will be too.
@@ -73,8 +72,8 @@ instance Applicative MaybeX where
   pure = either IsX_ IsDefined_ . isX
 
   liftA2 f (IsDefined_ a) (IsDefined_ b) = pure (f a b)
-  liftA2 _ (IsX_ msg)     _              = IsX_ msg
-  liftA2 _ _              (IsX_ msg)     = IsX_ msg
+  liftA2 _ (IsX_ msg) _ = IsX_ msg
+  liftA2 _ _ (IsX_ msg) = IsX_ msg
 
 -- | Construct a 'MaybeX' value. If @a@ evaluates to 'Clash.XException.XException',
 -- this function will return 'IsX'. Otherwise, it will return 'IsDefined'.
@@ -94,7 +93,7 @@ fromMaybeX = maybeX (throw . XException) id
 
 -- | Map functions over both constructors.
 maybeX :: (String -> b) -> (a -> b) -> MaybeX a -> b
-maybeX f _ (IsX_ msg)     = f msg
+maybeX f _ (IsX_ msg) = f msg
 maybeX _ g (IsDefined_ a) = g a
 
 -- | Implements '&&' accounting for X
@@ -117,11 +116,12 @@ maybeX _ g (IsDefined_ a) = g a
 --  1 | X | 1 | 0
 --  0 | 0 | 0 | 0
 andX :: MaybeX Bool -> MaybeX Bool -> MaybeX Bool
-andX (IsDefined_ False) _                  = IsDefined_ False
-andX _                  (IsDefined_ False) = IsDefined_ False
-andX (IsDefined_ True)  (IsDefined_ True)  = IsDefined_ True
-andX (IsX_ msg)         _                  = IsX_ msg
-andX _                  (IsX_ msg)         = IsX_ msg
+andX (IsDefined_ False) _ = IsDefined_ False
+andX _ (IsDefined_ False) = IsDefined_ False
+andX (IsDefined_ True) (IsDefined_ True) = IsDefined_ True
+andX (IsX_ msg) _ = IsX_ msg
+andX _ (IsX_ msg) = IsX_ msg
+
 infixr 3 `andX`
 
 -- | Implements '||' accounting for X
@@ -144,9 +144,10 @@ infixr 3 `andX`
 --  1 | 1 | 1 | 1
 --  0 | X | 1 | 0
 orX :: MaybeX Bool -> MaybeX Bool -> MaybeX Bool
-orX (IsDefined_ True)  _                  = IsDefined_ True
-orX _                  (IsDefined_ True)  = IsDefined_ True
+orX (IsDefined_ True) _ = IsDefined_ True
+orX _ (IsDefined_ True) = IsDefined_ True
 orX (IsDefined_ False) (IsDefined_ False) = IsDefined_ False
-orX (IsX_ msg)         _                  = IsX_ msg
-orX _                  (IsX_ msg)         = IsX_ msg
+orX (IsX_ msg) _ = IsX_ msg
+orX _ (IsX_ msg) = IsX_ msg
+
 infixr 2 `orX`

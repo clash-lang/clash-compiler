@@ -8,10 +8,10 @@
 
   Transformations of the Normalization process
 -}
-
 module Clash.Normalize.Transformations
-  ( module X
-  ) where
+  ( module X,
+  )
+where
 
 import Clash.Normalize.Transformations.ANF as X
 import Clash.Normalize.Transformations.Case as X

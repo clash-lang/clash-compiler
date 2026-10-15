@@ -4,44 +4,41 @@
 module Clash.Tests.Core.Subst (tests) where
 
 #if MIN_VERSION_ghc(9,0,0)
-import           GHC.Types.SrcLoc        (noSrcSpan)
+import GHC.Types.SrcLoc (noSrcSpan)
 #else
-import           SrcLoc                  (noSrcSpan)
+import SrcLoc (noSrcSpan)
 #endif
-
-import           Test.Tasty
-import           Test.Tasty.HUnit
-
-import           Clash.Core.Name         (Name(..), NameSort(..), OccName)
-import           Clash.Core.Term         (Bind(..), Pat(..), Term(..))
-import           Clash.Core.Type         (ConstTy(..), Type(..))
-import           Clash.Core.Subst
-import           Clash.Core.VarEnv
-import           Clash.Core.Var          (Id, IdScope(..), TyVar, Var(..))
-import           Clash.Unique            (Unique)
-
-import           Test.Clash.Rewrite
-  (assertAlphaEq, inScopeOf, intTy, localId, showPprU, tyVar)
+import Clash.Core.Name (Name (..), NameSort (..), OccName)
+import Clash.Core.Subst
+import Clash.Core.Term (Bind (..), Pat (..), Term (..))
+import Clash.Core.Type (ConstTy (..), Type (..))
+import Clash.Core.Var (Id, IdScope (..), TyVar, Var (..))
+import Clash.Core.VarEnv
+import Clash.Unique (Unique)
+import Test.Clash.Rewrite (assertAlphaEq, inScopeOf, intTy, localId, showPprU, tyVar)
+import Test.Tasty
+import Test.Tasty.HUnit
 
 fakeName :: Name a
 fakeName =
   Name
-    { nameSort=User
-    , nameOcc="fake"
-    , nameUniq=0
-    , nameLoc=noSrcSpan
+    { nameSort = User,
+      nameOcc = "fake",
+      nameUniq = 0,
+      nameLoc = noSrcSpan
     }
 
 unique :: Unique
 unique = 20
 
 mkTestId :: IdScope -> OccName -> Unique -> Id
-mkTestId scope occ uniq = Id {
-    varName = fakeName {nameUniq=uniq, nameOcc=occ}
-  , varUniq = uniq
-  , varType = ConstTy (TyCon fakeName)
-  , idScope = scope
-  }
+mkTestId scope occ uniq =
+  Id
+    { varName = fakeName{nameUniq = uniq, nameOcc = occ},
+      varUniq = uniq,
+      varType = ConstTy (TyCon fakeName),
+      idScope = scope
+    }
 
 termVar :: Var Term
 termVar = mkTestId LocalId "term" unique
@@ -71,10 +68,16 @@ payload = Var localY
 -- satisfies 'unsafeSubstTm's precondition for substituting 'localX'
 deshadowedTerm :: Term
 deshadowedTerm =
-  Lam localZ
-    (Let (NonRec localW (Var localX))
-      (Case (Var localW) fakeType
-        [(DefaultPat, App (Var localX) (Var localZ))]))
+  Lam
+    localZ
+    ( Let
+        (NonRec localW (Var localX))
+        ( Case
+            (Var localW)
+            fakeType
+            [(DefaultPat, App (Var localX) (Var localZ))]
+        )
+    )
 
 -- Variables for the capture-avoidance tests below
 x2, y1, z3 :: Id
@@ -94,8 +97,8 @@ c3 = tyVar User "c" 3
 substTmLam :: Assertion
 substTmLam =
   assertAlphaEq (Lam z3 (Var x2)) (substTm "substTmLam" subst (Lam x2 (Var y1)))
- where
-  subst = extendIdSubst (mkSubst (inScopeOf [x2])) y1 (Var x2)
+  where
+    subst = extendIdSubst (mkSubst (inScopeOf [x2])) y1 (Var x2)
 
 -- | Like 'substTmLam', but the term variable is captured through its /type/:
 -- substituting @[y := (x :: a)]@ in @/\\a -> y@ must rename the type binder.
@@ -109,17 +112,17 @@ substTmTyLam =
       | a == a2 -> assertFailure ("binder not renamed: " <> showPprU tm)
       | otherwise -> x @=? xa
     tm -> assertFailure ("unexpected result: " <> showPprU tm)
- where
-  xa = localId User "x" 5 (VarTy a2)
-  subst = extendIdSubst (mkSubst (inScopeOf [a2])) y1 (Var xa)
+  where
+    xa = localId User "x" 5 (VarTy a2)
+    subst = extendIdSubst (mkSubst (inScopeOf [a2])) y1 (Var xa)
 
 -- | Substituting @[b := a]@ in @forall a. b@ must rename the binder @a@.
 -- https://github.com/clash-lang/clash-compiler/pull/361
 substTyForAll :: Assertion
 substTyForAll =
   assertAlphaEq (ForAllTy c3 (VarTy a2)) (substTy subst (ForAllTy a2 (VarTy b1)))
- where
-  subst = extendTvSubst (mkSubst (inScopeOf [a2])) b1 (VarTy a2)
+  where
+    subst = extendTvSubst (mkSubst (inScopeOf [a2])) b1 (VarTy a2)
 
 -- | 'deShadowTerm' must rename a binder that is already in scope.
 -- https://github.com/clash-lang/clash-compiler/pull/361
@@ -141,7 +144,8 @@ freshenTmRenames =
       | x == x2 -> assertFailure ("binder not renamed: " <> showPprU tm)
       | otherwise -> do
           x @=? x'
-          assertBool "new binder not in returned in-scope set"
+          assertBool
+            "new binder not in returned in-scope set"
             (x `elemInScopeSet` is1)
     (_, tm) -> assertFailure ("unexpected result: " <> showPprU tm)
 
@@ -157,44 +161,55 @@ tests =
     -- https://github.com/clash-lang/clash-compiler/issues/1046,
     -- https://github.com/clash-lang/clash-compiler/pull/1048
     [ testCase "deShadow type/term (#1048)" $
-        term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet typeVar) term1
-
-    , testCase "unsafeSubstTm substitutes a local variable" $
-        App payload (Var localZ) @=?
-          unsafeSubstTm emptyVarEnv (unitVarEnv localX payload)
-            (App (Var localX) (Var localZ))
-
-    , testCase "unsafeSubstTm leaves unmatched variables alone" $
-        Var localZ @=?
-          unsafeSubstTm emptyVarEnv (unitVarEnv localX payload) (Var localZ)
-
-    , testCase "unsafeSubstTm looks globals up in the global substitution" $ do
-        payload @=? unsafeSubstTm (unitVarEnv globalG payload) emptyVarEnv
-                      (Var globalG)
+        term1 @=? deShadowTerm (extendInScopeSet emptyInScopeSet typeVar) term1,
+      testCase "unsafeSubstTm substitutes a local variable" $
+        App payload (Var localZ)
+          @=? unsafeSubstTm
+            emptyVarEnv
+            (unitVarEnv localX payload)
+            (App (Var localX) (Var localZ)),
+      testCase "unsafeSubstTm leaves unmatched variables alone" $
+        Var localZ
+          @=? unsafeSubstTm emptyVarEnv (unitVarEnv localX payload) (Var localZ),
+      testCase "unsafeSubstTm looks globals up in the global substitution" $ do
+        payload
+          @=? unsafeSubstTm
+            (unitVarEnv globalG payload)
+            emptyVarEnv
+            (Var globalG)
         -- A global is never looked up in the local substitution, nor the other
         -- way around
-        Var globalG @=? unsafeSubstTm emptyVarEnv (unitVarEnv globalG payload)
-                          (Var globalG)
-        Var localX @=? unsafeSubstTm (unitVarEnv localX payload) emptyVarEnv
-                         (Var localX)
-
-    , testCase "unsafeSubstTm agrees with substTm on a deshadowed term" $
-        let
-          is = extendInScopeSetList emptyInScopeSet [localX, localY]
-          subst = extendIdSubst (mkSubst is) localX payload
-        in
-          substTm "unsafeSubstTm test" subst deshadowedTerm @=?
-            unsafeSubstTm emptyVarEnv (unitVarEnv localX payload)
-              deshadowedTerm
-
-    , testCase "substTm renames a Lam binder that would capture (#361)"
-        substTmLam
-    , testCase "substTm renames a TyLam binder that would capture (#361)"
-        substTmTyLam
-    , testCase "substTy renames a ForAllTy binder that would capture (#361)"
-        substTyForAll
-    , testCase "deShadowTerm renames a binder that is in scope (#361)"
-        deShadowTermRenames
-    , testCase "freshenTm renames a binder that is in scope (#361)"
+        Var globalG
+          @=? unsafeSubstTm
+            emptyVarEnv
+            (unitVarEnv globalG payload)
+            (Var globalG)
+        Var localX
+          @=? unsafeSubstTm
+            (unitVarEnv localX payload)
+            emptyVarEnv
+            (Var localX),
+      testCase "unsafeSubstTm agrees with substTm on a deshadowed term" $
+        let is = extendInScopeSetList emptyInScopeSet [localX, localY]
+            subst = extendIdSubst (mkSubst is) localX payload
+         in substTm "unsafeSubstTm test" subst deshadowedTerm
+              @=? unsafeSubstTm
+                emptyVarEnv
+                (unitVarEnv localX payload)
+                deshadowedTerm,
+      testCase
+        "substTm renames a Lam binder that would capture (#361)"
+        substTmLam,
+      testCase
+        "substTm renames a TyLam binder that would capture (#361)"
+        substTmTyLam,
+      testCase
+        "substTy renames a ForAllTy binder that would capture (#361)"
+        substTyForAll,
+      testCase
+        "deShadowTerm renames a binder that is in scope (#361)"
+        deShadowTermRenames,
+      testCase
+        "freshenTm renames a binder that is in scope (#361)"
         freshenTmRenames
     ]

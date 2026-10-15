@@ -1,8 +1,5 @@
 module Main where
 
-import Test.Tasty
-import Test.Tasty.QuickCheck
-
 import qualified Clash.Tests.Core.AlphaEquivalence
 import qualified Clash.Tests.Core.FreeVars
 import qualified Clash.Tests.Core.StructuralEquivalence
@@ -25,6 +22,8 @@ import qualified Clash.Tests.Rewrite.Util
 import qualified Clash.Tests.Util.Interpolate
 import qualified Clash.Tests.Warning
 import qualified Test.Clash.Rewrite
+import Test.Tasty
+import Test.Tasty.QuickCheck
 
 -- AFAIK there's no good way to override the default, so we just detect the
 -- default value and change it.
@@ -33,33 +32,35 @@ setDefaultQuickCheckTests (QuickCheckTests 100) = 10000
 setDefaultQuickCheckTests opt = opt
 
 tests :: TestTree
-tests = testGroup "Unittests"
-  [ Clash.Tests.Core.AlphaEquivalence.tests
-  , Clash.Tests.Core.FreeVars.tests
-  , Clash.Tests.Core.StructuralEquivalence.tests
-  , Clash.Tests.Core.Subst.tests
-  , Clash.Tests.Core.TermLiteral.tests
-  , Clash.Tests.Driver.Manifest.tests
-  , Clash.Tests.Netlist.tests
-  , Clash.Tests.Netlist.Id.tests
-  , Clash.Tests.Normalize.tests
-  , Clash.Tests.Normalize.Transformations.tests
-  , Clash.Tests.Normalize.Transformations.ANF.tests
-  , Clash.Tests.Normalize.Transformations.Case.tests
-  , Clash.Tests.Normalize.Transformations.DEC.tests
-  , Clash.Tests.Normalize.Transformations.Inline.tests
-  , Clash.Tests.Normalize.Transformations.Letrec.tests
-  , Clash.Tests.Normalize.Transformations.Specialize.tests
-  , Clash.Tests.Normalize.Util.tests
-  , Clash.Tests.Rewrite.StrategyDSL.tests
-  , Clash.Tests.Rewrite.Util.tests
-  , Clash.Tests.Util.Interpolate.tests
-  , Clash.Tests.Warning.tests
-  , Test.Clash.Rewrite.tests
-  ]
+tests =
+  testGroup
+    "Unittests"
+    [ Clash.Tests.Core.AlphaEquivalence.tests,
+      Clash.Tests.Core.FreeVars.tests,
+      Clash.Tests.Core.StructuralEquivalence.tests,
+      Clash.Tests.Core.Subst.tests,
+      Clash.Tests.Core.TermLiteral.tests,
+      Clash.Tests.Driver.Manifest.tests,
+      Clash.Tests.Netlist.tests,
+      Clash.Tests.Netlist.Id.tests,
+      Clash.Tests.Normalize.tests,
+      Clash.Tests.Normalize.Transformations.tests,
+      Clash.Tests.Normalize.Transformations.ANF.tests,
+      Clash.Tests.Normalize.Transformations.Case.tests,
+      Clash.Tests.Normalize.Transformations.DEC.tests,
+      Clash.Tests.Normalize.Transformations.Inline.tests,
+      Clash.Tests.Normalize.Transformations.Letrec.tests,
+      Clash.Tests.Normalize.Transformations.Specialize.tests,
+      Clash.Tests.Normalize.Util.tests,
+      Clash.Tests.Rewrite.StrategyDSL.tests,
+      Clash.Tests.Rewrite.Util.tests,
+      Clash.Tests.Util.Interpolate.tests,
+      Clash.Tests.Warning.tests,
+      Test.Clash.Rewrite.tests
+    ]
 
 main :: IO ()
 main =
-    defaultMain
-  $ adjustOption setDefaultQuickCheckTests
-  $ tests
+  defaultMain
+    $ adjustOption setDefaultQuickCheckTests
+    $ tests

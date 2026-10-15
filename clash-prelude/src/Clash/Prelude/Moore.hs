@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+
 {-|
   Copyright  :  (C) 2013-2016, University of Twente
                     2017     , Google Inc.
@@ -11,24 +15,18 @@
   Moore machines are strictly less expressive, but may impose laxer timing
   requirements.
 -}
-
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-
-{-# LANGUAGE Safe #-}
-
 module Clash.Prelude.Moore
   ( -- * Moore machine
-    moore
-  , mooreB
-  , medvedev
-  , medvedevB
+    moore,
+    mooreB,
+    medvedev,
+    medvedevB,
   )
 where
 
 import qualified Clash.Explicit.Moore as E
-import           Clash.Signal
-import           Clash.XException                     (NFDataX)
+import Clash.Signal
+import Clash.XException (NFDataX)
 
 {- $setup
 >>> :set -XDataKinds -XTypeApplications
@@ -41,7 +39,6 @@ let macT s (x,y) = x * y + s
 :}
 
 -}
-
 
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine
@@ -78,30 +75,31 @@ let macT s (x,y) = x * y + s
 --     s1 = 'moore' macT id 0 ('Clash.Signal.bundle' (a,x))
 --     s2 = 'moore' macT id 0 ('Clash.Signal.bundle' (b,y))
 -- @
-moore
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s )
-  => (s -> i -> s)
-  -- ^ Transfer function in moore machine form: @state -> input -> newstate@
-  -> (s -> o)
-  -- ^ Output function in moore machine form: @state -> output@
-  -> s
-  -- ^ Initial state
-  -> (Signal dom i -> Signal dom o)
-  -- ^ Synchronous sequential function with input and output matching that
+moore ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s
+  ) =>
+  -- | Transfer function in moore machine form: @state -> input -> newstate@
+  (s -> i -> s) ->
+  -- | Output function in moore machine form: @state -> output@
+  (s -> o) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
   -- of the moore machine
+  (Signal dom i -> Signal dom o)
 moore = hideClockResetEnable E.moore
 {-# INLINE moore #-}
 
-
 -- | Create a synchronous function from a combinational function describing
 -- a moore machine without any output logic
-medvedev
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s )
-  => (s -> i -> s)
-  -> s
-  -> (Signal dom i -> Signal dom s)
+medvedev ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s
+  ) =>
+  (s -> i -> s) ->
+  s ->
+  (Signal dom i -> Signal dom s)
 medvedev tr st = moore tr id st
 {-# INLINE medvedev #-}
 
@@ -132,31 +130,33 @@ medvedev tr st = moore tr id st
 --     (i1,b1) = 'mooreB' t o 0 (a,b)
 --     (i2,b2) = 'mooreB' t o 3 (c,i1)
 -- @
-mooreB
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s
-     , Bundle i
-     , Bundle o )
-  => (s -> i -> s)
-  -- ^ Transfer function in moore machine form: @state -> input -> newstate@
-  -> (s -> o)
-  -- ^ Output function in moore machine form: @state -> output@
-  -> s
-  -- ^ Initial state
-  -> (Unbundled dom i -> Unbundled dom o)
-   -- ^ Synchronous sequential function with input and output matching that
-   -- of the moore machine
+mooreB ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s,
+    Bundle i,
+    Bundle o
+  ) =>
+  -- | Transfer function in moore machine form: @state -> input -> newstate@
+  (s -> i -> s) ->
+  -- | Output function in moore machine form: @state -> output@
+  (s -> o) ->
+  -- | Initial state
+  s ->
+  -- | Synchronous sequential function with input and output matching that
+  -- of the moore machine
+  (Unbundled dom i -> Unbundled dom o)
 mooreB = hideClockResetEnable E.mooreB
 {-# INLINE mooreB #-}
 
 -- | A version of 'medvedev' that does automatic 'Bundle'ing
-medvedevB
-  :: ( HiddenClockResetEnable dom
-     , NFDataX s
-     , Bundle i
-     , Bundle s )
-  => (s -> i -> s)
-  -> s
-  -> (Unbundled dom i -> Unbundled dom s)
+medvedevB ::
+  ( HiddenClockResetEnable dom,
+    NFDataX s,
+    Bundle i,
+    Bundle s
+  ) =>
+  (s -> i -> s) ->
+  s ->
+  (Unbundled dom i -> Unbundled dom s)
 medvedevB tr st = mooreB tr id st
 {-# INLINE medvedevB #-}

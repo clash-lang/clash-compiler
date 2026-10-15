@@ -1,14 +1,3 @@
-{-|
-  Copyright  :  (C) 2012-2016, University of Twente,
-                    2016-2017, Myrtle Software Ltd,
-                    2017-2022, Google Inc.,
-                    2021-2026, QBayLogic B.V.
-  License    :  BSD2 (see the file LICENSE)
-  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
-
-  Transformations for inlining
--}
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
@@ -20,94 +9,152 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
 
+{-|
+  Copyright  :  (C) 2012-2016, University of Twente,
+                    2016-2017, Myrtle Software Ltd,
+                    2017-2022, Google Inc.,
+                    2021-2026, QBayLogic B.V.
+  License    :  BSD2 (see the file LICENSE)
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+  Transformations for inlining
+-}
 module Clash.Normalize.Transformations.Inline
-  ( bindConstantVar
-  , bindConstantVarWorker
-  , inlineBndrsCleanup
-  , inlineCast
-  , inlineCastWorker
-  , inlineCleanup
-  , inlineCleanupWorker
-  , collapseRHSNoops
-  , collapseRHSNoopsWorker
-  , inlineNonRep
-  , inlineOrLiftNonRep
-  , inlineOrLiftNonRepWorker
-  , inlineSimIO
-  , inlineSimIOWorker
-  , inlineSmall
-  , inlineSmallWorker
-  , inlineWorkFree
-  , inlineWorkFreeWorker
-  ) where
-
-import qualified Control.Lens as Lens
-import qualified Control.Monad as Monad
-import Control.Monad ((>=>))
-import Control.Monad.Extra (anyM)
-import Control.Monad.Trans.Maybe (MaybeT(..))
-import Control.Monad.Writer (lift,listen)
-import Data.Default (Default(..))
-import Data.Either  (lefts, rights)
-import qualified Data.HashMap.Lazy as HashMap
-import qualified Data.List as List
-import qualified Data.Maybe as Maybe
-import qualified Data.Monoid as Monoid (Any(..))
-import qualified Data.Text as Text
-import qualified Data.Text.Extra as Text
-import GHC.Stack (HasCallStack)
-import GHC.BasicTypes.Extra (isNoInline)
-
-import qualified Clash.Explicit.SimIO as SimIO
-import qualified Clash.Sized.Internal.BitVector as BV (Bit(Bit), BitVector(BV), xToBV)
+  ( bindConstantVar,
+    bindConstantVarWorker,
+    inlineBndrsCleanup,
+    inlineCast,
+    inlineCastWorker,
+    inlineCleanup,
+    inlineCleanupWorker,
+    collapseRHSNoops,
+    collapseRHSNoopsWorker,
+    inlineNonRep,
+    inlineOrLiftNonRep,
+    inlineOrLiftNonRepWorker,
+    inlineSimIO,
+    inlineSimIOWorker,
+    inlineSmall,
+    inlineSmallWorker,
+    inlineWorkFree,
+    inlineWorkFreeWorker,
+  )
+where
 
 import Clash.Annotations.Primitive (extractPrim)
-import Clash.Core.DataCon (DataCon(..))
-import Clash.Core.FreeVars
-  (countFreeOccurances, freeLocalIds)
+import Clash.Core.DataCon (DataCon (..))
+import Clash.Core.FreeVars (countFreeOccurances, freeLocalIds)
 import Clash.Core.HasFreeVars
 import Clash.Core.HasType
-import Clash.Core.Name (Name(..), NameSort(..))
-import Clash.Core.Pretty (PrettyOptions(..), showPpr, showPpr')
+import Clash.Core.Name (Name (..), NameSort (..))
+import Clash.Core.Pretty (PrettyOptions (..), showPpr, showPpr')
 import Clash.Core.Subst
-import qualified Clash.Core.Term as Term
 import Clash.Core.Term
-  ( Bind, CoreContext(..), Pat(..), PrimInfo(..), Term(..), WorkInfo(..)
-  , bindToList, collectArgs, collectArgsTicks, collectTicks, mkApps , mkTicks
-  , stripTicks)
+  ( Bind,
+    CoreContext (..),
+    Pat (..),
+    PrimInfo (..),
+    Term (..),
+    WorkInfo (..),
+    bindToList,
+    collectArgs,
+    collectArgsTicks,
+    collectTicks,
+    mkApps,
+    mkTicks,
+    stripTicks,
+  )
+import qualified Clash.Core.Term as Term
 import Clash.Core.TermInfo (isLocalVar, termSizeSmallerThan)
-import Clash.Core.Type
-  (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
+import Clash.Core.Type (TypeView (..), isClassTy, isPolyFunCoreTy, tyView)
 import Clash.Core.Util (isSignalType, primUCo)
-import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
+import Clash.Core.Var (Id, Var (..), isGlobalId, isLocalId)
 import Clash.Core.VarEnv
-  ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarEnv, elemVarSet
-  , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
-  , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
-  , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
+  ( InScopeSet,
+    VarEnv,
+    VarSet,
+    elemUniqInScopeSet,
+    elemVarEnv,
+    elemVarSet,
+    eltsVarEnv,
+    emptyVarEnv,
+    extendInScopeSetList,
+    extendVarEnv,
+    foldlWithUniqueVarEnv',
+    lookupVarEnv,
+    lookupVarEnvDirectly,
+    mkVarEnv,
+    notElemVarSet,
+    unionVarEnv,
+    unionVarEnvWith,
+    unitVarSet,
+  )
 import Clash.Debug (trace)
-import Clash.Driver.Types (Binding(..))
-import Clash.Primitives.Types
-  (CompiledPrimMap, Primitive(..), TemplateKind(..))
-import Clash.Rewrite.Combinators (allR)
-import Clash.Rewrite.StrategyDSL
-  ( Transformation, onAppNode, onLet, onTickNode, onTyAppNode, onVarNode
-  , toTransformation)
-import Clash.Rewrite.Types
-  ( TransformContext(..), bindings, curFun, tcCache, topEntities
-  , inlineConstantLimit, inlineFunctionLimit, inlineLimit
-  , inlineWFCacheLimit, primitives)
-import Clash.Rewrite.Util
-  ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
-  , isUntranslatable, isUntranslatableType, isVoidWrapper, zoomExtra)
-import Clash.Rewrite.WorkFree (isWorkFreeIsh)
+import Clash.Driver.Types (Binding (..))
+import qualified Clash.Explicit.SimIO as SimIO
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
 import Clash.Normalize.Util
-  ( addNewInline, alreadyInlined, isRecursiveBndr, mkInlineTick
-  , normalizeTopLvlBndr, normalizeWorkFreeApp)
+  ( addNewInline,
+    alreadyInlined,
+    isRecursiveBndr,
+    mkInlineTick,
+    normalizeTopLvlBndr,
+    normalizeWorkFreeApp,
+  )
+import Clash.Primitives.Types (CompiledPrimMap, Primitive (..), TemplateKind (..))
+import Clash.Rewrite.Combinators (allR)
+import Clash.Rewrite.StrategyDSL
+  ( Transformation,
+    onAppNode,
+    onLet,
+    onTickNode,
+    onTyAppNode,
+    onVarNode,
+    toTransformation,
+  )
+import Clash.Rewrite.Types
+  ( TransformContext (..),
+    bindings,
+    curFun,
+    inlineConstantLimit,
+    inlineFunctionLimit,
+    inlineLimit,
+    inlineWFCacheLimit,
+    primitives,
+    tcCache,
+    topEntities,
+  )
+import Clash.Rewrite.Util
+  ( changed,
+    inlineBinders,
+    inlineOrLiftBinders,
+    isJoinPointIn,
+    isUntranslatable,
+    isUntranslatableType,
+    isVoidWrapper,
+    zoomExtra,
+  )
+import Clash.Rewrite.WorkFree (isWorkFreeIsh)
+import qualified Clash.Sized.Internal.BitVector as BV (Bit (Bit), BitVector (BV), xToBV)
 import Clash.Unique (Unique)
 import Clash.Util (curLoc)
 import qualified Clash.Util.Interpolate as I
+import qualified Control.Lens as Lens
+import Control.Monad ((>=>))
+import qualified Control.Monad as Monad
+import Control.Monad.Extra (anyM)
+import Control.Monad.Trans.Maybe (MaybeT (..))
+import Control.Monad.Writer (lift, listen)
+import Data.Default (Default (..))
+import Data.Either (lefts, rights)
+import qualified Data.HashMap.Lazy as HashMap
+import qualified Data.List as List
+import qualified Data.Maybe as Maybe
+import qualified Data.Monoid as Monoid (Any (..))
+import qualified Data.Text as Text
+import qualified Data.Text.Extra as Text
+import GHC.BasicTypes.Extra (isNoInline)
+import GHC.Stack (HasCallStack)
 
 {- [Note] join points and void wrappers
 Join points are functions that only occur in tail-call positions within an
@@ -131,29 +178,32 @@ bindConstantVar =
   toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
 
 -- | The 'Let' handler of 'bindConstantVar'.
-bindConstantVarWorker
-  :: HasCallStack
-  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+bindConstantVarWorker ::
+  (HasCallStack) =>
+  TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 bindConstantVarWorker = inlineBinders test
   where
-    test _ (i,stripTicks -> e) = case isLocalVar e of
+    test _ (i, stripTicks -> e) = case isLocalVar e of
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
       True -> return (i `notElemFreeVars` e)
-      _    -> do
-        (fn,_) <- Lens.use curFun
+      _ -> do
+        (fn, _) <- Lens.use curFun
         -- Don't inline globally recursive calls, it prevents the
         -- recToLetRec transformation from transforming global recursion to
         -- local recursion.
         -- See https://github.com/clash-lang/clash-compiler/issues/2839
-        if e == Var fn then return False else do
-          tcm <- Lens.view tcCache
-          -- Don't inline things that perform work, it increases the circuit
-          -- size.
-          case isWorkFreeIsh tcm e of
-            True -> Lens.view inlineConstantLimit >>= \case
-              0 -> return True
-              n -> return (termSizeSmallerThan (n + 1) e)
-            _ -> return False
+        if e == Var fn
+          then return False
+          else do
+            tcm <- Lens.view tcCache
+            -- Don't inline things that perform work, it increases the circuit
+            -- size.
+            case isWorkFreeIsh tcm e of
+              True ->
+                Lens.view inlineConstantLimit >>= \case
+                  0 -> return True
+                  n -> return (termSizeSmallerThan (n + 1) e)
+              _ -> return False
 {-# SCC bindConstantVarWorker #-}
 
 -- | Mark to track progress of 'reduceBindersCleanup'
@@ -161,14 +211,13 @@ data Mark = Temp | Done | Rec
 
 -- | Used (transitively) by 'inlineCleanup' inline to-inline let-binders into
 -- the other to-inline let-binders.
-reduceBindersCleanup
-  :: HasCallStack
-  => InScopeSet
-  -- ^ Current InScopeSet
-  -> VarEnv ((Id,Term),VarEnv Int)
-  -- ^ Original let-binders with their free variables (+ #occurrences)
-  -> (Maybe Subst,VarEnv Int,VarEnv ((Id,Term),VarEnv Int,Mark))
-  -- ^ Accumulated:
+reduceBindersCleanup ::
+  (HasCallStack) =>
+  -- | Current InScopeSet
+  InScopeSet ->
+  -- | Original let-binders with their free variables (+ #occurrences)
+  VarEnv ((Id, Term), VarEnv Int) ->
+  -- | Accumulated:
   --
   -- 1. (Maybe) the build up substitution so far
   -- 2. The free variables of the range of the substitution
@@ -177,124 +226,129 @@ reduceBindersCleanup
   --    * Temp: Will eventually form a recursive cycle
   --    * Done: Processed, non-recursive
   --    * Rec:  Processed, recursive
-  -> Unique
-  -- ^ The unique of the let-binding that we want to simplify
-  -> Int
-  -- ^ Ignore, artifact of 'foldlWithUniqueVarEnv'
-  -> (Maybe Subst,VarEnv Int,VarEnv ((Id,Term),VarEnv Int,Mark))
-  -- ^ Same as the third argument
-reduceBindersCleanup isN origInl (!substM,!substFVs,!doneInl) u _ =
+  (Maybe Subst, VarEnv Int, VarEnv ((Id, Term), VarEnv Int, Mark)) ->
+  -- | The unique of the let-binding that we want to simplify
+  Unique ->
+  -- | Ignore, artifact of 'foldlWithUniqueVarEnv'
+  Int ->
+  -- | Same as the third argument
+  (Maybe Subst, VarEnv Int, VarEnv ((Id, Term), VarEnv Int, Mark))
+reduceBindersCleanup isN origInl (!substM, !substFVs, !doneInl) u _ =
   case lookupVarEnvDirectly u doneInl of
     Nothing -> case lookupVarEnvDirectly u origInl of
       Nothing ->
         -- let-binding not found, cannot extend the substitution
-        if elemUniqInScopeSet u isN then
-          (substM,substFVs,doneInl)
-        else
-          error [I.i|
+        if elemUniqInScopeSet u isN
+          then
+            (substM, substFVs, doneInl)
+          else
+            error [I.i|
             Internal error: 'reduceBindersCleanup' encountered a variable
             reference that was neither in 'doneInl', 'origInl', or in the
             transformation's in scope set. Unique was: '#{u}'.
           |]
-      Just ((v,e),eFVs) ->
+      Just ((v, e), eFVs) ->
         -- Simplify the transitive dependencies
-        let (sM,substFVsE,doneInl1) =
+        let (sM, substFVsE, doneInl1) =
               foldlWithUniqueVarEnv'
                 (reduceBindersCleanup isN origInl)
-                ( Nothing
-                -- It's okay/needed to over-approximate the free variables of
-                -- the range of the new substitution by including the free
-                -- variables of the original let-binder, because this set of
-                -- free variables is only used to check whether let-binding will
-                -- become self-recursive after applying the substitution.
-                --
-                -- That is, it was already self-recursive, or becomes
-                -- self-recursive after applying the substitution because it was
-                -- part of a recursive group. And we do not want to inline
-                -- recursive binders.
-                , eFVs
-                -- Temporarily extend the processing environment with the
-                -- let-binding so we don't end up in a loop in case there is a
-                -- recursive group.
-                , extendVarEnv v ((v,e),eFVs,Temp) doneInl)
+                ( Nothing,
+                  -- It's okay/needed to over-approximate the free variables of
+                  -- the range of the new substitution by including the free
+                  -- variables of the original let-binder, because this set of
+                  -- free variables is only used to check whether let-binding will
+                  -- become self-recursive after applying the substitution.
+                  --
+                  -- That is, it was already self-recursive, or becomes
+                  -- self-recursive after applying the substitution because it was
+                  -- part of a recursive group. And we do not want to inline
+                  -- recursive binders.
+                  eFVs,
+                  -- Temporarily extend the processing environment with the
+                  -- let-binding so we don't end up in a loop in case there is a
+                  -- recursive group.
+                  extendVarEnv v ((v, e), eFVs, Temp) doneInl
+                )
                 eFVs
 
             e1 = maybeSubstTm "reduceBindersCleanup" sM e
-        in  if v `elemVarEnv` substFVsE then
-              -- We cannot inline recursive let-bindings, so we do not extend
-              -- the substitution environment.
-              ( substM
-              , substFVs
-              -- And we explicitly mark the let-binding as recursive in the
-              -- processing environment. So that it will be kept around at the
-              -- end of 'inlineCleanup'
-              , extendVarEnv v ((v,e1),substFVsE,Rec) doneInl1
-              )
-            else
-              -- Extend the substitution
-              ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e1)
-              , unionVarEnv substFVsE substFVs
-              -- Mark the let-binding a fully "reduced", so we don't repeat
-              -- this process when we encounter it again.
-              , extendVarEnv v ((v,e1),substFVsE,Done) doneInl1
-              )
+         in if v `elemVarEnv` substFVsE
+              then
+                -- We cannot inline recursive let-bindings, so we do not extend
+                -- the substitution environment.
+                ( substM,
+                  substFVs,
+                  -- And we explicitly mark the let-binding as recursive in the
+                  -- processing environment. So that it will be kept around at the
+                  -- end of 'inlineCleanup'
+                  extendVarEnv v ((v, e1), substFVsE, Rec) doneInl1
+                )
+              else
+                -- Extend the substitution
+                ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e1),
+                  unionVarEnv substFVsE substFVs,
+                  -- Mark the let-binding a fully "reduced", so we don't repeat
+                  -- this process when we encounter it again.
+                  extendVarEnv v ((v, e1), substFVsE, Done) doneInl1
+                )
     -- It's already been processed, just extend the substitution environment
-    Just ((v,e),eFVs,Done) ->
-      ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e)
-      , unionVarEnv eFVs substFVs
-      , doneInl
+    Just ((v, e), eFVs, Done) ->
+      ( Just (extendIdSubst (Maybe.fromMaybe (mkSubst isN) substM) v e),
+        unionVarEnv eFVs substFVs,
+        doneInl
       )
 
     -- It's either recursive (Rec), or part of a recursive group (Temp) where we
     -- originally entered a different part of the cycle. Regardless, we do not
     -- extend the substitution environment.
     Just _ ->
-      ( substM
-      , substFVs
-      , doneInl
+      ( substM,
+        substFVs,
+        doneInl
       )
 {-# SCC reduceBindersCleanup #-}
 
 -- | Used by 'inlineCleanup' to inline binders that we want to inline into the
 -- binders that we want to keep.
-inlineBndrsCleanup
-  :: HasCallStack
-  => InScopeSet
-  -- ^ Current InScopeSet
-  -> VarEnv ((Id,Term),VarEnv Int)
-  -- ^ Original let-binders with their free variables (+ #occurrences), that we
+inlineBndrsCleanup ::
+  (HasCallStack) =>
+  -- | Current InScopeSet
+  InScopeSet ->
+  -- | Original let-binders with their free variables (+ #occurrences), that we
   -- want to inline
-  -> VarEnv ((Id,Term),VarEnv Int,Mark)
-  -- ^ Processed let-binders with their free variables and a tag to mark the
+  VarEnv ((Id, Term), VarEnv Int) ->
+  -- | Processed let-binders with their free variables and a tag to mark the
   -- progress:
   --   * Temp: Will eventually form a recursive cycle
   --   * Done: Processed, non-recursive
   --   * Rec:  Processed, recursive
-  -> [((Id,Term),VarEnv Int)]
-  -- ^ The let-binders with their free variables (+ #occurrences), that we want
+  VarEnv ((Id, Term), VarEnv Int, Mark) ->
+  -- | The let-binders with their free variables (+ #occurrences), that we want
   -- to keep
-  -> [(Id,Term)]
+  [((Id, Term), VarEnv Int)] ->
+  [(Id, Term)]
 inlineBndrsCleanup isN origInl = go
- where
-  go doneInl [] =
-    -- If some of the let-binders that we wanted to inline turn out to be
-    -- recursive, then we have to keep those around as well, as we weren't able
-    -- to inline them. Furthermore, for every recursive binder there might still
-    -- be non-inlined variables left, see #1337.
-    flip map [ (ve, eFvs) | (ve,eFvs,Rec) <- eltsVarEnv doneInl ] $ \((v, e), eFvs) ->
-      let
-        (substM, _, _) = foldlWithUniqueVarEnv'
-                           (reduceBindersCleanup isN emptyVarEnv)
-                           (Nothing, emptyVarEnv, doneInl)
-                           eFvs
-      in (v, maybeSubstTm "inlineBndrsCleanup_0" substM e)
-  go !doneInl_0 (((v,e),eFVs):il) =
-    let (sM,_,doneInl_1) = foldlWithUniqueVarEnv'
-                            (reduceBindersCleanup isN origInl)
-                            (Nothing, emptyVarEnv, doneInl_0)
-                            eFVs
-        e1 = maybeSubstTm "inlineBndrsCleanup_1" sM e
-    in  (v,e1):go doneInl_1 il
+  where
+    go doneInl [] =
+      -- If some of the let-binders that we wanted to inline turn out to be
+      -- recursive, then we have to keep those around as well, as we weren't able
+      -- to inline them. Furthermore, for every recursive binder there might still
+      -- be non-inlined variables left, see #1337.
+      flip map [(ve, eFvs) | (ve, eFvs, Rec) <- eltsVarEnv doneInl] $ \((v, e), eFvs) ->
+        let (substM, _, _) =
+              foldlWithUniqueVarEnv'
+                (reduceBindersCleanup isN emptyVarEnv)
+                (Nothing, emptyVarEnv, doneInl)
+                eFvs
+         in (v, maybeSubstTm "inlineBndrsCleanup_0" substM e)
+    go !doneInl_0 (((v, e), eFVs) : il) =
+      let (sM, _, doneInl_1) =
+            foldlWithUniqueVarEnv'
+              (reduceBindersCleanup isN origInl)
+              (Nothing, emptyVarEnv, doneInl_0)
+              eFVs
+          e1 = maybeSubstTm "inlineBndrsCleanup_1" sM e
+       in (v, e1) : go doneInl_1 il
 {-# SCC inlineBndrsCleanup #-}
 
 -- | Only inline casts that just contain a 'Var', because these are guaranteed work-free.
@@ -303,12 +357,12 @@ inlineCast :: Transformation
 inlineCast = toTransformation "inlineCast" (onLet 'inlineCastWorker)
 
 -- | The 'Let' handler of 'inlineCast'.
-inlineCastWorker
-  :: HasCallStack
-  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineCastWorker ::
+  (HasCallStack) =>
+  TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 inlineCastWorker = inlineBinders test
   where
-    test _ (_, (Cast (stripTicks -> Var {}) _ _)) = return True
+    test _ (_, (Cast (stripTicks -> Var{}) _ _)) = return True
     test _ _ = return False
 {-# SCC inlineCastWorker #-}
 
@@ -325,36 +379,41 @@ inlineCleanup :: Transformation
 inlineCleanup = toTransformation "inlineCleanup" (onLet 'inlineCleanupWorker)
 
 -- | The 'Let' handler of 'inlineCleanup'.
-inlineCleanupWorker
-  :: HasCallStack
-  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineCleanupWorker ::
+  (HasCallStack) =>
+  TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 inlineCleanupWorker (TransformContext is0 _) _node (bindToList -> binds) body = do
   prims <- Lens.view primitives
   -- For all let-bindings, count the number of times they are referenced.
   -- We only inline let-bindings which are referenced only once, otherwise
   -- we would lose sharing.
-  let is1       = extendInScopeSetList is0 (map fst binds)
-      bindsFvs  = map (\(v,e) -> (v,((v,e),countFreeOccurances e))) binds
-      allOccs   = List.foldl' (unionVarEnvWith (+)) emptyVarEnv
-                $ map (snd.snd) bindsFvs
-      bodyFVs   = Lens.foldMapOf freeLocalIds unitVarSet body
-      (il,keep) = List.partition (isInteresting allOccs prims bodyFVs)
-                                 bindsFvs
-      keep'     = inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv
-                $ map snd keep
+  let is1 = extendInScopeSetList is0 (map fst binds)
+      bindsFvs = map (\(v, e) -> (v, ((v, e), countFreeOccurances e))) binds
+      allOccs =
+        List.foldl' (unionVarEnvWith (+)) emptyVarEnv $
+          map (snd . snd) bindsFvs
+      bodyFVs = Lens.foldMapOf freeLocalIds unitVarSet body
+      (il, keep) =
+        List.partition
+          (isInteresting allOccs prims bodyFVs)
+          bindsFvs
+      keep' =
+        inlineBndrsCleanup is1 (mkVarEnv il) emptyVarEnv $
+          map snd keep
 
-  if | null il -> return  (Letrec binds body)
-     | null keep' -> changed body
-     | otherwise -> changed (Letrec keep' body)
+  if
+    | null il -> return (Letrec binds body)
+    | null keep' -> changed body
+    | otherwise -> changed (Letrec keep' body)
   where
     -- Determine whether a let-binding is interesting to inline
-    isInteresting
-      :: VarEnv Int
-      -> CompiledPrimMap
-      -> VarSet
-      -> (Id,((Id, Term), VarEnv Int))
-      -> Bool
-    isInteresting allOccs prims bodyFVs (id_,((_,(fst.collectArgs) -> tm),_))
+    isInteresting ::
+      VarEnv Int ->
+      CompiledPrimMap ->
+      VarSet ->
+      (Id, ((Id, Term), VarEnv Int)) ->
+      Bool
+    isInteresting allOccs prims bodyFVs (id_, ((_, (fst . collectArgs) -> tm), _))
       -- Try to keep user defined names, but inline names generated by GHC or
       -- Clash. For example, if a user were to write:
       --
@@ -370,55 +429,52 @@ inlineCleanupWorker (TransformContext is0 _) _node (bindToList -> binds) body = 
       --    let x = f f_arg; f_arg = 2 * y
       --
       -- In that case, there's no harm in inlining f_arg.
-      | nameSort (varName id_) /= User
-      , id_ `notElemVarSet` bodyFVs
-      = case tm of
+      | nameSort (varName id_) /= User,
+        id_ `notElemVarSet` bodyFVs = case tm of
           Prim pInfo
-            | let nm = primName pInfo
-            , Just (extractPrim -> Just p@(BlackBox {})) <- HashMap.lookup nm prims
-            , TExpr <- kind p
-            , Just occ <- lookupVarEnv id_ allOccs
-            , occ < 2
-            -> True
-            | otherwise
-            -> primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+            | let nm = primName pInfo,
+              Just (extractPrim -> Just p@(BlackBox{})) <- HashMap.lookup nm prims,
+              TExpr <- kind p,
+              Just occ <- lookupVarEnv id_ allOccs,
+              occ < 2 ->
+                True
+            | otherwise ->
+                primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
           Case _ _ [_] -> True
           Data _ -> True
-          Case _ aTy (_:_:_)
-            | TyConApp nm _ <- tyView aTy
-            , nameOcc nm == Text.showt ''SimIO.SimIO
-            -> True
+          Case _ aTy (_ : _ : _)
+            | TyConApp nm _ <- tyView aTy,
+              nameOcc nm == Text.showt ''SimIO.SimIO ->
+                True
           _ -> False
-      | id_ `notElemVarSet` bodyFVs
-      = case tm of
+      | id_ `notElemVarSet` bodyFVs = case tm of
           Prim pInfo
-            | primName pInfo `elem`
-                        [ Text.showt 'SimIO.openFile
-                        , Text.showt 'SimIO.getChar
-                        , Text.showt 'SimIO.isEOF
-                        ]
-            , Just occ <- lookupVarEnv id_ allOccs
-            , occ < 2
-            -> True
-            | otherwise
-            -> primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
-          Case _ _ [(DataPat dcE _ _,_)]
-            -> let nm = (nameOcc (dcName dcE))
-               in -- Inlines WW projection that exposes internals of the BitVector types
-                  nm == Text.showt 'BV.BV  ||
-                  nm == Text.showt 'BV.Bit ||
+            | primName pInfo
+                `elem` [ Text.showt 'SimIO.openFile,
+                         Text.showt 'SimIO.getChar,
+                         Text.showt 'SimIO.isEOF
+                       ],
+              Just occ <- lookupVarEnv id_ allOccs,
+              occ < 2 ->
+                True
+            | otherwise ->
+                primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
+          Case _ _ [(DataPat dcE _ _, _)] ->
+            let nm = (nameOcc (dcName dcE))
+             in -- Inlines WW projection that exposes internals of the BitVector types
+                nm == Text.showt 'BV.BV
+                  || nm == Text.showt 'BV.Bit
                   -- Inlines projections out of constraint-tuples (e.g. HiddenClockReset).
                   -- The 'GHC.Classes' module hosts these on GHC <= 9.12; on
                   -- GHC >= 9.14 'base'\''s GHC.Classes re-exports them from
                   -- 'ghc-internal:GHC.Internal.Classes'.
-                  "GHC.Classes" `Text.isPrefixOf` nm ||
-                  "GHC.Internal.Classes" `Text.isPrefixOf` nm
-          Case _ aTy (_:_:_)
-            | TyConApp nm _ <- tyView aTy
-            , nameOcc nm == Text.showt ''SimIO.SimIO
-            -> True
+                  || "GHC.Classes" `Text.isPrefixOf` nm
+                  || "GHC.Internal.Classes" `Text.isPrefixOf` nm
+          Case _ aTy (_ : _ : _)
+            | TyConApp nm _ <- tyView aTy,
+              nameOcc nm == Text.showt ''SimIO.SimIO ->
+                True
           _ -> False
-
     isInteresting _ _ _ _ = False
 {-# SCC inlineCleanupWorker #-}
 
@@ -437,9 +493,9 @@ collapseRHSNoops =
   toTransformation "collapseRHSNoops" (onLet 'collapseRHSNoopsWorker)
 
 -- | The 'Let' handler of 'collapseRHSNoops'.
-collapseRHSNoopsWorker
-  :: HasCallStack
-  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+collapseRHSNoopsWorker ::
+  (HasCallStack) =>
+  TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 collapseRHSNoopsWorker _ letrec letBind body = do
   (curFunId, _) <- Lens.use curFun
   curBinding <- lookupVarEnv curFunId <$> Lens.use bindings
@@ -459,11 +515,11 @@ collapseRHSNoopsWorker _ letrec letBind body = do
     runCollapseNoop orig =
       runMaybeT (collapseNoop orig) >>= Maybe.maybe (return orig) changed
 
-    collapseNoop (iD,term) = do
-      (Prim info,args) <- return $ collectArgs term
-      identity         <- getIdentity info $ lefts args
-      collapsed        <- collapseToIdentity iD identity
-      return (iD,collapsed)
+    collapseNoop (iD, term) = do
+      (Prim info, args) <- return $ collectArgs term
+      identity <- getIdentity info $ lefts args
+      collapsed <- collapseToIdentity iD identity
+      return (iD, collapsed)
 
     collapseToIdentity iD identity = do
       tcm <- Lens.view tcCache
@@ -481,11 +537,11 @@ collapseRHSNoopsWorker _ letrec letBind body = do
       return $ args !! i
 
     isNoop (Var i) = do
-      binding     <- MaybeT $ lookupVarEnv i <$> Lens.use bindings
+      binding <- MaybeT $ lookupVarEnv i <$> Lens.use bindings
       isRecursive <- lift $ isRecursiveBndr $ bindingId binding
       Monad.guard $ not isRecursive
       isNoop $ bindingTerm binding
-    isNoop (Prim PrimInfo{primWorkInfo=WorkIdentity _ []}) = return True
+    isNoop (Prim PrimInfo{primWorkInfo = WorkIdentity _ []}) = return True
     isNoop (Lam x e) = isNoopApp x (collectArgs e)
     isNoop _ = return False
 
@@ -499,18 +555,18 @@ collapseRHSNoopsWorker _ letrec letBind body = do
     --  2. Primitives that are the identity on their argument
     --
     -- And that the variable 'x' is used by the last primitive in the chain.
-    isNoopApp x (Var y,[]) = return (x == y)
-    isNoopApp x (Prim PrimInfo{primWorkInfo=WorkIdentity i []},args) = do
+    isNoopApp x (Var y, []) = return (x == y)
+    isNoopApp x (Prim PrimInfo{primWorkInfo = WorkIdentity i []}, args) = do
       arg <- getTermArg (lefts args) i
       isNoopApp x (collectArgs arg)
-    isNoopApp x (Prim PrimInfo{primName},args)
+    isNoopApp x (Prim PrimInfo{primName}, args)
       | primName == Text.showt 'BV.xToBV = do
-      -- We don't make 'xToBV' something of 'WorkIdentity 1 []' because we don't
-      -- want 'getIdentity' to replace "naked" occurances of 'xToBV' by
-      -- 'unsafeCoerce#'. We don't want that since 'xToBV' has a special evaluator
-      -- rule that can translate XExceptions to 'undefined# :: BitVector n'.
-      arg@(App {}) <- getTermArg (lefts args) 1
-      isNoopApp x (collectArgs arg)
+          -- We don't make 'xToBV' something of 'WorkIdentity 1 []' because we don't
+          -- want 'getIdentity' to replace "naked" occurances of 'xToBV' by
+          -- 'unsafeCoerce#'. We don't want that since 'xToBV' has a special evaluator
+          -- rule that can translate XExceptions to 'undefined# :: BitVector n'.
+          arg@(App{}) <- getTermArg (lefts args) 1
+          isNoopApp x (collectArgs arg)
     isNoopApp _ _ = return False
 {-# SCC collapseRHSNoopsWorker #-}
 
@@ -518,8 +574,8 @@ collapseRHSNoopsWorker _ letrec letBind body = do
 -- of a Case-decomposition. It's a custom topdown traversal that -for efficiency
 -- reasons- does not explore alternative of cases whose subject triggered an
 -- 'inlineNonRepWorker'.
-inlineNonRep :: HasCallStack => NormRewrite
-inlineNonRep ctx0 e0@(Case {}) = do
+inlineNonRep :: (HasCallStack) => NormRewrite
+inlineNonRep ctx0 e0@(Case{}) = do
   r <- listen (inlineNonRepWorker e0)
   case r of
     (e1, Monoid.getAny -> True) ->
@@ -529,13 +585,15 @@ inlineNonRep ctx0 e0@(Case {}) = do
       -- propagate might eliminate this case. We therefore don't explore the
       -- alternatives. Note that this makes it substantially different from a
       -- 'topdownSucR' transformation.
-      let
-        (subj0,typ,alts) = case e1 of
-          Case s t a -> (s,t,a)
-          _ -> error ("internal error, inlineNonRep triggered on a non-Case:" <>
-                      showPpr e1)
-        TransformContext inScope ctx1 = ctx0
-        ctx2 = TransformContext inScope (CaseScrut:ctx1)
+      let (subj0, typ, alts) = case e1 of
+            Case s t a -> (s, t, a)
+            _ ->
+              error
+                ( "internal error, inlineNonRep triggered on a non-Case:"
+                    <> showPpr e1
+                )
+          TransformContext inScope ctx1 = ctx0
+          ctx2 = TransformContext inScope (CaseScrut : ctx1)
 
       listen (inlineNonRep ctx2 subj0) >>= \case
         (subj1, Monoid.getAny -> True) ->
@@ -544,7 +602,6 @@ inlineNonRep ctx0 e0@(Case {}) = do
           let (pats, rhss0) = unzip alts
           rhss1 <- mapM (inlineNonRep ctx2) rhss0
           pure (Case subj1 typ (zip pats rhss1))
-
 inlineNonRep ctx e =
   -- All non-case statements are simply traversed. TODO: are there other special
   -- cases like 'Case' that would warrant an optimization like ^ ?
@@ -557,30 +614,28 @@ inlineNonRep ctx e =
 --
 -- It sets the changed flag in the NormalizeSession if it successfully inlines
 -- a binder.
-inlineNonRepWorker :: HasCallStack => Term -> NormalizeSession Term
+inlineNonRepWorker :: (HasCallStack) => Term -> NormalizeSession Term
 inlineNonRepWorker e@(Case scrut altsTy alts)
-  | (Var f, args,ticks) <- collectArgsTicks scrut
-  , isGlobalId f
-  = do
-    (cf,_)    <- Lens.use curFun
-    isInlined <- zoomExtra (alreadyInlined f cf)
-    limit     <- Lens.view inlineLimit
-    tcm       <- Lens.view tcCache
-    let
-      scrutTy = inferCoreTypeOf tcm scrut
+  | (Var f, args, ticks) <- collectArgsTicks scrut,
+    isGlobalId f = do
+      (cf, _) <- Lens.use curFun
+      isInlined <- zoomExtra (alreadyInlined f cf)
+      limit <- Lens.view inlineLimit
+      tcm <- Lens.view tcCache
+      let scrutTy = inferCoreTypeOf tcm scrut
 
-      -- Constraint dictionary inlining always terminates, so we ignore the
-      -- usual inline safeguards.
-      notClassTy = not (isClassTy tcm scrutTy)
-      overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
+          -- Constraint dictionary inlining always terminates, so we ignore the
+          -- usual inline safeguards.
+          notClassTy = not (isClassTy tcm scrutTy)
+          overLimit = notClassTy && (Maybe.fromMaybe 0 isInlined) > limit
 
-
-    bodyMaybe   <- lookupVarEnv f <$> Lens.use bindings
-    nonRepScrut <- isUntranslatableType False scrutTy
-    case (nonRepScrut, bodyMaybe) of
-      (True, Just b) -> do
-        if overLimit then
-          trace ($(curLoc) ++ [I.i|
+      bodyMaybe <- lookupVarEnv f <$> Lens.use bindings
+      nonRepScrut <- isUntranslatableType False scrutTy
+      case (nonRepScrut, bodyMaybe) of
+        (True, Just b) -> do
+          if overLimit
+            then
+              trace ($(curLoc) ++ [I.i|
             InlineNonRep: #{showPpr (varName f)} already inlined
             #{limit} times in: #{showPpr (varName cf)}. The type of the subject
             is:
@@ -592,16 +647,15 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
 
             Run with '-fclash-inline-limit=N' to increase the inline limit to N.
           |]) (return e)
-        else do
-          Monad.when notClassTy (zoomExtra (addNewInline f cf))
+            else do
+              Monad.when notClassTy (zoomExtra (addNewInline f cf))
 
-          let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-          let scrutBody1 = mkApps scrutBody0 args
+              let scrutBody0 = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+              let scrutBody1 = mkApps scrutBody0 args
 
-          changed $ Case scrutBody1 altsTy alts
-      _ ->
-        return e
-
+              changed $ Case scrutBody1 altsTy alts
+        _ ->
+          return e
 inlineNonRepWorker e = pure e
 {-# SCC inlineNonRepWorker #-}
 
@@ -610,32 +664,33 @@ inlineOrLiftNonRep =
   toTransformation "bindOrLiftNonRep" (onLet 'inlineOrLiftNonRepWorker)
 
 -- | The 'Let' handler of 'inlineOrLiftNonRep'.
-inlineOrLiftNonRepWorker
-  :: HasCallStack
-  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineOrLiftNonRepWorker ::
+  (HasCallStack) =>
+  TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 inlineOrLiftNonRepWorker ctx eLet bind body =
-    inlineOrLiftBinders nonRepTest inlineTest ctx eLet bind body
+  inlineOrLiftBinders nonRepTest inlineTest ctx eLet bind body
   where
     bodyFreeOccs = countFreeOccurances body
 
     nonRepTest :: (Id, Term) -> NormalizeSession Bool
-    nonRepTest (Id {varType = ty}, _) = isUntranslatableType False ty
+    nonRepTest (Id{varType = ty}, _) = isUntranslatableType False ty
     nonRepTest _ = return False
 
     inlineTest :: Term -> (Id, Term) -> Bool
     inlineTest e (id_, e') =
       -- We do __NOT__ inline:
-      not $ or
-        [ -- 1. recursive let-binders
-          -- id_ `elemFreeVars` e' -- <= already checked in inlineOrLiftBinders
-          -- 2. join points (which are not void-wrappers)
-          isJoinPointIn id_ e && not (isVoidWrapper e')
-          -- 3. binders that are used more than once in the body, because
-          --    it makes CSE a whole lot more difficult.
-          --
-          -- XXX: Check whether we can extend this to the binders as well
-        , maybe False (>1) (lookupVarEnv id_ bodyFreeOccs)
-        ]
+      not $
+        or
+          [ -- 1. recursive let-binders
+            -- id_ `elemFreeVars` e' -- <= already checked in inlineOrLiftBinders
+            -- 2. join points (which are not void-wrappers)
+            isJoinPointIn id_ e && not (isVoidWrapper e'),
+            -- 3. binders that are used more than once in the body, because
+            --    it makes CSE a whole lot more difficult.
+            --
+            -- XXX: Check whether we can extend this to the binders as well
+            maybe False (> 1) (lookupVarEnv id_ bodyFreeOccs)
+          ]
 {-# SCC inlineOrLiftNonRepWorker #-}
 
 -- | Inline anything of type `SimIO`: IO actions cannot be shared
@@ -643,12 +698,12 @@ inlineSimIO :: Transformation
 inlineSimIO = toTransformation "bindSimIO" (onLet 'inlineSimIOWorker)
 
 -- | The 'Let' handler of 'inlineSimIO'.
-inlineSimIOWorker
-  :: HasCallStack
-  => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
+inlineSimIOWorker ::
+  (HasCallStack) =>
+  TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
 inlineSimIOWorker = inlineBinders test
   where
-    test _ (i,_) = case tyView (coreTypeOf i) of
+    test _ (i, _) = case tyView (coreTypeOf i) of
       TyConApp tc _ -> return $! nameOcc tc == Text.showt ''SimIO.SimIO
       _ -> return False
 {-# SCC inlineSimIOWorker #-}
@@ -675,32 +730,35 @@ inlineSimIOWorker = inlineBinders test
 -- 'collectTicks' before matching on a constructor.
 isPartOfVarAppSpine :: CoreContext -> Term -> Bool
 isPartOfVarAppSpine cc e = isSpineCtx cc && isSpineNode e
- where
-  isSpineCtx AppFun = True
-  isSpineCtx TyAppC = True
-  isSpineCtx (TickC _) = True
-  isSpineCtx _ = False
+  where
+    isSpineCtx AppFun = True
+    isSpineCtx TyAppC = True
+    isSpineCtx (TickC _) = True
+    isSpineCtx _ = False
 
-  isSpineNode Var {} = True
-  isSpineNode App {} = True
-  isSpineNode TyApp {} = True
-  isSpineNode Tick {} = True
-  isSpineNode _ = False
+    isSpineNode Var{} = True
+    isSpineNode App{} = True
+    isSpineNode TyApp{} = True
+    isSpineNode Tick{} = True
+    isSpineNode _ = False
 
 -- | Inline small functions
 inlineSmall :: Transformation
 inlineSmall =
-  toTransformation "inlineSmall"
-    (onVarNode 'inlineSmallWorker <> onAppNode 'inlineSmallWorker
-      <> onTyAppNode 'inlineSmallWorker <> onTickNode 'inlineSmallWorker)
+  toTransformation
+    "inlineSmall"
+    ( onVarNode 'inlineSmallWorker
+        <> onAppNode 'inlineSmallWorker
+        <> onTyAppNode 'inlineSmallWorker
+        <> onTickNode 'inlineSmallWorker
+    )
 
 -- | The application-spine handler of 'inlineSmall'.
-inlineSmallWorker :: HasCallStack => NormRewrite
-inlineSmallWorker (TransformContext _ (cc:_)) e
-  | isPartOfVarAppSpine cc e
-  = return e
-
-inlineSmallWorker _ e@(collectArgsTicks -> (Var f,args,ticks))
+inlineSmallWorker :: (HasCallStack) => NormRewrite
+inlineSmallWorker (TransformContext _ (cc : _)) e
+  | isPartOfVarAppSpine cc e =
+      return e
+inlineSmallWorker _ e@(collectArgsTicks -> (Var f, args, ticks))
   | isLocalId f = return e
   | otherwise = do
       -- XXX: This is deeply nested to short-circuit expensive checks
@@ -712,23 +770,20 @@ inlineSmallWorker _ e@(collectArgsTicks -> (Var f,args,ticks))
           sizeLimit <- Lens.view inlineFunctionLimit
           case lookupVarEnv f bndrs of
             Just b
-              | not (isNoInline (bindingSpec b))
-              , termSizeSmallerThan sizeLimit (bindingTerm b)
-              -> do
-                -- Don't inline recursive expressions
-                isRecBndr <- isRecursiveBndr f
-                if isRecBndr
-                   then return e
-                   else do
-                     untranslatable <- isUntranslatable True e
-                     if untranslatable
+              | not (isNoInline (bindingSpec b)),
+                termSizeSmallerThan sizeLimit (bindingTerm b) -> do
+                  -- Don't inline recursive expressions
+                  isRecBndr <- isRecursiveBndr f
+                  if isRecBndr
+                    then return e
+                    else do
+                      untranslatable <- isUntranslatable True e
+                      if untranslatable
                         then return e
                         else do
                           let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
                           changed $ mkApps tm args
-
             _ -> return e
-
 inlineSmallWorker _ e = return e
 {-# SCC inlineSmallWorker #-}
 
@@ -737,55 +792,61 @@ inlineSmallWorker _ e = return e
 -- inlined, see 'normalizeWorkFreeApp'.
 inlineWorkFree :: Transformation
 inlineWorkFree =
-  toTransformation "inlineWorkFree"
-    (onVarNode 'inlineWorkFreeWorker <> onAppNode 'inlineWorkFreeWorker
-      <> onTyAppNode 'inlineWorkFreeWorker <> onTickNode 'inlineWorkFreeWorker)
+  toTransformation
+    "inlineWorkFree"
+    ( onVarNode 'inlineWorkFreeWorker
+        <> onAppNode 'inlineWorkFreeWorker
+        <> onTyAppNode 'inlineWorkFreeWorker
+        <> onTickNode 'inlineWorkFreeWorker
+    )
 
 -- | The application-spine handler of 'inlineWorkFree'.
-inlineWorkFreeWorker :: HasCallStack => NormRewrite
-inlineWorkFreeWorker (TransformContext _ (cc:_)) e
-  | isPartOfVarAppSpine cc e
-  = return e
-
-inlineWorkFreeWorker _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
+inlineWorkFreeWorker :: (HasCallStack) => NormRewrite
+inlineWorkFreeWorker (TransformContext _ (cc : _)) e
+  | isPartOfVarAppSpine cc e =
+      return e
+inlineWorkFreeWorker _ e@(collectArgsTicks -> (Var f, args@(_ : _), ticks))
   | isLocalId f = return e
-  | otherwise
-  = do
-    -- XXX: This is deeply nested to short-circuit expensive checks
-    topEnts <- Lens.view topEntities
-    if f `elemVarSet` topEnts
-      then return e
-      else do
-        bndrs <- Lens.use bindings
-        case lookupVarEnv f bndrs of
-          Just b -> do
-            tcm <- Lens.view tcCache
-            let eTy = inferCoreTypeOf tcm e
-            if isSignalType tcm eTy
-              then return e
-              else do
-                untranslatable <- isUntranslatableType True eTy
-                argsHaveWork <- anyM (either expressionHasWork
-                                             (const (pure False)))
-                                     args
-                if untranslatable || argsHaveWork
-                  then return e
-                  else do
-                    -- Don't inline recursive expressions
-                    isRecBndr <- isRecursiveBndr f
-                    if | isRecBndr -> return e
-                       -- Type arguments can still mention type variables bound
-                       -- in the context, which rules out caching. Note that
-                       -- closedness for the term is already checked in
-                      -- 'expressionHasWork'.
-                       | all isClosed (rights args) -> do
-                         tm <- normalizeWorkFreeApp f b args
-                         changed (mkTicks tm (mkInlineTick f : ticks))
-                       | otherwise -> do
-                         let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
-                         changed $ mkApps tm args
-
-          _ -> return e
+  | otherwise = do
+      -- XXX: This is deeply nested to short-circuit expensive checks
+      topEnts <- Lens.view topEntities
+      if f `elemVarSet` topEnts
+        then return e
+        else do
+          bndrs <- Lens.use bindings
+          case lookupVarEnv f bndrs of
+            Just b -> do
+              tcm <- Lens.view tcCache
+              let eTy = inferCoreTypeOf tcm e
+              if isSignalType tcm eTy
+                then return e
+                else do
+                  untranslatable <- isUntranslatableType True eTy
+                  argsHaveWork <-
+                    anyM
+                      ( either
+                          expressionHasWork
+                          (const (pure False))
+                      )
+                      args
+                  if untranslatable || argsHaveWork
+                    then return e
+                    else do
+                      -- Don't inline recursive expressions
+                      isRecBndr <- isRecursiveBndr f
+                      if
+                        | isRecBndr -> return e
+                        -- Type arguments can still mention type variables bound
+                        -- in the context, which rules out caching. Note that
+                        -- closedness for the term is already checked in
+                        -- 'expressionHasWork'.
+                        | all isClosed (rights args) -> do
+                            tm <- normalizeWorkFreeApp f b args
+                            changed (mkTicks tm (mkInlineTick f : ticks))
+                        | otherwise -> do
+                            let tm = mkTicks (bindingTerm b) (mkInlineTick f : ticks)
+                            changed $ mkApps tm args
+            _ -> return e
   where
     -- an expression has work when it contains free local variables,
     -- or has a Signal type, i.e. it does not evaluate to a work-free
@@ -798,13 +859,12 @@ inlineWorkFreeWorker _ e@(collectArgsTicks -> (Var f,args@(_:_),ticks))
           tcm <- Lens.view tcCache
           let e'Ty = inferCoreTypeOf tcm e'
           return (isSignalType tcm e'Ty)
-
 inlineWorkFreeWorker _ e@(collectTicks -> (Var f, ticks))
   | isLocalId f = return e
   | otherwise = do
       topEnts <- Lens.view topEntities
       tcm <- Lens.view tcCache
-      let fTy    = coreTypeOf f
+      let fTy = coreTypeOf f
           closed = not (isPolyFunCoreTy tcm fTy)
       if f `elemVarSet` topEnts || not closed || isSignalType tcm fTy
         then return e
@@ -819,18 +879,18 @@ inlineWorkFreeWorker _ e@(collectTicks -> (Var f, ticks))
                 Just top -> do
                   isRecBndr <- isRecursiveBndr f
                   if isRecBndr
-                     then return e
-                     else do
+                    then return e
+                    else do
                       let topB = bindingTerm top
                       sizeLimit <- Lens.view inlineWFCacheLimit
                       -- caching only worth it from a certain size onwards, otherwise
                       -- the caching mechanism itself brings more of an overhead.
-                      if termSizeSmallerThan sizeLimit topB then
-                        changed (mkTicks topB ticks)
-                      else do
-                        b <- normalizeTopLvlBndr False f top
-                        changed (mkTicks (bindingTerm b) ticks)
+                      if termSizeSmallerThan sizeLimit topB
+                        then
+                          changed (mkTicks topB ticks)
+                        else do
+                          b <- normalizeTopLvlBndr False f top
+                          changed (mkTicks (bindingTerm b) ticks)
                 _ -> return e
-
 inlineWorkFreeWorker _ e = return e
 {-# SCC inlineWorkFreeWorker #-}

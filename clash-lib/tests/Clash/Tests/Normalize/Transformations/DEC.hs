@@ -1,3 +1,6 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -5,18 +8,7 @@
 
   Tests for "Clash.Normalize.Transformations.DEC"
 -}
-
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Tests.Normalize.Transformations.DEC (tests) where
-
-import Data.Default (def)
-import Data.List (find)
-import qualified Data.Text as Text
-
-import Test.Tasty
-import Test.Tasty.HUnit
 
 import Clash.Core.Literal (Literal (IntLiteral))
 import Clash.Core.Name (Name (..), NameSort (User))
@@ -28,10 +20,24 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Unique (Unique)
 import Clash.Util.Supply (Supply, newSupply)
-
+import Data.Default (def)
+import Data.List (find)
+import qualified Data.Text as Text
 import Test.Clash.Rewrite
-  ( assertNoShadowing, globalId, inScopeOf, intFunTy, intId, intLit, intTy
-  , letBinders, mkBindingMap, runSingleTransformation, showPprU )
+  ( assertNoShadowing,
+    globalId,
+    inScopeOf,
+    intFunTy,
+    intId,
+    intLit,
+    intTy,
+    letBinders,
+    mkBindingMap,
+    runSingleTransformation,
+    showPprU,
+  )
+import Test.Tasty
+import Test.Tasty.HUnit
 
 decR :: NormRewrite
 decR = $(asRewriteQ disjointExpressionConsolidation)
@@ -54,21 +60,25 @@ kId = globalId User "k" 33 (intFunTy 2)
 -- applications in both alternatives.
 decTerm :: Unique -> Term
 decTerm bUniq =
-  Case (Var sId) intTy
-    [ (DefaultPat, App (Var fId) (Var yId))
-    , ( LitPat (IntLiteral 1)
-      , Letrec [(b, intLit 3)]
-          (mkApps (Var kId) [Left (Var b), Left (App (Var fId) (Var xId))]))
+  Case
+    (Var sId)
+    intTy
+    [ (DefaultPat, App (Var fId) (Var yId)),
+      ( LitPat (IntLiteral 1),
+        Letrec
+          [(b, intLit 3)]
+          (mkApps (Var kId) [Left (Var b), Left (App (Var fId) (Var xId))])
+      )
     ]
- where
-  b = intId User "b" bUniq
+  where
+    b = intId User "b" bUniq
 
 -- | Run DEC on a term, with the given unique supply
 runDEC :: Supply -> Term -> IO Term
 runDEC supply = runSingleTransformation def st (inScopeOf [sId, xId, yId]) decR
- where
-  st = def{_bindings = mkBindingMap [(fId, Lam a (Var a))], _uniqSupply = supply}
-  a = intId User "a" 20
+  where
+    st = def{_bindings = mkBindingMap [(fId, Lam a (Var a))], _uniqSupply = supply}
+    a = intId User "a" 20
 
 -- | DEC substitutes a reference to the lifted @f_out@ for every application of
 -- @f@ in the alternatives, which puts that reference under the binders of the
@@ -95,6 +105,7 @@ tests :: TestTree
 tests =
   testGroup
     "Clash.Tests.Normalize.Transformations.DEC"
-    [ testCase "DEC does not capture lifted expressions (#1317)"
+    [ testCase
+        "DEC does not capture lifted expressions (#1317)"
         decDoesNotCaptureLiftedExpression
     ]

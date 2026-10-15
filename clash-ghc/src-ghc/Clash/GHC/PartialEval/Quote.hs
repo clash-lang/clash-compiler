@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 {-|
 Copyright   : (C) 2020-2021, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
@@ -6,23 +8,19 @@ Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 This module provides the "quoting" part of the partial evaluator, which
 traverses a WHNF value, recursively evaluating sub-terms to remove redexes.
 -}
-
-{-# LANGUAGE LambdaCase #-}
-
 module Clash.GHC.PartialEval.Quote
-  ( quote
-  ) where
-
-import Data.Bitraversable
+  ( quote,
+  )
+where
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.PartialEval.Monad
 import Clash.Core.PartialEval.NormalForm
-import Clash.Core.Term (Bind(..), Term, PrimInfo, TickInfo, Pat)
-import Clash.Core.Type (Type(VarTy))
+import Clash.Core.Term (Bind (..), Pat, PrimInfo, Term, TickInfo)
+import Clash.Core.Type (Type (VarTy))
 import Clash.Core.Var (Id, TyVar)
-
 import Clash.GHC.PartialEval.Eval
+import Data.Bitraversable
 
 quote :: Value -> Eval Normal
 quote = \case
@@ -94,9 +92,9 @@ quoteNeTyApp x ty = NeTyApp <$> quoteNeutral x <*> pure ty
 quoteNeLet :: Bind Value -> Value -> Eval (Neutral Normal)
 quoteNeLet bs x =
   withIds (bindToList bs) (NeLet <$> quoteBind bs <*> quote x)
- where
-  bindToList (NonRec i e) = [(i, e)]
-  bindToList (Rec xs) = xs
+  where
+    bindToList (NonRec i e) = [(i, e)]
+    bindToList (Rec xs) = xs
 
 quoteNeCase :: Value -> Type -> [(Pat, Value)] -> Eval (Neutral Normal)
 quoteNeCase x ty alts =

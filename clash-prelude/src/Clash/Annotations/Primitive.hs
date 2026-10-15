@@ -1,3 +1,10 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE Safe #-}
+{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2017-2019, Myrtle Software
                   2022,      QBayLogic B.V.
@@ -9,35 +16,25 @@ or in a specified directory. For distribution of new packages with primitive
 HDL templates. Primitive guards can be added to warn on instantiating
 primitives.
 -}
-
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NoGeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
-
-{-# LANGUAGE Safe #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Annotations.Primitive
-  ( dontTranslate
-  , hasBlackBox
-  , warnNonSynthesizable
-  , warnAlways
-  , Primitive(..)
-  , HDL(..)
-  , PrimitiveGuard(..)
-  , PrimitiveWarning(..)
-  , extractPrim
-  , extractWarnings
-  ) where
+  ( dontTranslate,
+    hasBlackBox,
+    warnNonSynthesizable,
+    warnAlways,
+    Primitive (..),
+    HDL (..),
+    PrimitiveGuard (..),
+    PrimitiveWarning (..),
+    extractPrim,
+    extractWarnings,
+  )
+where
 
-import           Control.DeepSeq                          (NFData)
-import           Data.Binary                              (Binary)
-import           Data.Data
-import           Data.Hashable                            (Hashable)
-import           GHC.Generics                             (Generic)
-
+import Control.DeepSeq (NFData)
+import Data.Binary (Binary)
+import Data.Data
+import Data.Hashable (Hashable)
+import GHC.Generics (Generic)
 
 -- The commented code directly below this comment is affected by an old
 -- GHC bug: https://gitlab.haskell.org/ghc/ghc/-/issues/5463. In short, NOINLINE
@@ -264,12 +261,12 @@ data HDL
 -- example = fmap succ
 -- @
 data Primitive
-  = Primitive [HDL] FilePath
-  -- ^ Description of a primitive for given 'HDL's in a file at 'FilePath'
-  | InlinePrimitive [HDL] String
-  -- ^ Description of a primitive for given 'HDL's as an inline JSON 'String'
-  | InlineYamlPrimitive [HDL] String
-  -- ^ Description of a primitive for given 'HDL's as an inline YAML 'String'
+  = -- | Description of a primitive for given 'HDL's in a file at 'FilePath'
+    Primitive [HDL] FilePath
+  | -- | Description of a primitive for given 'HDL's as an inline JSON 'String'
+    InlinePrimitive [HDL] String
+  | -- | Description of a primitive for given 'HDL's as an inline YAML 'String'
+    InlineYamlPrimitive [HDL] String
   deriving (Show, Read, Data, Generic, NFData, Hashable, Eq)
 
 -- | Primitive guard to mark a value as either not translatable or as having a
@@ -279,41 +276,51 @@ data Primitive
 -- For use, see 'dontTranslate', 'hasBlackBox', 'warnNonSynthesizable' and
 -- 'warnAlways'.
 data PrimitiveGuard a
-  = DontTranslate
-  -- ^ Marks value as not translatable. Clash will error if it finds a blackbox
-  -- definition for it, or when it is forced to translate it.
-  | HasBlackBox [PrimitiveWarning] a
-  -- ^ Marks a value as having a blackbox. Clash will error if it hasn't found
-  -- a blackbox.
+  = -- | Marks value as not translatable. Clash will error if it finds a blackbox
+    -- definition for it, or when it is forced to translate it.
+    DontTranslate
+  | -- | Marks a value as having a blackbox. Clash will error if it hasn't found
+    -- a blackbox.
+    HasBlackBox [PrimitiveWarning] a
   deriving
-    ( Show, Read, Data, Generic, NFData, Hashable, Functor, Foldable
-    , Traversable, Binary, Eq )
+    ( Show,
+      Read,
+      Data,
+      Generic,
+      NFData,
+      Hashable,
+      Functor,
+      Foldable,
+      Traversable,
+      Binary,
+      Eq
+    )
 
 -- | Warning that will be emitted on instantiating a guarded value.
 data PrimitiveWarning
-  = WarnNonSynthesizable String
-  -- ^ Marks value as non-synthesizable. This will trigger a warning if
-  -- instantiated in a non-testbench context.
-  | WarnAlways String
-  -- ^ Always emit warning upon primitive instantiation.
-    deriving (Show, Read, Data, Generic, NFData, Hashable, Binary, Eq)
+  = -- | Marks value as non-synthesizable. This will trigger a warning if
+    -- instantiated in a non-testbench context.
+    WarnNonSynthesizable String
+  | -- | Always emit warning upon primitive instantiation.
+    WarnAlways String
+  deriving (Show, Read, Data, Generic, NFData, Hashable, Binary, Eq)
 
 -- | Extract primitive definition from a PrimitiveGuard. Will yield Nothing
 -- for guards of value 'DontTranslate'.
-extractPrim
-  :: PrimitiveGuard a
-  -> Maybe a
+extractPrim ::
+  PrimitiveGuard a ->
+  Maybe a
 extractPrim =
   \case
     HasBlackBox _ p -> Just p
-    DontTranslate   -> Nothing
+    DontTranslate -> Nothing
 
 -- | Extract primitive warnings from a PrimitiveGuard. Will yield an empty list
 -- for guards of value 'DontTranslate'.
-extractWarnings
-  :: PrimitiveGuard a
-  -> [PrimitiveWarning]
+extractWarnings ::
+  PrimitiveGuard a ->
+  [PrimitiveWarning]
 extractWarnings =
   \case
     HasBlackBox w _ -> w
-    DontTranslate   -> []
+    DontTranslate -> []

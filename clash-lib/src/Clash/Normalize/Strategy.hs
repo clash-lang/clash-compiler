@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
   Copyright  :  (C) 2012-2016, University of Twente,
                 (C) 2021-2026, QBayLogic B.V.
@@ -8,14 +10,13 @@
   described in "Clash.Normalize.Strategy.Spec".
 -}
 
-{-# LANGUAGE TemplateHaskell #-}
-
---{-# OPTIONS_GHC -ddump-splices #-}
+-- {-# OPTIONS_GHC -ddump-splices #-}
 
 module Clash.Normalize.Strategy
-  ( normalization
-  , constantPropagation
-  ) where
+  ( normalization,
+    constantPropagation,
+  )
+where
 
 import Clash.Normalize.Strategy.Spec
 import Clash.Normalize.Types (NormRewrite)

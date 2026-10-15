@@ -1,3 +1,10 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE TypeFamilies #-}
+-- TryDomain instance
+{-# OPTIONS_GHC -Wno-deprecations #-}
+
 {-|
 Copyright  :  (C) 2022,      Google Inc.,
 License    :  BSD2 (see the file LICENSE)
@@ -9,22 +16,11 @@ are here mostly to deal with varying @`timescale@ defintions, see:
   https://www.chipverify.com/verilog/verilog-timescale
 
 -}
-
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE TypeFamilies #-}
-
--- TryDomain instance
-{-# OPTIONS_GHC -Wno-deprecations #-}
-
 module Clash.Backend.Verilog.Time where
 
-import Clash.Class.HasDomain.HasSingleDomain
-  (TryDomain, TryDomainResult(NotFound))
-
+import Clash.Class.HasDomain.HasSingleDomain (TryDomain, TryDomainResult (NotFound))
 import Control.DeepSeq (NFData)
-import Data.Char (toLower, isDigit)
+import Data.Char (isDigit, toLower)
 import Data.Hashable (Hashable)
 import Data.List (find)
 import Data.Word (Word64)
@@ -44,10 +40,9 @@ data Period = Period Word64 Unit
 -- | Verilog timescale. Influences simulation precision.
 data Scale = Scale
   { -- | Time step in wait statements, e.g. `#1`.
-    step :: Period
-
+    step :: Period,
     -- | Simulator precision - all units will get rounded to this period.
-  , precision :: Period
+    precision :: Period
   }
   deriving (Show, Generic, Hashable, Eq, NFData)
 
@@ -84,10 +79,10 @@ unitToString = map toLower . show
 -- Nothing
 --
 parseUnit :: String -> Maybe Unit
-parseUnit s = find tryUnit [minBound..]
- where
-  tryUnit :: Unit -> Bool
-  tryUnit u = unitToString u == s
+parseUnit s = find tryUnit [minBound ..]
+  where
+    tryUnit :: Unit -> Bool
+    tryUnit u = unitToString u == s
 
 -- | Parse a Verilog
 --
@@ -122,9 +117,9 @@ parsePeriod s =
 --
 convertUnit :: Unit -> Period -> Word64
 convertUnit targetUnit = go
- where
-  go (Period len unit) =
-    case compare unit targetUnit of
-      LT -> go (Period (len `div` 1000) (succ unit))
-      EQ -> max 1 len
-      GT -> go (Period (len * 1000) (pred unit))
+  where
+    go (Period len unit) =
+      case compare unit targetUnit of
+        LT -> go (Period (len `div` 1000) (succ unit))
+        EQ -> max 1 len
+        GT -> go (Period (len * 1000) (pred unit))

@@ -1,19 +1,16 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE Trustworthy #-}
+{-# OPTIONS_HADDOCK show-extensions #-}
+
 {-|
 Copyright  :  (C) 2013-2016, University of Twente,
                   2021,      QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
-
-{-# LANGUAGE FlexibleContexts #-}
-
-{-# LANGUAGE Trustworthy #-}
-
-{-# OPTIONS_HADDOCK show-extensions #-}
-
 module Clash.Class.BitPack.BitReduction where
 
-import Clash.Class.BitPack.Internal   (BitPack (..))
+import Clash.Class.BitPack.Internal (BitPack (..))
 import Clash.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 
 {- $setup
@@ -22,6 +19,7 @@ import Clash.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 -}
 
 {-# INLINE reduceAnd #-}
+
 -- | Are all bits set to '1'?
 --
 -- >>> pack (-2 :: Signed 6)
@@ -37,10 +35,11 @@ import Clash.Sized.Internal.BitVector (Bit, reduceAnd#, reduceOr#, reduceXor#)
 --
 -- >>> reduceAnd (0 :: Unsigned 0)
 -- 1
-reduceAnd :: BitPack a => a -> Bit
+reduceAnd :: (BitPack a) => a -> Bit
 reduceAnd v = reduceAnd# (pack v)
 
 {-# INLINE reduceOr #-}
+
 -- | Is there at least one bit set to '1'?
 --
 -- >>> pack (5 :: Signed 6)
@@ -56,10 +55,11 @@ reduceAnd v = reduceAnd# (pack v)
 --
 -- >>> reduceOr (0 :: Unsigned 0)
 -- 0
-reduceOr :: BitPack a => a -> Bit
+reduceOr :: (BitPack a) => a -> Bit
 reduceOr v = reduceOr# (pack v)
 
 {-# INLINE reduceXor #-}
+
 -- | Is the number of bits set to '1' uneven?
 --
 -- >>> pack (5 :: Signed 6)
@@ -79,5 +79,5 @@ reduceOr v = reduceOr# (pack v)
 --
 -- >>> reduceXor (0 :: Unsigned 0)
 -- 0
-reduceXor :: BitPack a => a -> Bit
+reduceXor :: (BitPack a) => a -> Bit
 reduceXor v = reduceXor# (pack v)

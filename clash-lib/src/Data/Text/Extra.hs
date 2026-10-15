@@ -1,7 +1,8 @@
 module Data.Text.Extra
-  ( showt
-  , showtl
-  ) where
+  ( showt,
+    showtl,
+  )
+where
 
 import qualified Data.Text as TS
 import qualified Data.Text.Lazy as TL

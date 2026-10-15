@@ -3,12 +3,11 @@
 
 module Data.Primitive.ByteArray.Extra where
 
-import Data.Binary (Binary(..))
+import Data.Binary (Binary (..))
 import Data.Primitive.ByteArray (ByteArray)
-import GHC.Exts (IsList(..))
-
+import GHC.Exts (IsList (..))
 #if !MIN_VERSION_primitive(0,7,1)
-import Control.DeepSeq (NFData(..))
+import Control.DeepSeq (NFData (..))
 #endif
 
 -- hashable 1.4.2 defines Hashable for Data.Array.Byte.ByteArray, either from
@@ -21,7 +20,7 @@ import Control.DeepSeq (NFData(..))
 #endif
 
 #ifdef DEFINE_HASHABLE_BYTEARRAY
-import Data.Hashable (Hashable(..))
+import Data.Hashable (Hashable (..))
 #endif
 
 #if !MIN_VERSION_primitive(0,7,1)

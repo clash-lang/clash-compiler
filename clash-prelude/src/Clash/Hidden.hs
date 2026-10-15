@@ -1,3 +1,10 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE Trustworthy #-}
+
 {-|
 Copyright  :  (C) 2018     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
@@ -5,20 +12,12 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
 Hidden arguments
 -}
-
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes #-}
-
-{-# LANGUAGE Trustworthy #-}
-
 module Clash.Hidden
-  ( Hidden
-  , expose
-  -- * OverloadedLabels
-  , fromLabel
+  ( Hidden,
+    expose,
+
+    -- * OverloadedLabels
+    fromLabel,
   )
 where
 
@@ -58,7 +57,7 @@ import Unsafe.Coerce
 -- error.
 type Hidden (x :: Symbol) a = GHC.Classes.IP x a
 
-newtype Secret x a r = Secret (Hidden x a => r)
+newtype Secret x a r = Secret ((Hidden x a) => r)
 
 -- | Expose a 'Hidden' argument so that it can be applied normally, e.g.
 --
@@ -71,12 +70,12 @@ newtype Secret x a r = Secret (Hidden x a => r)
 -- g :: Int -> Bool -> Int
 -- g = 'expose' \@\"foo" f
 -- @
-expose
-  :: forall x a r
-   . (Hidden x a => r)
-  -- ^ Function with a 'Hidden' argument
-  -> (a -> r)
-  -- ^ Function with the 'Hidden' argument exposed
+expose ::
+  forall x a r.
+  -- | Function with a 'Hidden' argument
+  ((Hidden x a) => r) ->
+  -- | Function with the 'Hidden' argument exposed
+  (a -> r)
 expose k = unsafeCoerce (Secret @x @a @r k)
 {-# INLINE expose #-}
 
@@ -91,6 +90,6 @@ expose k = unsafeCoerce (Secret @x @a @r k)
 --   => Int -> Int
 -- g i = f i #foo
 -- @
-fromLabel :: forall x a . Hidden x a => a
+fromLabel :: forall x a. (Hidden x a) => a
 fromLabel = GHC.Classes.ip @x
 {-# INLINE fromLabel #-}

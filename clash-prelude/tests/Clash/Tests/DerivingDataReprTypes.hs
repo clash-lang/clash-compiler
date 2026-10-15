@@ -4,8 +4,8 @@
 
 module Clash.Tests.DerivingDataReprTypes where
 
-import Clash.Sized.Unsigned
 import Clash.Annotations.BitRepresentation.Deriving
+import Clash.Sized.Unsigned
 
 type SmallInt = Unsigned 2
 
@@ -21,19 +21,18 @@ data Train
   | Maintenance
   | Toy
 
-
 data RGB
   = R
   | G
   | B
 
-deriveDefaultAnnotation [t| RGB |]
-deriveBitPack [t| RGB |]
+deriveDefaultAnnotation [t|RGB|]
+deriveBitPack [t|RGB|]
 
 data Headphones
   = InEar
-      { _wireless :: Bool }
+      {_wireless :: Bool}
   | OverEar
-      { _impedance :: SmallInt }
+      {_impedance :: SmallInt}
 
 data EarCup = SmallInt :<>: SmallInt

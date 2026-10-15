@@ -1,3 +1,6 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 {-|
   Copyright   :  (C) 2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
@@ -5,22 +8,19 @@
 
   Tests for "Clash.Normalize.Transformations.ANF"
 -}
-
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module Clash.Tests.Normalize.Transformations.ANF (tests) where
-
-import Data.Default (def)
-
-import Test.Tasty
-import Test.Tasty.HUnit
 
 import Clash.Core.DataCon (DataCon)
 import Clash.Core.Name (NameSort (User), noSrcSpan)
 import Clash.Core.Term
-  ( Bind (..), IsMultiPrim (SingleResult), PrimInfo (..)
-  , PrimUnfolding (NoUnfolding), Term (..), WorkInfo (WorkVariable), mkApps )
+  ( Bind (..),
+    IsMultiPrim (SingleResult),
+    PrimInfo (..),
+    PrimUnfolding (NoUnfolding),
+    Term (..),
+    WorkInfo (WorkVariable),
+    mkApps,
+  )
 import Clash.Core.Type (mkFunTy)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
@@ -31,12 +31,25 @@ import Clash.Rewrite.StrategyDSL.TH (asRewriteQ)
 import Clash.Rewrite.Types (RewriteState (..))
 import Clash.Unique (Unique)
 import Clash.Util.Supply (Supply, newSupply)
-
+import Data.Default (def)
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, globalId, inScopeOf
-  , intFunTy, intId
-  , intLit, intTy, letBinders, mkDataCon, parseTyConTy, runSingleTransformation
-  , showPprU )
+  ( assertAlphaEq,
+    assertNoFreeLocals,
+    assertNoShadowing,
+    globalId,
+    inScopeOf,
+    intFunTy,
+    intId,
+    intLit,
+    intTy,
+    letBinders,
+    mkDataCon,
+    parseTyConTy,
+    runSingleTransformation,
+    showPprU,
+  )
+import Test.Tasty
+import Test.Tasty.HUnit
 
 nonRepANFR :: NormRewrite
 nonRepANFR = $(asRewriteQ nonRepANF)
@@ -50,24 +63,27 @@ mkP = mkDataCon "MkP" 1001 [] [] [intTy, intFunTy 1] (parseTyConTy "P")
 nonRepANFCapture :: IO Term
 nonRepANFCapture =
   runSingleTransformation def def (inScopeOf [u, x]) nonRepANFR $
-    mkApps (Data mkP)
-      [ Left (Var x)
-      , Left (Let (NonRec x (Var u)) (Lam y (Var x))) ]
- where
-  u = intId User "u" 1
-  x = intId User "x" 2
-  y = intId User "y" 3
+    mkApps
+      (Data mkP)
+      [ Left (Var x),
+        Left (Let (NonRec x (Var u)) (Lam y (Var x)))
+      ]
+  where
+    u = intId User "u" 1
+    x = intId User "x" 2
+    y = intId User "y" 3
 
 -- | The expected result of 'nonRepANFCapture'
 nonRepANFCaptureExpected :: Term
 nonRepANFCaptureExpected =
-  Let (NonRec x1 (Var u))
+  Let
+    (NonRec x1 (Var u))
     (mkApps (Data mkP) [Left (Var x), Left (Lam y (Var x1))])
- where
-  u = intId User "u" 1
-  x = intId User "x" 2
-  y = intId User "y" 3
-  x1 = intId User "x" 4
+  where
+    u = intId User "u" 1
+    x = intId User "x" 2
+    y = intId User "y" 3
+    x1 = intId User "x" 4
 
 -- * makeANF
 
@@ -86,11 +102,13 @@ xId = intId User "x" 31
 -- @h x@ and lifts @b@ into the same let-expression.
 anfTerm :: Unique -> Term
 anfTerm bUniq =
-  mkApps (Var kId)
-    [ Left (App (Var hId) (Var xId))
-    , Left (Letrec [(b, intLit 3)] (Var b)) ]
- where
-  b = intId User "b" bUniq
+  mkApps
+    (Var kId)
+    [ Left (App (Var hId) (Var xId)),
+      Left (Letrec [(b, intLit 3)] (Var b))
+    ]
+  where
+    b = intId User "b" bUniq
 
 -- | Run 'makeANF' on a term, with the given unique supply
 runANF :: Supply -> Term -> IO Term
@@ -115,8 +133,10 @@ anfDoesNotDuplicateBinders = do
     [i] -> pure i
     _ -> assertFailure ("ANF did not let-bind h x:\n" <> showPprU res1)
   res2 <- runANF supply (anfTerm (varUniq appArg))
-  assertEqual ("Number of let-binders in:\n" <> showPprU res2)
-    2 (length (letBinders res2))
+  assertEqual
+    ("Number of let-binders in:\n" <> showPprU res2)
+    2
+    (length (letBinders res2))
   assertNoShadowing res2
 
 -- | ANF moves all let-bindings it creates to the root of the term. It used to
@@ -131,12 +151,14 @@ anfDoesNotDuplicateBinders = do
 anfDoesNotLiftOutOfLambdas :: Assertion
 anfDoesNotLiftOutOfLambdas = do
   supply <- newSupply
-  let p = PrimInfo
-        { primName = "p"
-        , primType = mkFunTy (intFunTy 1) intTy
-        , primWorkInfo = WorkVariable
-        , primMultiResult = SingleResult
-        , primUnfolding = NoUnfolding }
+  let p =
+        PrimInfo
+          { primName = "p",
+            primType = mkFunTy (intFunTy 1) intTy,
+            primWorkInfo = WorkVariable,
+            primMultiResult = SingleResult,
+            primUnfolding = NoUnfolding
+          }
       z = intId User "z" 71
       cf = globalId User "top" 42 (intFunTy 1)
       tm = App (Prim p) (Lam z (mkApps (Var kId) [Left (App (Var hId) (Var z)), Left (Var z)]))
@@ -153,9 +175,11 @@ tests =
     -- free variables of the other arguments.
     -- https://github.com/clash-lang/clash-compiler/pull/1071
     [ testCase "nonRepANF deshadows let-bindings (#1071)" $
-        nonRepANFCapture >>= assertAlphaEq nonRepANFCaptureExpected
-    , testCase "ANF does not duplicate binders"
-        anfDoesNotDuplicateBinders
-    , testCase "ANF does not lift expressions out of lambdas"
+        nonRepANFCapture >>= assertAlphaEq nonRepANFCaptureExpected,
+      testCase
+        "ANF does not duplicate binders"
+        anfDoesNotDuplicateBinders,
+      testCase
+        "ANF does not lift expressions out of lambdas"
         anfDoesNotLiftOutOfLambdas
     ]

@@ -1,13 +1,13 @@
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE NoStarIsType #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE NoStarIsType #-}
 
 module Clash.Sized.Internal.CheckedLiterals where
 
 import Data.Kind (Type)
 import GHC.TypeError
-  ( ErrorMessage (ShowType, Text, (:$$:), (:<>:))
-  , TypeError
+  ( ErrorMessage (ShowType, Text, (:$$:), (:<>:)),
+    TypeError,
   )
 
 type CheckedLiteralUncheckedFix =

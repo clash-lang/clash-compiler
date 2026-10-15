@@ -5,22 +5,23 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Signal.Internal.Ambiguous
-  ( knownVDomain
-  , clockPeriod
-  , activeEdge
-  , resetKind
-  , initBehavior
-  , resetPolarity
-  ) where
+  ( knownVDomain,
+    clockPeriod,
+    activeEdge,
+    resetKind,
+    initBehavior,
+    resetPolarity,
+  )
+where
 
-import           Clash.Signal.Internal
-import           Clash.Promoted.Nat         (SNat)
+import Clash.Promoted.Nat (SNat)
+import Clash.Signal.Internal
 
 -- | Get the clock period from a KnownDomain context
-clockPeriod
-  :: forall dom period
-   . (KnownDomain dom, DomainPeriod dom ~ period)
-  => SNat period
+clockPeriod ::
+  forall dom period.
+  (KnownDomain dom, DomainPeriod dom ~ period) =>
+  SNat period
 clockPeriod =
   case knownDomain @dom of
     SDomainConfiguration{sPeriod} ->
@@ -37,10 +38,10 @@ clockPeriod =
 --     SRising -> foo
 --     SFalling -> bar
 -- @
-activeEdge
-  :: forall dom edge
-   . (KnownDomain dom, DomainActiveEdge dom ~ edge)
-  => SActiveEdge edge
+activeEdge ::
+  forall dom edge.
+  (KnownDomain dom, DomainActiveEdge dom ~ edge) =>
+  SActiveEdge edge
 activeEdge =
   case knownDomain @dom of
     SDomainConfiguration{sActiveEdge} ->
@@ -57,10 +58,10 @@ activeEdge =
 --     SAsynchronous -> foo
 --     SSynchronous -> bar
 -- @
-resetKind
-  :: forall dom sync
-   . (KnownDomain dom, DomainResetKind dom ~ sync)
-  => SResetKind sync
+resetKind ::
+  forall dom sync.
+  (KnownDomain dom, DomainResetKind dom ~ sync) =>
+  SResetKind sync
 resetKind =
   case knownDomain @dom of
     SDomainConfiguration{sResetKind} ->
@@ -77,10 +78,10 @@ resetKind =
 --     SDefined -> foo
 --     SUnknown -> bar
 -- @
-initBehavior
-  :: forall dom init
-   . (KnownDomain dom, DomainInitBehavior dom ~ init)
-  => SInitBehavior init
+initBehavior ::
+  forall dom init.
+  (KnownDomain dom, DomainInitBehavior dom ~ init) =>
+  SInitBehavior init
 initBehavior =
   case knownDomain @dom of
     SDomainConfiguration{sInitBehavior} ->
@@ -97,10 +98,10 @@ initBehavior =
 --     SActiveHigh -> foo
 --     SActiveLow -> bar
 -- @
-resetPolarity
-  :: forall dom polarity
-   . (KnownDomain dom, DomainResetPolarity dom ~ polarity)
-  => SResetPolarity polarity
+resetPolarity ::
+  forall dom polarity.
+  (KnownDomain dom, DomainResetPolarity dom ~ polarity) =>
+  SResetPolarity polarity
 resetPolarity =
   case knownDomain @dom of
     SDomainConfiguration{sResetPolarity} ->
@@ -110,9 +111,9 @@ resetPolarity =
 
 -- | Like 'knownDomain but yields a 'VDomainConfiguration'. Should only be used
 -- in combination with 'createDomain'.
-knownVDomain
-  :: forall dom
-   . KnownDomain dom
-  => VDomainConfiguration
+knownVDomain ::
+  forall dom.
+  (KnownDomain dom) =>
+  VDomainConfiguration
 knownVDomain =
   vDomain (knownDomain @dom)
