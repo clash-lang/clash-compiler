@@ -17,8 +17,6 @@
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-#include "../../ClashDebug.h"
-
 module Clash.Core.Subst
   ( -- * Substitution into types
     -- ** Substitution environments
@@ -458,16 +456,16 @@ checkValidSubst
   -> a
   -> a
 checkValidSubst subst@(TvSubst inScope tenv) tys a =
-  WARN( not (isValidSubst subst),
-        "inScope" <+> clashPretty inScope <> line <>
-        "tenv" <+> clashPretty tenv <> line <>
-        "tenvFVs" <+> clashPretty (freeVarsOf tenv) <> line <>
-        "tys" <+> fromPpr tys)
-  WARN( not tysFVsInSope,
-       "inScope" <+> clashPretty inScope <> line <>
-       "tenv" <+> clashPretty tenv <> line <>
-       "tys" <+> fromPpr tys <> line <>
-       "needsInScope" <+> clashPretty needsInScope)
+  warnPprTrace (not (isValidSubst subst)) __FILE__ __LINE__
+    ("inScope" <+> clashPretty inScope <> line <>
+     "tenv" <+> clashPretty tenv <> line <>
+     "tenvFVs" <+> clashPretty (freeVarsOf tenv) <> line <>
+     "tys" <+> fromPpr tys) $
+  warnPprTrace (not tysFVsInSope) __FILE__ __LINE__
+    ("inScope" <+> clashPretty inScope <> line <>
+     "tenv" <+> clashPretty tenv <> line <>
+     "tys" <+> fromPpr tys <> line <>
+     "needsInScope" <+> clashPretty needsInScope) $
   a
  where
   needsInScope = UniqMap.foldrWithUnique (\k _ s -> delVarSetByKey k s)
@@ -521,10 +519,12 @@ substTyVarBndr
   -> TyVar
   -> (TvSubst, TyVar)
 substTyVarBndr subst@(TvSubst inScope tenv) oldVar =
-  ASSERT2( no_capture, clashPretty oldVar <> line
-                    <> clashPretty newVar <> line
-                    <> clashPretty subst )
-  (TvSubst (inScope `extendInScopeSet` newVar) newEnv, newVar)
+  if debugIsOn && not no_capture
+    then assertPprPanic __FILE__ __LINE__
+      (clashPretty oldVar <> line
+       <> clashPretty newVar <> line
+       <> clashPretty subst)
+    else (TvSubst (inScope `extendInScopeSet` newVar) newEnv, newVar)
  where
   newEnv | noChange  = delVarEnv tenv oldVar
          | otherwise = extendVarEnv oldVar (VarTy newVar) tenv
@@ -728,8 +728,10 @@ lookupIdSubst doc (Subst inScope tmS _ genv) v
   -- TODO:   https://github.com/clash-lang/clash-compiler/issues/1046
   -- TODO:
   | Just v'@(Id {}) <- lookupInScope inScope v = Var (coerce v')
-  | otherwise = WARN(True, "Subst.lookupIdSubst" <+> doc <+> fromPpr v)
-                Var v
+  | otherwise =
+      warnPprTrace True __FILE__ __LINE__
+        ("Subst.lookupIdSubst" <+> doc <+> fromPpr v) $
+      Var v
 
 -- | Substitute an 'Id' for another one according to the 'Subst' given,
 -- returning the result and an update 'Subst' that should be used in subsequent
@@ -806,8 +808,9 @@ substTyWith
   -> Type
   -> Type
 substTyWith tvs tys =
-  ASSERT( List.equalLength tvs tys )
-  substTy (zipTvSubst tvs tys)
+  if debugIsOn && not (List.equalLength tvs tys)
+    then assertPanic __FILE__ __LINE__
+    else substTy (zipTvSubst tvs tys)
 
 -- | Ensure that non of the binders in an expression shadow each-other, nor
 -- conflict with he in-scope set

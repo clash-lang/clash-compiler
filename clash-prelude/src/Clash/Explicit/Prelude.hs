@@ -175,9 +175,6 @@ import Clash.Explicit.BlockRam.Blob
 import Clash.Explicit.BlockRam.File
 import Clash.Explicit.Mealy
 import Clash.Explicit.Moore
-import Clash.Explicit.RAM
-import Clash.Explicit.ROM
-import Clash.Explicit.ROM.Blob
 import Clash.Explicit.ROM.File
 import Clash.Explicit.Prelude.Safe
 import Clash.Explicit.Reset
