@@ -4,19 +4,19 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-partial-type-signatures #-}
 
-import           Clash.Driver
-import           Clash.Driver.Types
+--import           Clash.Driver
+--import           Clash.Driver.Types
 
-import           Clash.GHC.PartialEval
-import           Clash.GHC.Evaluator
-import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
+--import           Clash.GHC.PartialEval
+--import           Clash.GHC.Evaluator
+--import           Clash.GHC.NetlistTypes       (ghcTypeToHWType)
 
-import           Clash.Netlist.Types          (TopEntityT(topId))
-import qualified Clash.Util.Supply            as Supply
+--import           Clash.Netlist.Types          (TopEntityT(topId))
+--import qualified Clash.Util.Supply            as Supply
 
 import           Criterion.Main
 
-import           Control.DeepSeq              (NFData(..), rwhnf)
+--import           Control.DeepSeq              (NFData(..), rwhnf)
 import           Data.List                    (isPrefixOf, partition)
 import           System.Environment           (getArgs, withArgs)
 
@@ -40,8 +40,8 @@ main = do
   withArgs optionArgs (defaultMain $ fmap (benchFile idirs1) tests)
 
 benchFile :: [FilePath] -> FilePath -> Benchmark
-benchFile idirs src =
-  env (setupEnv idirs src) $
+benchFile {-idirs src-} = error "TODO"
+{-  env (setupEnv idirs src) $
     \ ~(clashEnv, clashDesign, supplyN) -> do
       let topEntities = fmap topId (designEntities clashDesign)
           topEntity = case topEntities of
@@ -52,7 +52,7 @@ benchFile idirs src =
               (normalizeEntity
                 clashEnv
                 (designBindings clashDesign)
-                (ghcTypeToHWType (opt_intWidth (envOpts clashEnv)))
+                (ghcTypeToHWType (envDomainTCUs clashEnv) (opt_intWidth (envOpts clashEnv)))
                 ghcEvaluator
                 evaluator
                 topEntities
@@ -69,4 +69,4 @@ setupEnv idirs src = do
   return (clashEnv, clashDesign ,supplyN)
 
 instance NFData Supply.Supply where
-  rnf = rwhnf
+  rnf = rwhnf-}

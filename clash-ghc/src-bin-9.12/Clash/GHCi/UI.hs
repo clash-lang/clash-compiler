@@ -2478,7 +2478,7 @@ makeHDL Proxy startAction optsRef srcs = do
                   clashEnv
                   clashDesign
                   (Just backend)
-                  (ghcTypeToHWType iw)
+                  (ghcTypeToHWType (envDomainTCUs clashEnv) iw)
                   ghcEvaluator
                   evaluator
                   mainTopEntity

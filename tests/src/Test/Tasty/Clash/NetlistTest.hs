@@ -81,28 +81,29 @@ runToNetlistStage target f src = do
 
   supplyN <- Supply.newSupply
 
-  transformedBindings <-
+  (transformedBindings, domains) <-
     normalizeEntity env (designBindings design)
-      (ghcTypeToHWType (opt_intWidth opts))
+      (ghcTypeToHWType (envDomainTCUs env) (opt_intWidth opts))
       ghcEvaluator
       evaluator
       teNames supplyN te
 
   fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
     netlistFrom
-      (env, transformedBindings, tes2, compNames, te, initIs)
+      (env, domains, transformedBindings, tes2, compNames, te, initIs)
  where
   opts = f mkClashOpts
   backend = initBackend @(TargetToState target) opts
   hdl = buildTargetToHdl target
 
-  netlistFrom (env, bm, tes, compNames, te, seen) =
-    genNetlist env ghcEvaluator False bm tes compNames (ghcTypeToHWType (opt_intWidth opts))
+  netlistFrom (env, doms, bm, tes, compNames, te, seen) =
+    genNetlist env ghcEvaluator False bm tes compNames
+      (ghcTypeToHWType (envDomainTCUs env) (opt_intWidth opts))
       ite (SomeBackend hdlSt) seen hdlDir Nothing te
    where
     teS     = Text.unpack . nameOcc $ varName te
     modN    = takeWhile (/= '.') teS
-    hdlSt   = setDomainConfigurations (envDomains env)
+    hdlSt   = setDomainConfigurations doms
             $ setModName (Text.pack modN) backend
     ite     = ifThenElseExpr hdlSt
     hdlDir  = fromMaybe "." (opt_hdlDir opts)

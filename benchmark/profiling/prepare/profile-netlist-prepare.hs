@@ -34,7 +34,7 @@ prepareFile idirs fIn = do
                , envTyConMap clashEnv
                , envCustomReprs clashEnv
                , top
-               , envDomains clashEnv
+               , mempty --TODO --envDomains clashEnv
                )
 
   putStrLn $ "Serialising to : " ++ fOut
