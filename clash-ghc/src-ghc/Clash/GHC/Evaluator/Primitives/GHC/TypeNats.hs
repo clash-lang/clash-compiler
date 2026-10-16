@@ -15,15 +15,12 @@ module Clash.GHC.Evaluator.Primitives.GHC.TypeNats
   ( primitives
   ) where
 
-import qualified Data.Either         as Either
 import           Data.Text           (Text)
 
 import           Clash.Core.Evaluator.Types
 import           Clash.Core.Literal  (Literal (..))
 import Clash.Core.Term (Term (..), mkApps)
-import Clash.Core.Type (Type (..), LitTy (..), TypeView (..), splitFunForallTy, tyView)
-import Clash.Core.TyCon (tyConDataCons)
-import qualified Clash.Data.UniqMap as UniqMap
+import Clash.Core.Type (Type (..), LitTy (..))
 import Clash.Util (textNameLit)
 
 import qualified GHC.TypeNats
@@ -48,12 +45,10 @@ primitives =
   , primStepEntry $(textNameLit 'GHC.TypeNats.withSomeSNat) $ \case
       PrimStepContext{..}
         | Lit (NaturalLiteral n) : fun : _ <- args
-        , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
-        , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
-        , Just snatTc <- UniqMap.lookup snatTcNm tcm
-        , [snatDc] <- tyConDataCons snatTc
+        -- 'GHC.TypeNats.SNat' is a newtype over 'Natural', which Clash
+        -- represents by the value it wraps, so the literal is the 'SNat'.
         -> let nTy = LitTy (NumTy n)
-               snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+               snat = Literal (NaturalLiteral n)
                ret = mkApps (valToTerm fun) [Right nTy, Left snat]
             in reduce ret
       _ -> Nothing
