@@ -3,6 +3,7 @@ Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd
                   2021     , LUMI GUIDE FIETSDETECTIE B.V.
+                  2026     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
@@ -41,7 +42,8 @@ module Clash.Signal.Delayed
 where
 
 import           GHC.TypeLits
-  (KnownNat, type (^), type (+), type (*))
+  (KnownNat, type (+), type (*), type (<=))
+import GHC.TypeLits.Extra (CLog)
 
 import Clash.Signal.Delayed.Internal
   (DSignal(..), dfromList, dfromList_lazy, fromSignal, toSignal,
@@ -181,7 +183,9 @@ delayI dflt = hideClock (hideEnable (E.delayI dflt))
 
 -- | Tree fold over a 'Vec' of 'DSignal's with a combinational function,
 -- and delaying @delay@ cycles after each application.
--- Values at times 0..(delay*k)-1 are set to a default.
+-- Each pipeline register starts with the supplied initial value. This adds
+-- @delay * CLog 2 n@ enabled clock cycles of latency.
+-- The fold operation must be associative.
 --
 -- @
 -- countingSignals :: Vec 4 (DSignal dom 0 Int)
@@ -194,20 +198,21 @@ delayI dflt = hideClock (hideEnable (E.delayI dflt))
 -- >>> printX $ sampleN @System 8 (toSignal (delayedFold d2 (-1) (*) countingSignals))
 -- [-1,-1,1,1,0,1,16,81]
 delayedFold
-  :: forall dom  n delay k a
+  :: forall dom d delay n a
    . ( HiddenClock dom
      , HiddenEnable dom
      , NFDataX a
      , KnownNat delay
-     , KnownNat k )
+     , KnownNat n
+     , 1 <= n)
   => SNat delay
   -- ^ Delay applied after each step
   -> a
   -- ^ Initial value
   -> (a -> a -> a)
   -- ^ Fold operation to apply
-  -> Vec (2^k) (DSignal dom n a)
-  -- ^ Vector input of size 2^k
-  -> DSignal dom (n + (delay * k)) a
-  -- ^ Output Signal delayed by (delay * k)
+  -> Vec n (DSignal dom d a)
+  -- ^ Vector input of size @n@
+  -> DSignal dom (d + (delay * CLog 2 n)) a
+  -- ^ Output Signal delayed by @delay * CLog 2 n@
 delayedFold d dflt f = hideClock (hideEnable (E.delayedFold d dflt f))
