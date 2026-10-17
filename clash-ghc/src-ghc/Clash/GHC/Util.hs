@@ -35,7 +35,7 @@ import Control.Exception  (Exception(..))
 import GHC.Exception      (SomeException)
 import System.Exit        (ExitCode(ExitFailure), exitWith)
 
-import Clash.Util         (ClashException(..))
+import Clash.Util         (ClashException(..), exceptionBacktrace, originalException)
 import Clash.Util.Interpolate (i)
 import Clash.Driver.Types (ClashOpts(..))
 
@@ -52,7 +52,7 @@ handleClashException
   -> ClashOpts
   -> SomeException
   -> m a
-handleClashException _df opts e = case fromException e of
+handleClashException _df opts e0 = case fromException e of
   Just (ClashException sp s eM) -> do
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
@@ -84,8 +84,21 @@ handleClashException _df opts e = case fromException e of
 #else
               (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
 #endif
-              (text "Other error:" $$ textLines (displayException e)))
+              (text "Other error:" $$ textLines (displayException e) $$ backtrace))
   where
+    -- Anything thrown while compiling top entities concurrently arrives
+    -- wrapped, see 'withPreservedBacktrace'. Unwrap before matching on the
+    -- exception's type, and read the backtrace off the wrapper.
+    e = originalException e0
+
+    -- Since base-4.20 (GHC 9.10) 'HasCallStack' backtraces are no longer part
+    -- of the exception itself ('ErrorCallWithLocation' is deprecated), but are
+    -- attached to its 'ExceptionContext'. 'displayException' does not include
+    -- them, so we print them separately.
+    backtrace = case exceptionBacktrace e0 of
+      [] -> empty
+      ctx -> blankLine $$ textLines ctx
+
     srcInfo = textLines [i|
       The source location of the error is not exact, only indicative, as it
       is acquired after optimizations. The actual location of the error can be
