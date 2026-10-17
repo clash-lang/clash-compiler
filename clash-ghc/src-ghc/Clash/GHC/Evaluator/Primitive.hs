@@ -4645,12 +4645,10 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     -> reduce (valToTerm arg)
   $(namePat 'GHC.TypeNats.withSomeSNat)
     | Lit (NaturalLiteral n) : fun : _ <- args
-    , _ : funTy : _ <- Either.rights (fst (splitFunForallTy ty))
-    , (tyView -> TyConApp snatTcNm _) : _ <- Either.rights (fst (splitFunForallTy funTy))
-    , Just snatTc <- UniqMap.lookup snatTcNm tcm
-    , [snatDc] <- tyConDataCons snatTc
+    -- 'GHC.TypeNats.SNat' is a newtype over 'Natural', which Clash
+    -- represents by the value it wraps, so the literal is the 'SNat'.
     -> let nTy = LitTy (NumTy n)
-           snat = mkApps (Data snatDc) [Right nTy, Left (Literal (NaturalLiteral n))]
+           snat = Literal (NaturalLiteral n)
            ret = mkApps (valToTerm fun) [Right nTy, Left snat]
         in reduce ret
   -- XXX: Does not seem to exist?
