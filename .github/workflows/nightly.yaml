@@ -13,7 +13,6 @@ on:
 jobs:
   ci:
     name: CI
-    needs: ci_recipe
     uses: $/.github/workflows/ci.yaml
     with:
       flavor: nightly
