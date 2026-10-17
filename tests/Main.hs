@@ -612,6 +612,11 @@ runClashTest t3105Env = defaultMain
                          , hdlSim = hdlSim def \\ [Vivado]
                          }
           in runTest "DDRin" _opts
+        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchVec"
+                                                        , "testBenchTree"
+                                                        ]
+                         }
+          in runTest "DDRinVec" _opts
 
           -- XXX: `ddrOut` contains a number of (implicit) parallel, coinciding
           --      processes. Execution for these processes is left undefined in

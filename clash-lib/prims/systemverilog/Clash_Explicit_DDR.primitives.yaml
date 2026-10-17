@@ -43,7 +43,7 @@
         end
       end
 
-      assign ~RESULT = {~SYM[3], ~SYM[1]};
+      assign ~RESULT = {~TOBV[~SYM[3]][~TYP[11]], ~TOBV[~SYM[1]][~TYP[11]]};
       // ddrIn end
 - BlackBox:
     name: Clash.Explicit.DDR.ddrOut#
