@@ -951,6 +951,7 @@ runClashTest t3105Env = defaultMain
         , runTest "BlockRam1" def
         , clashTestGroup "BlockRam"
           [ runTest "Blob" def
+          , runTest "VecPayload" def
           ]
         , runTest "AndEnable" def
         , runTest "Ram" def
