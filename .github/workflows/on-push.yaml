@@ -19,8 +19,8 @@ jobs:
     needs: ci_recipe
     uses: $/.github/workflows/ci.yaml
     with:
-      flavor: pr
-      nightly: false
+      flavor: nightly
+      nightly: true
       # Jobs running on GitHub shared runners and using 'actions/cache' can only
       # use caches created on their head branch or the default branch, or on
       # their target branch if they got triggered by a pull_request event. We
