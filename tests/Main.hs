@@ -882,6 +882,8 @@ runClashTest t3105Env = defaultMain
             { clashFlags=["-fconstraint-solver-iterations=15"]
             , ghcFlags=["-itests/shouldwork/Numbers"]
             }
+        , outputTest "LogBaseOutOfDomain"
+            def{hdlTargets=[Verilog], clashFlags=["-Werror=clash-non-synthesizable"]}
         , runTest "Naturals" def
         , runTest "NaturalToInteger" def{hdlSim=[]}
         , runTest "NegativeLits" def
