@@ -49,6 +49,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+
+      # Since runner image 20261013.0424.1, linking with GHC fails with "tapi
+      # error: malformed file" on MacOSX27.0.sdk's .tbd files. Explicitly
+      # selecting the Command Line Tools fixes this. See:
+      # https://github.com/actions/runner-images/issues/14940
+      - name: Work around broken macOS SDK
+        if: ${{ startsWith(matrix.os, 'macos') }}
+        run: sudo xcode-select -s /Library/Developer/CommandLineTools
+
       - uses: haskell-actions/setup@cd0d9bdd65b20557f41bea4dbe43d0b5fbbfe553  # v2.11.0
         id: setup-haskell
         with:
