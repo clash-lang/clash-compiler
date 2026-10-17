@@ -30,16 +30,21 @@ assertNotIn needle haystack
                                                     , "\n\nIn:\n\n", haystack ]
   | otherwise = pure ()
 
+-- Enums were requested in #431 but have since been removed again. Guard that
+-- sum types stay rendered as bit vectors.
 mainVHDL :: IO ()
 mainVHDL = do
   [topDir] <- getArgs
   content <- readFile (topDir </> show 'topEntity </> "topEntity.vhdl")
 
-  -- no bit vector literals appear, so no double quotes appear
-  assertNotIn "\"" content
+  -- no enum variants appear in the design
+  assertNotIn "TrafficLight'(Red)" content
+  assertNotIn "TrafficLight'(RedAmber)" content
+  assertNotIn "TrafficLight'(Amber)" content
+  assertNotIn "TrafficLight'(Green)" content
 
-  -- enum variants appear in the design
-  assertIn "TrafficLight'(Red)" content
-  assertIn "TrafficLight'(RedAmber)" content
-  assertIn "TrafficLight'(Amber)" content
-  assertIn "TrafficLight'(Green)" content
+  -- the constructors are encoded as bit vector literals instead
+  assertIn "\"01\" when \"00\"" content
+  assertIn "\"11\" when \"01\"" content
+  assertIn "\"00\" when \"10\"" content
+  assertIn "\"10\" when others" content

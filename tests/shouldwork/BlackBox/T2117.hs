@@ -58,7 +58,7 @@ testUndefined !_ = pure True
   [ { "BlackBox" :
       { "name"      : "T2117.testUndefined"
       , "kind"      : "Expression"
-      , "template"  : "~IF ~ISUNDEFINED[1] ~THEN true ~ELSE false ~FI"
+      , "template"  : "~IF ~ISUNDEFINED[1] ~THEN '1' ~ELSE '0' ~FI"
       }
     }
   ]
@@ -76,7 +76,7 @@ testDefined !_ = pure True
   [ { "BlackBox" :
       { "name"      : "T2117.testDefined"
       , "kind"      : "Expression"
-      , "template"  : "~IF ~ISUNDEFINED[1] ~THEN false ~ELSE true ~FI"
+      , "template"  : "~IF ~ISUNDEFINED[1] ~THEN '0' ~ELSE '1' ~FI"
       }
     }
   ]
