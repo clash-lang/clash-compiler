@@ -398,10 +398,18 @@ coreTypeToHWType builtInTranslation reprs m ty = do
     coreTypeToHWType builtInTranslation reprs m ty'
   -- Try to create hwtype based on AST:
   go _ (tyView -> TyConApp tc args) = runExceptT $ do
-    hwty <- mkADT builtInTranslation reprs m (showPpr ty) tc args
+    hwty <- mkADT builtInTranslation reprs m (showPpr ty) hasCustomRepr tc args
     return (maybeConvertToCustomRepr reprs ty hwty)
   -- All methods failed:
   go _ _ = return $ Left $ "Can't translate non-tycon type: " ++ showPpr ty
+
+  -- Does 'ty' carry a custom bit representation? If so, 'mkADT' should not
+  -- collapse a single-constructor/single-field type into the HWType of that
+  -- field, as 'convertToCustomRepr' needs the 'Product' to hang the
+  -- representation off of.
+  hasCustomRepr = case coreToType' ty of
+    Right tyName -> isJust (getDataRepr tyName reprs)
+    Left _ -> False
 
 -- | Generates original indices in list before filtering, given a list of
 -- removed indices.
@@ -426,6 +434,10 @@ mkADT
   -- ^ TyCon cache
   -> String
   -- ^ String representation of the Core type for error messages
+  -> Bool
+  -- ^ Whether the type carries a custom bit representation. If it does, a
+  -- single-constructor/single-field type is /not/ collapsed into the HWType of
+  -- that field, as 'convertToCustomRepr' needs a 'Product' to work with.
   -> TyConName
   -- ^ The TyCon
   -> [Type]
@@ -433,11 +445,11 @@ mkADT
   -> ExceptT String (State HWMap) FilteredHWType
   -- ^ An error string or a tuple with the type and possibly a list of
   -- removed arguments.
-mkADT _ _ m tyString tc _
+mkADT _ _ m tyString _ tc _
   | isRecursiveTy m tc
   = throwE $ $(curLoc) ++ "Can't translate recursive type: " ++ tyString
 
-mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.find tc m) of
+mkADT builtInTranslation reprs m tyString hasCustomRepr tc args = case tyConDataCons (UniqMap.find tc m) of
   []  -> return (FilteredHWType (Void Nothing) [])
   dcs -> do
     let tcName           = nameOcc tc
@@ -445,7 +457,13 @@ mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.
     argHTyss0           <- mapM (mapM (ExceptT . coreTypeToHWType builtInTranslation reprs m)) substArgTyss
     let argHTyss1        = map (\tys -> zip (map isFilteredVoid tys) tys) argHTyss0
     let areVoids         = map (map fst) argHTyss1
-    let filteredArgHTyss = map (map snd . filter (not . fst)) argHTyss1
+    let filteredArgHTyss
+          -- 'convertToCustomRepr' lines the field types up with 'crFieldAnns'
+          -- positionally, so for a type with a custom bit representation the
+          -- void fields have to stay where they are. It marks the fields the
+          -- representation gives zero bits to as 'Void' itself.
+          | hasCustomRepr = argHTyss0
+          | otherwise = map (map snd . filter (not . fst)) argHTyss1
 
     -- Every alternative is annotated with some examples. Be sure to read them.
     case (dcs, filteredArgHTyss) of
@@ -464,7 +482,7 @@ mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.
       -- second field of FilteredHWType would then look like:
       --
       -- >>> [[False, True]]
-      (_:[],[[elemTy]]) ->
+      (_:[],[[elemTy]]) | not hasCustomRepr ->
         return (FilteredHWType (stripFiltered elemTy) argHTyss1)
 
       -- Type has one constructor, but multiple fields modulo empty fields
@@ -479,6 +497,9 @@ mkADT builtInTranslation reprs m tyString tc args = case tyConDataCons (UniqMap.
         labelsM <-
           if null labels0 then
             return Nothing
+          else if hasCustomRepr then
+            -- Nothing was filtered out, so the labels still line up.
+            return (Just labels0)
           else
             -- Filter out labels belonging to arguments filtered due to being
             -- void. See argHTyss1.
