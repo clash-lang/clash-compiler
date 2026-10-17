@@ -974,8 +974,8 @@ runClashTest t3105Env = defaultMain
         , runTest "Compression" def
         , runTest "DelayedReset" def
         , let _opts = def{ -- Vivado segfaults
-                           hdlLoad=hdlLoad def \\ [Verilator, Vivado]
-                         , hdlSim=hdlSim def \\ [Verilator, Vivado]
+                           hdlLoad=hdlLoad def \\ [Vivado]
+                         , hdlSim=hdlSim def \\ [Vivado]
                          , buildTargets=BuildSpecific [ "testBenchAB"
                                                       , "testBenchBC"]
                          }
