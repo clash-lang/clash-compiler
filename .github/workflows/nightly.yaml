@@ -1,0 +1,23 @@
+name: Nightly
+
+on:
+  workflow_dispatch:
+    inputs:
+      hackage_publish:
+        description: Should we upload a candidate to Hackage?
+        required: true
+        default: "no"
+        type: choice
+        options: ["no", "candidate"]
+
+jobs:
+  ci:
+    name: CI
+    needs: ci_recipe
+    uses: $/.github/workflows/ci.yaml
+    with:
+      flavor: nightly
+      nightly: true
+      mac_windows: false
+      hackage_publish: ${{ inputs.hackage_publish }}
+    secrets: inherit

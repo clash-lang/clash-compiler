@@ -1,0 +1,780 @@
+name: CI
+
+on:
+  workflow_call:
+    inputs:
+      flavor:
+        # See .ci/ci_recipe.py
+        required: true
+        type: string
+      nightly:
+        required: true
+        type: boolean
+      mac_windows:
+        required: true
+        type: boolean
+      hackage_publish:
+        # Valid values:
+        #   - "no": Don't build and upload sdists
+        #   - "candidate": Upload as candidate
+        #   - "release": Upload and publish the package
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci_recipe:
+    name: Construct CI recipe
+    runs-on: ubuntu-slim
+    outputs:
+      recipe: ${{ steps.ci_recipe.outputs.recipe }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - id: ci_recipe
+        run:
+          .ci/ci_recipe.py ${{ inputs.flavor }}
+
+
+  build_mac_windows:
+    name: Build and run limited tests
+    if: inputs.mac_windows
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, windows-latest]
+        # TODO: Stackage does not use 9.14 yet. Include after Stackage upgrades.
+        ghc: ["9.6", "9.8", "9.10", "9.12"]
+        exclude:
+          # GHC/Clash starts extremely slowly, see
+          # https://github.com/clash-lang/clash-compiler/issues/2684
+          - os: windows-latest
+            ghc: "9.6"
+
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: windows-latest
+            ghc: "9.8"
+
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: windows-latest
+            ghc: "9.10"
+
+          # Vector test suite takes an _extremely_ long time to execute. Same
+          # issue as 9.6?
+          - os: windows-latest
+            ghc: "9.12"
+
+          - os: windows-latest
+            ghc: "9.14"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Since runner image 20261013.0424.1, linking with GHC fails with "tapi
+      # error: malformed file" on MacOSX27.0.sdk's .tbd files. Explicitly
+      # selecting the Command Line Tools fixes this. See:
+      # https://github.com/actions/runner-images/issues/14940
+      - name: Work around broken macOS SDK
+        if: startsWith(matrix.os, 'macos')
+        run: sudo xcode-select -s /Library/Developer/CommandLineTools
+
+      - uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+        id: setup_haskell
+        with:
+          enable-stack: true
+          stack-no-global: true
+
+      - name: Install IVerilog (macos)
+        if: startsWith(matrix.os, 'macos')
+        run: brew install icarus-verilog
+
+      - name: Install IVerilog (Windows)
+        if: startsWith(matrix.os, 'windows')
+        run: choco install --no-progress iverilog
+
+      - name: General Setup
+        shell: bash
+        run: |
+          cp .ci/stack-${{ matrix.ghc }}.yaml stack.yaml
+          # Print out stack.yaml for debugging purposes
+          cat stack.yaml
+
+      - name: Restore cache (Windows)
+        if: startsWith(matrix.os, 'windows')
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        id: cache_win
+        with:
+          # On windows we have to use "\" as a path separator, otherwise caching fails
+          path: |
+            ${{ steps.setup_haskell.outputs.stack-root }}\snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yaml') }}
+          restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
+      - name: Restore cache (non-Windows)
+        if: ${{ !startsWith(matrix.os, 'windows') }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        id: cache_other
+        with:
+          path: |
+            ${{ steps.setup_haskell.outputs.stack-root }}/snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yaml') }}
+          restore-keys: ${{ matrix.os }}-${{ matrix.ghc }}-
+
+      # https://gitlab.haskell.org/haskell/ghcup-hs/-/issues/188
+      # https://github.com/commercialhaskell/stack/issues/4937
+      # - name: Use system GHC
+      #   run: stack config set system-ghc --global true
+
+      # Retry Stack initialization, see:
+      # https://github.com/commercialhaskell/stack/issues/5770
+      - name: Initialize Stack
+        shell: bash
+        run: ./.ci/retry.sh stack build base -j1 +RTS -N1
+
+      # Building 'happy' sometimes fails on Windows for some obscure reason
+      - name: Build happy with Stack
+        shell: bash
+        run: ./.ci/retry.sh stack build happy
+
+      - name: Build dependencies
+        run: stack build --only-dependencies
+
+      - name: Save cache (Windows)
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        # Trying to save over an existing cache gives distracting
+        # "Warning: Cache save failed." since they are immutable
+        if: startsWith(matrix.os, 'windows') && steps.cache_win.outputs.cache-hit != 'true'
+        with:
+          # On windows we have to use "\" as a path separator, otherwise caching fails
+          path: |
+            ${{ steps.setup_haskell.outputs.stack-root }}\snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yaml') }}
+      - name: Save cache (non-Windows)
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        # Trying to save over an existing cache gives distracting
+        # "Warning: Cache save failed." since they are immutable
+        if: ${{ !startsWith(matrix.os, 'windows') && steps.cache_other.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ${{ steps.setup_haskell.outputs.stack-root }}/snapshots
+          key: ${{ matrix.os }}-${{ matrix.ghc }}-${{ hashFiles('stack.yaml', '**/*.cabal', '.github/workflows/ci.yaml') }}
+
+      # Note: the --pedantic switch adds -Wall -Werror to the options passed to
+      # GHC. Options specified in stack.yaml (like -Wcompat) are still passed;
+      # it is cumulative. Future versions of Stack might add behavior to
+      # --pedantic.
+      - name: Build with Stack
+        run: stack build --pedantic
+
+      - name: Run Vector testsuite
+        if: github.ref != 'refs/heads/master'
+        run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim --no-vivado
+
+
+  # Nix by default runs tests, meaning that there's not much point in re-running
+  # tests in Cabal/Stack So for these we do a simple compilation test instead,
+  # checking that they still compile with whatever changes got made
+  cabal:
+    name: Cabal compilation test
+    needs: ci_recipe
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).cabal.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Perhaps we should preinstall these on the container?
+      # This step always takes a minute...
+      # We'd lose the ability to select the version of cabal inside of the runner though
+      - name: Install GHC
+        id: ghc_install
+        uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+        with:
+          ghc-version: ${{ matrix.ghc }}
+          cabal-version: latest
+          cabal-update: false
+
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}
+            ${{ runner.os }}-master-cabal-${{ matrix.ghc }}
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Version information
+        run:
+          cabal --version
+
+      - name: Cabal update
+        run:
+          .ci/retry.sh cabal update
+
+      - name: Setup
+        run: .ci/gh-setup.sh
+
+      - name: Build dependencies
+        run: cabal v2-build all -j$(.ci/effective_cpus.sh) --dependencies-only
+
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          reion: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Build
+        run: |
+          cabal v2-build all -j$(.ci/effective_cpus.sh)
+
+      - name: Run small tests
+        run: .ci/small-tests.sh
+
+      - name: Clash-dev test
+        run: .ci/build_clash_dev.sh
+
+
+  cabal_haddock:
+    name: Haddock tests
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install GHC
+        id: ghc_install
+        uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+        with:
+          ghc-version: "9.6.7"
+          cabal-version: latest
+
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-
+            ${{ runner.os }}-master-cabal-haddock-
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Version information
+        run:
+          cabal --version
+
+      - name: Setup
+        run: .ci/gh-setup.sh
+
+      - name: Build dependencies
+        run: cabal v2-build clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog -O0 --enable-documentation --only-dependencies
+
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Build & check documentation
+        run: .ci/build_docs.sh
+
+  stack:
+    name: Stack compilation test
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Perhaps we should preinstall these on the container?
+      # This step always takes a minute...
+      # We'd lose the ability to select the version of cabal inside of the runner though
+      - name: Install GHC
+        uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+        with:
+          enable-stack: true
+          stack-no-global: true
+          stack-version: latest
+
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('stack.yaml', '.github/workflow/ci.yaml', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-stack-
+            ${{ runner.os }}-master-stack-
+          # stack-root is set to null for some reason, which in turn breaks the entire stack cache
+          # Hardcoding the stack path... for now
+          # path: ${{ steps.ghc_install.outputs.stack-root }}
+          path: ~/.stack
+
+      - name: Ensure stack is initialized
+        run: .ci/retry.sh stack build base -j1 +RTS -N1
+
+      - name: Version information
+        run:
+          stack --version
+
+      - name: Setup
+        run: .ci/gh-setup.sh
+
+      - name: Build Dependencies
+        run:
+          stack build -j$(.ci/effective_cpus.sh) --dependencies-only
+
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('stack.yaml', '.github/workflow/ci.yaml', '**/*.cabal' ) }}
+          # stack-root is set to null for some reason, which in turn breaks the entire stack cache
+          # Hardcoding the stack path... for now
+          # path: ${{ steps.ghc_install.outputs.stack-root }}
+          path: ~/.stack
+
+      - name: Build
+        run:
+          # Note: the --pedantic switch adds -Wall -Werror to the options passed to GHC. Options
+          # specified in stack.yaml (like -Wcompat) are still passed; it is cumulative. Future
+          # versions of Stack might add behavior to --pedantic.
+          stack build -j$(.ci/effective_cpus.sh) --pedantic
+
+
+  packages_common:
+    name: "Build Common (${{ matrix.ghc }}\
+           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }})"
+    needs: ci_recipe
+    runs-on: self-hosted
+    strategy:
+      # If caching fails for one package, then we are still interested in caching other packages
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_common.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+        # Most clash- related packages depend on these three packages, having them be build
+        # sequentially and then the other packages in parallel speeds up CI
+        #
+        # We upload each build result to the local cache immediately, even if later steps fail it
+        # has some older steps cached, so the re-run goes faster
+        # Although I'm not entirely sure that it works...
+        # Well, it does not cause any harm so might as well keep it
+
+      - run: |
+          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude
+          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude)
+      - run: |
+          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib
+          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib)
+      - run: |
+          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc
+          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc)
+
+      - name: Cachix
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude \
+            | cachix push clash-lang
+          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib \
+            | cachix push clash-lang
+          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc \
+            | cachix push clash-lang
+
+
+  packages_other:
+    name: "Build Other (${{ matrix.ghc }}\
+           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.package }})"
+    needs: [ci_recipe, packages_common]
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_other.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Build
+        run: nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }}
+
+      - name: Local cache
+        run: attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }})
+
+      - name: Cachix
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }} \
+            | cachix push clash-lang
+
+
+  developer_shells:
+    name: Build Developer Shells (${{ matrix.ghc }})
+    needs: [ci_recipe, packages_common]
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).developer_shells.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Nix devShell ${{ matrix.ghc }}
+        run: nix build -L .#devShells.x86_64-linux.ghc${{ matrix.ghc }}
+
+      - name: Local cache
+        run: attic push public $(nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }})
+
+      - name: Cachix
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }} | cachix push clash-lang
+
+
+  packages_testsuite:
+    name: "Packaging clash-testsuite (${{ matrix.ghc }}\
+           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }})"
+    needs: ci_recipe
+    runs-on: self-hosted
+    strategy:
+      # If caching fails for one package, then we are still interested in caching other packages
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_testsuite.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Build clash-testsuite
+        run: |
+          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug
+          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug)
+
+      - name: Cachix
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        env:
+          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+        run: |
+          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug \
+            | cachix push clash-lang
+
+
+  running_testsuite:
+    name: "Running clash-testsuite (${{ matrix.ghc }}\
+           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.hdl }})"
+    needs: [ci_recipe, packages_testsuite]
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_testsuite.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Run clash-testsuite
+        run: |
+          nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}. --no-vivado --no-modelsim
+
+
+  running_nightly_testsuite:
+    # Name is affected by:
+    #   job.name expression not evaluated when job skipped
+    #   https://github.com/orgs/community/discussions/13261
+    name: "Running nightly clash-testsuite (${{ matrix.ghc }}\
+           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.hdl }})"
+    if: fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite
+    needs: [ci_recipe, packages_testsuite]
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite.matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Authenticate cache
+        env:
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+        run: .ci/attic-auth.sh
+
+      - name: Run clash-testsuite
+        run: |
+          . /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+          nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}.tools.Vivado.
+
+
+  hackage_sdist:
+    name: "Hackage: Build sdist"
+    if: inputs.hackage_publish != 'no'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install GHC
+        id: ghc_install
+        uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+        with:
+          ghc-version: "9.6.7"
+          cabal-version: latest
+
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-sdist
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Version information
+        run:
+          cabal --version
+
+      - name: Setup
+        run: .ci/gh-setup.sh
+
+      - name: Build clash-prelude sdist
+        run: .ci/build_sdist.sh clash-prelude
+
+      - name: Build clash-prelude-hedgehog sdist
+        run: .ci/build_sdist.sh clash-prelude-hedgehog
+
+      - name: Build clash-lib sdist
+        run: .ci/build_sdist.sh clash-lib
+
+      - name: Build clash-lib-hedgehog sdist
+        run: .ci/build_sdist.sh clash-lib-hedgehog
+
+      - name: Build clash-ghc sdist
+        run: .ci/build_sdist.sh clash-ghc
+
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-sdist
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+        with:
+          name: sdist
+          # clash-{prelude,lib,...}-$version{-docs,}.tar.gz
+          path: clash-*.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+
+
+  hackage_publish:
+    # XXX: Release pipeline stuff from /.ci/setup.sh hasn't been integrated yet!
+
+    name: "Hackage: Publish sdist"
+    if: inputs.hackage_publish != 'no'
+    runs-on: self-hosted
+    needs:
+      - hackage_sdist
+      # We want this to run only if all the following jobs all report success.
+      - cabal
+      - cabal_haddock
+      - stack
+      - packages_other
+      - developer_shells
+      - running_testsuite
+      - running_nightly_testsuite
+    env:
+      HACKAGE_RELEASE: ${{ case(inputs.hackage_publish == 'release', 'yes', 'no') }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+        with:
+          name: sdist
+
+      - name: Install GHC
+        id: ghc_install
+        uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+        with:
+          ghc-version: "9.6.7"
+          cabal-version: latest
+
+      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-publish
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Version information
+        run:
+          cabal --version
+
+      - name: Setup
+        run: .ci/gh-setup.sh
+
+      - name: Publish sdist
+        env:
+          HACKAGE_USERNAME: ${{ secrets.HACKAGE_USERNAME }}
+          HACKAGE_PASSWORD: ${{ secrets.HACKAGE_PASSWORD }}
+          HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
+        # XXX: This GitHub job does not treat the exit code 64 specially like
+        # the GitLab job does/did. Instead of failing allowed-to-fail when
+        # trying to upload a candidate for a released Clash version, we now have
+        # the knob `inputs.hackage_publish` to turn to simply not attempt this
+        # on release branches unless explicitly requested in a workflow dispatch
+        # event.
+        run: |
+          .ci/publish_sdist.sh clash-prelude
+          .ci/publish_sdist.sh clash-prelude-hedgehog
+          .ci/publish_sdist.sh clash-lib
+          .ci/publish_sdist.sh clash-lib-hedgehog
+          .ci/publish_sdist.sh clash-ghc
+
+      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          bucket: runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-publish
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+
+  all:
+    name: All jobs finished
+    if: ${{ !cancelled() && (inputs.nightly || github.event_name == 'pull_request') }}
+    needs:
+      - ci_recipe
+      - build_mac_windows
+      - cabal
+      - cabal_haddock
+      - stack
+      - packages_common
+      - packages_other
+      - developer_shells
+      - packages_testsuite
+      - running_testsuite
+      - running_nightly_testsuite
+      - hackage_sdist
+      - hackage_publish
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: clash-lang/all-jobs-ok@26ea496e5a73cf53bee713b734bd2a31b1beac50  # v2.0.2
+        with:
+          needs: ${{ toJSON(needs) }}
+          exclude: |
+            notify_slack
+
+
+  notify_slack:
+      name: Notify Slack on scheduled failure
+      if: ${{ failure() && inputs.nightly }}
+      needs: all
+      runs-on: ubuntu-slim
+      steps:
+        - name: Post failure notification to Slack
+          uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d  # v4.0.0
+          with:
+            method: chat.postMessage
+            token: ${{ secrets.SLACK_BOT_TOKEN }}
+            payload: |
+              channel: CQR9YG4CT
+              text: "Nightly CI failed on `${{ github.ref_name }}`: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+              blocks:
+                - type: "section"
+                  text:
+                    type: "mrkdwn"
+                    text: "*Nightly CI failed* on `${{ github.ref_name }}` (commit `${{ github.sha }}`)\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"

@@ -1,0 +1,27 @@
+name: PR
+
+on:
+  pull_request:
+
+jobs:
+  ci:
+    name: CI
+    needs: ci_recipe
+    uses: $/.github/workflows/ci.yaml
+    with:
+      flavor: pr
+      nightly: false
+      mac_windows: true
+      hackage_publish: "no"
+    secrets: inherit
+
+
+  qlog_entries:
+    name: Check qlog entries
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: Find and check changed entries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: .ci/check_qlog_entries.sh ${{ github.event.pull_request.number }}
