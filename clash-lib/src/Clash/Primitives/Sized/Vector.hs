@@ -1,5 +1,5 @@
 {-|
-  Copyright   :  (C) 2020-2022 QBayLogic B.V.
+  Copyright   :  (C) 2020-2026 QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -89,7 +89,7 @@ iterateTF' bbCtx
     , _hoFunction
     , (a, aType)
     ] <- tInputs bbCtx
-  , let aTemplateType = [TypElem (Typ (Just 2))]
+  , let aTemplateType = [Typ (Just 2)]
   , let inst arg = instHO bbCtx 1 (aType, aTemplateType) [(arg, aTemplateType)]
   = declarationReturn bbCtx "iterateI" (fmap pure . Prim.vec =<< iterateNM (fromInteger n) inst a)
   | otherwise
