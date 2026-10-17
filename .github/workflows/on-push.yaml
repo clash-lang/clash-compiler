@@ -1,0 +1,30 @@
+name: On push
+
+on:
+  push:
+   branches:
+     - main
+     - "1.10"
+  workflow_dispatch:
+    inputs:
+      mac_windows:
+        description: Run macOS and Windows tests?
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  ci:
+    name: CI
+    uses: $/.github/workflows/ci.yaml
+    with:
+      flavor: pr
+      nightly: false
+      # Jobs running on GitHub shared runners and using 'actions/cache' can only
+      # use caches created on their head branch or the default branch, or on
+      # their target branch if they got triggered by a pull_request event. We
+      # therefore want to make sure we run on 'master' and the release branches
+      # too, so we have a cache for PR's that have those as target branch.
+      mac_windows: ${{ github.event_name == 'push' || inputs.mac_windows }}
+      hackage_publish: "no"
+    secrets: inherit
