@@ -1390,16 +1390,16 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         // Shared memory
         logic [~SIZE[~TYP[#{datA}]]-1:0] ~GENSYM[mem][#{symMem}] [~LIT[#{knownNatAddrs}]-1:0];
 
-        ~SIGD[~GENSYM[a_dout][#{symDoutA}]][#{datA}];
-        ~SIGD[~GENSYM[b_dout][#{symDoutB}]][#{datB}];
+        logic [~SIZE[~TYP[#{datA}]]-1:0] ~GENSYM[a_dout][#{symDoutA}];
+        logic [~SIZE[~TYP[#{datB}]]-1:0] ~GENSYM[b_dout][#{symDoutB}];
 
         // Port A
         always @(~IF~ACTIVEEDGE[Rising][#{knownDomainA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
             if(~ARG[#{enaA}]) begin
                 ~SYM[#{symDoutA}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI];
                 if(~ARG[#{wenaA}]) begin
-                    ~SYM[#{symDoutA}] <= ~ARG[#{datA}];
-                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI] <= ~ARG[#{datA}];
+                    ~SYM[#{symDoutA}] <= ~TOBV[~ARG[#{datA}]][~TYP[#{datA}]];
+                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI] <= ~TOBV[~ARG[#{datA}]][~TYP[#{datA}]];
                 end
             end
         end
@@ -1409,8 +1409,8 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
             if(~ARG[#{enaB}]) begin
                 ~SYM[#{symDoutB}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI];
                 if(~ARG[#{wenaB}]) begin
-                    ~SYM[#{symDoutB}] <= ~ARG[#{datB}];
-                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI] <= ~ARG[#{datB}];
+                    ~SYM[#{symDoutB}] <= ~TOBV[~ARG[#{datB}]][~TYP[#{datB}]];
+                    ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI] <= ~TOBV[~ARG[#{datB}]][~TYP[#{datB}]];
                 end
             end
         end
