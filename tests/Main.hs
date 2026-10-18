@@ -206,6 +206,18 @@ defaultTimeout :: Timeout -> Timeout
 defaultTimeout NoTimeout = mkTimeout (5 * 60 * 1000000) -- 5 minutes
 defaultTimeout userSet = userSet
 
+-- | Synthesis checks for a 1024x32 RAM: it should fit in a single block RAM,
+-- which also absorbs the output registers.
+blockRamSynth :: [Synth]
+blockRamSynth =
+  [ VivadoSynth [("RAMB36E1", 1), ("FD*", 0)]
+  , YosysSynth [("RAMB36E1", 1), ("FD*", 0)]
+  , QuartusSynth
+      [ ("Total block memory bits", 32768)
+      , ("Dedicated logic registers", 0)
+      ]
+  ]
+
 runClashTest :: [(String, String)] -> IO ()
 runClashTest t3105Env = defaultMain
   $ adjustOption defaultTimeout
@@ -957,6 +969,33 @@ runClashTest t3105Env = defaultMain
         , clashTestGroup "BlockRam"
           [ runTest "Blob" def
           , runTest "VecPayload" def
+          , runTest "Inference" def
+              { hdlSim=[]
+              , hdlLoad=[]
+              , hdlSynth=blockRamSynth
+              , buildTargets=BuildSpecific
+                  [ "blockRamBV"
+                  , "blockRamUBV"
+                  , "blockRam1BV"
+                  , "trueDualPortBlockRamBV"
+                  , "trueDualPortBlockRamSingleClockBV"
+                  ]
+              }
+          , runTest "InferenceVec" def
+              { hdlTargets=[Verilog, SystemVerilog]
+              , hdlSim=[]
+              , hdlLoad=[]
+              , hdlSynth=blockRamSynth
+              , buildTargets=BuildSpecific
+                  [ "blockRamUVec"
+                  , "blockRamUTree"
+                  , "blockRam1Vec"
+                  , "blockRam1Tree"
+                  , "trueDualPortBlockRamVec"
+                  , "trueDualPortBlockRamTree"
+                  , "trueDualPortBlockRamSingleClockVec"
+                  ]
+              }
           ]
         , runTest "AndEnable" def
         , runTest "Ram" def
