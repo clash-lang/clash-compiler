@@ -983,8 +983,7 @@ runClashTest t3105Env = defaultMain
                   ]
               }
           , runTest "InferenceVec" def
-              { hdlTargets=[Verilog, SystemVerilog]
-              , hdlSim=[]
+              { hdlSim=[]
               , hdlLoad=[]
               , hdlSynth=blockRamSynth
               , buildTargets=BuildSpecific

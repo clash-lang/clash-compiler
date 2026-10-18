@@ -1320,13 +1320,14 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
         ~GENSYM[~RESULT_trueDualPortBlockRam][#{symBlockName}] : block
           -- Shared memory. Simultaneous reads and writes of the same address on
           -- different ports have undefined results, so Quartus doesn't need to
-          -- add logic to resolve them.
-          type mem_type is array ( ~LIT[#{knownNatAddrs}]-1 downto 0 ) of ~TYP[#{datA}];
+          -- add logic to resolve them. Store bit vectors, as Vivado does not
+          -- infer block RAMs for memories of arrays or records.
+          type mem_type is array ( ~LIT[#{knownNatAddrs}]-1 downto 0 ) of std_logic_vector(~SIZE[~TYP[#{datA}]]-1 downto 0);
           shared variable mem : mem_type;
           attribute ramstyle : string;
           attribute ramstyle of mem : variable is "no_rw_check";
-          signal ~GENSYM[a_dout][#{symDoutA}] : ~TYP[#{datA}];
-          signal ~GENSYM[b_dout][#{symDoutB}] : ~TYP[#{datB}];
+          signal ~GENSYM[a_dout][#{symDoutA}] : std_logic_vector(~SIZE[~TYP[#{datA}]]-1 downto 0);
+          signal ~GENSYM[b_dout][#{symDoutB}] : std_logic_vector(~SIZE[~TYP[#{datB}]]-1 downto 0);
         begin
 
           -- Port A
@@ -1335,7 +1336,7 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
               if(rising_edge(~ARG[#{clockA}])) then
                     if(~ARG[#{enaA}]) then
                       if(~ARG[#{wenaA}]) then
-                          mem(~IF~SIZE[~TYP[#{addrA}]]~THENto_integer(~ARG[#{addrA}])~ELSE0~FI) := ~ARG[#{datA}];
+                          mem(~IF~SIZE[~TYP[#{addrA}]]~THENto_integer(~ARG[#{addrA}])~ELSE0~FI) := ~TOBV[~ARG[#{datA}]][~TYP[#{datA}]];
                       end if;
                       ~SYM[#{symDoutA}] <= mem(~IF~SIZE[~TYP[#{addrA}]]~THENto_integer(~ARG[#{addrA}])~ELSE0~FI);
                   end if;
@@ -1348,14 +1349,14 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
               if(rising_edge(~ARG[#{clockB}])) then
                   if(~ARG[#{enaB}]) then
                       if(~ARG[#{wenaB}]) then
-                          mem(~IF~SIZE[~TYP[#{addrB}]]~THENto_integer(~ARG[#{addrB}])~ELSE0~FI) := ~ARG[#{datB}];
+                          mem(~IF~SIZE[~TYP[#{addrB}]]~THENto_integer(~ARG[#{addrB}])~ELSE0~FI) := ~TOBV[~ARG[#{datB}]][~TYP[#{datB}]];
                       end if;
                       ~SYM[#{symDoutB}] <= mem(~IF~SIZE[~TYP[#{addrB}]]~THENto_integer(~ARG[#{addrB}])~ELSE0~FI);
                   end if;
               end if;
           end process;
 
-          ~RESULT <= (~SYM[#{symDoutA}], ~SYM[#{symDoutB}]);
+          ~RESULT <= (~FROMBV[~SYM[#{symDoutA}]][~TYP[#{datA}]], ~FROMBV[~SYM[#{symDoutB}]][~TYP[#{datB}]]);
         end block;
         -- end trueDualPortBlockRam
 |]) #-}

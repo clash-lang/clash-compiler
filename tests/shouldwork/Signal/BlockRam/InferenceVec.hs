@@ -7,8 +7,7 @@
 --
 -- TODO: 'blockRam' is missing, as Vivado implements it in registers when the
 -- SystemVerilog backend renders the memory as an array of 'Vec's, unless
--- passed @-fclash-hdlsyn Vivado@. For the same reason, this test does not run
--- for VHDL.
+-- passed @-fclash-hdlsyn Vivado@.
 module InferenceVec where
 
 import Clash.Explicit.Prelude

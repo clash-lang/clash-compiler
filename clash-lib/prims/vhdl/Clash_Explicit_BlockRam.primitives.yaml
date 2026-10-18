@@ -18,7 +18,22 @@
     template: |-
       -- blockRam begin
       ~GENSYM[~RESULT_blockRam][1] : block
-        signal ~GENSYM[~RESULT_RAM][2] : ~TYP[5] := ~CONST[5];
+        -- Store bit vectors, as Vivado does not infer block RAMs for memories
+        -- of arrays or records. With -fclash-hdlsyn Vivado, the type of the
+        -- initial contents already is an array of bit vectors.~IF ~VIVADO ~THEN ~ELSE
+        type ~GENSYM[ram_t][8] is array (0 to ~LENGTH[~TYP[5]]-1) of std_logic_vector(~SIZE[~TYP[9]]-1 downto 0);
+        -- Takes a bit vector rather than the initial contents themselves, as
+        -- Vivado's simulator crashes on functions taking arrays of arrays
+        function ~GENSYM[toRam][9] (bits : std_logic_vector) return ~SYM[8] is
+          alias bs : std_logic_vector(0 to bits'length-1) is bits;
+          variable ram : ~SYM[8];
+        begin
+          for i in ram'range loop
+            ram(i) := bs(i*~SIZE[~TYP[9]] to (i+1)*~SIZE[~TYP[9]]-1);
+          end loop;
+          return ram;
+        end function;~FI
+        signal ~GENSYM[~RESULT_RAM][2] : ~IF ~VIVADO ~THEN~TYP[5] := ~CONST[5]~ELSE~SYM[8] := ~SYM[9](~TOBV[~CONST[5]][~TYP[5]])~FI;
         signal ~GENSYM[rd][4]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
         signal ~GENSYM[wr][5]  : integer range 0 to ~LENGTH[~TYP[5]] - 1;
       begin
@@ -33,7 +48,7 @@
                       mod ~LENGTH[~TYP[5]]
         -- pragma translate_on
                       ;
-      ~IF ~VIVADO ~THEN
+
         ~SYM[6] : process(~ARG[3])
         begin
           if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
@@ -41,23 +56,11 @@
               ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
             end if;~IF ~ISACTIVEENABLE[4] ~THEN
             if ~ARG[4] then
-              ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
+              ~RESULT <= ~FROMBV[~SYM[2](~SYM[4])][~TYP[9]];
             end if;~ELSE
-            ~RESULT <= fromSLV(~SYM[2](~SYM[4]));~FI
+            ~RESULT <= ~FROMBV[~SYM[2](~SYM[4])][~TYP[9]];~FI
           end if;
-        end process; ~ELSE
-        ~SYM[6] : process(~ARG[3])
-        begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-            if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-              ~SYM[2](~SYM[5]) <= ~ARG[9];
-            end if;~IF ~ISACTIVEENABLE[4] ~THEN
-            if ~ARG[4] then
-              ~RESULT <= ~SYM[2](~SYM[4]);
-            end if;~ELSE
-            ~RESULT <= ~SYM[2](~SYM[4]);~FI
-          end if;
-        end process; ~FI
+        end process;
       end block;
       --end blockRam
 - BlackBox:
@@ -79,9 +82,10 @@
         -> Signal dom a
     template: |-
       -- blockRamU begin
-      ~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN
-        type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[9]]-1 downto 0);~ELSE
-        type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[9];~FI
+      ~GENSYM[~RESULT_blockRam][1] : block
+        -- Store bit vectors, as Vivado does not infer block RAMs for memories
+        -- of arrays or records
+        type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[9]]-1 downto 0);
         signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8];
         signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
         signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
@@ -97,7 +101,7 @@
                       mod ~LIT[5]
         -- pragma translate_on
                       ;
-      ~IF ~VIVADO ~THEN
+
         ~SYM[6] : process(~ARG[3])
         begin
           if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
@@ -105,23 +109,11 @@
               ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[9]][~TYP[9]];
             end if;~IF ~ISACTIVEENABLE[4] ~THEN
             if ~ARG[4] then
-              ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
+              ~RESULT <= ~FROMBV[~SYM[2](~SYM[4])][~TYP[9]];
             end if;~ELSE
-            ~RESULT <= fromSLV(~SYM[2](~SYM[4]));~FI
+            ~RESULT <= ~FROMBV[~SYM[2](~SYM[4])][~TYP[9]];~FI
           end if;
-        end process; ~ELSE
-        ~SYM[6] : process(~ARG[3])
-        begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-            if ~ARG[7] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-              ~SYM[2](~SYM[5]) <= ~ARG[9];
-            end if;~IF ~ISACTIVEENABLE[4] ~THEN
-            if ~ARG[4] then
-              ~RESULT <= ~SYM[2](~SYM[4]);
-            end if;~ELSE
-            ~RESULT <= ~SYM[2](~SYM[4]);~FI
-          end if;
-        end process; ~FI
+        end process;
       end block;
       --end blockRamU
 - BlackBox:
@@ -144,10 +136,11 @@
         -> Signal dom a
     template: |-
       -- blockRam1 begin
-      ~GENSYM[~RESULT_blockRam][1] : block~IF~VIVADO~THEN
-        type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);~ELSE
-        type ~SYM[8] is array (0 to integer'(~LIT[5])-1) of ~TYP[6];~FI
-        signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8] := (others => ~IF~VIVADO~THEN~TOBV[~CONST[6]][~TYP[6]]~ELSE~CONST[6]~FI);
+      ~GENSYM[~RESULT_blockRam][1] : block
+        -- Store bit vectors, as Vivado does not infer block RAMs for memories
+        -- of arrays or records
+        type ~GENSYM[ram_t][8] is array (0 to integer'(~LIT[5])-1) of std_logic_vector(~SIZE[~TYP[6]]-1 downto 0);
+        signal ~GENSYM[~RESULT_RAM][2] : ~SYM[8] := (others => ~TOBV[~CONST[6]][~TYP[6]]);
         signal ~GENSYM[rd][4]  : integer range 0 to ~LIT[5] - 1;
         signal ~GENSYM[wr][5]  : integer range 0 to ~LIT[5] - 1;
       begin
@@ -162,7 +155,7 @@
                       mod ~LIT[5]
         -- pragma translate_on
                       ;
-      ~IF ~VIVADO ~THEN
+
         ~SYM[6] : process(~ARG[3])
         begin
           if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
@@ -170,22 +163,10 @@
               ~SYM[2](~SYM[5]) <= ~TOBV[~ARG[10]][~TYP[10]];
             end if;~IF ~ISACTIVEENABLE[4] ~THEN
             if ~ARG[4] then
-              ~RESULT <= fromSLV(~SYM[2](~SYM[4]));
+              ~RESULT <= ~FROMBV[~SYM[2](~SYM[4])][~TYP[10]];
             end if;~ELSE
-            ~RESULT <= fromSLV(~SYM[2](~SYM[4]));~FI
+            ~RESULT <= ~FROMBV[~SYM[2](~SYM[4])][~TYP[10]];~FI
           end if;
-        end process; ~ELSE
-        ~SYM[6] : process(~ARG[3])
-        begin
-          if ~IF~ACTIVEEDGE[Rising][0]~THENrising_edge~ELSEfalling_edge~FI(~ARG[3]) then
-            if ~ARG[8] ~IF ~ISACTIVEENABLE[4] ~THEN and ~ARG[4] ~ELSE ~FI then
-              ~SYM[2](~SYM[5]) <= ~ARG[10];
-            end if;~IF ~ISACTIVEENABLE[4] ~THEN
-            if ~ARG[4] then
-              ~RESULT <= ~SYM[2](~SYM[4]);
-            end if;~ELSE
-            ~RESULT <= ~SYM[2](~SYM[4]);~FI
-          end if;
-        end process; ~FI
+        end process;
       end block;
       --end blockRam1
