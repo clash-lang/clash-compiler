@@ -28,6 +28,7 @@ import qualified Control.Monad as Monad
 import Control.Monad.State (StateT, lift, modify, runStateT)
 import Control.Monad.Writer (listen)
 import Data.Bifunctor (second)
+import Data.Either (lefts)
 import qualified Data.Monoid as Monoid (Any(..))
 import qualified Data.Text.Extra as Text (showt)
 import GHC.Exts (State#)
@@ -58,7 +59,7 @@ import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
 import Clash.Rewrite.Util
-  (changed, isUntranslatable, mkDerivedName, mkTmBinderFor)
+  (changed, isUntranslatable, mkAltName, mkArgName, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isConstant, isConstantNotClockReset)
 import Clash.Util (curLoc)
 
@@ -258,7 +259,7 @@ isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
 --    depends on IO actions to be propagated down as far as possible.
 collectANF :: HasCallStack => NormRewriteW
 collectANF ctx e@(App appf arg)
-  | (conVarPrim, _) <- collectArgs e
+  | (conVarPrim, args) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
     tcm <- Lens.view tcCache
@@ -270,7 +271,8 @@ collectANF ctx e@(App appf arg)
       (False,False,False,_) -> do
         -- See Note [ANF InScopeSet]
         is1   <- Lens.use _2
-        argId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "app_arg") arg)
+        argNm <- lift (mkArgName ctx conVarPrim (length (lefts args) - 1))
+        argId <- lift (mkTmBinderFor is1 tcm argNm arg)
         -- See Note [ANF InScopeSet]
         tellBinders [(argId,arg)]
         return (App appf (Var argId))
@@ -364,7 +366,7 @@ collectANF ctx (Case subj ty alts) = do
           tcm <- Lens.view tcCache
           -- See Note [ANF InScopeSet]
           is1 <- Lens.use _2
-          altId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_alt") altExpr)
+          altId <- lift (mkTmBinderFor is1 tcm (mkAltName ctx (DataPat dc exts xs)) altExpr)
           -- See Note [ANF InScopeSet]
           tellBinders (patSels ++ [(altId,altExpr)])
           return (DataPat dc exts xs,Var altId)
@@ -379,7 +381,7 @@ collectANF ctx (Case subj ty alts) = do
           tcm <- Lens.view tcCache
           -- See Note [ANF InScopeSet]
           is1 <- Lens.use _2
-          altId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_alt") altExpr)
+          altId <- lift (mkTmBinderFor is1 tcm (mkAltName ctx pat) altExpr)
           tellBinders [(altId,altExpr)]
           return (pat,Var altId)
 
