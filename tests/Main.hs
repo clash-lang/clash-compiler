@@ -833,6 +833,8 @@ runClashTest t3105Env = defaultMain
         , runTest "T967c" def{hdlSim=[]}
         , clashLibTest "T1041" def
         , clashLibTest "NameHint" def{hdlTargets=[VHDL,Verilog]}
+        , runTest "DerivedNames" def{hdlSim=[]}
+        , outputTest "DerivedNames" def
         , runTest "StructFieldNames" def{hdlTargets=[SystemVerilog], hdlSim=[]}
         , outputTest "StructFieldNames" def{hdlTargets=[SystemVerilog]}
         ]
