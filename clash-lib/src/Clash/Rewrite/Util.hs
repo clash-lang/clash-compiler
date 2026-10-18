@@ -34,6 +34,7 @@ import qualified Control.Monad.State.Strict  as State
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import qualified Control.Monad.Writer        as Writer
 import           Data.Bifunctor              (second)
+import           Data.Char                   (isAlpha, isAlphaNum)
 import           Data.Coerce                 (coerce)
 import           Data.Functor.Const          (Const (..))
 import           Data.HashMap.Strict         (HashMap)
@@ -54,6 +55,7 @@ import qualified Data.ByteString.Lazy        as BL
 
 import           GHC.Types.Basic             (InlineSpec (..))
 
+import           Clash.Core.DataCon          (DataCon (..))
 import           Clash.Core.Evaluator.Types  (PureHeap, whnf')
 import           Clash.Core.FreeVars
   (freeLocalVars, termFreeVars', freeLocalIds, globalIdOccursIn)
@@ -67,7 +69,7 @@ import           Clash.Core.Term
 import           Clash.Core.TyCon            (TyConMap)
 import           Clash.Core.Type             (Type (..), normalizeType)
 import           Clash.Core.Var
-  (Id, IdScope (..), TyVar, Var (..), mkGlobalId, mkLocalId, mkTyVar)
+  (Id, IdScope (..), TyVar, Var (..), isGlobalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
    uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
@@ -360,6 +362,78 @@ mkDerivedName :: TransformContext -> OccName -> TmName
 mkDerivedName (TransformContext _ ctx) sf = case closestLetBinder ctx of
   Just id_ -> appendToName (varName id_) ('_' `Text.cons` sf)
   _ -> mkUnsafeInternalName sf 0
+
+-- | Name for a new binder for an argument of an application. Prefers names
+-- derived from what the argument is passed to:
+--
+--   * The record field name, for arguments of a data constructor, e.g.
+--     @c$baudCount@ for the second field of @Tx { txState, baudCount }@
+--
+--   * The parameter name, for arguments of a global function, e.g.
+--     @c$txStep_s@ for the first argument of @txStep s input = ...@
+--
+-- Falls back to 'mkDerivedName' with suffix @app_arg@.
+mkArgName
+  :: TransformContext
+  -> Term
+  -- ^ Function part of the application
+  -> Int
+  -- ^ Index of the argument among the term arguments of the application
+  -> RewriteMonad extra TmName
+mkArgName ctx fun i = case fun of
+  Data dc
+    | (label:_) <- drop i (dcFieldLabels dc)
+    , isIdentifierText label
+    -> pure (mkDerivedName ctx label)
+  Var f | isGlobalId f -> do
+    bndrs <- Lens.use bindings
+    pure $ case lookupVarEnv f bndrs of
+      Just b
+        | (param:_) <- drop i (lamIds (bindingTerm b))
+        , nameSort (varName param) == User
+        , let paramNm = nameOcc (varName param)
+        , let funNm = unqualifiedOcc (nameOcc (varName f))
+        , isIdentifierText paramNm
+        , isIdentifierText funNm
+        -> mkUnsafeInternalName (funNm <> "_" <> paramNm) 0
+      _ -> fallback
+  _ -> pure fallback
+ where
+  fallback = mkDerivedName ctx "app_arg"
+
+  -- Term binders of the leading lambdas of a function
+  lamIds = \case
+    Lam x e -> x : lamIds e
+    TyLam _ e -> lamIds e
+    Tick _ e -> lamIds e
+    _ -> []
+
+-- | Name for a new binder for the right-hand side of a case alternative.
+-- Includes the constructor matched by the alternative, e.g. @c$ds_case_TxIdle@,
+-- or @case_default@ for the default alternative. Uses @case_alt@ for literal
+-- patterns and constructors that are operators.
+mkAltName :: TransformContext -> Pat -> TmName
+mkAltName ctx = \case
+  DataPat dc _ _
+    | let con = unqualifiedOcc (nameOcc (dcName dc))
+    , isIdentifierText con
+    -> mkDerivedName ctx ("case_" <> con)
+  DefaultPat -> mkDerivedName ctx "case_default"
+  _ -> mkDerivedName ctx "case_alt"
+
+-- | Drop the module qualification of a name, e.g. @Clash.Sized.Vector.Cons@
+-- becomes @Cons@.
+unqualifiedOcc :: Text -> Text
+unqualifiedOcc = snd . Text.breakOnEnd "."
+
+-- | Whether text is a plain (Haskell) identifier, i.e., not an operator. These
+-- can be used as (part of) names in HDL.
+isIdentifierText :: Text -> Bool
+isIdentifierText t = case Text.uncons t of
+  Just (c, _) -> (isAlpha c || c == '_') && Text.all isIdChar t
+  Nothing -> False
+ where
+  isIdChar c = isAlphaNum c || c == '_' || c == '\''
 
 -- | Make a new binder and variable reference for a term
 mkTmBinderFor
