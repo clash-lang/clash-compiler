@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2021-2024, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -24,7 +24,7 @@ import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
-import Data.List                               (mapAccumR, uncons)
+import Data.List                               (mapAccumL, mapAccumR, uncons)
 import Data.List.Extra                         (zipEqual)
 import Data.List.NonEmpty                      (NonEmpty (..), toList)
 import Data.Maybe
@@ -62,6 +62,62 @@ import Clash.Util.Supply                 (Supply, freshId)
 
 import {-# SOURCE #-} qualified Clash.Normalize.Primitives as Primitives
 import Clash.XException (errorX)
+
+-- | Change the names of variables, both at their binding sites and at the
+-- occurrences referring to them, to the names of the variables with the same
+-- unique in the given environment. Only the 'varName' of a variable changes,
+-- its type and unique stay the same.
+--
+-- A binder with the same unique as a renamed binder it's in the scope of
+-- shadows it, so it keeps its name, as do the occurrences referring to it. In:
+--
+-- > let x = 5 in (\x -> x + 1) x
+--
+-- where both binders of @x@ have the same unique, only the let-bound @x@ and
+-- the @x@ the lambda is applied to are renamed. Occurrences of variables that
+-- aren't bound in the term keep their names, so that they keep matching their
+-- binding sites outside of it.
+renameIds :: VarEnv Id -> Term -> Term
+renameIds renames = go emptyVarEnv
+ where
+  -- 'env' holds the renames of the binders we're in the scope of
+  go env tm = case tm of
+    Var v -> Var (maybe v (rename v) (lookupVarEnv v env))
+    Lam v e ->
+      let (env1, v1) = bndr env v
+       in Lam v1 (go env1 e)
+    TyLam tv e -> TyLam tv (go env e)
+    App f a -> App (go env f) (go env a)
+    TyApp e ty -> TyApp (go env e) ty
+    Let (NonRec v e) b ->
+      let (env1, v1) = bndr env v
+       in Let (NonRec v1 (go env e)) (go env1 b)
+    Let (Rec bs) b ->
+      let (env1, vs1) = mapAccumL bndr env (map fst bs)
+       in Let (Rec (zip vs1 (map (go env1 . snd) bs))) (go env1 b)
+    Case subj ty alts -> Case (go env subj) ty (map (goAlt env) alts)
+    Cast e ty1 ty2 -> Cast (go env e) ty1 ty2
+    Tick t e -> Tick (goTick env t) (go env e)
+    Data{} -> tm
+    Literal{} -> tm
+    Prim{} -> tm
+
+  bndr env v
+    -- A binder shadowing a renamed binder keeps its name. Map it to itself, so
+    -- that binders with the same unique in its scope shadow it too.
+    | v `elemVarEnv` env = (extendVarEnv v v env, v)
+    | Just v1 <- lookupVarEnv v renames = (extendVarEnv v v1 env, rename v v1)
+    | otherwise = (env, v)
+
+  rename v v1 = v {varName = varName v1}
+
+  goAlt env (DataPat dc tvs ids, e) =
+    let (env1, ids1) = mapAccumL bndr env ids
+     in (DataPat dc tvs ids1, go env1 e)
+  goAlt env (p, e) = (p, go env e)
+
+  goTick env (Attributes ty e) = Attributes ty (go env e)
+  goTick _ t = t
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
 -- of bindings and remaking Let (NonRec ...) ... and Let (Rec ...) ...
