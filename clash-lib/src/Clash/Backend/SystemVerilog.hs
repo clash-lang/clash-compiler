@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -35,6 +35,7 @@ import qualified Data.Map                             as Map
 import           Data.Map                             (Map)
 import           Data.List                            (nub, nubBy)
 import           Data.List.Extra                      ((<:>), zipEqual)
+import           Data.Char                            (isAlpha, isAlphaNum, isAscii, isDigit)
 import           Data.Maybe                           (catMaybes,fromMaybe,mapMaybe)
 import           Data.Monoid                          (Ap(Ap))
 import           Data.Monoid.Extra                    ()
@@ -64,6 +65,7 @@ import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, addFilePath)
 import qualified Clash.Netlist.Id                     as Id
+import qualified Clash.Netlist.Id.SystemVerilog       as SystemVerilog
 import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
@@ -397,7 +399,7 @@ tyDec ty@(Product _ _ tys) | typeSize ty > 0 = Just A.<$> prodDec
         Nothing -> pure Nothing
         Just y' -> Just A.<$> (pure y' <+> x <> semi)
     tName    = tyName ty
-    selNames = map (\i -> tName <> "_sel" <> int i) [0..]
+    selNames = map (verilogRecSel ty) [0..]
 
 tyDec _ = pure Nothing
 
@@ -689,11 +691,48 @@ singularErrValue ty = do
     Just Nothing  -> int (typeSize ty) <> "'d0 /* undefined */"
     Just (Just x) -> braces (int (typeSize ty) <+> braces ("1'b" <> int x)) <+> "/* undefined */"
 
+-- | Name of a field of a struct.
+--
+-- Fields of records are named after the record fields, e.g. @baudCount@. Struct
+-- members live in their own namespace, so they don't need to be unique among
+-- other identifiers. That doesn't work when a record field isn't a valid
+-- SystemVerilog identifier, e.g. @count'@ or @type@. In that case all fields of
+-- the struct are named after the type, the field index, and the record field,
+-- e.g. @Tx_sel1_count_@.
+--
+-- Fields of other products, such as tuples, are named after the type and the
+-- field index, e.g. @Tuple2_sel0@.
 verilogRecSel
   :: HWType
   -> Int
   -> SystemVerilogM Doc
-verilogRecSel ty i = tyName ty <> "_sel" <> int i
+verilogRecSel ty i = case ty of
+  Product _ (Just labels) _
+    | all isPlainIdentifier labels
+    , (l:_) <- drop i labels
+    -> PP.pretty l
+    | (l:_) <- drop i labels
+    , not (TextS.null l)
+    -> byIndex <> "_" <> PP.pretty (TextS.map sanitize l)
+  _ -> byIndex
+ where
+  byIndex = tyName ty <> "_sel" <> int i
+
+  isPlainIdentifier l = case TextS.uncons l of
+    Just (c, _) ->
+         (isAsciiLetter c || c == '_')
+      && TextS.all (\c1 -> isAsciiLetter c1 || isDigit c1 || c1 == '_') l
+      && not (SystemVerilog.isKeyword l)
+    Nothing -> False
+
+  isAsciiLetter c = isAscii c && isAlpha c
+
+  -- Haskell field names may contain characters that aren't allowed in
+  -- (unescaped) SystemVerilog identifiers, such as @'@. The field index in the
+  -- name keeps fields unique after replacing those.
+  sanitize c
+    | isAscii c && (isAlphaNum c || c == '_') = c
+    | otherwise = '_'
 
 decls :: [Declaration] -> SystemVerilogM Doc
 decls [] = emptyDoc
@@ -1054,7 +1093,7 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
     end      = start - argSize + 1
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _ tys),_,fI)))) = do
-  id'<- fmap (Text.toStrict . renderOneLine) (pretty id_ <> dot <> tyName ty <> "_sel" <> int fI)
+  id'<- fmap (Text.toStrict . renderOneLine) (pretty id_ <> dot <> verilogRecSel ty fI)
   simpleFromSLV (tys !! fI) id'
 
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
