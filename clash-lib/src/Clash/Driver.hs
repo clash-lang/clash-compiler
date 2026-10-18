@@ -122,7 +122,8 @@ import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
-import           Clash.Netlist.Util               (checkTopEntityPorts)
+import           Clash.Netlist.Util
+  (ExpandError(..), checkTopEntityPorts, expandErrorMessage)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -173,15 +174,25 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
     case shouldSplit tcm a of
       Just (_,_,argTys@(_:_:_)) ->
         -- Port must be split up into 'n' pieces.. can it?
+        let n = length argTys in
         case p of
-          PortProduct nm portNames0 ->
-            let
-              n = length argTys
-              newPortNames = map (PortName . show) [(0::Int)..]
-              portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
-              newLam = foldr1 mkFunTy (argTys ++ [res])
-            in
-              go newLam (take n portNames1 ++ ps)
+          PortProduct nm portNames0
+            -- More port names given than pieces the signal is split into.
+            -- 'take n' below would silently drop the superfluous names (#2243).
+            | length portNames0 > n ->
+              throw (flip (ClashException sp) Nothing $ expandErrorMessage $
+                SuperfluousPortNames
+                  (Data.Text.pack (if null nm then "unnamed 'PortProduct'" else nm))
+                  n
+                  (length portNames0)
+                  (drop n portNames0))
+            | otherwise ->
+              let
+                newPortNames = map (PortName . show) [(0::Int)..]
+                portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
+                newLam = foldr1 mkFunTy (argTys ++ [res])
+              in
+                go newLam (take n portNames1 ++ ps)
           PortName nm ->
             throw (flip (ClashException sp) Nothing $ [I.i|
               Couldn't separate clock, reset, or enable from a product type due
