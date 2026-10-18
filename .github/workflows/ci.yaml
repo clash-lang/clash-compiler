@@ -544,7 +544,7 @@ jobs:
 
       - name: Run clash-testsuite
         run: |
-          nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}. --no-vivado --no-modelsim
+          nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}. --no-vivado --no-modelsim --no-quartus
 
 
   running_nightly_testsuite:

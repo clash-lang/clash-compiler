@@ -1298,6 +1298,8 @@ autoDetectTools =
   , ("--no-ghdl",       ["ghdl"])
   , ("--no-symbiyosys", ["sby"])
   , ("--no-iverilog",   ["iverilog"])
+  , ("--no-yosys",      ["yosys"])
+  , ("--no-quartus",    ["quartus_syn"])
   ]
 
 -- | Replace @--auto-detect-tools@ in the argument list with @--no-*@ flags for

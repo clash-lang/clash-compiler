@@ -89,9 +89,11 @@ library
     Test.Tasty.Iverilog
     Test.Tasty.Modelsim
     Test.Tasty.Program
+    Test.Tasty.Quartus
     Test.Tasty.SymbiYosys
     Test.Tasty.Verilator
     Test.Tasty.Vivado
+    Test.Tasty.Yosys
 
     -- From tests/shouldwork/LoadModules/precompiled
     T1796a
