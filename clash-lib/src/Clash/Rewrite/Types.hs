@@ -165,6 +165,9 @@ inlineWFCacheLimit = clashEnv . Lens.to (opt_inlineWFCacheLimit . envOpts)
 newInlineStrategy :: Lens.Getter RewriteEnv Bool
 newInlineStrategy = clashEnv . Lens.to (opt_newInlineStrat . envOpts)
 
+splitRegisters :: Lens.Getter RewriteEnv Bool
+splitRegisters = clashEnv . Lens.to (opt_splitRegisters . envOpts)
+
 specializationLimit :: Lens.Getter RewriteEnv Int
 specializationLimit = clashEnv . Lens.to (opt_specLimit . envOpts)
 
