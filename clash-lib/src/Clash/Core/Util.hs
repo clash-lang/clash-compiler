@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2021-2024, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -62,6 +62,34 @@ import Clash.Util.Supply                 (Supply, freshId)
 
 import {-# SOURCE #-} qualified Clash.Normalize.Primitives as Primitives
 import Clash.XException (errorX)
+
+-- | Change the names of variables, both at their binding sites and at their
+-- occurrences. The renamed variables must keep their uniques.
+renameIds :: VarEnv Id -> Term -> Term
+renameIds env = go
+ where
+  rn v = fromMaybe v (lookupVarEnv v env)
+
+  go tm = case tm of
+    Var v -> Var (rn v)
+    Lam v e -> Lam (rn v) (go e)
+    TyLam tv e -> TyLam tv (go e)
+    App f a -> App (go f) (go a)
+    TyApp e ty -> TyApp (go e) ty
+    Let (NonRec v e) b -> Let (NonRec (rn v) (go e)) (go b)
+    Let (Rec bs) b -> Let (Rec [(rn v, go e) | (v, e) <- bs]) (go b)
+    Case subj ty alts -> Case (go subj) ty [(goPat p, go e) | (p, e) <- alts]
+    Cast e ty1 ty2 -> Cast (go e) ty1 ty2
+    Tick t e -> Tick (goTick t) (go e)
+    Data{} -> tm
+    Literal{} -> tm
+    Prim{} -> tm
+
+  goPat (DataPat dc tvs ids) = DataPat dc tvs (map rn ids)
+  goPat p = p
+
+  goTick (Attributes ty e) = Attributes ty (go e)
+  goTick t = t
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
 -- of bindings and remaking Let (NonRec ...) ... and Let (Rec ...) ...
