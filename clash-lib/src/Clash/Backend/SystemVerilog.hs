@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -64,6 +64,8 @@ import           Clash.Netlist.BlackBox.Types         (HdlSyn (..))
 import           Clash.Netlist.BlackBox.Util
   (extractLiterals, renderBlackBox, addFilePath)
 import qualified Clash.Netlist.Id                     as Id
+import qualified Clash.Netlist.Id.SystemVerilog       as SystemVerilog
+import qualified Clash.Netlist.Id.Verilog             as Verilog
 import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
 import           Clash.Signal.Internal                (ActiveEdge (..))
@@ -397,7 +399,7 @@ tyDec ty@(Product _ _ tys) | typeSize ty > 0 = Just A.<$> prodDec
         Nothing -> pure Nothing
         Just y' -> Just A.<$> (pure y' <+> x <> semi)
     tName    = tyName ty
-    selNames = map (\i -> tName <> "_sel" <> int i) [0..]
+    selNames = map (verilogRecSel ty) [0..]
 
 tyDec _ = pure Nothing
 
@@ -689,11 +691,48 @@ singularErrValue ty = do
     Just Nothing  -> int (typeSize ty) <> "'d0 /* undefined */"
     Just (Just x) -> braces (int (typeSize ty) <+> braces ("1'b" <> int x)) <+> "/* undefined */"
 
+-- | Name of a field of a struct.
+--
+-- Fields of records are named after the record fields. For example, the struct
+-- for:
+--
+-- > data Tx = Tx { busy :: Bool, baudCount :: Unsigned 8 }
+--
+-- has fields @busy@ and @baudCount@. Struct members live in their own
+-- namespace, so they don't need to be unique among other identifiers. That
+-- doesn't work when a record field isn't a valid SystemVerilog identifier,
+-- such as a keyword or a name with a @'@. In that case all fields of the struct
+-- are named after the type, the field index, and the record field. For
+-- example, the struct for:
+--
+-- > data Counter = Counter { count' :: Unsigned 4, valid :: Bool }
+--
+-- has fields @Counter_sel0_count_@ and @Counter_sel1_valid@.
+--
+-- Fields of other products, such as tuples, are named after the type and the
+-- field index, e.g. @Tuple2_sel0@.
 verilogRecSel
   :: HWType
   -> Int
   -> SystemVerilogM Doc
-verilogRecSel ty i = tyName ty <> "_sel" <> int i
+verilogRecSel ty i = case ty of
+  Product _ (Just labels) _
+    | all SystemVerilog.parseBasic labels
+    , (l:_) <- drop i labels
+    -> PP.pretty l
+    | (l:_) <- drop i labels
+    , not (TextS.null l)
+    -> byIndex <> "_" <> PP.pretty (TextS.map sanitize l)
+  _ -> byIndex
+ where
+  byIndex = tyName ty <> "_sel" <> int i
+
+  -- Haskell field names may contain characters that aren't allowed in
+  -- (unescaped) SystemVerilog identifiers, such as @'@. The field index in the
+  -- name keeps fields unique after replacing those.
+  sanitize c
+    | Verilog.isBasicChar c = c
+    | otherwise = '_'
 
 decls :: [Declaration] -> SystemVerilogM Doc
 decls [] = emptyDoc
@@ -1054,7 +1093,7 @@ expr_ _ (Identifier id_ (Just (Indexed (ty@(SP _ args),dcI,fI)))) =
     end      = start - argSize + 1
 
 expr_ _ (Identifier id_ (Just (Indexed (ty@(Product _ _ tys),_,fI)))) = do
-  id'<- fmap (Text.toStrict . renderOneLine) (pretty id_ <> dot <> tyName ty <> "_sel" <> int fI)
+  id'<- fmap (Text.toStrict . renderOneLine) (pretty id_ <> dot <> verilogRecSel ty fI)
   simpleFromSLV (tys !! fI) id'
 
 expr_ _ (Identifier id_ (Just (Indexed ((Vector _ elTy),1,0)))) = do
