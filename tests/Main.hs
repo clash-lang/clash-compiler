@@ -835,6 +835,9 @@ runClashTest t3105Env = defaultMain
         , clashLibTest "NameHint" def{hdlTargets=[VHDL,Verilog]}
         , runTest "DerivedNames" def{hdlSim=[]}
         , outputTest "DerivedNames" def
+        , runTest "SplitRegister" def{clashFlags=["-fclash-split-registers"]}
+        , outputTest "SplitRegister" def{clashFlags=["-fclash-split-registers"]}
+        , outputTest "SplitRegisterOff" def
         , runTest "StructFieldNames" def{hdlTargets=[SystemVerilog], hdlSim=[]}
         , outputTest "StructFieldNames" def{hdlTargets=[SystemVerilog]}
         ]

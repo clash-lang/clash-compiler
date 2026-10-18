@@ -395,6 +395,11 @@ data ClashOpts = ClashOpts
   , opt_renderEnums :: Bool
   -- ^ Render sum types with all zero-width fields as enums where supported, as
   -- opposed to rendering them as bitvectors.
+  , opt_splitRegisters :: Bool
+  -- ^ Split registers of product types (records, tuples) into a register per
+  -- field, so the HDL contains a named register for every field.
+  --
+  -- Command line flag: -fclash-split-registers
   , opt_timescalePrecision :: Period
   -- ^ Timescale precision set in Verilog files. E.g., setting this would sets
   -- the second part of @`timescale 100fs/100fs@.
@@ -449,6 +454,7 @@ defClashOpts
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
   , opt_edalize             = False
   , opt_renderEnums         = True
+  , opt_splitRegisters      = False
   , opt_timescalePrecision  = Period 100 Fs
   -- XXX: We probe environment variables until we've found a proper solution to
   --      https://github.com/clash-lang/clash-compiler/issues/2762.
