@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                           2017, QBayLogic, Google Inc.,
-                     2021-2022, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -75,7 +75,7 @@ import           Clash.Driver.Bool       (toGhcOverridingBool)
 import           Clash.Driver.Types      (BindingMap, Binding(..), IsPrim(..), ClashEnv(..), ClashDesign(..), ClashOpts(..))
 import           Clash.Driver.Warning    (warnAbout, warnAboutM)
 import           Clash.GHC.GHC2Core
-  (C2C, GHC2CoreState, GHC2CoreEnv (..), tyConMap, coreToId, coreToName, coreToTerm,
+  (C2C, GHC2CoreState, GHC2CoreEnv (..), mkGHC2CoreEnv, tyConMap, coreToId, coreToName, coreToTerm,
    makeAllTyCons, pendingWarnings, qualifiedNameString, emptyGHC2CoreState,
    srcSpan)
 import           Clash.GHC.LoadModules   (ghcLibDir, loadModules)
@@ -163,7 +163,7 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
   primMapC <- compilePrimitives importDirs hintArgs tdir primMapR
   let ((bindingsMap,clsVMap),tcMap,_) =
         RWS.runRWS (mkBindings primMapC bindings clsOps unlocatable)
-                   (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
+                   (mkGHC2CoreEnv GHC.noSrcSpan fiEnvs opts)
                    emptyGHC2CoreState
       (tcMap',tupTcCache)           = mkTupTyCons opts tcMap
       tcCache                       = makeAllTyCons opts tcMap' fiEnvs
@@ -180,7 +180,7 @@ generateBindings opts startAction primDirs importDirs hdl modName dflagsM = do
              clsVMap
       allBindings                   = bindingsMap `unionVarEnv` clsMap
       topEntities'                  =
-        (\m -> fst (RWS.evalRWS m (GHC2CoreEnv GHC.noSrcSpan fiEnvs opts) tcMap')) $
+        (\m -> fst (RWS.evalRWS m (mkGHC2CoreEnv GHC.noSrcSpan fiEnvs opts) tcMap')) $
           mapM (\(topEnt,annM,isTb) -> do
             topEnt' <- coreToName GHC.varName GHC.varUnique qualifiedNameString topEnt
             return (topEnt', annM, isTb)) topEntities
@@ -467,7 +467,7 @@ mkTupTyCons opts tcMap = (tcMap'',tupTcCache)
     (tcNames,tcMap',_) =
       RWS.runRWS (mapM (\tc -> coreToName GHC.tyConName GHC.tyConUnique
                                           qualifiedNameString tc) tupTyCons)
-                 (GHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs opts)
+                 (mkGHC2CoreEnv GHC.noSrcSpan GHC.emptyFamInstEnvs opts)
                  tcMap
     tupTcCache       = IMS.fromList (zip [2..GHC.mAX_TUPLE_SIZE] (drop 3 tcNames))
     tupHM            = UniqMap.fromList (zip tcNames tupTyCons)
