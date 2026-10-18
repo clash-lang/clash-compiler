@@ -1318,9 +1318,13 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
       template: |-
         -- trueDualPortBlockRam begin
         ~GENSYM[~RESULT_trueDualPortBlockRam][#{symBlockName}] : block
-          -- Shared memory
+          -- Shared memory. Simultaneous reads and writes of the same address on
+          -- different ports have undefined results, so Quartus doesn't need to
+          -- add logic to resolve them.
           type mem_type is array ( ~LIT[#{knownNatAddrs}]-1 downto 0 ) of ~TYP[#{datA}];
           shared variable mem : mem_type;
+          attribute ramstyle : string;
+          attribute ramstyle of mem : variable is "no_rw_check";
           signal ~GENSYM[a_dout][#{symDoutA}] : ~TYP[#{datA}];
           signal ~GENSYM[b_dout][#{symDoutB}] : ~TYP[#{datB}];
         begin
@@ -1380,6 +1384,10 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
     symMem
      :< symDoutA
      :< symDoutB
+     :< symEnA
+     :< symWeA
+     :< symEnB
+     :< symWeB
      :< _ = ((0 :: Int)...)
   in InlineYamlPrimitive [SystemVerilog] [__i|
     BlackBox:
@@ -1387,17 +1395,27 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
       kind: Declaration
       template: |-
         // trueDualPortBlockRam begin
-        // Shared memory
+        // Shared memory. Simultaneous reads and writes of the same address on
+        // different ports have undefined results, so Yosys doesn't need to add
+        // logic to resolve them.
+        (* no_rw_check *)
         logic [~SIZE[~TYP[#{datA}]]-1:0] ~GENSYM[mem][#{symMem}] [~LIT[#{knownNatAddrs}]-1:0];
 
         logic [~SIZE[~TYP[#{datA}]]-1:0] ~GENSYM[a_dout][#{symDoutA}];
         logic [~SIZE[~TYP[#{datB}]]-1:0] ~GENSYM[b_dout][#{symDoutB}];
 
+        // Quartus only infers a block RAM if it does not optimize the logic
+        // driving the enables into the RAM's output registers
+        (* keep *) wire logic ~GENSYM[enA][#{symEnA}] = ~ARG[#{enaA}];
+        (* keep *) wire logic ~GENSYM[weA][#{symWeA}] = ~ARG[#{wenaA}];
+        (* keep *) wire logic ~GENSYM[enB][#{symEnB}] = ~ARG[#{enaB}];
+        (* keep *) wire logic ~GENSYM[weB][#{symWeB}] = ~ARG[#{wenaB}];
+
         // Port A
         always @(~IF~ACTIVEEDGE[Rising][#{knownDomainA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
-            if(~ARG[#{enaA}]) begin
+            if(~SYM[#{symEnA}]) begin
                 ~SYM[#{symDoutA}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI];
-                if(~ARG[#{wenaA}]) begin
+                if(~SYM[#{symWeA}]) begin
                     ~SYM[#{symDoutA}] <= ~TOBV[~ARG[#{datA}]][~TYP[#{datA}]];
                     ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI] <= ~TOBV[~ARG[#{datA}]][~TYP[#{datA}]];
                 end
@@ -1406,9 +1424,9 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
 
         // Port B
         always @(~IF~ACTIVEEDGE[Rising][#{knownDomainB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
-            if(~ARG[#{enaB}]) begin
+            if(~SYM[#{symEnB}]) begin
                 ~SYM[#{symDoutB}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI];
-                if(~ARG[#{wenaB}]) begin
+                if(~SYM[#{symWeB}]) begin
                     ~SYM[#{symDoutB}] <= ~TOBV[~ARG[#{datB}]][~TYP[#{datB}]];
                     ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI] <= ~TOBV[~ARG[#{datB}]][~TYP[#{datB}]];
                 end
@@ -1444,6 +1462,10 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
     symMem
      :< symDoutA
      :< symDoutB
+     :< symEnA
+     :< symWeA
+     :< symEnB
+     :< symWeB
      :< _ = ((0 :: Int)...)
   in InlineYamlPrimitive [Verilog] [__i|
     BlackBox:
@@ -1451,17 +1473,27 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
       kind: Declaration
       template: |-
         // trueDualPortBlockRam begin
-        // Shared memory
+        // Shared memory. Simultaneous reads and writes of the same address on
+        // different ports have undefined results, so Yosys doesn't need to add
+        // logic to resolve them.
+        (* no_rw_check *)
         reg [~SIZE[~TYP[#{datA}]]-1:0] ~GENSYM[mem][#{symMem}] [~LIT[#{knownNatAddrs}]-1:0];
 
         reg ~SIGD[~GENSYM[a_dout][#{symDoutA}]][#{datA}];
         reg ~SIGD[~GENSYM[b_dout][#{symDoutB}]][#{datB}];
 
+        // Quartus only infers a block RAM if it does not optimize the logic
+        // driving the enables into the RAM's output registers
+        (* keep *) wire ~GENSYM[enA][#{symEnA}] = ~ARG[#{enaA}];
+        (* keep *) wire ~GENSYM[weA][#{symWeA}] = ~ARG[#{wenaA}];
+        (* keep *) wire ~GENSYM[enB][#{symEnB}] = ~ARG[#{enaB}];
+        (* keep *) wire ~GENSYM[weB][#{symWeB}] = ~ARG[#{wenaB}];
+
         // Port A
         always @(~IF~ACTIVEEDGE[Rising][#{knownDomainA}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockA}]) begin
-            if(~ARG[#{enaA}]) begin
+            if(~SYM[#{symEnA}]) begin
                 ~SYM[#{symDoutA}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI];
-                if(~ARG[#{wenaA}]) begin
+                if(~SYM[#{symWeA}]) begin
                     ~SYM[#{symDoutA}] <= ~ARG[#{datA}];
                     ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrA}]]~THEN~ARG[#{addrA}]~ELSE0~FI] <= ~ARG[#{datA}];
                 end
@@ -1470,9 +1502,9 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
 
         // Port B
         always @(~IF~ACTIVEEDGE[Rising][#{knownDomainB}]~THENposedge~ELSEnegedge~FI ~ARG[#{clockB}]) begin
-            if(~ARG[#{enaB}]) begin
+            if(~SYM[#{symEnB}]) begin
                 ~SYM[#{symDoutB}] <= ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI];
-                if(~ARG[#{wenaB}]) begin
+                if(~SYM[#{symWeB}]) begin
                     ~SYM[#{symDoutB}] <= ~ARG[#{datB}];
                     ~SYM[#{symMem}][~IF~SIZE[~TYP[#{addrB}]]~THEN~ARG[#{addrB}]~ELSE0~FI] <= ~ARG[#{datB}];
                 end
