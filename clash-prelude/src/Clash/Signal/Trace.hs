@@ -1,3 +1,13 @@
+{-|
+
+
+
+
+
+This module is intended to be imported qualified.
+
+-}
+
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Clash.Signal.Trace (
@@ -31,7 +41,6 @@ module Clash.Signal.Trace (
   Period, Width, Value,
   TraceMap,
 
-
   -- * VCD File generation
   vcdText,
   writeVcd,
@@ -53,7 +62,7 @@ module Clash.Signal.Trace (
   loadTrace,
   loadTraces,
 
-  -- ** Inspecting files
+  -- ** Inspecting signal dump files
   FileHeader(..),
   SignalDescr(..),
   DataType(..),
@@ -64,7 +73,7 @@ module Clash.Signal.Trace (
   Old.traceSignal1, Old.traceVecSignal1,
   -- ** Tracing in a multi-clock environment
   Old.traceSignal, Old.traceVecSignal,
-  -- * VCD dump functions
+  -- * VCD generation
   Old.dumpVCD,
   -- * Replay functions
   Old.dumpReplayable, Old.replay,

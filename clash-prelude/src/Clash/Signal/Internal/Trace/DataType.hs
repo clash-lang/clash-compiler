@@ -1,6 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DeriveAnyClass #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Signal.Internal.Trace.DataType (
   DataType(..),
   simpleTypeRep,

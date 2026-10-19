@@ -55,6 +55,8 @@ main = do
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Signal.Internal.Trace.OldTrace
   (
   -- * Tracing functions
