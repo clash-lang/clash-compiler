@@ -8,13 +8,15 @@
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Signal.Internal.Trace (
   -- * Helper types
   Period, Width, Value,
   TraceMap,
 
   -- * Traces
-  Trace,
+  Trace(..),
   toTrace,fromTrace,
 
   -- * Tracing
@@ -90,7 +92,15 @@ import Clash.Signal.Internal.Trace.CompatibleTypes (DataType, compatible, simple
 type Period = Time
 type Width = Int
 type Value = (Natural, Natural) -- (mask, value)
-type Trace = (DataType,Period,Width,[Value])
+
+
+data Trace = Trace
+  { dataType :: DataType
+  , period   :: Period
+  , width    :: Width
+  , values   :: [Value]
+  }
+
 type TraceMap = Map String Trace
 
 type Traceable a = (NFDataX a, BitPack a, Typeable a)
@@ -121,6 +131,7 @@ data Config
   -- ^ Start the dump at this time
   , stop :: AtOrForTime
   -- ^ Stop the dump at this time, or for this time after start.
+  -- __NB__: This field has no default! It *must* be provided explicitly.
   , clockStart :: Time
   -- ^ Start the clocks at this time
   , shiftToZero :: Bool
@@ -136,7 +147,8 @@ instance Default Config where
   def =
     Config
       { start = TimeFS 0
-      , stop = For $ TimeNS 500
+      , stop = error (  "The stop field of the simulation config has no default"
+                     <> " and must be provided explicitly." )
       , clockStart = TimeNS 100
       , shiftToZero = True
       , statusMsgs = True
@@ -484,11 +496,11 @@ clockTrace = clockTrace0 (clockPeriodTime @dom) vActiveEdge
 -- | Create a trace from a clock period and active edge. The period *must* be an even number of fs.
 clockTrace0 :: Time -> ActiveEdge -> Trace
 clockTrace0 (TimeFS t) edge
-  | (halfPeriod,0) <- t `divMod` 2 =
-    ( simpleTypeRep @Bit
-    , TimeFS halfPeriod
-    , 1
-    , L.cycle $ L.map (unsafeToTup . pack) bits )
+  | (halfPeriod,0) <- t `divMod` 2 = Trace
+    { dataType = simpleTypeRep @Bit
+    , period = TimeFS halfPeriod
+    , width = 1
+    , values = L.cycle $ L.map (unsafeToTup . pack) bits }
   | otherwise = error "Cannot create clock trace for odd periods (in fs)"
  where
   unsafeToTup (BV mask value) = (mask, value)
@@ -510,11 +522,11 @@ toTrace ::
   Traceable a =>
   Signal dom a ->
   Trace
-toTrace sig =
-  ( simpleTypeRep @a
-  , clockPeriodTime @dom
-  , fromInteger $ natVal (Proxy @(BitSize a))
-  , sample (unsafeToTup . pack <$> sig) )
+toTrace sig = Trace
+  (simpleTypeRep @a)
+  (clockPeriodTime @dom)
+  (fromInteger $ natVal $ Proxy @(BitSize a))
+  (sample $ unsafeToTup . pack <$> sig)
  where
   unsafeToTup (BV mask value) = (mask, value)
 
@@ -525,9 +537,11 @@ fromTrace ::
   Traceable a =>
   Trace ->
   Either String (Signal dom a)
-fromTrace (ty,_period,_width,values)
-  | compatible ty (simpleTypeRep @a) = Right $ fromList $ L.map (unpack . uncurry BV) values
-  | otherwise = Left "Trace did not match target type"
+fromTrace Trace{dataType, values}
+  | compatible dataType (simpleTypeRep @a) =
+      Right $ fromList $ L.map (unpack . uncurry BV) values
+  | otherwise =
+      Left "Trace did not match target data type"
 
 -- | Add a 'Trace' to a 'Simulation'
 addTrace ::

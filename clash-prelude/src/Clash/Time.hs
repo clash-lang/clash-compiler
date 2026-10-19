@@ -1,24 +1,30 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Clash.Time (
+  -- * Time
   Time(TimeFS, TimePS, TimeNS, TimeUS, TimeMS, TimeS),
+  -- ** Rounding
   timeInFS, timeInPS, timeInNS, timeInUS, timeInMS, timeInS,
+  -- * Utility
   clockCycles, clockPeriodTime,
   timeUntil,
   mulTime,
-  AtOrForTime(..), absTime
+  -- ** Relative and absolute time
+  AtOrForTime(..), absTime,
+  -- ** String representation
+  pprTime, splitTimeUnit,
 ) where
 
-import qualified Data.Foldable
-import Data.List (findIndex)
-import Data.Maybe (fromMaybe)
 import Text.Read
 
+import Clash.XException (NFDataX)
 import Clash.Promoted.Nat (snatToNum)
-import Clash.Signal (KnownDomain(..), Signal, SDomainConfiguration(..))
+import Clash.Signal (KnownDomain(..), Signal, SDomainConfiguration(..), sample)
+import Clash.Signal.Internal (tail#)
 
 -- | Time with up to fs precision.
 -- The constructors 'TimeFS', 'TimePS', 'TimeNS', 'TimeUS', 'TimeMS' and 'TimeMS',
@@ -56,23 +62,31 @@ getTimePat k (TimeFS t) =
 
 -- | Time is shown, and can be read, in a @<value><unit>@ format.
 instance Show Time where
-  show (TimeS  t) = show t <> "s"
-  show (TimeMS t) = show t <> "ms"
-  show (TimeUS t) = show t <> "us"
-  show (TimeNS t) = show t <> "ns"
-  show (TimePS t) = show t <> "ps"
-  show (TimeFS t) = show t <> "fs"
+  showsPrec d t = showParen (d > app_prec) $ showString (unit <> show value)
+   where
+    (unit,value) = split t
+    split (TimeS  i) = ("TimeS " ,i)
+    split (TimeMS i) = ("TimeMS ",i)
+    split (TimeUS i) = ("TimeUS ",i)
+    split (TimeNS i) = ("TimeNS ",i)
+    split (TimePS i) = ("TimePS ",i)
+    split (TimeFS i) = ("TimeFS ",i)
+    app_prec = 10
 
-  -- showsPrec d t = showParen (d > app_prec) $ showString (unit <> show value)
-  --  where
-  --   (unit,value) = split t
-  --   split (TimeS  t) = ("TimeS " ,t)
-  --   split (TimeMS t) = ("TimeMS ",t)
-  --   split (TimeUS t) = ("TimeUS ",t)
-  --   split (TimeNS t) = ("TimeNS ",t)
-  --   split (TimePS t) = ("TimePS ",t)
-  --   split (TimeFS t) = ("TimeFS ",t)
-  --   app_prec = 10
+-- | Turn a time value into an integer with maximal unit.
+-- For example, `TimePS 12000` becomes `(12,"ns")`.
+splitTimeUnit :: Time -> (Integer, String)
+splitTimeUnit (TimeS  t) = (t, "s")
+splitTimeUnit (TimeMS t) = (t,"ms")
+splitTimeUnit (TimeUS t) = (t,"us")
+splitTimeUnit (TimeNS t) = (t,"ns")
+splitTimeUnit (TimePS t) = (t,"ps")
+splitTimeUnit (TimeFS t) = (t,"fs")
+
+-- | Print time in an easily readable format, like `10ns`.
+pprTime :: Time -> String
+pprTime t = let (i,u) = splitTimeUnit t in show i <> u
+
 
 -- | Time can be read from the Haskell constructors, as well as with a unit postfix.
 instance Read Time where
@@ -172,23 +186,21 @@ data AtOrForTime = At Time | For Time
 
 -- | Compute the 'Time' that elapses from the first clock edge of the simulation
 -- to the edge at which the signal satisfies the predicate.
--- Note that the first value of a signal is the initial value before the first clock edge,
--- and is ignored by this function.
+-- Note that the first value of a signal is the initial value
+-- (before the first clock edge), and is ignored by this function.
 timeUntil ::
   forall dom a.
   KnownDomain dom =>
+  NFDataX a =>
   (a -> Bool) ->
   Signal dom a ->
   Time
 timeUntil cond sig = clockCycles @dom
   $ toInteger
-  $ fromMaybe undefined
-  $ findIndex cond
-  $ unsafeTail -- drop reset value
-  $ Data.Foldable.foldr (:) [] sig
- where
-  unsafeTail (_:t) = t
-  unsafeTail [] = error "(unreachable) empty signal"
+  $ length
+  $ takeWhile (not . cond)
+  $ sample
+  $ tail# sig -- drop initial value
 
 -- | Go from an absolute or relative time and starting point to an absolute time.
 absTime ::

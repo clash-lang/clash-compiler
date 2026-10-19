@@ -1,4 +1,4 @@
-{-
+{- |
 
 Module for storing traces in files.
 
@@ -11,6 +11,10 @@ Module for storing traces in files.
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedRecordDot #-}
+{-# LANGUAGE RecordWildCards #-}
+
+{-# OPTIONS_HADDOCK hide #-}
 
 module Clash.Signal.Internal.Trace.Store (
   FileHeader(..),
@@ -133,8 +137,8 @@ storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
 
 -- | Store a single trace as a signal dump.
 storeTrace :: String -> (Int,Int) -> Trace -> ByteString
-storeTrace name samples (ty,_period,width,values) =
-  storeTrace0 samples [SignalDescr{name,width,dataType=ty}] values
+storeTrace name samples Trace{..} =
+  storeTrace0 samples [SignalDescr{name,width,dataType}] values
 
 -- | Store multiple traces in a single binary file.
 -- All traces must have the same clock period.
@@ -142,19 +146,20 @@ storeTraces :: (Int,Int) -> [(String,Trace)] -> Either String ByteString
 storeTraces samples traces = do
   let same (a:r@(b:_)) = a==b && (same r)
       same _ = True
-  if same (map (\(_,(_,_,p,_)) -> p) traces)
+  if same (map ((.period) . snd) traces)
   then do
     Right ()
   else do
     Left
       "Attempting to store multiple traces with different periods in one signal dump file."
 
-  let meta = map (\(name,(ty,_,width,_)) -> SignalDescr{name, width, dataType=ty}) traces
-      widths = map (\(_,(_,_,w,_)) -> w) traces
+  let meta = map descrFromTrace traces
+      descrFromTrace (name,Trace{width,dataType}) = SignalDescr{name, width, dataType}
+      widths = map ((.width) . snd) traces
       ccat vs = foldl
         (\(v,m) (w,(v0,m0)) -> ((v `shiftL` w).|.v0, (m `shiftL` w).|.m0)) (0,0)
         (zip widths vs)
-      values = map ccat $ transpose $ map (\(_,(_,_,_,vs)) -> vs) traces -- combine values TODO: make more efficient
+      values = map ccat $ transpose $ map ((.values) . snd) traces -- combine values TODO: make more efficient
 
   Right $ storeTrace0 samples meta values
 
@@ -165,8 +170,8 @@ store ::
   Simulation ->
   Either String ByteString
 store name sim@Simulation{simConfig} = do
-  trc@(_,period,_,_) <- fetchTrace name sim
-  let samples = simulationTimeRangeToCycles simConfig period
+  trc <- fetchTrace name sim
+  let samples = simulationTimeRangeToCycles simConfig trc.period
   pure $ storeTrace name samples trc
 
 -- | Store multiple traces into a single binary.
@@ -178,7 +183,7 @@ stores ::
   Either String ByteString
 stores names sim@Simulation{simConfig} = do
   traces <- mapM (\n -> fetchTrace n sim) names
-  (_,period,_,_) <- case traces of
+  Trace{period} <- case traces of
     [] -> Left "stores called without any trace names"
     (t:_) -> Right t
   let samples = simulationTimeRangeToCycles simConfig period
@@ -212,7 +217,7 @@ storeSignals ::
   ByteString
 storeSignals samples sigs = storeTrace0 samples signals values
  where
-  (_,_,_,values) = toTrace (bundle sigs)
+  Trace{values} = toTrace (bundle sigs)
   signals = storeSignalMeta @a
 
 -- | Helper class to get signal information from anonymous records.
@@ -291,13 +296,7 @@ loadTrace period bs = do
   (header, values) <- loadTrace0 bs
   let FileHeader{width, signals} = header
       ty = constructRecord $ map (\SignalDescr{name,dataType} -> (name,dataType)) signals
-
-  pure
-    ( ty
-    , period
-    , width
-    , values
-    )
+  pure Trace{dataType=ty, period, width, values}
 
 -- | Load multiple traces from a single binary.
 loadTraces :: Period -> ByteString -> Either String [(String,Trace)]
@@ -319,7 +318,7 @@ loadTraces period bs = do
         go n = (n `shiftR` lo) .&. ((1 `shiftL` bits) - 1)
 
       valuess = map (\r -> map (slice0 r) values) ranges
-      traces = zipWith3 (\t w vs -> (t, period, w, vs)) types widths valuess
+      traces = zipWith3 (flip Trace period) types widths valuess
 
   Right $ zip names traces
 

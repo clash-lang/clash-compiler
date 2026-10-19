@@ -5,6 +5,9 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 A TH function for deriving 'Data.AnonRecord.AsTuple' instances.
 -}
+
+{-# OPTIONS_HADDOCK hide #-}
+
 module Data.Internal.TH.AnonRecords where
 
 import Control.Monad (replicateM)

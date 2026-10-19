@@ -30,6 +30,8 @@ This cannot be done through a coercible class, as the values exist in runtime on
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
 
+{-# OPTIONS_HADDOCK hide #-}
+
 module Clash.Signal.Internal.Trace.CompatibleTypes (
   module Clash.Signal.Internal.Trace.DataType,
   compatible,

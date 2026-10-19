@@ -2,14 +2,17 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
+
+{-# OPTIONS_HADDOCK hide #-}
 
 module Clash.Signal.Internal.Trace.Vcd (
   VcdFile(..),
   DeclarationCommand(..), SimulationCommand(..),
   Var(..),
   ValueChange(..),
-  Scope, IDCode, VcdTime, TimeUnit, Value, TimeScale,
+  Scope, IDCode, VcdTime, TimeUnit, Value,
   vcd,
   vcdText,
   writeVcd,
@@ -36,8 +39,8 @@ import qualified Data.Version
 import GHC.Exts (groupWith)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
-import           Clash.Signal.Internal.Trace
-import           Clash.Time            (timeInFS, absTime)
+import Clash.Signal.Internal.Trace
+import Clash.Time (Time(..), timeInFS, absTime, splitTimeUnit)
 
 import qualified Paths_clash_prelude
 
@@ -49,7 +52,7 @@ data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand]
 data DeclarationCommand
   = Version String                   -- ^ The (Clash) version used to generate the VCD.
   | Date UTCTime                     -- ^ The timestamp the VCD was created.
-  | TimeScale TimeScale              -- ^ The unit of the VCD time stamps.
+  | TimeScale Time                   -- ^ The unit of the VCD time stamps.
                                      -- Must be 1, 10 or 100 and an appropriate unit.
   | VarDec Var                       -- ^ Variable declaration.
   | Scope Scope [DeclarationCommand] -- ^ A closed scope declaration.
@@ -85,7 +88,6 @@ type Scope = String
 type IDCode = String
 type VcdTime = Integer --TODO: check if Int is faster
 type TimeUnit = String
-type TimeScale = (Integer, TimeUnit)
 
 -- | Create a 'Vcd' object from a 'Simulation'.
 vcd ::
@@ -138,20 +140,20 @@ vcd Simulation
   allLabels = concatMap (\s -> map (snoc s) alphabet) ("": labels)
     where alphabet = map chr [33..126]
 
-  allTraces = Map.toList traceMap
-  (allNames, _) = L.unzip allTraces
+  allTraces = Map.toAscList traceMap
+  allNames = Map.keys traceMap
 
-  nonUnitTraces = filter (\(_,(_,(_,_,w,_))) -> w>0) $ zip allLabels allTraces -- TODO: Use warnZeroWidth here?
+  nonUnitTraces = filter (\(_l,(_n,t)) -> t.width>0) $ zip allLabels allTraces -- TODO: Use warnZeroWidth here?
 
   (labels,names,periods,widths,valuess) = L.unzip5
-    $ L.map (\(l,(n,(_t,p,w,vs))) -> (l,n,p,w,vs)) nonUnitTraces
+    $ L.map (\(l,(n,Trace{..})) -> (l,n,period,width,values)) nonUnitTraces
 
   ----------- VCD FILE CONSTRUCTION ------------
 
   headers =
     [ Date simTimestamp
     , Version $ Data.Version.showVersion Paths_clash_prelude.version
-    , TimeScale timeScale
+    , TimeScale $ TimeFS vcdTimeScaleFS
     ]
 
   simulation =
@@ -208,12 +210,6 @@ vcd Simulation
    where
     largestPow10 p x | x>=10*p = largestPow10 (p*10) x
                      | otherwise = p
-
-  timeScale = timeScale0 vcdTimeScaleFS "fs" ["ps","ns","us","ms","s"]
-   where
-    timeScale0 t u [] = (t,u)
-    timeScale0 t u (u0:r) | t>=1000 = timeScale0 (t `div` 1000) u0 r
-                          | otherwise = (t,u)
 
   timeOffset =
     if shiftToZero
@@ -372,8 +368,8 @@ renderDecl = \case
     vcdCommand "version" [Text.pack v]
   Date t ->
     vcdCommand "date" [Text.pack $ iso8601Format t]
-  TimeScale (x,unit) ->
-    vcdCommand "timescale" [Text.show x, Text.pack unit]
+  TimeScale t | (x,u) <- splitTimeUnit t ->
+    vcdCommand "timescale" [Text.show x, Text.pack u]
   VarDec Var{varSize, varIDCode, varReference} ->
     vcdCommand "var"
       [ "wire"
