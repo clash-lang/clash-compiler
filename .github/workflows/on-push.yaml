@@ -2,9 +2,9 @@ name: On push
 
 on:
   push:
-   branches:
-     - main
-     - "1.10"
+    branches:
+      - master
+      - "1.10"
   workflow_dispatch:
     inputs:
       mac_windows:
