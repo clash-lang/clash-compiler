@@ -172,7 +172,7 @@ jobs:
         run: stack build --pedantic
 
       - name: Run Vector testsuite
-        if: github.ref != 'refs/heads/master'
+        if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/1.10'
         run: stack run -- clash-testsuite --hide-successes -p .Vector. --no-ghdl --no-verilator --no-modelsim --no-vivado
 
 
