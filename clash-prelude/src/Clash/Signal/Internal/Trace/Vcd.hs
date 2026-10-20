@@ -99,12 +99,8 @@ vcd ::
   Simulation ->
   Either String VcdFile
 vcd Simulation
-      { simConfig = Config
-                  { start, stop, clockStart
-                  , shiftToZero
-                  --, statusMsgs
-                  --, warnZeroWidth
-                  }
+      { simTimes = Times{start, stop, clockStart}
+      , simConfig = Config{shiftToZero}
       , simTraces = traceMap
       , simTimestamp
       }
