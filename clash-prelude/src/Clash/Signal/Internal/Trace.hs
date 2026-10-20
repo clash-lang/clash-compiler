@@ -48,6 +48,7 @@ module Clash.Signal.Internal.Trace (
   registerTrace,
   registerFound,
   registerMsg,
+  registerErr,
 
   trace0,
   traceVec0,
@@ -58,8 +59,11 @@ module Clash.Signal.Internal.Trace (
   domainName, replaceDollar,
 ) where
 
+import Prelude hiding (undefined)
+
 import Control.Exception (evaluate)
 import Control.Monad (foldM, when)
+import Control.Monad.Except (ExceptT(..), runExceptT)
 import Data.Default (Default(..))
 import Data.Either.Extra (maybeToEither)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
@@ -68,14 +72,13 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import Data.Typeable (Typeable, Proxy(..))
-import qualified Debug.Trace
 import GHC.Natural (Natural)
 import GHC.TypeLits (KnownNat, natVal, symbolVal)
 import System.IO (hPutStrLn, stderr)
 import System.IO.Unsafe (unsafePerformIO)
 
 import Clash.Class.BitPack (BitPack(..), BitSize)
-import Clash.XException (NFDataX(rnfX), deepseqX)
+import Clash.XException (NFDataX(rnfX), undefined)
 import Clash.Signal
   (KnownDomain, SDomainConfiguration(..), knownDomain,
   ActiveEdge(..),
@@ -122,6 +125,7 @@ data GlobalData = GlobalData
   { globTraces :: TraceMap
   , globFound :: [String]
   , globMessages :: [String]
+  , globError :: Maybe String
   , globFirstRun :: Bool
   }
 
@@ -176,6 +180,7 @@ globalDataRef = unsafePerformIO (newIORef gd)
     { globTraces = Map.empty
     , globFound = []
     , globMessages = []
+    , globError = Nothing
     , globFirstRun = True
     }
 {-# OPAQUE globalDataRef #-}
@@ -273,65 +278,103 @@ forceEvaluateSignal ::
   IO (Either String ())
 forceEvaluateSignal ref sig waitFor (start,stop) statusMsgs =
   case (waitFor, statusMsgs) of
-    ([],False) -> pure $ Right $ deepseqX values ()
-    ([],True)  -> do
-      mapM_ printMessages values0
-      pure $ Right ()
-    _          -> lookFor values0 waitFor
+    ([],False) -> ioMapM_         $                map evalAll           values0
+    ([],True ) -> ioMapM_         $ progressMap  $ map evalAllWithStatus values0
+    (_ ,False) -> waitSig waitFor $                map evalSig           values0
+    (_ ,True ) -> waitSig waitFor $ progressMap0 $ map evalSig           values0
  where
   values :: [a]
   values = drop (fromIntegral start) $ sampleN_lazy (fromIntegral stop) sig
 
-  values0 :: [a]
-  values0 =
-    if statusMsgs
-    then zipWith ($) (progress $ stop - start) values
-    else values
+  -- Add a single undefined, so that the evaluation function is called at least
+  -- once, thus printing any messages/errors that were registered before evaluation
+  -- started. Also causes both 0% and 100% to be printed.
+  values0 = undefined:values
 
-  progress n = map go [0..n-1]
-   where
-    go k =
-      if (20*k `div` n) /= (20*(k-1) `div` n)
-      then Debug.Trace.trace $ show ((20*k) `div` n * 5) ++ "%"
-      else id
+  -- Execute IO actions, stopping on a Left
+  ioMapM_ :: [IO (Either String ())] -> IO (Either String ())
+  ioMapM_ = runExceptT . mapM_ (ExceptT)
 
-  -- Reset the found and messages fields of the global data,
-  -- returning their previous values.
-  -- Meant for @atomicModifyIORef'@.
-  extractFoundAndMsgs :: GlobalData -> (GlobalData, ([String],[String]))
-  extractFoundAndMsgs glob@GlobalData{globFound,globMessages} =
-    (glob{globFound = [], globMessages = []}, (globFound,globMessages))
+  -- Fold IO actions with a list of signals to look for, stopping when all are found
+  waitSig :: [String] -> [[String] -> IO (Either String [String])] -> IO (Either String ())
+  waitSig [] _ = do
+    when statusMsgs $ hPutStrLn stderr "All signals found"
+    pure $ Right ()
+  waitSig toFind [] = do
+    pure $ Left $ "Signal(s) not found: " <> L.intercalate ", " toFind
+  waitSig toFind (f:fs) = do
+    r <- f toFind
+    case r of
+      Right []      -> pure $ Right ()
+      Right toFind0 -> waitSig toFind0 fs
+      Left e        -> pure $ Left e
 
-  -- Evaluate a value and print messages that have popped up.
-  printMessages :: a -> IO ()
-  printMessages x = do
+  maybeLeft :: q -> Maybe p -> Either p q
+  maybeLeft _ (Just e) = Left e
+  maybeLeft x _ = Right x
+
+  -- No signal list, no status messages
+  evalAll :: a -> IO (Either String ())
+  evalAll x = do
     evaluate $ rnfX x
-    (_,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
+    GlobalData{globError} <- readIORef ref
+    pure $ maybeLeft () globError
+
+  -- Status messages, but no signal list
+  evalAllWithStatus :: a -> IO (Either String ())
+  evalAllWithStatus x = do
+    evaluate $ rnfX x
+    (_,newMsgs,err) <- atomicModifyIORef' ref extractFoundAndMsgs
     mapM_ (hPutStrLn stderr) newMsgs
-    pure ()
+    pure $ maybeLeft () err
 
-  -- Evaluate a list of values, looking for certain signals.
-  -- For implementation simplicity, does not check for signals that appear after
-  -- evalutating the last value.
-  lookFor :: [a] -> [String] -> IO (Either String ())
-  lookFor xs1 ss0 = lookFor0 (xs1 <> [undefined]) ss0 [] True
+  -- Signal list, potentially with messages
+  evalSig :: a -> [String] -> IO (Either String [String])
+  evalSig x signals = do
+    evaluate $ rnfX x
+    (found,newMsgs,err) <- atomicModifyIORef' ref extractFoundAndMsgs
+    when statusMsgs $ mapM_ (hPutStrLn stderr) newMsgs
+    let signals0 = signals L.\\ found
+    pure $ maybeLeft signals0 err
+
+  -- Add progress printing to list of evaluation actions
+  progressMap :: [IO p] -> [IO p]
+  progressMap = progressMap1 0 percentages
    where
-    lookFor0 :: [a] -> [String] -> [String] -> Bool -> IO (Either String ())
-    lookFor0 _ [] _ _ = pure $ Right ()
-    lookFor0 [] (s:_) _ _ = pure $ Left ("Did not find signal " <> s)
-    lookFor0 xs@(x:xs0) sss@(s:ss) found firstTime = do
-      (newFound,newMsgs) <- atomicModifyIORef' ref extractFoundAndMsgs
+    progressMap1 _ _ [] = []
+    progressMap1 _ [] s = s
+    progressMap1 i ps0@((k,p):ps) (s:ss) =
+      if k==i
+      then progressMap1 i ps (( do
+              r <- s
+              hPutStrLn stderr $ show p <> "%"
+              pure r
+           ) : ss)
+      else s : progressMap1 (i+1) ps0 ss
 
-      when statusMsgs $ do
-        mapM_ (hPutStrLn stderr) newMsgs
+  progressMap0 :: [p -> IO q] -> [p -> IO q]
+  progressMap0 = progressMap1 0 percentages
+   where
+    progressMap1 _ _ [] = []
+    progressMap1 _ [] s = s
+    progressMap1 i ps0@((k,p):ps) (s:ss) =
+      if k==i
+      then progressMap1 i ps $ (\x -> ( do
+              r <- s x
+              hPutStrLn stderr $ show p <> "%"
+              pure r
+           )) : ss
+      else s : progressMap1 (i+1) ps0 ss
 
-      let found0 = newFound <> found
-      if s `elem` (if firstTime then found0 else newFound)
-      then do
-        lookFor0 xs ss found0 True
-      else do
-        evaluate $ rnfX x
-        lookFor0 xs0 sss found0 False
+  -- list of (sample index, percentage to report)
+  percentages = [(p*(stop-start) `div` 100,p) | p <- [0,5..100]]
+
+  -- Reset the found signals and messages fields of the global data,
+  -- returning their previous values as well as any potential error message.
+  -- Meant for @atomicModifyIORef'@.
+  extractFoundAndMsgs :: GlobalData -> (GlobalData, ([String], [String], Maybe String))
+  extractFoundAndMsgs glob@GlobalData{..} =
+    (glob{globFound = [], globMessages = []}, (globFound,globMessages,globError))
 
 
 
@@ -379,6 +422,10 @@ registerFound new glob@GlobalData{globFound} = glob{globFound = new <> globFound
 registerMsg :: String -> GlobalData -> GlobalData
 registerMsg msg glob@GlobalData{globMessages} = glob{globMessages = msg : globMessages}
 
+-- | Store an error message.
+registerErr :: String -> GlobalData -> GlobalData
+registerErr msg glob = glob{globError = Just msg}
+
 -- | Trace a 'Signal'.
 -- This converts the signal to a trace, and stores it in global storage.
 trace ::
@@ -400,17 +447,18 @@ trace0 ::
   Trace ->
   GlobalData ->
   GlobalData
-trace0 name trc =
+trace0 name trc glob =
   right
-    . registerTrace fullName trc
-    . registerFound found
-    . registerMsg ("Found signal " <> fullName)
+    $ registerTrace fullName trc
+    $ registerFound found
+    $ registerMsg ("Found signal " <> fullName)
+    $ glob
  where
   fullName = replaceDollar (domainName @dom) name
   found = if fullName == name then [name] else [name, fullName]
 
   right (Right x) = x
-  right (Left e) = error e
+  right (Left e) = registerErr e glob
 {-# OPAQUE trace0 #-}
 
 -- | Trace all values in a vector signal individually.
@@ -436,10 +484,11 @@ traceVec0 ::
   Signal dom (Vec n a) ->
   GlobalData ->
   GlobalData
-traceVec0 name sig =
+traceVec0 name sig glob =
   registerTraces
-    . registerFound found
-    . registerMsg ("Found vector signal " <> fullName)
+    $ registerFound found
+    $ registerMsg ("Found vector signal " <> fullName)
+    $ glob
  where
   traces = toList $ toTrace <$> unbundle sig
   fullName = replaceDollar (domainName @dom) name
@@ -449,7 +498,7 @@ traceVec0 name sig =
   registerTraces g = right $ foldM (flip ($)) g $ zipWith registerTrace fullNames traces
 
   right (Right x) = x
-  right (Left e) = error e
+  right (Left e) = registerErr e glob
 {-# OPAQUE traceVec0 #-}
 
 -- | Like 'trace', but operates on a 'Reset'
