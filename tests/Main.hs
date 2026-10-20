@@ -840,6 +840,7 @@ runClashTest t3105Env = defaultMain
         , outputTest "SplitRegisterOff" def
         , runTest "StructFieldNames" def{hdlTargets=[SystemVerilog], hdlSim=[]}
         , outputTest "StructFieldNames" def{hdlTargets=[SystemVerilog]}
+        , outputTest "DeclarationOrder" def{hdlTargets=[Verilog]}
         ]
       , clashTestGroup "Netlist"
           [ clashLibTest "Identity" def
