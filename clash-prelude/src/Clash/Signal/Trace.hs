@@ -15,6 +15,7 @@ module Clash.Signal.Trace (
   -- * Simulation and tracing
   Traceable,
   Simulation,
+  Times(..), times,
   Config(..),
   simulate, simulateWith,
   emptySim,

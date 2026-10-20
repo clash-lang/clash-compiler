@@ -169,9 +169,9 @@ store ::
   String ->
   Simulation ->
   Either String ByteString
-store name sim@Simulation{simConfig} = do
+store name sim@Simulation{simTimes} = do
   trc <- fetchTrace name sim
-  let samples = simulationTimeRangeToCycles simConfig trc.period
+  let samples = simulationTimeRangeToCycles simTimes trc.period
   pure $ storeTrace name samples trc
 
 -- | Store multiple traces into a single binary.
@@ -181,12 +181,12 @@ stores ::
   [String] ->
   Simulation ->
   Either String ByteString
-stores names sim@Simulation{simConfig} = do
+stores names sim@Simulation{simTimes} = do
   traces <- mapM (\n -> fetchTrace n sim) names
   Trace{period} <- case traces of
     [] -> Left "stores called without any trace names"
     (t:_) -> Right t
-  let samples = simulationTimeRangeToCycles simConfig period
+  let samples = simulationTimeRangeToCycles simTimes period
   storeTraces samples (zip names traces) -- periods are checked here
 
 -- | Store a 'Signal' in binary form.

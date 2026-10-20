@@ -27,6 +27,8 @@ module Clash.Signal.Internal.Trace (
   -- * Simulation
   Traceable,
   Simulation(..),
+  Times(..),
+  times,
   Config(..),
   simulate, simulateWith,
   emptySim,
@@ -115,7 +117,8 @@ type ClockWave = (String, Time, ActiveEdge)
 -- | Object containing the simulation configuration
 -- and the traces captured during simulation.
 data Simulation = Simulation
-  { simConfig :: Config
+  { simTimes :: Times
+  , simConfig :: Config
   , simTraces :: TraceMap
   , simTimestamp :: UTCTime
   }
@@ -129,16 +132,25 @@ data GlobalData = GlobalData
   , globFirstRun :: Bool
   }
 
-data Config
-  = Config
+data Times
+  = Times
   { start :: Time
-  -- ^ Start the dump at this time
+  -- ^ Start the simulation/dump at this time
   , stop :: AtOrForTime
-  -- ^ Stop the dump at this time, or for this time after start.
-  -- __NB__: This field has no default! It *must* be provided explicitly.
+  -- ^ Stop the dump at this time, or after this time after start.
   , clockStart :: Time
   -- ^ Start the clocks at this time
-  , shiftToZero :: Bool
+  }
+ deriving (Show)
+
+-- | Create a time window starting at 0 and ending at the specified time,
+-- with clocks starting after 100ns.
+times :: AtOrForTime -> Times
+times stop =  Times{start = 0, stop, clockStart = TimeNS 100}
+
+data Config
+  = Config
+  { shiftToZero :: Bool
   -- ^ Shift `start` to time zero in the output?
   , statusMsgs :: Bool
   -- ^ Emit status messages to stdout?
@@ -150,11 +162,7 @@ data Config
 instance Default Config where
   def =
     Config
-      { start = TimeFS 0
-      , stop = error (  "The stop field of the simulation config has no default"
-                     <> " and must be provided explicitly." )
-      , clockStart = TimeNS 100
-      , shiftToZero = True
+      { shiftToZero = True
       , statusMsgs = True
       , warnZeroWidth = True
       }
@@ -190,7 +198,7 @@ simulate ::
   forall dom a.
   KnownDomain dom =>
   NFDataX a =>
-  -- | Duration
+  -- | Duration after clock start
   Time ->
   -- | Clock waves to render
   [ClockWave] ->
@@ -199,7 +207,7 @@ simulate ::
   -- | (One of) the outputs of the circuit containing the traces
   Signal dom a ->
   IO (Either String Simulation)
-simulate d = simulateWith def{stop = For $ d + clockStart def}
+simulate d = simulateWith def (times $ For $ d + TimeNS 100)
 
 -- | Simulate a design by forcefully evaluating an output signal.
 -- Like 'simulate', but with more options.
@@ -207,7 +215,10 @@ simulateWith ::
   forall dom a.
   KnownDomain dom =>
   NFDataX a =>
+  -- | Config options.
   Config ->
+  -- | Time window to simulate for.
+  Times ->
   -- | Clock waves to render
   [ClockWave] ->
   -- | Names of the traces you definitely want to be in the output
@@ -224,11 +235,12 @@ simulate0 ::
   NFDataX a =>
   IORef GlobalData ->
   Config ->
+  Times ->
   [ClockWave] ->
   [String] ->
   Signal dom a ->
   IO (Either String Simulation)
-simulate0 ref simConfig@Config{..} clockWaves signals sig = do
+simulate0 ref simConfig@Config{..} simTimes@Times{..} clockWaves signals sig = do
   simTimestamp <- getCurrentTime
 
   firstRun <- atomicModifyIORef' ref
@@ -238,7 +250,7 @@ simulate0 ref simConfig@Config{..} clockWaves signals sig = do
     hPutStrLn stderr "Warning: `simulate` can only be safely called once"
 
   -- evaluate signal
-  let cycRange = simulationTimeRangeToCycles simConfig (clockPeriodTime @dom)
+  let cycRange = simulationTimeRangeToCycles simTimes (clockPeriodTime @dom)
   evalResult <- forceEvaluateSignal ref sig signals cycRange statusMsgs
 
   -- create Simulation
@@ -246,10 +258,10 @@ simulate0 ref simConfig@Config{..} clockWaves signals sig = do
   let simTraces = Map.union
         (Map.fromList $ L.map (\(n,p,a) -> (n,clockTrace0 p a)) clockWaves)
         globTraces
-  pure $ Simulation{simConfig, simTraces, simTimestamp} <$ evalResult
+  pure $ Simulation{simTimes, simConfig, simTraces, simTimestamp} <$ evalResult
 
-simulationTimeRangeToCycles :: Config -> Time -> (Int,Int)
-simulationTimeRangeToCycles Config{start,stop,clockStart} period =
+simulationTimeRangeToCycles :: Times -> Time -> (Int,Int)
+simulationTimeRangeToCycles Times{start,stop,clockStart} period =
   (fromInteger cStart, fromInteger cStop)
  where
     cStart = max 0
@@ -384,14 +396,21 @@ setStartStop ::
   AtOrForTime ->
   Simulation ->
   Simulation
-setStartStop start stop sim@Simulation{simConfig} = sim{simConfig=simConfig{start,stop}}
+setStartStop start stop sim@Simulation{simTimes} = sim{simTimes=simTimes{start,stop}}
 
 -- | Change when the clocks start in a 'Simulation'.
 setClockStart ::
   Time ->
   Simulation ->
   Simulation
-setClockStart clockStart sim@Simulation{simConfig} = sim{simConfig=simConfig{clockStart}}
+setClockStart clockStart sim@Simulation{simTimes} = sim{simTimes=simTimes{clockStart}}
+
+-- | Change the start, stop and clock start times in a 'Simulation'.
+setTimes ::
+  Times ->
+  Simulation ->
+  Simulation
+setTimes simTimes sim = sim{simTimes}
 
 -- | Create a 'ClockWave' for a given domain.
 clockWave ::
