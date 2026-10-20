@@ -100,7 +100,7 @@ vcd ::
   Either String VcdFile
 vcd Simulation
       { simTimes = Times{start, stop, clockStart}
-      , simConfig = Config{shiftToZero}
+      , simConfig = Config{shiftToZero, warnZeroWidth}
       , simTraces = traceMap
       , simTimestamp
       }
@@ -151,9 +151,12 @@ vcd Simulation
     $ map (\(l,(n,Trace{..})) -> (l,n,period,width,values)) nonUnitTraces
 
   unitTraceNames = map (fst . snd) unitTraces
-  warnings = map
-    (\n -> "Warning: Zero-width trace '" <> n <> "' is omitted from the VCD")
-    unitTraceNames
+  warnings =
+    if warnZeroWidth
+    then map
+          (\n -> "Warning: Zero-width trace '" <> n <> "' is omitted from the VCD")
+          unitTraceNames
+    else []
 
   ----------- VCD FILE CONSTRUCTION ------------
 
@@ -345,8 +348,7 @@ writeVcd file sim@Simulation{simConfig=Config{warnZeroWidth}} = do
   case vcdText sim of
     Left e -> withFrozenCallStack $ errorIO e
     Right (text, warnings) -> do
-      when warnZeroWidth $
-        mapM_ (hPutStrLn stderr) warnings
+      mapM_ (hPutStrLn stderr) warnings
       Data.Text.IO.writeFile file text
 
 -- | Render a 'Vcd' object as 'Text'.
