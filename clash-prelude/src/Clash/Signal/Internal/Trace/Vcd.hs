@@ -23,9 +23,11 @@ module Clash.Signal.Internal.Trace.Vcd (
 ) where
 
 import Control.Exception.Extra (errorIO)
+import Control.Monad (when)
 import Data.Char (chr, ord)
 import Data.Bits (testBit)
-import qualified Data.List as L
+import Data.List
+  (zip3, zip4, unzip5, concatMap, isInfixOf, partition, splitAt, transpose, uncons)
 import Data.List.Extra (snoc)
 import Data.List.Split (splitOn)
 import qualified Data.Map as Map
@@ -38,6 +40,7 @@ import Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified Data.Version
 import GHC.Exts (groupWith)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
+import System.IO (hPutStrLn, stderr)
 
 import Clash.Signal.Internal.Trace
 import Clash.Time (Time(..), timeInFS, absTime, splitTimeUnit)
@@ -45,7 +48,9 @@ import Clash.Time (Time(..), timeInFS, absTime, splitTimeUnit)
 import qualified Paths_clash_prelude
 
 -- | A complete VCD file.
-data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand]
+-- This includes the contents of the VCD file, as well as warnings
+-- from its creation.
+data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand] [String]
   deriving (Show)
 
 -- | A VCD declaration command.
@@ -128,10 +133,10 @@ vcd Simulation
       <> nm
       <> "' contains empty scope names, which is not supported by VCD."
   | otherwise
-  = Right $ VcdFile (headers ++ variables) simulation
+  = Right $ VcdFile (headers ++ variables) simulation warnings
  where
   offensiveNames = filter (any (not . printable)) allNames
-  emptyScopes = filter (\nm -> ".." `L.isInfixOf` ('.' : nm <> ".")) allNames
+  emptyScopes = filter (\nm -> ".." `isInfixOf` ('.' : nm <> ".")) allNames
 
   ----------- SPLIT TRACES INTO PARTS -----------
 
@@ -143,10 +148,16 @@ vcd Simulation
   allTraces = Map.toAscList traceMap
   allNames = Map.keys traceMap
 
-  nonUnitTraces = filter (\(_l,(_n,t)) -> t.width>0) $ zip allLabels allTraces -- TODO: Use warnZeroWidth here?
+  (nonUnitTraces, unitTraces) =
+    partition (\(_l,(_n,t)) -> t.width>0) $ zip allLabels allTraces
 
-  (labels,names,periods,widths,valuess) = L.unzip5
-    $ L.map (\(l,(n,Trace{..})) -> (l,n,period,width,values)) nonUnitTraces
+  (labels,names,periods,widths,valuess) = unzip5
+    $ map (\(l,(n,Trace{..})) -> (l,n,period,width,values)) nonUnitTraces
+
+  unitTraceNames = map (fst . snd) unitTraces
+  warnings = map
+    (\n -> "Warning: Zero-width trace '" <> n <> "' is omitted from the VCD")
+    unitTraceNames
 
   ----------- VCD FILE CONSTRUCTION ------------
 
@@ -158,8 +169,7 @@ vcd Simulation
 
   simulation =
     [ SimulationTime vStart
-    , DumpVars initialValues
-    ] -- use dumpvars only for initial values?
+    , DumpVars initialValues ]
     <> changes
     <> [SimulationTime vStop]
 
@@ -167,9 +177,9 @@ vcd Simulation
 
   variables = mergeScopes varScopes []
    where
-    varScopes = L.map (\(n,w,l) -> mkScope (splitOn "." n) w l)
-      -- $ L.sort -- automatically sorted because `names` comes from map keys
-      $ L.zip3 names widths labels
+    varScopes = map (\(n,w,l) -> mkScope (splitOn "." n) w l)
+      -- $ sort -- automatically sorted because `names` comes from map keys
+      $ zip3 names widths labels
 
   -- essentially x:xs
   addScope :: DeclarationCommand -> [DeclarationCommand] -> [DeclarationCommand]
@@ -200,13 +210,13 @@ vcd Simulation
 
   -}
 
-  simTimeScaleFS = foldl1 gcd $ L.map timeInFS periods
+  simTimeScaleFS = foldl1 gcd $ map timeInFS periods
 
   vcdTimeScaleFS = largestPow10 1
     $ foldl1 gcd
-    $ simTimeScaleFS : L.map timeInFS [ start
-                                      , absTime start stop
-                                      , clockStart ]
+    $ simTimeScaleFS : map timeInFS [ start
+                                    , absTime start stop
+                                    , clockStart ]
    where
     largestPow10 p x | x>=10*p = largestPow10 (p*10) x
                      | otherwise = p
@@ -244,16 +254,16 @@ vcd Simulation
   unsafeHead [] = error "(unreachable) cannot take head of empty list"
 
   changesPerDomain :: [([ValueChange],[(VcdTime,[ValueChange])])]
-  changesPerDomain = L.map findChanges domains
+  changesPerDomain = map findChanges domains
 
   initialValues :: [ValueChange]
-  initialValues = L.concatMap fst changesPerDomain
+  initialValues = concatMap fst changesPerDomain
 
   -- essentially merge sort with nested merging on equal values
   blocks :: [(VcdTime, [ValueChange])]
   blocks =
     treeFold zipTimed
-      $ (L.map snd changesPerDomain :: [[(VcdTime,[ValueChange])]])
+      (map snd changesPerDomain :: [[(VcdTime,[ValueChange])]])
 
   changes :: [SimulationCommand]
   changes = concatMap (\(t,cs) -> [SimulationTime t, ValueChanges cs]) blocks
@@ -270,7 +280,7 @@ vcd Simulation
     treeFold0 l f xs  = treeFold0 l0 f as `f` treeFold0 (l - l0) f bs
      where
       l0 = l `div` 2
-      (as, bs) = L.splitAt l0 xs
+      (as, bs) = splitAt l0 xs
 
   -- | Zip two lists of timestamped lists of changes.
   -- A single merge in the merge sort
@@ -296,20 +306,20 @@ vcd Simulation
 
       -- group by clock cycle and add timestamps (the initial value starts at -inf)
       valuessFrom :: [(VcdTime,[Value])]
-      valuessFrom = zip (-1000000000000:clkEdges) $ L.transpose valuess0
+      valuessFrom = zip (-1000000000000:clkEdges) $ transpose valuess0
         --TODO: minBound, but we're using integers, which are unbounded :/
 
       skipStart :: [(VcdTime,[Value])]
       skipStart = map fst $ dropWhile ((<= vStart) . snd) $ zip valuessFrom clkEdges
 
-      ((_,initial) , rest) = fromMaybe (error "(unreachable) finite signal") $ L.uncons skipStart
+      ((_,initial) , rest) = fromMaybe (error "(unreachable) finite signal") $ uncons skipStart
 
       samples :: [(VcdTime,[Value])]
       samples = takeWhile ((< vStop) . fst) rest
 
       filterChanges (_ta,va) (tb,vb) =
         (tb
-        , [ValueChange w l b | (a,b,w,l) <- L.zip4 va vb widths0 labels0, a /= b]
+        , [ValueChange w l b | (a,b,w,l) <- zip4 va vb widths0 labels0, a /= b]
         )
 
       initial0 :: [ValueChange]
@@ -320,11 +330,12 @@ vcd Simulation
 
 
 -- | Create a VCD file for the given traces and simulation configuration.
--- Zero-width signals are dropped.
+-- Zero-width signals are not included, and instead warnings for these signals
+-- are returned.
 vcdText ::
   Simulation ->
-  Either String Text
-vcdText sim = renderVcd <$> vcd sim
+  Either String (Text, [String])
+vcdText sim = (\v@(VcdFile _ _ warn) -> (renderVcd v, warn)) <$> vcd sim
 
 -- | Create a VCD file for the given traces and simulation configuration,
 -- and write it to a file.
@@ -334,19 +345,22 @@ writeVcd ::
   FilePath ->
   Simulation ->
   IO ()
-writeVcd file sim = do
+writeVcd file sim@Simulation{simConfig=Config{warnZeroWidth}} = do
   case vcdText sim of
     Left e -> withFrozenCallStack $ errorIO e
-    Right text -> Data.Text.IO.writeFile file text
+    Right (text, warnings) -> do
+      when warnZeroWidth $
+        mapM_ (hPutStrLn stderr) warnings
+      Data.Text.IO.writeFile file text
 
 -- | Render a 'Vcd' object as 'Text'.
 renderVcd ::
   VcdFile ->
   Text
-renderVcd (VcdFile decl sim) = Text.unlines
-  $  L.map renderDecl decl
+renderVcd (VcdFile decl sim _warn) = Text.unlines
+  $  map renderDecl decl
   <> ["$enddefinitions $end\n"]
-  <> L.map renderSim sim
+  <> map renderSim sim
 
 -- | Render a VCD 'DeclarationCommand' as 'Text'.
 renderDecl ::
@@ -367,7 +381,7 @@ renderDecl = \case
       , Text.pack varReference ]
   Scope name subs -> Text.intercalate "\n" $
     vcdCommand "scope" ["module", Text.pack name]
-    : L.map renderDecl subs
+    : map renderDecl subs
     <> [vcdCommand "upscope" [] ]
   Comment c ->
     vcdCommand "comment" [Text.pack c]
@@ -382,10 +396,10 @@ renderSim = \case
   DumpVars ch ->
     Text.unlines
       $ "$dumpvars"
-        : L.map renderChange ch
+        : map renderChange ch
         <> ["$end"]
   ValueChanges ch ->
-    Text.unlines $ L.map renderChange ch
+    Text.unlines $ map renderChange ch
 
 -- | Render a VCD 'ValueChange' as 'Text'.
 renderChange ::
@@ -407,7 +421,7 @@ renderChange (ValueChange 1 idCode (mask, val)) =
       ++ show mask
 renderChange ValueChange{..} =
   Text.pack $
-       ('b' : shorten (L.map digit $ reverse [0 .. changeSize - 1]))
+       ('b' : shorten (map digit $ reverse [0 .. changeSize - 1]))
     <> (' ' : changeIDCode)
  where
   (mask, val) = changeValue
