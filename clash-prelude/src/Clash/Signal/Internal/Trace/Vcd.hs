@@ -119,12 +119,12 @@ vcd Simulation
   = Left "VCD: No traces found."
   | (nm:_) <- offensiveNames
   = Left $
-         "Trace '"
+         "VCD: Trace '"
       <> nm
       <> "' contains non-printable ASCII characters, which is not supported by VCD."
   | (nm:_) <- emptyScopes
   = Left $
-         "Trace '"
+         "VCD: Trace '"
       <> nm
       <> "' contains empty scope names, which is not supported by VCD."
   | otherwise
@@ -159,7 +159,7 @@ vcd Simulation
   simulation =
     [ SimulationTime vStart
     , DumpVars initialValues
-    ] -- use dumpvars only for reset values? the values at the start?
+    ] -- use dumpvars only for initial values?
     <> changes
     <> [SimulationTime vStop]
 
@@ -168,7 +168,7 @@ vcd Simulation
   variables = mergeScopes varScopes []
    where
     varScopes = L.map (\(n,w,l) -> mkScope (splitOn "." n) w l)
-      $ L.sort
+      -- $ L.sort -- automatically sorted because `names` comes from map keys
       $ L.zip3 names widths labels
 
   -- essentially x:xs
@@ -182,7 +182,7 @@ vcd Simulation
   mergeScopes (x:xs) ys = addScope x $ mergeScopes xs ys
 
   mkScope :: [String] -> Width -> IDCode -> DeclarationCommand
-  mkScope [] _ _ = error "empty signal name"
+  mkScope [] _ _ = error "(unreachable) empty signal name"
   mkScope [varReference] varSize varIDCode = VarDec $ Var{..}
   mkScope (n:ns) w l = Scope n [mkScope ns w l]
 
@@ -216,9 +216,9 @@ vcd Simulation
     then timeInFS (-start) `div` vcdTimeScaleFS
     else 0 :: VcdTime
 
-  vClockStart = timeInFS clockStart `div` vcdTimeScaleFS :: VcdTime
-  vStart = timeInFS start `div` vcdTimeScaleFS + timeOffset :: VcdTime
-  vStop = timeInFS (absTime start stop) `div` vcdTimeScaleFS + timeOffset :: VcdTime
+  vClockStart = timeInFS clockStart           `div` vcdTimeScaleFS + timeOffset :: VcdTime
+  vStart      = timeInFS start                `div` vcdTimeScaleFS + timeOffset :: VcdTime
+  vStop       = timeInFS (absTime start stop) `div` vcdTimeScaleFS + timeOffset :: VcdTime
 
 
   --------------- SIGNAL VALUES ----------------
@@ -235,7 +235,7 @@ vcd Simulation
   domains :: [(Period,([Width],[IDCode],[[Value]]))]
   domains =
     map
-      (\traces -> (fst $ unsafeHead traces, unzip3 $ map (snd) traces))
+      (\traces -> (fst $ unsafeHead traces, unzip3 $ map snd traces))
       $ groupWith fst
       $ zip periods
       $ zip3 widths labels valuess
@@ -265,7 +265,7 @@ vcd Simulation
   treeFold :: (a -> a -> a) -> [a] -> a
   treeFold f0 xs0 = treeFold0 (length xs0) f0 xs0
    where
-    treeFold0 _ _ []  = error "treeFold used on empty sequence"
+    treeFold0 _ _ []  = error "treeFold used on empty sequence" -- unreachable for us
     treeFold0 _ _ [x] = x
     treeFold0 l f xs  = treeFold0 l0 f as `f` treeFold0 (l - l0) f bs
      where
@@ -330,25 +330,14 @@ vcdText sim = renderVcd <$> vcd sim
 -- and write it to a file.
 -- Errors if the VCD generation fails.
 writeVcd ::
+  HasCallStack =>
   FilePath ->
   Simulation ->
   IO ()
 writeVcd file sim = do
-  text <- assertRight $ vcdText sim
-  Data.Text.IO.writeFile file text
- where
-  assertRight :: -- TODO; duplicate of the one in Prelude :(
-    forall a b.
-    HasCallStack =>
-    Show a =>
-    Either a b ->
-    IO b
-  assertRight = either err pure
-   where
-    err a =
-      withFrozenCallStack
-        $ errorIO
-        $ "assertRight: expected a Right value, given " <> show (Left a :: Either a a)
+  case vcdText sim of
+    Left e -> withFrozenCallStack $ errorIO e
+    Right text -> Data.Text.IO.writeFile file text
 
 -- | Render a 'Vcd' object as 'Text'.
 renderVcd ::
