@@ -71,7 +71,7 @@ import           Clash.Core.Var
   (Id, IdScope (..), TyVar, Var (..), isGlobalId, mkGlobalId, mkLocalId, mkTyVar)
 import           Clash.Core.VarEnv
   (InScopeSet, extendInScopeSet, extendInScopeSetList, mkInScopeSet, notElemInScopeSet,
-   uniqAway, uniqAway', mapVarEnv, eltsVarEnv, unitVarSet, emptyVarEnv,
+   uniqAway, uniqAway', mapVarEnv, unitVarSet, emptyVarEnv,
    mkVarEnv, eltsVarSet, elemVarEnv, lookupVarEnv, extendVarEnv, elemVarSet,
    differenceVarEnv)
 import           Clash.Data.UniqMap (UniqMap)
@@ -944,7 +944,9 @@ removeUnusedBinders (NonRec i _) body =
    in if i `elemVarSet` bodyFVs then Nothing else Just body
 
 removeUnusedBinders (Rec binds) body =
-  case eltsVarEnv used of
+  -- Filter 'binds' instead of taking the elements of 'used': those are ordered
+  -- by 'Unique', which would scramble the order of declarations in the HDL.
+  case filter ((`elemVarEnv` used) . fst) binds of
     [] -> Just body
     qqL | not (List.equalLength qqL binds)
         -> Just (Letrec qqL body)
