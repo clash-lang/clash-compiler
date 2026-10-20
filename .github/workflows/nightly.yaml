@@ -11,12 +11,13 @@ on:
         options: ["no", "candidate"]
 
 jobs:
-  ci:
-    name: CI
-    uses: $/.github/workflows/ci.yaml
-    with:
-      flavor: nightly
-      nightly: true
-      mac_windows: false
-      hackage_publish: ${{ inputs.hackage_publish }}
-    secrets: inherit
+  dummy:
+    name: Dummy
+    runs-on: ubuntu-slim
+    steps:
+      - run: |
+          echo "GITHUB_REF = $GITHUB_REF"
+          echo "hackage_publish = ${{ inputs.hackage_publish }}"
+          echo
+          python3 -m json.tool $GITHUB_EVENT_PATH
+          export
