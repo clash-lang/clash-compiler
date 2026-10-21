@@ -249,6 +249,9 @@ jobs:
         run: |
           cabal v2-build all -j$(.ci/effective_cpus.sh)
 
+      - name: Check version numbers
+        run: .ci/check_versions.sh
+
       - name: Run small tests
         run: .ci/small-tests.sh
 
@@ -608,6 +611,9 @@ jobs:
       - name: Setup
         run: .ci/gh-setup.sh
 
+      - name: Check version numbers
+        run: .ci/check_versions.sh
+
       - name: Build clash-prelude sdist
         run: .ci/build_sdist.sh clash-prelude
 
@@ -647,8 +653,6 @@ jobs:
 
 
   hackage_publish:
-    # XXX: Release pipeline stuff from /.ci/setup.sh hasn't been integrated yet!
-
     name: "Hackage: Publish sdist"
     if: inputs.hackage_publish != 'no'
     runs-on: self-hosted
