@@ -107,11 +107,11 @@ caseCaseWorker
   :: HasCallStack
   => TransformContext -> Term -> Term -> Type -> [Alt] -> NormalizeSession Term
 caseCaseWorker (TransformContext is0 _) e (stripTicks -> Case scrut alts1Ty alts1) alts2Ty alts2 = do
-  ty1Rep <- not <$> isUntranslatableType False alts1Ty
+  ty1NonRep <- isUntranslatableType False alts1Ty
 
   -- This is only worth doing if the inner case-expression has a
   -- non-representable alternative type.
-  if ty1Rep then return e else
+  if ty1NonRep then
     -- Deshadow to prevent accidental capture of free variables of inner
     -- case. Imagine:
     --
@@ -135,6 +135,8 @@ caseCaseWorker (TransformContext is0 _) e (stripTicks -> Case scrut alts1Ty alts
     let newAlts = fmap (second (\altE -> Case altE alts2Ty alts2))
                       (fmap (deShadowAlt is0) alts1)
      in changed $ Case scrut alts2Ty newAlts
+  else
+    return e
 
 caseCaseWorker _ e _ _ _ = return e
 {-# SCC caseCaseWorker #-}

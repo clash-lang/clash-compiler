@@ -53,6 +53,7 @@ import qualified Data.List.NonEmpty               as NE
 #endif
 import qualified Data.Maybe                       as Maybe
 import           Data.Semigroup                   (sconcat)
+import           Data.Text                        (pack)
 import           Data.Text.Extra                  (showt)
 import qualified GHC.Classes
 import           GHC.Stack                        (HasCallStack)
@@ -60,6 +61,9 @@ import           GHC.Stack                        (HasCallStack)
 import           GHC.Builtin.Names
   (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
    typeNatSubTyFamNameKey)
+import           GHC.Builtin.Types.Literals
+  (typeNatAddTyCon, typeNatMulTyCon, typeNatSubTyCon)
+import           GHC.Types.Name                   (getName, nameStableString)
 import           GHC.Types.SrcLoc                 (wiredInSrcSpan)
 
 import           Clash.Core.DataCon               (DataCon)
@@ -103,14 +107,17 @@ import qualified Clash.Util.Interpolate           as I
 typeNatAdd :: TyConName
 typeNatAdd =
   Name User "GHC.TypeNats.+" (fromGhcUnique typeNatAddTyFamNameKey) wiredInSrcSpan
+    (pack $ nameStableString $ getName typeNatAddTyCon)
 
 typeNatMul :: TyConName
 typeNatMul =
   Name User "GHC.TypeNats.*" (fromGhcUnique typeNatMulTyFamNameKey) wiredInSrcSpan
+    (pack $ nameStableString $ getName typeNatMulTyCon)
 
 typeNatSub :: TyConName
 typeNatSub =
   Name User "GHC.TypeNats.-" (fromGhcUnique typeNatSubTyFamNameKey) wiredInSrcSpan
+    (pack $ nameStableString $ getName typeNatSubTyCon)
 
 -- | The compiled 'Clash.Normalize.Strategy.constantPropagation' strategy,
 -- taken from the normalization state. See the documentation of

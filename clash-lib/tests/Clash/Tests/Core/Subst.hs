@@ -30,6 +30,7 @@ fakeName =
     , nameOcc="fake"
     , nameUniq=0
     , nameLoc=noSrcSpan
+    , nameStable="fake"
     }
 
 unique :: Unique

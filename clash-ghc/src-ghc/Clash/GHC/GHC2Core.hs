@@ -99,7 +99,7 @@ import GHC.Types.Id.Info (IdDetails (..), unfoldingInfo)
 import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
 import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
-  (Name, nameModule_maybe, nameOccName, nameUnique, getSrcSpan)
+  (Name, nameModule_maybe, nameOccName, nameUnique, nameStableString, getSrcSpan)
 import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
 import GHC.Types.Name.Occurrence (occNameFS, occNameString)
 import GHC.Data.Pair (Pair (..))
@@ -472,19 +472,22 @@ coreToTerm primMap unlocs = term
       = term' e
       where
         -- Remove most Signal transformers
-        go "Clash.Signal.Internal.mapSignal#"  args
+        go "Clash.Signal.Internal.mapSignal#" args
           | length args == 5
           = term (App (args!!3) (args!!4))
-        go "Clash.Signal.Internal.signal#"     args
+        go "Clash.Signal.Internal.signal#" args
           | length args == 3
           = term (args!!2)
-        go "Clash.Signal.Internal.appSignal#"  args
+        go "Clash.Signal.Internal.appSignal#" args
           | length args == 5
           = term (App (args!!3) (args!!4))
         go "Clash.Signal.Internal.joinSignal#" args
           | length args == 3
           = term (args!!2)
-        go "Clash.Signal.Bundle.vecBundle#"    args
+        go "Clash.Signal.Internal.switchDomain" args
+          | length args == 13
+          = term (last args)
+        go "Clash.Signal.Bundle.vecBundle#" args
           | length args == 4
           = term (args!!3)
         --- Remove `$`
@@ -1170,6 +1173,7 @@ coreToName toName toUnique toString v = do
   ns <- toString (toName v)
   let key  = fromGhcUnique (toUnique v)
       locI = getSrcSpan (toName v)
+      sn = pack (nameStableString (toName v))
       -- Is it one of [ds,ds1,ds2,..]
       isDSX = maybe False (maybe True (isDigit . fst) . Text.uncons) . Text.stripPrefix "ds"
       sort | isDSX ns || Text.isPrefixOf "$" ns
@@ -1178,7 +1182,7 @@ coreToName toName toUnique toString v = do
            = C.User
   locR <- view srcSpan
   let loc = if isGoodSrcSpan locI then locI else locR
-  return (C.Name sort ns key loc)
+  return (C.Name sort ns key loc sn)
 
 qualifiedNameString'
   :: Name
