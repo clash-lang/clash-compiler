@@ -1,0 +1,15 @@
+name: Create branch or tag
+
+on: create
+
+jobs:
+  ci:
+    name: CI
+    if: github.ref_type == 'tag'
+    uses: $/.github/workflows/ci.yaml
+    with:
+      flavor: nightly
+      nightly: true
+      mac_windows: false
+      hackage_publish: release
+    secrets: inherit
