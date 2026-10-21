@@ -40,7 +40,7 @@
         ~GENSYM[romFileSync][7] : process (~ARG[2])
         begin
           if (~IF~ACTIVEEDGE[Rising][1]~THENrising_edge~ELSEfalling_edge~FI(~ARG[2])) then
-            if ~ARG[3] then
+            if ~ARG[3] = '1' then
               ~RESULT <= to_stdlogicvector(~SYM[2](~SYM[3]));
             end if;
           end if;

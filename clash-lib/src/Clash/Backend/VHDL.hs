@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -117,10 +117,7 @@ data VHDLState =
   , _undefValue :: Maybe (Maybe Int)
   , _productFieldNameCache :: HashMap (Maybe [TextS.Text], [HWType]) [TextS.Text]
   -- ^ Caches output of 'productFieldNames'.
-  , _enumNameCache :: HashMap HWType [TextS.Text]
-  -- ^ Cache for enum variant names.
   , _aggressiveXOptBB_ :: AggressiveXOptBB
-  , _renderEnums_ :: RenderEnums
   , _domainConfigurations_ :: DomainMap
   , _usages :: UsageMap
   }
@@ -152,9 +149,7 @@ instance Backend VHDLState where
     , _hdlsyn=opt_hdlSyn opts
     , _undefValue=opt_forceUndefined opts
     , _productFieldNameCache=mempty
-    , _enumNameCache=mempty
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
-    , _renderEnums_=coerce (opt_renderEnums opts)
     , _domainConfigurations_=emptyDomainMap
     , _usages=mempty
     }
@@ -175,11 +170,8 @@ instance Backend VHDLState where
     Product {} -> pure UserType
     MemBlob {} -> pure UserType
 
-    Sum {} -> do
-      -- If an enum is rendered, it is a user type. If not, an std_logic_vector
-      -- is rendered, and it is a synonym.
-      RenderEnums enums <- renderEnums
-      if enums then pure UserType else pure SynonymType
+    -- Rendered as an std_logic_vector subtype.
+    Sum {} -> pure SynonymType
 
     Clock {} -> pure SynonymType
     ClockN {} -> pure SynonymType
@@ -229,9 +221,8 @@ instance Backend VHDLState where
   expr            = expr_
   iwWidth         = use intWidth
 
-  toBV t id_ = do
-    enums <- Ap renderEnums
-    if isBV enums t then pretty id_ else do
+  toBV t id_ =
+    if isBV t then pretty id_ else do
       nm <- Ap $ use modNm
       -- TODO: restore hack
 --      seen <- use seenIdentifiers
@@ -242,9 +233,8 @@ instance Backend VHDLState where
 --            | otherwise =
       let e = hdlTypeMark t <> squote <> parens (pretty id_)
       pretty nm <> "_types.toSLV" <> parens e
-  fromBV t id_ = do
-    enums <- Ap renderEnums
-    if isBV enums t then pretty id_ else do
+  fromBV t id_ =
+    if isBV t then pretty id_ else do
       nm <- Ap $ use modNm
       qualTyName t <> "'" <> parens (pretty nm <> "_types.fromSLV" <> parens (pretty id_))
   hdlSyn          = use hdlsyn
@@ -285,16 +275,15 @@ instance Backend VHDLState where
   getMemoryDataFiles = use memoryDataFiles
   ifThenElseExpr _ = False
   aggressiveXOptBB = use aggressiveXOptBB_
-  renderEnums = use renderEnums_
   domainConfigurations = use domainConfigurations_
   setDomainConfigurations confs s = s {_domainConfigurations_ = confs}
 
 type VHDLM a = Ap (State VHDLState) a
 
 -- Check if the underlying type is a BitVector
-isBV :: RenderEnums -> HWType -> Bool
-isBV e (normaliseType e -> BitVector _) = True
-isBV _ _ = False
+isBV :: HWType -> Bool
+isBV (normaliseType -> BitVector _) = True
+isBV _ = False
 
 -- | Generate unique (partial) names for product fields. Example:
 --
@@ -374,21 +363,6 @@ selectProductField
 selectProductField fieldLabels fieldTypes fieldIndex =
   "_sel" <> int fieldIndex <> "_" <> productFieldName fieldLabels fieldTypes fieldIndex
 
-enumVariantName
-  :: HasCallStack
-  => HWType
-  -> Int
-  -> VHDLM Doc
-enumVariantName ty@(Sum _ vs) i = do
-  names <- makeCached ty enumNameCache (traverse variantName vs)
-  pure (PP.pretty (names !! i))
- where
-  -- Make a basic identifier from the last part of a qualified name
-  variantName = fmap Id.toText . Id.makeBasic . snd . TextS.breakOnEnd "."
-
-enumVariantName _ _ =
-  error $ $(curLoc) ++ "enumVariantName called on non-enum type"
-
 -- | Generate VHDL for a Netlist component
 genVHDL
   :: ClashOpts
@@ -430,12 +404,12 @@ mkTyPackage_ :: ModName -> [HWType] -> VHDLM [(String,Doc)]
 mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     { Ap (tyPkgCtx .= True)
     ; syn <- Ap hdlSyn
-    ; enums <- Ap renderEnums
     ; let usedTys     = concatMap mkUsedTys hwtys
     ; let normTys0    = nub (map mkVecZ (hwtys ++ usedTys))
     ; let sortedTys0  = topSortHWTys normTys0
           packageDec  = vcat $ mapM tyDec (nubBy eqTypM sortedTys0)
-          (funDecs,funBodies) = unzip . mapMaybe (funDec enums syn) $ nubBy eqTypM (normaliseType enums <$> sortedTys0)
+          (funDecs0,funBodies0) = unzip . mapMaybe (funDec syn) $ nubBy eqTypM (normaliseType <$> sortedTys0)
+          (funDecs,funBodies) = (toStdLogicDec:funDecs0, toStdLogicBody:funBodies0)
 
     ; pkg <- (:[]) <$> (TextS.unpack (modName `TextS.append` "_types"),) <$>
       "library IEEE;" <> line <>
@@ -465,6 +439,26 @@ mkTyPackage_ modName (map filterTransparent -> hwtys) = do
     eqTypM (Unsigned _) (Unsigned _)     = True
     eqTypM (BitVector _) (BitVector _)   = True
     eqTypM ty1 ty2                       = ty1 == ty2
+
+-- | Convert the @boolean@ a VHDL relational operator yields to a Clash 'Bool'.
+-- Always emitted, black boxes can't know whether a design declares it.
+toStdLogicDec :: VHDLM Doc
+toStdLogicDec =
+  "function" <+> "to_std_logic" <+> parens ("b" <+> colon <+> "in" <+> "boolean")
+             <+> "return" <+> "std_logic" <> semi
+
+toStdLogicBody :: VHDLM Doc
+toStdLogicBody =
+  "function" <+> "to_std_logic" <+> parens ("b" <+> colon <+> "in" <+> "boolean")
+             <+> "return" <+> "std_logic" <+> "is" <> line <>
+  "begin" <> line <>
+    indent 2 (vcat $ sequence [ "if" <+> "b" <+> "then"
+                              ,   indent 2 ("return" <+> squotes (int 1) <> semi)
+                              , "else"
+                              ,   indent 2 ("return" <+> squotes (int 0) <> semi)
+                              , "end" <+> "if" <> semi
+                              ]) <> line <>
+  "end" <> semi
 
 mkUsedTys :: HWType -> [HWType]
 mkUsedTys hwty = hwty : case hwty of
@@ -540,17 +534,15 @@ mkVecZ (RTree _ elTy)  = RTree 0 elTy
 mkVecZ t               = t
 
 typAliasDec :: HasCallStack => HWType -> VHDLM Doc
-typAliasDec hwty = do
-  enums <- Ap renderEnums
+typAliasDec hwty =
   "subtype" <+> tyName hwty
             <+> "is"
-            <+> sizedTyName (normaliseType enums hwty)
+            <+> sizedTyName (normaliseType hwty)
             <> semi
 
 tyDec :: HasCallStack => HWType -> VHDLM Doc
 tyDec hwty = do
   syn <- Ap hdlSyn
-  RenderEnums enums <- Ap renderEnums
 
   case hwty of
     -- "Proper" custom types:
@@ -589,13 +581,6 @@ tyDec hwty = do
       "type" <+> tyName hwty <+> "is record" <> line  <>
         indent 2 (vcat $ zipWithM (\x y -> x <+> colon <+> y <> semi) selNames selTys) <> line <>
       "end record" <> semi
-
-    Sum _ vs | enums ->
-        let variantNames = traverse (enumVariantName hwty) [0..length vs - 1] in
-          "type" <+> tyName hwty
-                 <+> "is"
-                 <+> parens (hsep (punctuate comma variantNames))
-                 <> semi
 
     MemBlob n m -> tyDec (Vector n (BitVector m))
 
@@ -636,53 +621,15 @@ tyDec hwty = do
 
 
 
-funDec :: RenderEnums -> HdlSyn -> HWType -> Maybe (VHDLM Doc,VHDLM Doc)
-funDec _ _ Bool = Just
-  ( "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <> semi <> line <>
-    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <> semi <> line <>
-    "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <> semi
-  , "function" <+> "toSLV" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                                ,  indent 2 ("return" <+> dquotes (int 1) <> semi)
-                                ,"else"
-                                ,  indent 2 ("return" <+> dquotes (int 0) <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("sl" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "boolean" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> dquotes (int 1) <+> "then"
-                                ,   indent 2 ("return" <+> "true" <> semi)
-                                ,"else"
-                                ,   indent 2 ("return" <+> "false" <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi <> line <>
-    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "boolean" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <+> "then"
-                                ,   indent 2 ("return" <+> "false" <> semi)
-                                ,"else"
-                                ,   indent 2 ("return" <+> "true" <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi <> line <>
-    "function" <+> "dataToTag" <+> parens ("b" <+> colon <+> "in" <+> "boolean") <+> "return" <+> "signed" <+> "is" <> line <>
-    "begin" <> line <>
-      indent 2 (vcat $ sequence ["if" <+> "b" <+> "then"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
-                                ,"else"
-                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
-                                ,"end" <+> "if" <> semi
-                                ]) <> line <>
-    "end" <> semi
-  )
-
-funDec _ _ bit@Bit = Just
+funDec :: HdlSyn -> HWType -> Maybe (VHDLM Doc,VHDLM Doc)
+-- 'Bool' is absent here: 'normaliseType' maps it onto 'Bit', so both share these
+-- @std_logic@ conversions. That is also why @tagToEnum@ and @dataToTag@ live
+-- here, they only ever apply to 'Bool'.
+funDec _ bit@Bit = Just
   ( "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <> semi
+    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> tyName bit <> semi <> line <>
+    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> tyName bit <> semi <> line <>
+    "function" <+> "dataToTag" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "signed" <> semi
   , "function" <+> "toSLV" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
     "begin" <> line <>
       indent 2 ("return" <+> "std_logic_vector'" <> parens (int 0 <+> rarrow <+> "sl") <> semi) <> line <>
@@ -693,10 +640,28 @@ funDec _ _ bit@Bit = Just
         ) <> line <>
     "begin" <> line <>
       indent 2 ("return" <+> "islv" <> parens (int 0) <> semi) <> line <>
+    "end" <> semi <> line <>
+    "function" <+> "tagToEnum" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> tyName bit <+> "is" <> line <>
+    "begin" <> line <>
+      indent 2 (vcat $ sequence ["if" <+> "s" <+> "=" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <+> "then"
+                                ,   indent 2 ("return" <+> squotes (int 0) <> semi)
+                                ,"else"
+                                ,   indent 2 ("return" <+> squotes (int 1) <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <> line <>
+    "end" <> semi <> line <>
+    "function" <+> "dataToTag" <+> parens ("sl" <+> colon <+> "in" <+> tyName bit) <+> "return" <+> "signed" <+> "is" <> line <>
+    "begin" <> line <>
+      indent 2 (vcat $ sequence ["if" <+> "sl" <+> "=" <+> squotes (int 1) <+> "then"
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 1 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
+                                ,"else"
+                                ,  indent 2 ("return" <+> "to_signed" <> parens (int 0 <> comma <> (Ap (use intWidth) >>= int)) <> semi)
+                                ,"end" <+> "if" <> semi
+                                ]) <> line <>
     "end" <> semi
   )
 
-funDec _ _ (Signed _) = Just
+funDec _ (Signed _) = Just
   ( "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "signed" <> semi
   , "function" <+> "toSLV" <+> parens ("s" <+> colon <+> "in" <+> "signed") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
@@ -710,7 +675,7 @@ funDec _ _ (Signed _) = Just
     "end" <> semi
   )
 
-funDec _ _ (Unsigned _) = Just
+funDec _ (Unsigned _) = Just
   ( "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "unsigned" <> semi
   , "function" <+> "toSLV" <+> parens ("u" <+> colon <+> "in" <+> "unsigned") <+> "return" <+> "std_logic_vector" <+> "is"  <> line <>
@@ -725,7 +690,7 @@ funDec _ _ (Unsigned _) = Just
 
   )
 
-funDec _ _ t@(Product _ labels elTys) = Just
+funDec _ t@(Product _ labels elTys) = Just
   ( "function" <+> "toSLV" <+> parens ("p :" <+> sizedTyName t) <+> "return std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> sizedTyName t <> semi
   , "function" <+> "toSLV" <+> parens ("p :" <+> sizedTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
@@ -752,41 +717,7 @@ funDec _ _ t@(Product _ labels elTys) = Just
                        (\(s,e) -> "fromSLV" <>
                           parens ("islv" <> parens (int s <+> "to" <+> int e)))
 
-funDec (RenderEnums enums) _ t@(Sum _ _) | enums = Just
-  ( "function" <+> "toSLV" <+> parens("value" <+> colon <+> "in" <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <> semi
-  , "function" <+> "toSLV" <+> parens ("value" <+> colon <+> "in" <+> qualTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
-    "begin" <> line <>
-    indent 2
-      ( "return" <+> "std_logic_vector" <>
-        parens ("to_unsigned" <>
-          parens (qualTyName t <> "'pos(value)" <> comma <+> int (typeSize t))
-        )) <> semi <> line <>
-    "end" <> semi <> line <>
-    "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <+> "is" <> line <>
-    "begin" <> line <>
-    indent 2
-      (
-      translate_off (
-      "if unsigned(slv) <= " <> qualTyName t <> "'pos("<> qualTyName t <> "'high) then"
-      ) <> line <>
-        indent 2
-          ( "return" <+> qualTyName t <> "'val" <>
-            parens ("to_integer" <>
-              parens ("unsigned" <> parens "slv"))) <> semi <> line <>
-      translate_off (
-        "else" <> line <>
-        indent 2
-          ( "return" <+> qualTyName t <> "'val(0)") <> semi <> line <>
-        "end if" <> semi
-      )
-      ) <> line <>
-    "end" <> semi
-  )
-  where
-    translate_off body = "-- pragma translate_off" <> line <> body <> line <> "-- pragma translate_on"
-
-funDec _ syn t@(Vector _ elTy) = Just
+funDec syn t@(Vector _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <> semi
   , "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
@@ -832,7 +763,7 @@ funDec _ syn t@(Vector _ elTy) = Just
     eSz     = int (typeSize elTy)
     getElem = "islv" <> parens ("i * " <> eSz <+> "to (i+1) * " <> eSz <+> "- 1")
 
-funDec _ _ (BitVector _) = Just
+funDec _ (BitVector _) = Just
   ( "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <> semi
   , "function" <+> "toSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> "std_logic_vector" <+> "is" <> line <>
@@ -845,7 +776,7 @@ funDec _ _ (BitVector _) = Just
     "end" <> semi
   )
 
-funDec _ syn t@(RTree _ elTy) = Just
+funDec syn t@(RTree _ elTy) = Just
   ( "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <> semi <> line <>
     "function" <+> "fromSLV" <+> parens ("slv" <+> colon <+> "in" <+> "std_logic_vector") <+> "return" <+> qualTyName t <> semi
   , "function" <+> "toSLV" <+> parens ("value : " <+> qualTyName t) <+> "return std_logic_vector" <+> "is" <> line <>
@@ -891,7 +822,7 @@ funDec _ syn t@(RTree _ elTy) = Just
     eSz     = int (typeSize elTy)
     getElem = "islv" <> parens ("i * " <> eSz <+> "to (i+1) * " <> eSz <+> "- 1")
 
-funDec _ _ _ = Nothing
+funDec _ _ = Nothing
 
 tyImports :: ModName -> VHDLM Doc
 tyImports nm = do
@@ -1199,7 +1130,7 @@ tyName' rec0 (filterTransparent -> t) = do
       return (error ($(curLoc) ++ "Forced to print KnownDomain tyName"))
     Void _ ->
       return (error ($(curLoc) ++ "Forced to print Void tyName: " ++ show t))
-    Bool          -> return "boolean"
+    Bool          -> return "std_logic"
     Signed n      ->
       let app = if rec0 then ["_", showt n] else [] in
       return $ TextS.concat $ "signed" : app
@@ -1261,13 +1192,12 @@ tyName' rec0 (filterTransparent -> t) = do
 
 -- | Returns underlying type of given HWType. That is, the type by which it
 -- eventually will be represented in VHDL.
-normaliseType :: RenderEnums -> HWType -> HWType
-normaliseType enums@(RenderEnums e) hwty = case hwty of
+normaliseType :: HWType -> HWType
+normaliseType hwty = case hwty of
   Void {} -> hwty
   KnownDomain {} -> hwty
 
   -- Base types:
-  Bool          -> hwty
   Signed _      -> hwty
   Unsigned _    -> hwty
   BitVector _   -> hwty
@@ -1280,23 +1210,24 @@ normaliseType enums@(RenderEnums e) hwty = case hwty of
   Vector _ _    -> hwty
   RTree _ _     -> hwty
   Product _ _ _ -> hwty
-  Sum _ _       -> if e then hwty else BitVector (typeSize hwty)
   MemBlob n m   -> Vector n (BitVector m)
 
   -- Simple types, for which a subtype (without qualifiers) will be made in VHDL:
+  Bool              -> Bit
   Clock _           -> Bit
   ClockN _          -> Bit
   Reset _           -> Bit
-  Enable _          -> Bool
+  Enable _          -> Bit
   Index _           -> Unsigned (typeSize hwty)
+  Sum _ _           -> BitVector (typeSize hwty)
   CustomSP _ _ _ _  -> BitVector (typeSize hwty)
   SP _ _            -> BitVector (typeSize hwty)
   CustomSum _ _ _ _ -> BitVector (typeSize hwty)
   CustomProduct {}  -> BitVector (typeSize hwty)
 
   -- Transparent types:
-  Annotated _ elTy -> normaliseType enums elTy
-  BiDirectional _ elTy -> normaliseType enums elTy
+  Annotated _ elTy -> normaliseType elTy
+  BiDirectional _ elTy -> normaliseType elTy
 
 -- | Recursively remove transparent types from given type
 filterTransparent :: HWType -> HWType
@@ -1358,11 +1289,8 @@ userTyName dflt nm0 hwTy = do
 
 -- | Convert a Netlist HWType to an error VHDL value for that type
 sizedQualTyNameErrValue :: HWType -> VHDLM Doc
-sizedQualTyNameErrValue Bool                = do
-  udf <- Ap (use undefValue)
-  case udf of
-    Just (Just 0) -> "false"
-    _             -> "true"
+-- Unlike a VHDL @boolean@, @std_logic@ can carry a don't-care.
+sizedQualTyNameErrValue Bool                = singularErrValue
 sizedQualTyNameErrValue Bit                 = singularErrValue
 sizedQualTyNameErrValue t@(Vector n elTy)   = do
   syn <-Ap hdlSyn
@@ -1380,13 +1308,8 @@ sizedQualTyNameErrValue t@(RTree n elTy)    = do
     _ -> qualTyName t <> "'" <>  parens (int 0 <+> "to" <+> int (2^n - 1) <+> rarrow <+> sizedQualTyNameErrValue elTy)
 sizedQualTyNameErrValue t@(Product _ _ elTys) =
   qualTyName t <> "'" <> tupled (mapM sizedQualTyNameErrValue elTys)
-sizedQualTyNameErrValue t@(Sum _ _)  = do
-  -- No undefined / don't care for enums, so just set it to the first value
-  RenderEnums enums <- Ap renderEnums
-  if enums then
-    tyName t <> "'val" <> parens (int 0)
-  else
-    qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> singularErrValue)
+sizedQualTyNameErrValue t@(Sum _ _)  =
+  qualTyName t <> "'" <> parens (int 0 <+> "to" <+> int (typeSize t - 1) <+> rarrow <+> singularErrValue)
 sizedQualTyNameErrValue (Clock _)  = singularErrValue
 sizedQualTyNameErrValue (ClockN _) = singularErrValue
 sizedQualTyNameErrValue (Reset _)  = singularErrValue
@@ -1557,7 +1480,9 @@ inst_ (Assignment id_ Cont e) = fmap Just $
 inst_ (CondAssignment id_ _ scrut _ [(Just (BoolLit b), l),(_,r)]) = fmap Just $
   pretty id_ <+> larrow
            <+> align (vsep (sequence [expr_ False t <+> "when" <+>
-                                      expr_ False scrut <+> "else"
+                                      -- A 'Bool' is a std_logic, so it needs a
+                                      -- test to become a condition
+                                      parens (expr_ False scrut <+> "=" <+> squotes (int 1)) <+> "else"
                                      ,expr_ False f <> semi
                                      ]))
   where
@@ -1679,6 +1604,10 @@ expr_
   -> Expr
   -- ^ Expr to convert
   -> VHDLM Doc
+-- A bare @'0'@ is an overloaded character literal, so @'0' = '1'@ is ambiguous.
+-- Qualify where the context may embed us in a larger expression.
+expr_ True (Literal _ (BoolLit v)) =
+  "std_logic'" <> parens (squotes (if v then char '1' else char '0'))
 expr_ _ (Literal sizeM lit) = exprLit sizeM lit
 expr_ _ (Identifier id_ Nothing) = pretty id_
 
@@ -1743,12 +1672,7 @@ expr_ _ (DataCon ty@(SP _ args) (DC (_,i)) es) = assignExpr
                    n -> [bits (replicate n U)]
     assignExpr = "std_logic_vector'" <> parens (hcat $ punctuate " & " $ sequence (dcExpr:argExprs ++ extraArg))
 
-expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = do
-  RenderEnums enums <- Ap renderEnums
-  if enums then
-    tyName ty <> "'" <> parens (enumVariantName ty i)
-  else
-    expr_ False (dcToExpr ty i)
+expr_ _ (DataCon ty@(Sum _ _) (DC (_,i)) []) = expr_ False (dcToExpr ty i)
 expr_ _ (DataCon ty@(CustomSum _ _ _ tys) (DC (_,i)) []) =
   let (ConstrRepr' _ _ _ value _) = fst $ tys !! i in
   "std_logic_vector" <> parens ("to_unsigned" <> parens (int (fromIntegral value) <> comma <> int (typeSize ty)))
@@ -1762,8 +1686,10 @@ expr_ _ (DataCon (CustomProduct _ dataRepr _size _labels tys) _ es) |
 expr_ _ (DataCon ty@(Product _ labels tys) _ es) =
     tupled $ zipWithM (\i e' -> tyName ty <> selectProductField labels tys i <+> rarrow <+> expr_ False e') [0..] es
 
-expr_ _ (DataCon (Enable _) _ [e]) =
-  expr_ False e
+-- 'Enable' is transparent, so pass @b@ on. Without this an 'andEnable' renders
+-- as a bare @a and b@, which reassociates if the consumer appends to it.
+expr_ b (DataCon (Enable _) _ [e]) =
+  expr_ b e
 
 expr_ _ (BlackBoxE pNm _ _ _ _ bbCtx _)
   | pNm == "Clash.Sized.Internal.Signed.fromInteger#"
@@ -1810,20 +1736,12 @@ expr_ b (BlackBoxE _ libs imps inc bs bbCtx b') = do
 expr_ _ (DataTag Bool (Left id_)) = "tagToEnum" <> parens (pretty id_)
 expr_ _ (DataTag Bool (Right id_)) = "dataToTag" <> parens (pretty id_)
 
-expr_ _ (DataTag hty@(Sum _ _) (Left id_)) = do
-  RenderEnums enums <- Ap renderEnums
-  nm <- Ap $ use modNm
-
-  let inner = "std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (pretty id_)) <> "," <> int (typeSize hty)))
-  if enums then pretty nm <> "_types.fromSLV" <> parens inner else inner
+expr_ _ (DataTag hty@(Sum _ _) (Left id_)) =
+  "std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens ("std_logic_vector" <> parens (pretty id_)) <> "," <> int (typeSize hty)))
 
 expr_ _ (DataTag (Sum _ _) (Right id_)) = do
-  RenderEnums enums <- Ap renderEnums
   iw <- Ap $ use intWidth
-  nm <- Ap $ use modNm
-
-  let inner = if enums then pretty nm <> "_types.toSLV" <> parens (pretty id_) else pretty id_
-  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens inner <> "," <> int iw)))
+  "signed" <> parens ("std_logic_vector" <> parens ("resize" <> parens ("unsigned" <> parens (pretty id_) <> "," <> int iw)))
 
 expr_ _ (DataTag (Product {}) (Right _))  = do
   iw <- Ap $ use intWidth
@@ -1920,25 +1838,19 @@ exprLit (Just (hty,sz)) (BitVecLit m i) = case m of
     bvlit = bits (toBits' sz m i)
 
 
-exprLit _             (BoolLit t)   = if t then "true" else "false"
+exprLit _             (BoolLit t)   = squotes (if t then char '1' else char '0')
 exprLit _             (BitLit b)    = squotes $ bit_char b
 exprLit _             (StringLit s) = pretty . T.pack $ show s
 exprLit _             l             = error $ $(curLoc) ++ "exprLit: " ++ show l
 
 patLit :: HWType -> Literal -> VHDLM Doc
 patLit Bit (NumLit i) = if i == 0 then "'0'" else "'1'"
-patLit hwty (NumLit i) = do
-  RenderEnums enums <- Ap renderEnums
-
-  case hwty of
-    Sum{} | enums ->
-      tyName hwty <> "'" <> parens (enumVariantName hwty (fromInteger i))
-
-    _ ->
-      let sz = conSize hwty
-       in case sz `mod` 4 of
-            0 -> hex  (toHex sz i)
-            _ -> bits (toBits sz i)
+patLit Bool (NumLit i) = if i == 0 then "'0'" else "'1'"
+patLit hwty (NumLit i) =
+  let sz = conSize hwty
+   in case sz `mod` 4 of
+        0 -> hex  (toHex sz i)
+        _ -> bits (toBits sz i)
 
 patLit _    l          = exprLit Nothing l
 
@@ -2006,13 +1918,7 @@ toSLV (BitVector _) e = expr_ True e
 toSLV (Signed _)   e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Unsigned _) e = "std_logic_vector" <> parens (expr_ False e)
 toSLV (Index _)    e = "std_logic_vector" <> parens (expr_ False e)
-toSLV (Sum _ _)    e = do
-  RenderEnums enums <- Ap renderEnums
-  if enums then do
-    nm <- Ap $ use modNm
-    pretty nm <> "_types.toSLV" <> parens (expr_ False e)
-  else
-    expr_ False e
+toSLV (Sum _ _)    e = expr_ False e
 toSLV (CustomSum _ _dataRepr size reprs) (DataCon _ (DC (_,i)) _) =
   let (ConstrRepr' _ _ _ value _) = fst $ reprs !! i in
   let unsigned = "to_unsigned" <> parens (int (fromIntegral value) <> comma <> int size) in
@@ -2436,11 +2342,10 @@ renderModifier (DontCare,_) _ = do
     sizedQualTyNameErrValue (Unsigned iw)
 renderModifier (Range r,t) doc = do
   nm <- Ap (use modNm)
-  enums <- Ap renderEnums
   let doc1 = case r of
         Contiguous start end -> slice start end
         Split rs -> parens (hcat (punctuate " & " (mapM (\(s,e,_) -> slice s e) rs)))
-  case normaliseType enums t of
+  case normaliseType t of
     BitVector _ -> doc1
     -- See [Note] Continuing from an SLV slice
     _ ->

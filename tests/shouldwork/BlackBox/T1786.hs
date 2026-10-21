@@ -23,7 +23,7 @@ testAlwaysEnabled !_ = pure True
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabled"
       , "kind"      : "Expression"
-      , "template"  : "~IF ~ISACTIVEENABLE[0] ~THEN false ~ELSE true ~FI"
+      , "template"  : "~IF ~ISACTIVEENABLE[0] ~THEN '0' ~ELSE '1' ~FI"
       }
     }
   ]
@@ -52,7 +52,7 @@ testAlwaysEnabledBool !_ = pure True
   [ { "BlackBox" :
       { "name"      : "T1786.testAlwaysEnabledBool"
       , "kind"      : "Expression"
-      , "template"  : "~IF ~ISACTIVEENABLE[0] ~THEN false ~ELSE true ~FI"
+      , "template"  : "~IF ~ISACTIVEENABLE[0] ~THEN '0' ~ELSE '1' ~FI"
       }
     }
   ]
