@@ -460,6 +460,8 @@ runClashTest = defaultMain
         , runTest "T1556" def
         , runTest "T1591" def{hdlTargets=[VHDL], hdlSim=[]}
         , runTest "TagToEnum" def{hdlSim=[]}
+        , runTest "CaseDataToTag" def
+        , outputTest "CaseDataToTag" def{hdlTargets=[Verilog]}
         , runTest "TwoFunctions" def{hdlSim=[]}
         , runTest "XToError" def{hdlSim=[]}
         ]
