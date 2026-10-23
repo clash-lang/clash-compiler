@@ -7,6 +7,7 @@
 --   * Case alternatives get the constructor they match on
 --   * Pattern bindings get the names of the variables in the pattern
 --   * Variables GHC made up get the name of the parameter they are passed to
+--   * Record fields matched on get the name of the signal and the field
 --
 -- And struct fields in SystemVerilog are named after record fields. See
 -- "SplitRegister" for splitting the state register per field.
@@ -85,6 +86,8 @@ mainVerilog = do
   -- Case alternatives
   assertIn "wire [9:0] c$nextMode_nextCounter_case_Idle;" content
   assertIn "wire [9:0] c$nextMode_nextCounter_case_Counting;" content
+  -- Record field projected out of a signal to be matched on
+  assertIn "wire [1:0] c$controller_s_mode;" content
 
 mainSystemVerilog :: IO ()
 mainSystemVerilog = do
