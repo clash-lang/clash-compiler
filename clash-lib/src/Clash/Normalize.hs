@@ -31,6 +31,7 @@ import           Clash.Data.UniqMap               (UniqMap)
 import qualified Clash.Data.UniqMap               as UniqMap
 import           Data.List
   (intercalate, intersect, mapAccumL)
+import qualified Data.List                        as List
 import qualified Data.HashMap.Strict              as HashMap
 import qualified Data.Map                         as Map
 import qualified Data.Maybe                       as Maybe
@@ -44,6 +45,7 @@ import           Data.Text.Prettyprint.Doc        (vcat)
 #endif
 
 import           GHC.BasicTypes.Extra             (isNoInline)
+import           GHC.Types.SrcLoc                 (isGoodSrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
@@ -56,14 +58,17 @@ import           Clash.Core.PartialEval as PE     (Evaluator)
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr', ppr)
 import           Clash.Core.Subst
   (extendGblSubstList, mkSubst, substTm)
-import           Clash.Core.Term                  (Term (..), collectArgsTicks
-                                                  ,mkApps, mkTicks)
+import           Clash.Core.Name                  (Name (..), NameSort (..))
+import           Clash.Core.Term
+  (Term (..), collectArgs, collectArgsTicks, collectBndrs, mkApps, mkTicks,
+   walkTerm)
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
+import           Clash.Core.Util                  (renameIds)
 import           Clash.Core.TyCon (TyConMap)
 import           Clash.Core.Type                  (isPolyTy)
-import           Clash.Core.Var                   (Id, varName, varType)
+import           Clash.Core.Var                   (Id, Var (..), isLocalId)
 import           Clash.Core.VarEnv
-  (VarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
+  (VarEnv, elemVarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
    extendVarEnv, lookupVarEnv, mapVarEnv, mapMaybeVarEnv,
    mkVarEnv, mkVarSet, notElemVarEnv, notElemVarSet, nullVarEnv, unionVarEnv)
 import           Clash.Debug                      (traceIf)
@@ -289,6 +294,65 @@ cleanupGraph topEntity norm
        return (mkVarEnv $ snd $ callTreeToList [] ctFlat)
 cleanupGraph _ norm = return norm
 
+-- | Before inlining functions defined by the user, name variables made up by
+-- GHC after the parameter of the function they are passed to. For example,
+-- given:
+--
+-- > topEntity = \eta -> ... txStep s eta ...
+-- > txStep = \s input -> ...
+--
+-- where GHC made up @eta@ when it eta-expanded @topEntity@, we rename @eta@ to
+-- @input@. Once @txStep@ is inlined, @input@ would otherwise be gone from the
+-- HDL. For top entities without a 'Clash.Annotations.TopEntity.Synthesize'
+-- annotation this also names the ports.
+--
+-- Functions count as defined by the user when their binding has a source
+-- location, i.e., when they were defined in a module compiled from source. We
+-- don't take names from library functions: their parameters are often named
+-- @x@ or @f@, which isn't an improvement over a name made up by GHC.
+--
+-- If a variable is passed to multiple user-defined functions, the first
+-- application found determines its name.
+nameArgsAfterParams
+  :: BindingMap
+  -- ^ All bindings, used to find out which functions are defined by the user
+  -> [(Id, Term)]
+  -- ^ Functions that are about to be inlined, and their definitions
+  -> Term
+  -- ^ Term the functions are inlined in
+  -> Term
+nameArgsAfterParams bndrs toInline tm
+  | nullVarEnv renames = tm
+  | otherwise = renameIds renames tm
+ where
+  userParams =
+    mkVarEnv
+      [ (f, lefts (fst (collectBndrs e)))
+      | (f, e) <- toInline
+      , Just b <- [lookupVarEnv f bndrs]
+      , isGoodSrcSpan (bindingLoc b)
+      ]
+
+  renames = List.foldl' addRename emptyVarEnv (concat (walkTerm findArgs tm))
+
+  addRename env (y, p)
+    | y `elemVarEnv` env = env
+    | otherwise = extendVarEnv y (rename y p) env
+
+  findArgs t = case collectArgs t of
+    (Var f, args) | Just params <- lookupVarEnv f userParams ->
+      Just
+        [ (y, p)
+        | (Var y, p) <- zip (lefts args) params
+        , isLocalId y
+        , nameSort (varName y) == System
+        , nameSort (varName p) == User
+        ]
+    _ -> Nothing
+
+  rename y p =
+    y {varName = (varName y) {nameOcc = nameOcc (varName p), nameSort = User}}
+
 -- | A tree of identifiers and their bindings, with branches containing
 -- additional bindings which are used. See "Clash.Driver.Types.Binding".
 --
@@ -392,12 +456,14 @@ flattenCallTree cache (CBranch (nm,(Binding nm' sp inl pr tm r)) used) = do
   doFlatten = do
    flattenedUsed   <- mapM (flattenCallTree cache) used
    (newUsed,il_ct) <- partitionEithers <$> mapM flattenNode flattenedUsed
+   bndrs <- Lens.use bindings
    let (toInline,il_used) = unzip il_ct
        subst = extendGblSubstList (mkSubst emptyInScopeSet) toInline
    newExpr <- case toInline of
      [] -> return tm
      _  -> do
-       let tm1 = substTm "flattenCallTree.flattenExpr" subst tm
+       let tm0 = nameArgsAfterParams bndrs toInline tm
+           tm1 = substTm "flattenCallTree.flattenExpr" subst tm0
 
        -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
        opts <- Lens.view debugOpts

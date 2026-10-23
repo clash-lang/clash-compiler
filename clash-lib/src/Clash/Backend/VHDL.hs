@@ -1526,6 +1526,25 @@ insts (d:ds) = do
     Just doc -> pure doc <> line <> line <> insts ds
     _ -> insts ds
 
+-- | Comment saying which constructor an alternative of a conditional
+-- assignment matches, see 'literalToConName'. Patterns of enumerations
+-- already mention the constructor, unless the alternative is rendered as
+-- @others@.
+conComment
+  :: Bool
+  -- ^ Whether the alternative is rendered as @others@
+  -> HWType
+  -> Maybe Literal
+  -> VHDLM Doc
+conComment isOthers ty lit = do
+  RenderEnums enums <- Ap renderEnums
+  case lit >>= literalToConName ty of
+    Just con | isOthers || not (enums && isSum ty) -> " --" <+> pretty con
+    _ -> emptyDoc
+ where
+  isSum Sum{} = True
+  isSum _ = False
+
 -- | Helper function for inst_, handling CustomSP and CustomSum
 inst_'
   :: Identifier
@@ -1534,7 +1553,7 @@ inst_'
   -> [(Maybe Literal, Expr)]
   -> VHDLM (Maybe Doc)
 inst_' id_ scrut scrutTy es = fmap Just $
-  (pretty id_ <+> larrow <+> align (vcat (conds esNub) <> semi))
+  (pretty id_ <+> larrow <+> align (vcat (conds esNub)))
     where
       esMod = map (first (fmap (patMod scrutTy))) es
       esNub = nubBy ((==) `on` fst) esMod
@@ -1542,11 +1561,12 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
       conds :: [(Maybe Literal,Expr)] -> VHDLM [Doc]
       conds []                = return []
-      conds [(_,e)]           = expr_ False e <:> return []
-      conds ((Nothing,e):_)   = expr_ False e <:> return []
+      conds [(c,e)]           = expr_ False e <> semi <> conComment True scrutTy c <:> return []
+      conds ((Nothing,e):_)   = expr_ False e <> semi <:> return []
       conds ((Just c ,e):es') = expr_ False e <+> "when"
                                               <+> patLitCustom var scrutTy c
                                               <+> "else"
+                                              <> conComment False scrutTy (Just c)
                                               <:> conds es'
 
 -- | Turn a Netlist Declaration to a VHDL concurrent block
@@ -1574,16 +1594,16 @@ inst_ (CondAssignment id_ _ scrut scrutTy@(CustomProduct _ _ _ _ _) es) =
 
 inst_ (CondAssignment id_ _sig scrut scrutTy es) = fmap Just $
     "with" <+> parens (expr_ True scrut) <+> "select" <> line <>
-      indent 2 (pretty id_ <+> larrow <+> align (vcat (punctuate comma (conds esNub)) <> semi))
+      indent 2 (pretty id_ <+> larrow <+> align (vcat (conds esNub)))
   where
     esMod = map (first (fmap (patMod scrutTy))) es
     esNub = nubBy ((==) `on` fst) esMod
 
     conds :: [(Maybe Literal,Expr)] -> VHDLM [Doc]
     conds []                = return []
-    conds [(_,e)]           = expr_ False e <+> "when" <+> "others" <:> return []
-    conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <:> return []
-    conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <:> conds es'
+    conds [(c,e)]           = expr_ False e <+> "when" <+> "others" <> semi <> conComment True scrutTy c <:> return []
+    conds ((Nothing,e):_)   = expr_ False e <+> "when" <+> "others" <> semi <:> return []
+    conds ((Just c ,e):es') = expr_ False e <+> "when" <+> patLit scrutTy c <> comma <> conComment False scrutTy (Just c) <:> conds es'
 
 inst_ (InstDecl entOrComp libM _ nm lbl gens pms0) = do
     maybe (return ()) (\lib -> Ap (libraries %= (T.fromStrict lib:))) libM

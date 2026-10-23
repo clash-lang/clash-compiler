@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
-                     2021-2024, QBayLogic B.V.,
+                     2021-2026, QBayLogic B.V.,
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -24,7 +24,7 @@ import Control.Monad.Trans.Except              (Except, throwE, runExcept)
 import Data.Bifunctor                          (first, second)
 import qualified Data.HashSet                  as HashSet
 import qualified Data.Graph                    as Graph
-import Data.List                               (mapAccumR, uncons)
+import Data.List                               (mapAccumL, mapAccumR, uncons)
 import Data.List.Extra                         (zipEqual)
 import Data.List.NonEmpty                      (NonEmpty (..), toList)
 import Data.Maybe
@@ -62,6 +62,65 @@ import Clash.Util.Supply                 (Supply, freshId)
 
 import {-# SOURCE #-} qualified Clash.Normalize.Primitives as Primitives
 import Clash.XException (errorX)
+
+-- | Change the names of variables, both at their binding sites and at the
+-- occurrences referring to them, to the names of the variables with the same
+-- unique in the given environment. Only the 'varName' of a variable changes,
+-- its type and unique stay the same.
+--
+-- Only the outermost binding site of a variable is renamed. In:
+--
+-- > let x = 5 in (\x -> x + 1) x
+--
+-- where both binders of @x@ have the same unique, only the let-bound @x@ and
+-- the @x@ the lambda is applied to are renamed. Occurrences of variables that
+-- aren't bound in the term keep their names, so that they keep matching their
+-- binding sites outside of it.
+renameIds :: VarEnv Id -> Term -> Term
+renameIds = go emptyVarEnv
+ where
+  -- 'active' holds the renames of the binders we're in the scope of, 'pending'
+  -- those of the binders we haven't come across yet.
+  go active pending tm = case tm of
+    Var v -> Var (maybe v (rename v) (lookupVarEnv v active))
+    Lam v e ->
+      let ((active1, pending1), v1) = bndr (active, pending) v
+       in Lam v1 (go active1 pending1 e)
+    TyLam tv e -> TyLam tv (go active pending e)
+    App f a -> App (go active pending f) (go active pending a)
+    TyApp e ty -> TyApp (go active pending e) ty
+    Let (NonRec v e) b ->
+      let ((active1, pending1), v1) = bndr (active, pending) v
+       in Let (NonRec v1 (go active pending e)) (go active1 pending1 b)
+    Let (Rec bs) b ->
+      let ((active1, pending1), vs1) = mapAccumL bndr (active, pending) (map fst bs)
+       in Let (Rec (zip vs1 (map (go active1 pending1 . snd) bs))) (go active1 pending1 b)
+    Case subj ty alts ->
+      Case (go active pending subj) ty (map (goAlt active pending) alts)
+    Cast e ty1 ty2 -> Cast (go active pending e) ty1 ty2
+    Tick t e -> Tick (goTick active pending t) (go active pending e)
+    Data{} -> tm
+    Literal{} -> tm
+    Prim{} -> tm
+
+  -- Rename a binder if it's the outermost binding site of a variable in the
+  -- environment. Otherwise, it shadows any binder with the same unique, so
+  -- occurrences in its scope keep their names.
+  bndr (active, pending) v = case lookupVarEnv v pending of
+    Just v1 ->
+      let v2 = rename v v1
+       in ((extendVarEnv v v2 active, delVarEnv pending v), v2)
+    Nothing -> ((delVarEnv active v, pending), v)
+
+  rename v v1 = v {varName = varName v1}
+
+  goAlt active pending (DataPat dc tvs ids, e) =
+    let ((active1, pending1), ids1) = mapAccumL bndr (active, pending) ids
+     in (DataPat dc tvs ids1, go active1 pending1 e)
+  goAlt active pending (p, e) = (p, go active pending e)
+
+  goTick active pending (Attributes ty e) = Attributes ty (go active pending e)
+  goTick _ _ t = t
 
 -- | Rebuild a let expression / let expressions by taking the SCCs of a list
 -- of bindings and remaking Let (NonRec ...) ... and Let (Rec ...) ...

@@ -27,8 +27,11 @@ import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad.State (StateT, lift, modify, runStateT)
 import Control.Monad.Writer (listen)
-import Data.Bifunctor (second)
+import Data.Either (lefts)
+import Data.Foldable (toList)
 import qualified Data.Monoid as Monoid (Any(..))
+import Data.Sequence (Seq, (><))
+import qualified Data.Sequence as Seq
 import qualified Data.Text.Extra as Text (showt)
 import GHC.Exts (State#)
 import GHC.Stack (HasCallStack)
@@ -58,7 +61,7 @@ import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
 import Clash.Rewrite.Util
-  (changed, isUntranslatable, mkDerivedName, mkTmBinderFor)
+  (changed, isUntranslatable, mkAltName, mkArgName, mkDerivedName, mkTmBinderFor)
 import Clash.Rewrite.WorkFree (isConstant, isConstantNotClockReset)
 import Clash.Util (curLoc)
 
@@ -162,25 +165,29 @@ makeANF ctx@(TransformContext is0 _) e0 = do
     -- See also Note [ANF InScopeSet]
     let (is2,e1) = freshenTm is0 e0
     ((e2,(bndrs,_)),Monoid.getAny -> hasChanged) <-
-      listen (runStateT (bottomupR collectANF ctx e1) ([],is2))
-    case bndrs of
+      listen (runStateT (bottomupR collectANF ctx e1) (Seq.empty,is2))
+    case toList bndrs of
       [] -> if hasChanged then return e2 else return e0
-      _  -> do
+      bndrs1 -> do
         let (e3,ticks) = collectTicks e2
             (srcTicks,nmTicks) = partitionTicks ticks
         -- Ensure that `AppendName` ticks still scope over the entire expression
-        changed (mkTicks (Letrec bndrs (mkTicks e3 srcTicks)) nmTicks)
+        changed (mkTicks (Letrec bndrs1 (mkTicks e3 srcTicks)) nmTicks)
 {-# SCC makeANF #-}
 
-type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) NormalizeSession)
+-- | Binders collected so far, in the order they were made, and the binders in
+-- scope.
+type ANFState = (Seq LetBinding, InScopeSet)
 
--- | See Note [ANF InScopeSet]
-tellBinders :: [LetBinding] -> StateT ([LetBinding],InScopeSet) NormalizeSession ()
-tellBinders bs = modify ((bs ++) *** (`extendInScopeSetList` (map fst bs)))
+type NormRewriteW = Transform (StateT ANFState NormalizeSession)
 
--- | See Note [ANF InScopeSet]; only extends the inscopeset
-notifyBinders :: Monad m => [LetBinding] -> StateT ([LetBinding],InScopeSet) m ()
-notifyBinders bs = modify (second (`extendInScopeSetList` (map fst bs)))
+-- | Add binders after the binders collected so far. As 'collectANF' works
+-- bottom-up, binders end up after the binders they refer to, so signals in the
+-- generated HDL are declared before the signals that use them.
+--
+-- See Note [ANF InScopeSet]
+tellBinders :: [LetBinding] -> StateT ANFState NormalizeSession ()
+tellBinders bs = modify ((>< Seq.fromList bs) *** (`extendInScopeSetList` (map fst bs)))
 
 -- | Is the given type IO-like
 isSimIOTy
@@ -258,7 +265,7 @@ isStateTokenTy tcm ty = case tyView (coreView tcm ty) of
 --    depends on IO actions to be propagated down as far as possible.
 collectANF :: HasCallStack => NormRewriteW
 collectANF ctx e@(App appf arg)
-  | (conVarPrim, _) <- collectArgs e
+  | (conVarPrim, args) <- collectArgs e
   , isCon conVarPrim || isPrim conVarPrim || isVar conVarPrim
   = do
     tcm <- Lens.view tcCache
@@ -270,7 +277,8 @@ collectANF ctx e@(App appf arg)
       (False,False,False,_) -> do
         -- See Note [ANF InScopeSet]
         is1   <- Lens.use _2
-        argId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "app_arg") arg)
+        argNm <- lift (mkArgName ctx conVarPrim (length (lefts args) - 1))
+        argId <- lift (mkTmBinderFor is1 tcm argNm arg)
         -- See Note [ANF InScopeSet]
         tellBinders [(argId,arg)]
         return (App appf (Var argId))
@@ -297,8 +305,8 @@ collectANF _ (Letrec binds body) = do
       is1 <- Lens.use _2
       argId <- lift (mkTmBinderFor is1 tcm (mkUnsafeSystemName "result" 0) body)
       -- See Note [ANF InScopeSet]
-      tellBinders [(argId,body)]
       tellBinders binds
+      tellBinders [(argId,body)]
       return (Var argId)
 
 -- TODO: The code below special-cases ANF for the ':-' constructor for the
@@ -324,22 +332,21 @@ collectANF ctx (Case subj ty alts) = do
     let localVar = isLocalVar subj
     let isConstantSubj = isConstant subj
 
-    (subj',subjBinders) <- if localVar || isConstantSubj
-      then return (subj,[])
+    subj' <- if localVar || isConstantSubj
+      then return subj
       else do
         tcm <- Lens.view tcCache
         -- See Note [ANF InScopeSet]
         is1 <- Lens.use _2
         argId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_scrut") subj)
         -- See Note [ANF InScopeSet]
-        notifyBinders [(argId,subj)]
-        return (Var argId,[(argId,subj)])
+        tellBinders [(argId,subj)]
+        return (Var argId)
 
     tcm <- Lens.view tcCache
     let isSimIOAlt = isSimIOTy tcm ty
 
     alts' <- mapM (doAlt isSimIOAlt subj') alts
-    tellBinders subjBinders
 
     case alts' of
       [(DataPat _ [] xs,altExpr)]
@@ -347,7 +354,7 @@ collectANF ctx (Case subj ty alts) = do
         -> return altExpr
       _ -> return (Case subj' ty alts')
   where
-    doAlt :: Bool -> Term -> Alt -> StateT ([LetBinding],InScopeSet) NormalizeSession Alt
+    doAlt :: Bool -> Term -> Alt -> StateT ANFState NormalizeSession Alt
     doAlt isSimIOAlt subj' alt@(DataPat dc exts xs,altExpr) | not (bindsExistentials exts xs) = do
       let lv = isLocalVar altExpr
       patSels <- Monad.zipWithM (doPatBndr subj' dc) xs [0..]
@@ -364,7 +371,7 @@ collectANF ctx (Case subj ty alts) = do
           tcm <- Lens.view tcCache
           -- See Note [ANF InScopeSet]
           is1 <- Lens.use _2
-          altId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_alt") altExpr)
+          altId <- lift (mkTmBinderFor is1 tcm (mkAltName ctx (DataPat dc exts xs)) altExpr)
           -- See Note [ANF InScopeSet]
           tellBinders (patSels ++ [(altId,altExpr)])
           return (DataPat dc exts xs,Var altId)
@@ -379,11 +386,11 @@ collectANF ctx (Case subj ty alts) = do
           tcm <- Lens.view tcCache
           -- See Note [ANF InScopeSet]
           is1 <- Lens.use _2
-          altId <- lift (mkTmBinderFor is1 tcm (mkDerivedName ctx "case_alt") altExpr)
+          altId <- lift (mkTmBinderFor is1 tcm (mkAltName ctx pat) altExpr)
           tellBinders [(altId,altExpr)]
           return (pat,Var altId)
 
-    doPatBndr :: Term -> DataCon -> Id -> Int -> StateT ([LetBinding],InScopeSet) NormalizeSession LetBinding
+    doPatBndr :: Term -> DataCon -> Id -> Int -> StateT ANFState NormalizeSession LetBinding
     doPatBndr subj' dc pId i = do
       tcm <- Lens.view tcCache
       -- See Note [ANF InScopeSet]
