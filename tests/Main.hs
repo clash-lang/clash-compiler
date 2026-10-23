@@ -839,6 +839,8 @@ runClashTest t3105Env = defaultMain
         , outputTest "DerivedNames" def
         , runTest "StructFieldNames" def{hdlTargets=[SystemVerilog], hdlSim=[]}
         , outputTest "StructFieldNames" def{hdlTargets=[SystemVerilog]}
+        , runTest "ConstructorComments" def{hdlSim=[]}
+        , outputTest "ConstructorComments" def
         ]
       , clashTestGroup "Netlist"
           [ clashLibTest "Identity" def

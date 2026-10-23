@@ -86,7 +86,7 @@ import           Clash.Core.HasFreeVars  (elemFreeVars, isClosed)
 import           Clash.Core.HasType
 import qualified Clash.Core.Literal      as C
 import           Clash.Core.Name
-  (Name (..), appendToName, mkUnsafeSystemName, nameOcc)
+  (Name (..), appendToName, mkUnsafeSystemName, nameOcc, unqualifiedOcc)
 import           Clash.Core.PartialEval
 import           Clash.Core.Pretty       (PrettyPrec, showPpr, showPprDiag)
 import           Clash.Core.Subst
@@ -1129,6 +1129,22 @@ dcToLiteral :: HWType -> Int -> Literal
 dcToLiteral Bool 1 = BoolLit False
 dcToLiteral Bool 2 = BoolLit True
 dcToLiteral _ i    = NumLit (toInteger i-1)
+
+-- | Name of the constructor matched by the given literal, the inverse of
+-- 'dcToLiteral'. Used to mention in the HDL which constructor an alternative of
+-- a case-expression on a value of the given type matches.
+literalToConName :: HWType -> Literal -> Maybe Text
+literalToConName ty lit = case (ty, lit) of
+  (Annotated _ ty1, _) -> literalToConName ty1 lit
+  (Sum _ cons, NumLit i) -> unqualifiedOcc <$> index cons i
+  (SP _ cons, NumLit i) -> unqualifiedOcc . fst <$> index cons i
+  (CustomSum _ _ _ cons, NumLit i) -> unqualifiedOcc . snd <$> index cons i
+  (CustomSP _ _ _ cons, NumLit i) -> (\(_, c, _) -> unqualifiedOcc c) <$> index cons i
+  _ -> Nothing
+ where
+  index xs i
+    | i < 0 = Nothing
+    | otherwise = listToMaybe (drop (fromInteger i) xs)
 
 -- * TopEntity Annotations
 
