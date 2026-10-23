@@ -827,6 +827,13 @@ patMod :: HWType -> Literal -> Literal
 patMod hwTy (NumLit i) = NumLit (i `mod` (2 ^ typeSize hwTy))
 patMod _ l = l
 
+-- | Comment saying which constructor an alternative of a case statement
+-- matches, see 'literalToConName'.
+conComment :: HWType -> Maybe Literal -> SystemVerilogM Doc
+conComment ty lit = case lit >>= literalToConName ty of
+  Just con -> " //" <+> stringS con
+  Nothing -> emptyDoc
+
 -- | Helper function for inst_, handling CustomSP and CustomSum
 inst_' :: Identifier -> Expr -> HWType -> [(Maybe Literal, Expr)] -> SystemVerilogM (Maybe Doc)
 inst_' id_ scrut scrutTy es = fmap Just $
@@ -843,10 +850,10 @@ inst_' id_ scrut scrutTy es = fmap Just $
 
       conds :: [(Maybe Literal,Expr)] -> SystemVerilogM Doc
       conds []                = error $ $(curLoc) ++ "Empty list of conditions invalid."
-      conds [(_,e)]           = "default" <+> ":" <+> pretty id_ <+> "=" <+> expr_ False e <> ";"
+      conds [(c,e)]           = "default" <+> ":" <+> pretty id_ <+> "=" <+> expr_ False e <> ";" <> conComment scrutTy c
       conds ((Nothing,e):_)   = "default" <+> ":" <+> pretty id_ <+> "=" <+> expr_ False e <> ";"
       conds ((Just c ,e):es') =
-        mask' <+> ":" <+> pretty id_ <+> "=" <+> expr_ False e <> ";" <> line <> conds es'
+        mask' <+> ":" <+> pretty id_ <+> "=" <+> expr_ False e <> ";" <> conComment scrutTy (Just c) <> line <> conds es'
           where
             mask' = patLitCustom scrutTy c
 
@@ -902,23 +909,23 @@ inst_ (CondAssignment id_ ty scrut scrutTy es) = fmap Just $ do
            ; verilogType ty <+> pretty regId <> semi <> line <>
              "always_comb begin" <> line <>
              indent 2 ("case" <> parens (expr_ True scrut) <> line <>
-                         (indent 2 $ vcat $ punctuate semi (conds regId es)) <> semi <> line <>
+                         (indent 2 $ vcat $ conds regId es) <> line <>
                        "endcase") <> line <>
              "end" <> line <>
              "assign" <+> pretty id_ <+> equals <+> pretty regId <> semi
            }
          else "always_comb begin" <> line <>
               indent 2 ("case" <> parens (expr_ True scrut) <> line <>
-                          (indent 2 $ vcat $ punctuate semi (conds id_ es)) <> semi <> line <>
+                          (indent 2 $ vcat $ conds id_ es) <> line <>
                         "endcase") <> line <>
               "end"
     }
   where
     conds :: Identifier -> [(Maybe Literal,Expr)] -> SystemVerilogM [Doc]
     conds _ []                = return []
-    conds i [(_,e)]           = ("default" <+> colon <+> pretty i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Nothing,e):_)   = ("default" <+> colon <+> pretty i <+> equals <+> expr_ False e) <:> return []
-    conds i ((Just c ,e):es') = (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> pretty i <+> equals <+> expr_ False e) <:> conds i es'
+    conds i [(c,e)]           = ("default" <+> colon <+> pretty i <+> equals <+> expr_ False e <> semi <> conComment scrutTy c) <:> return []
+    conds i ((Nothing,e):_)   = ("default" <+> colon <+> pretty i <+> equals <+> expr_ False e <> semi) <:> return []
+    conds i ((Just c ,e):es') = (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> pretty i <+> equals <+> expr_ False e <> semi <> conComment scrutTy (Just c)) <:> conds i es'
 
 inst_ (InstDecl _ _ attrs nm lbl ps pms0) = fmap Just $
     attrs' <> nest 2 (pretty nm <> params <> pretty lbl <> line <> pms2 <> semi)
@@ -1020,8 +1027,8 @@ seq_ (Branch scrut scrutTy es) =
         conds :: [(Maybe Literal,[Seq])] -> SystemVerilogM [Doc]
         conds [] =
           return []
-        conds [(_,sq)] =
-          ("default" <+> colon <+> "begin" <> line <>
+        conds [(c,sq)] =
+          ("default" <+> colon <+> "begin" <> conComment scrutTy c <> line <>
             indent 2 (seqs sq) <> line <>
           "end") <:> return []
         conds ((Nothing,sq):_) =
@@ -1029,7 +1036,7 @@ seq_ (Branch scrut scrutTy es) =
             indent 2 (seqs sq) <> line <>
           "end") <:> return []
         conds ((Just c ,sq):es') =
-          (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> "begin" <> line <>
+          (exprLitSV (Just (scrutTy,conSize scrutTy)) c <+> colon <+> "begin" <> conComment scrutTy (Just c) <> line <>
             indent 2 (seqs sq) <> line <>
           "end") <:> conds es'
 
