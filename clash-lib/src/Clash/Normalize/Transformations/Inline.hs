@@ -126,6 +126,14 @@ as they'd need to be.
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
+--
+-- Inlining a local variable reference loses the name of its binder, even when
+-- the user wrote it. For example, in @let b = a in ...@, where the user named
+-- both @a@ and @b@, only @a@ ends up in the HDL. The same goes for a parameter
+-- of an inlined function whose argument is a variable named by the user. We'd
+-- like to keep such aliases, so that the HDL shows both names, e.g.
+-- @assign b = a;@. However, keeping them would probably break constant
+-- propagation, such as for the reset values of registers.
 bindConstantVar :: Transformation
 bindConstantVar =
   toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
