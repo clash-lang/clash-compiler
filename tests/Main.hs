@@ -833,6 +833,9 @@ runClashTest t3105Env = defaultMain
         , runTest "T967c" def{hdlSim=[]}
         , clashLibTest "T1041" def
         , clashLibTest "NameHint" def{hdlTargets=[VHDL,Verilog]}
+        , runTest "SplitRegister" def{clashFlags=["-fclash-split-registers"]}
+        , outputTest "SplitRegister" def{clashFlags=["-fclash-split-registers"]}
+        , outputTest "SplitRegisterOff" def
         ]
       , clashTestGroup "Netlist"
           [ clashLibTest "Identity" def

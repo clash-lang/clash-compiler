@@ -279,6 +279,7 @@ Library
                       Clash.Normalize.Transformations.Reduce
                       Clash.Normalize.Transformations.SeparateArgs
                       Clash.Normalize.Transformations.Specialize
+                      Clash.Normalize.Transformations.SplitRegister
                       Clash.Normalize.Transformations.XOptimize
                       Clash.Normalize.Types
                       Clash.Normalize.Util

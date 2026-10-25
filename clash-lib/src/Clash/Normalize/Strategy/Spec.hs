@@ -46,7 +46,7 @@ import Clash.Rewrite.StrategyDSL
 normalizationSpec :: Name -> Strat
 normalizationSpec constantPropagationName =
   rmDeadcode >-> multPrim >-> callStrategy constantPropagationName >->
-  rmUnusedExpr >-!-> anf >-!-> rmDeadcode >->
+  rmUnusedExpr >-!-> anf >-!-> splitRegs >-> rmDeadcode >->
   bindConst >-> letTL
   >-> evalConst
   >-!-> cse >-!-> cleanup >->
@@ -58,6 +58,7 @@ normalizationSpec constantPropagationName =
     anf        = topdown nonRepANF >-> pass "ANF" 'makeANF >-> topdown caseCon
     letTL      = topdownSuc topLet
     recLetRec  = pass "recToLetRec" 'recToLetRec
+    splitRegs  = topdown splitRegister
     rmUnusedExpr = bottomup removeUnusedExpr
     rmDeadcode = bottomup (named "deadcode" deadCode)
     bindConst  = topdown bindConstantVar

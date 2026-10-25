@@ -2,7 +2,7 @@
   Copyright  :  (C) 2012-2016, University of Twente,
                     2016-2017, Myrtle Software Ltd,
                     2017-2018, Google Inc.,
-                    2021     , QBayLogic B.V.
+                    2021,2026, QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
   Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -23,5 +23,6 @@ import Clash.Normalize.Transformations.Letrec as X
 import Clash.Normalize.Transformations.MultiPrim as X
 import Clash.Normalize.Transformations.Reduce as X
 import Clash.Normalize.Transformations.SeparateArgs as X
+import Clash.Normalize.Transformations.SplitRegister as X
 import Clash.Normalize.Transformations.Specialize as X
 import Clash.Normalize.Transformations.XOptimize as X

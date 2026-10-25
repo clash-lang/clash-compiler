@@ -1,5 +1,6 @@
 {-|
-  Copyright   :  (C) 2017, Google Inc.
+  Copyright   :  (C) 2017, Google Inc.,
+                     2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  Christiaan Baaij <christiaan.baaij@gmail.com>
 
@@ -20,9 +21,11 @@ where
 
 import           Control.DeepSeq                        (NFData)
 import           Data.Binary                            (Binary)
+import           Data.Char                              (isAlpha, isAlphaNum)
 import           Data.Function                          (on)
 import           Data.Hashable                          (Hashable (..))
 import           Data.Text                              (Text, append)
+import qualified Data.Text                              as Text
 import           GHC.BasicTypes.Extra                   ()
 import           GHC.Generics                           (Generic)
 import           GHC.SrcLoc.Extra                       ()
@@ -75,6 +78,15 @@ instance Uniquable (Name a) where
   setUnique nm u = nm {nameUniq=u}
 
 type OccName = Text
+
+-- | Whether text is a plain (Haskell) identifier, i.e., not an operator. These
+-- can be used as (part of) names in HDL.
+isIdentifierText :: Text -> Bool
+isIdentifierText t = case Text.uncons t of
+  Just (c, _) -> (isAlpha c || c == '_') && Text.all isIdChar t
+  Nothing -> False
+ where
+  isIdChar c = isAlphaNum c || c == '_' || c == '\''
 
 data NameSort
   = User
