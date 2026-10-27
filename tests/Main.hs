@@ -811,6 +811,7 @@ runClashTest t3105Env = defaultMain
         , runTest "T3439" def{hdlSim=[]}
         , runTest "T3461" def{hdlTargets=[VHDL], hdlSim=[], hdlLoad=[]}
         , runTest "T3460_void_projection" def
+        , runTest "T3495_iterateI_arg_type" def{hdlTargets=[Verilog]}
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
