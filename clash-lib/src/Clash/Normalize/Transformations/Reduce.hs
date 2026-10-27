@@ -43,12 +43,13 @@ import Clash.Core.Term
   ( CoreContext(..), LetBinding, PrimInfo(..), Term(..), TickInfo(..)
   , WorkInfo(..), collectArgs, collectArgsTicks, mkApps, mkTicks, mkTmApps)
 import Clash.Core.TyCon (TyCon(..), TyConMap, tyConDataCons)
-import Clash.Core.Type (Type, TypeView(..), mkTyConApp, splitFunForallTy, tyView, coreView)
+import Clash.Core.Type
+  (Type, TypeView(..), mkTyConApp, splitFunForallTy, tyView, coreView, normalizeType)
 import Clash.Core.Util (mkVec, shouldSplit, tyNatSize, mkInternalVar)
 import Clash.Core.VarEnv (extendInScopeSet)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Normalize.PrimitiveReductions
-import Clash.Normalize.Primitives (removedArg)
+import Clash.Normalize.Transformations.Specialize (zeroWidthTypeElem)
 import Clash.Normalize.Types (NormalizeSession)
 import Clash.Normalize.Util (shouldReduce)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
@@ -736,28 +737,34 @@ reduceSplitHandler ReducePrimContext{..}
   | (tmArgs,[nTy,mTy]) <- Either.partitionEithers primArguments
   = case (runExcept (tyNatSize tyConMap nTy), runExcept (tyNatSize tyConMap mTy), resultTypeView) of
       (Right n, Right m, TyConApp tupTcNm [lTy,rTy])
-        | n == 0 -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
+        -- XXX: This transformation is optimistic: it will return a defined value
+        --      even if the input is a bottom, if one of its results is zero width.
+        | n == 0
+        , Just zeroWidthR <- zeroWidthTypeElem tyConMap (normalizeType tyConMap rTy)
+        -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
             \(_kn :: Term) bvArg (_ctx :: TransformContext) -> do
               let tup = mkApps (Data tupDc)
                            [Right lTy
                            ,Right rTy
                            ,Left  bvArg
-                           ,Left  (TyApp (Prim removedArg) rTy)
+                           ,Left  zeroWidthR
                            ]
 
               (changed (mkTicks tup primTicks) :: NormalizeSession Term)
-        | m == 0 -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
+        | m == 0
+        , Just zeroWidthL <- zeroWidthTypeElem tyConMap (normalizeType tyConMap lTy)
+        -> abstractOverMissingArgs primTicks tmArgs termType transformContext $
             \(_kn :: Term) bvArg (_ctx :: TransformContext) -> do
               let tup = mkApps (Data tupDc)
                            [Right lTy
                            ,Right rTy
-                           ,Left  (TyApp (Prim removedArg) lTy)
+                           ,Left  zeroWidthL
                            ,Left  bvArg
                            ]
 
               (changed (mkTicks tup primTicks) :: NormalizeSession Term)
        where
-        tupDc = fromMaybe (error "reducePrim: faield to create tup DC") $ do
+        tupDc = fromMaybe (error "reducePrim: failed to create tup DC") $ do
                 tupTc <- UniqMap.lookup tupTcNm tyConMap
                 listToMaybe (tyConDataCons tupTc)
       _ -> return originalTerm
