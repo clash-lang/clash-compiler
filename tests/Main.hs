@@ -518,6 +518,8 @@ runClashTest t3105Env = defaultMain
         , runTest "T1556" def
         , runTest "T1591" def{hdlTargets=[VHDL], hdlSim=[]}
         , runTest "TagToEnum" def{hdlSim=[]}
+        , runTest "CaseDataToTag" def
+        , outputTest "CaseDataToTag" def{hdlTargets=[Verilog]}
         , runTest "TwoFunctions" def{hdlSim=[]}
         , runTest "XToError" def{hdlSim=[]}
         ]
@@ -833,6 +835,12 @@ runClashTest t3105Env = defaultMain
         , runTest "T967c" def{hdlSim=[]}
         , clashLibTest "T1041" def
         , clashLibTest "NameHint" def{hdlTargets=[VHDL,Verilog]}
+        , runTest "DerivedNames" def{hdlSim=[]}
+        , outputTest "DerivedNames" def
+        , runTest "StructFieldNames" def{hdlTargets=[SystemVerilog], hdlSim=[]}
+        , outputTest "StructFieldNames" def{hdlTargets=[SystemVerilog]}
+        , runTest "ConstructorComments" def{hdlSim=[]}
+        , outputTest "ConstructorComments" def
         ]
       , clashTestGroup "Netlist"
           [ clashLibTest "Identity" def

@@ -58,7 +58,7 @@ import           Clash.Annotations.BitRepresentation.Internal
 import           Clash.Core.DataCon               (DataCon (..))
 import           Clash.Core.HasType
 import           Clash.Core.Literal               (Literal (..))
-import           Clash.Core.Name                  (Name(..))
+import           Clash.Core.Name                  (Name(..), isIdentifierText)
 import           Clash.Core.Pretty                (showPpr)
 import           Clash.Core.Term
   (IsMultiPrim (..), PrimInfo (..), mpi_resultTypes,  Alt, Pat (..), Term (..),
@@ -983,9 +983,22 @@ mkProjection declType mkDec bndr scrut altTy alt@(pat,v) = do
                ++ "Not in normal form: Unexpected pattern in case-projection:\n\n"
                ++ showPpr e) Nothing)
       let extractExpr = Identifier (maybe altVarId (const selId) modifier) modifier
+          -- The record field the projection selects, if any
+          fieldLabel = case pat of
+            DataPat dc _ tms
+              | Just i <- elemIndex varTm tms
+              , (label:_) <- drop i (dcFieldLabels dc)
+              , isIdentifierText label
+              -> Just label
+            _ -> Nothing
       case bndr of
         NetlistId scrutNm _ | mkDec -> do
-          scrutNm' <- Id.next scrutNm
+          -- Name a signal holding a record field after the signal it's
+          -- projected out of and the field, e.g. @s_mode@ for the field
+          -- @mode@ of a signal @s@
+          scrutNm' <- case (modifier, fieldLabel) of
+            (Just _, Just label) -> Id.suffix selId label
+            _ -> Id.next scrutNm
           scrutDecl <- mkInit declType assignTy scrutNm' vHwTy extractExpr
           return (Identifier scrutNm' Nothing, scrutDecl ++ decls)
         MultiId {} -> error "mkProjection: MultiId"
