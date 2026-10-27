@@ -475,6 +475,7 @@ runClashTest = defaultMain
         , runTest "AppendZero" def
         , runTest "PopCountNoInteger"
             def{clashFlags=["-Werror=clash-dubious-primitive"]}
+        , clashLibTest "SplitZeroWidth" def{hdlTargets=[Verilog]}
         , runTest "PackGHCNums" def
         , runTest "UnpackGHCNums" def
         , runTest "GenericBitPack" def{clashFlags=["-fconstraint-solver-iterations=15"]}
