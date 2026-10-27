@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2015-2016, University of Twente,
                      2017-2018, Google Inc.,
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
                      2022     , Google Inc.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
@@ -208,7 +208,6 @@ instance Backend VerilogState where
   getMemoryDataFiles = use memoryDataFiles
   ifThenElseExpr _ = True
   aggressiveXOptBB = use aggressiveXOptBB_
-  renderEnums = pure (RenderEnums False)
   domainConfigurations = use domainConfigurations_
   setDomainConfigurations confs s = s {_domainConfigurations_ = confs}
 
