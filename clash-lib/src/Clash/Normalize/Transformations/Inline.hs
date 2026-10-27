@@ -78,13 +78,13 @@ import Clash.Core.Term
 import Clash.Core.TermInfo (isLocalVar, termSizeSmallerThan)
 import Clash.Core.Type
   (TypeView(..), isClassTy, isPolyFunCoreTy, tyView)
-import Clash.Core.Util (isSignalType, primUCo)
+import Clash.Core.Util (isSignalType, primUCo, renameIds)
 import Clash.Core.Var (Id, Var(..), isGlobalId, isLocalId)
 import Clash.Core.VarEnv
   ( InScopeSet, VarEnv, VarSet, elemUniqInScopeSet, elemVarEnv, elemVarSet
   , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
-  , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
-  , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet)
+  , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv, mkVarSet
+  , notElemVarSet, nullVarEnv, unionVarEnv, unionVarEnvWith, unitVarSet)
 import Clash.Debug (trace)
 import Clash.Driver.Types (Binding(..))
 import Clash.Primitives.Types
@@ -126,6 +126,14 @@ as they'd need to be.
 
 -- | Inline let-bindings when the RHS is either a local variable reference or
 -- is constant (except clock or reset generators)
+--
+-- Inlining a local variable reference loses the name of its binder, even when
+-- the user wrote it. For example, in @let b = a in ...@, where the user named
+-- both @a@ and @b@, only @a@ ends up in the HDL. The same goes for a parameter
+-- of an inlined function whose argument is a variable named by the user. We'd
+-- like to keep such aliases, so that the HDL shows both names, e.g.
+-- @assign b = a;@. However, keeping them would probably break constant
+-- propagation, such as for the reset values of registers.
 bindConstantVar :: Transformation
 bindConstantVar =
   toTransformation "bindConstantVar" (onLet 'bindConstantVarWorker)
@@ -134,11 +142,43 @@ bindConstantVar =
 bindConstantVarWorker
   :: HasCallStack
   => TransformContext -> Term -> Bind Term -> Term -> NormalizeSession Term
-bindConstantVarWorker = inlineBinders test
+bindConstantVarWorker ctx node bind body
+  | Term.Rec xes <- bind
+  , renames <- userAliasRenames xes
+  , not (nullVarEnv renames)
+  = do
+    -- See 'userAliasRenames'
+    let node1 = renameIds renames node
+    case node1 of
+      Let bind1 body1 -> changed =<< inlineBinders test ctx node1 bind1 body1
+      _ -> error "bindConstantVar: renaming changed the shape of a let-expression"
+  | otherwise
+  = inlineBinders test ctx node bind body
   where
+    TransformContext _ ctxFrames = ctx
+    -- Variables bound by let-expressions enclosing this one
+    enclosingLetBound = mkVarSet $ concat
+      [ ids
+      | frame <- ctxFrames
+      , ids <- case frame of
+          LetBinding _ siblings -> [siblings]
+          LetBody bs -> [map fst bs]
+          _ -> []
+      ]
+
     test _ (i,stripTicks -> e) = case isLocalVar e of
       -- Don't inline `let x = x in x`, it throws  us in an infinite loop
-      True -> return (i `notElemFreeVars` e)
+      True
+        -- Don't inline a user-named alias of a compiler-named variable bound
+        -- by an enclosing let-expression just yet: once 'flattenLet' has
+        -- merged the let-expressions, 'userAliasRenames' can give the variable
+        -- the user's name.
+        | Var v <- e
+        , nameSort (varName i) == User
+        , nameSort (varName v) /= User
+        , v `elemVarSet` enclosingLetBound
+        -> return False
+        | otherwise -> return (i `notElemFreeVars` e)
       _    -> do
         (fn,_) <- Lens.use curFun
         -- Don't inline globally recursive calls, it prevents the
@@ -155,6 +195,38 @@ bindConstantVarWorker = inlineBinders test
               n -> return (termSizeSmallerThan (n + 1) e)
             _ -> return False
 {-# SCC bindConstantVarWorker #-}
+
+-- | When 'bindConstantVar' inlines a user-named alias of a variable made up by
+-- the compiler, e.g. @dSCL@ in:
+--
+-- > letrec
+-- >   c$s_dSCL = register# ...
+-- >   dSCL = c$s_dSCL
+-- > in ...
+--
+-- the user's name would be lost. Instead, rename the variable to the user's
+-- name first, so that we end up with:
+--
+-- > letrec
+-- >   dSCL = register# ...
+-- > in ...
+--
+-- We only rename variables bound in the same let-expression, as those are the
+-- only binding sites we can see. When a variable has multiple user-named
+-- aliases, the first one determines its name.
+userAliasRenames :: [(Id, Term)] -> VarEnv Id
+userAliasRenames xes =
+  -- 'foldr', so that the first alias is inserted last and wins
+  List.foldr (uncurry extendVarEnv) emptyVarEnv
+  [ (v, v {varName = (varName v) {nameOcc = nameOcc (varName u), nameSort = User}})
+  | (u, stripTicks -> Var v) <- xes
+  , u /= v
+  , nameSort (varName u) == User
+  , nameSort (varName v) /= User
+  , v `elemVarSet` bound
+  ]
+ where
+  bound = mkVarSet (map fst xes)
 
 -- | Mark to track progress of 'reduceBindersCleanup'
 data Mark = Temp | Done | Rec

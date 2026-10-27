@@ -8,6 +8,7 @@ import qualified Clash.Tests.Core.FreeVars
 import qualified Clash.Tests.Core.StructuralEquivalence
 import qualified Clash.Tests.Core.Subst
 import qualified Clash.Tests.Core.TermLiteral
+import qualified Clash.Tests.Core.Util
 import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Normalize.Transformations
@@ -28,6 +29,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Core.StructuralEquivalence.tests
   , Clash.Tests.Core.Subst.tests
   , Clash.Tests.Core.TermLiteral.tests
+  , Clash.Tests.Core.Util.tests
   , Clash.Tests.Driver.Manifest.tests
   , Clash.Tests.Netlist.Id.tests
   , Clash.Tests.Normalize.Transformations.tests

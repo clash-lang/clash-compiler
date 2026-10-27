@@ -9,6 +9,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -22,6 +23,7 @@ module Clash.GHC.GHC2Core
   ( C2C
   , GHC2CoreState
   , GHC2CoreEnv (..)
+  , mkGHC2CoreEnv
   , srcSpan
   , tyConMap
   , coreToTerm
@@ -45,10 +47,11 @@ import           Data.Bifunctor              (second)
 import           GHC.Float                   (castDoubleToWord64, castFloatToWord32)
 import qualified Data.ByteString.Char8       as Char8
 import           Data.Char                   (isDigit)
+import qualified Data.IntMap.Strict          as IntMap
 import           Data.Hashable               (Hashable (..))
 import           Data.HashMap.Strict         (HashMap)
 import qualified Data.HashMap.Strict         as HashMap
-import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe)
+import           Data.Maybe                  (catMaybes,fromMaybe,listToMaybe,mapMaybe)
 import           Data.Text                   (Text, pack)
 import qualified Data.Text                   as Text
 import           Data.Text.Encoding          (decodeUtf8)
@@ -78,7 +81,7 @@ import GHC.Core
 #if MIN_VERSION_ghc(9,14,0)
    isTypeArg, isValArg,
 #endif
-   collectArgs, rhssOfAlts)
+   collectArgs, rhssOfAlts, rhssOfBind)
 import GHC.Types.Tickish (GenTickish (..))
 import GHC.Core.DataCon
   (DataCon, dataConExTyCoVars, dataConName,
@@ -119,6 +122,7 @@ import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
 import GHC.Types.Var
   (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
    varUnique, idInfo, isGlobalId)
+import GHC.Types.Var.Env (VarEnv, emptyVarEnv, extendVarEnvList, lookupVarEnv)
 import GHC.Types.Var.Set (isEmptyVarSet)
 
 -- Local imports
@@ -233,9 +237,15 @@ data GHC2CoreEnv
   = GHC2CoreEnv
   { _srcSpan :: SrcSpan
   , _famInstEnvs :: FamInstEnvs
+  , _nameOverrides :: VarEnv Text
+  -- ^ Names to use for local variables instead of the names GHC gave them. See
+  -- 'withPatternBindingNames'.
   }
 
 makeLenses ''GHC2CoreEnv
+
+mkGHC2CoreEnv :: SrcSpan -> FamInstEnvs -> GHC2CoreEnv
+mkGHC2CoreEnv sp fiEnvs = GHC2CoreEnv sp fiEnvs emptyVarEnv
 
 emptyGHC2CoreState :: GHC2CoreState
 emptyGHC2CoreState =
@@ -265,7 +275,7 @@ makeAllTyCons hm fiEnvs = go hm hm
         | otherwise                = tcm <> tcm'
       where
         (tcm,old', _) = RWS.runRWS (T.mapM makeTyCon (new ^. tyConMap))
-                                   (GHC2CoreEnv noSrcSpan fiEnvs)
+                                   (mkGHC2CoreEnv noSrcSpan fiEnvs)
                                    old
         tcm'          = go old' (old' & tyConMap %~ (`C.difference` (old ^. tyConMap)))
 
@@ -442,7 +452,7 @@ coreToTerm primMap unlocs = term
 #endif
       | (Var x,args) <- collectArgs e
       , let (nm, _) = RWS.evalRWS (qualifiedNameString (varName x))
-                                  (GHC2CoreEnv noSrcSpan emptyFamInstEnvs)
+                                  (mkGHC2CoreEnv noSrcSpan emptyFamInstEnvs)
                                   emptyGHC2CoreState
       = go nm args
       | otherwise
@@ -550,17 +560,17 @@ coreToTerm primMap unlocs = term
       | isTyVar x
       = C.TyLam <$> coreToTyVar x <*> addUsefull (getSrcSpan x) (term e)
       | otherwise
-      = do
+      = withPatternBindingNames [x] [e] $ do
         (e',sp) <- termSP (getSrcSpan x) e
         x' <- coreToIdSP sp x
         return (C.Lam  x' e')
-    term' (Let (NonRec x e1) e2)  = do
+    term' (Let (NonRec x e1) e2)  = withPatternBindingNames [x] [e2] $ do
       (e1',sp) <- termSP (getSrcSpan x) e1
       x'  <- coreToIdSP sp x
       e2' <- term e2
       return (C.Let (C.NonRec x' e1') e2')
 
-    term' (Let (Rec xes) e) = do
+    term' (Let (Rec xes) e) = withPatternBindingNames (map fst xes) (e : map snd xes) $ do
       xes' <- mapM go xes
       e'   <- term e
       return (C.Let (C.Rec xes') e')
@@ -1119,7 +1129,89 @@ coreToId i = do
 
 coreToVar :: Var
           -> C2C (C.Name a)
-coreToVar = coreToName varName varUnique qualifiedNameStringM
+coreToVar v = do
+  nm <- coreToName varName varUnique qualifiedNameStringM v
+  overrides <- view nameOverrides
+  pure $ case lookupVarEnv overrides v of
+    Just occ -> nm { C.nameOcc = occ }
+    Nothing -> nm
+
+-- | GHC desugars a pattern binding such as @(nextState, txLine) = rhs@ to a
+-- binder named @ds@ (or @ds1@, ...) for @rhs@, which it takes apart with case
+-- expressions like @case ds of (nextState, txLine) -> nextState@ where needed.
+-- The same goes for function arguments that are patterns. Run a translation
+-- with such binders named after the variables of the pattern instead, e.g.
+-- @nextState_txLine@, so that the HDL shows which values the signal holds.
+--
+-- The binders keep their 'C.System' name sort, so Clash inlines them just like
+-- before. The pattern might come from a library function inlined by GHC (e.g.
+-- @(s', o)@ in 'Clash.Prelude.mealy'), so the names aren't necessarily the
+-- user's.
+withPatternBindingNames ::
+  -- | Binders
+  [Var] ->
+  -- | Expressions in the scope of the binders
+  [CoreExpr] ->
+  C2C a ->
+  C2C a
+withPatternBindingNames bndrs scope =
+  RWS.local (nameOverrides %~ (`extendVarEnvList` renames))
+ where
+  renames =
+    [ (b, nm)
+    | b <- bndrs
+    , isSysX ["ds"] (pack (occNameString (nameOccName (varName b))))
+    , Just nm <- [patternBindingName b scope]
+    ]
+
+-- | Name for a binder based on the user-written names of the pattern variables
+-- of case expressions that take it apart. See 'withPatternBindingNames'.
+patternBindingName :: Var -> [CoreExpr] -> Maybe Text
+patternBindingName x scope =
+  case IntMap.elems (IntMap.fromListWith (\_new old -> old) (concatMap go scope)) of
+    [] -> Nothing
+    names -> Just (Text.intercalate "_" names)
+ where
+  go :: CoreExpr -> [(Int, Text)]
+  go = \case
+    Case scrut _ _ alts
+      | isScrutinee scrut
+      , [Alt (DataAlt _) bs rhs] <- alts
+      -> [ (i, nm)
+         | (i, b) <- zip [0..] (filter (not . isTyVar) bs)
+         , let nm = pack (occNameString (nameOccName (varName b)))
+         , not (isGhcSystemName nm)
+         ] <> go rhs
+      | otherwise -> go scrut <> concat [go rhs | Alt _ _ rhs <- alts]
+    App f a -> go f <> go a
+    Lam _ e -> go e
+    Let b e -> concatMap go (rhssOfBind b) <> go e
+    Cast e _ -> go e
+    Tick _ e -> go e
+    _ -> []
+
+  isScrutinee = \case
+    Var v -> v == x
+    Cast e _ -> isScrutinee e
+    Tick _ e -> isScrutinee e
+    _ -> False
+
+-- | Does a name consist of one of the given prefixes, optionally followed by a
+-- number? That's how GHC names variables it made up, e.g. @ds@, @ds1@, @ds2@.
+isSysX :: [Text] -> Text -> Bool
+isSysX prefixes nm =
+  case stripAnyPrefix of
+    Just suffix | Text.all isDigit suffix -> True
+    _ -> False
+ where
+  stripAnyPrefix = listToMaybe (mapMaybe (`Text.stripPrefix` nm) prefixes)
+
+-- | Is it a name GHC made up, e.g. one of [ds,ds1,ds2,..] or [eta,eta1,..]?
+--
+-- XXX: GHC tracks these as system names, but tidying turns them into ordinary
+-- internal names, so we have to recognize them by their spelling.
+isGhcSystemName :: Text -> Bool
+isGhcSystemName = isSysX ["ds", "eta", "wild", "lvl", "sat"]
 
 -- | Convert the type of a variable, memoized on the variable's name.
 --
@@ -1147,9 +1239,7 @@ coreToName toName toUnique toString v = do
   ns <- toString (toName v)
   let key  = fromGhcUnique (toUnique v)
       locI = getSrcSpan (toName v)
-      -- Is it one of [ds,ds1,ds2,..]
-      isDSX = maybe False (maybe True (isDigit . fst) . Text.uncons) . Text.stripPrefix "ds"
-      sort | isDSX ns || Text.isPrefixOf "$" ns
+      sort | isGhcSystemName ns || Text.isPrefixOf "$" ns
            = C.System
            | otherwise
            = C.User

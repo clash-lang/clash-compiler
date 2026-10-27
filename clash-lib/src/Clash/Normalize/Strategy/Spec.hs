@@ -110,6 +110,7 @@ constantPropagationSpec =
       , caseLet
       , caseCase
       , caseCon
+      , caseDataToTag
       , elimExistentials
       , caseEliminateNonReachable
       , removeUnusedExpr
