@@ -293,6 +293,7 @@ Library
                       Clash.Primitives.GHC.Word
                       Clash.Primitives.Intel.ClockGen
                       Clash.Primitives.Magic
+                      Clash.Primitives.Sized.BitVector
                       Clash.Primitives.Sized.ToInteger
                       Clash.Primitives.Sized.Signed
                       Clash.Primitives.Sized.Vector

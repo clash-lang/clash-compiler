@@ -243,6 +243,7 @@ constantArgs nm (BlackBoxHaskell{}) = Set.fromList fromIntForce
     -- primitives under index_int are fully unrolled.
   fromIntForce
     | nm == "Clash.Sized.Vector.index_int"                 = [2]
+    | nm == "Clash.Sized.BitVector.index#"                 = [2]
     | otherwise = []
 constantArgs _ _ = Set.empty
 

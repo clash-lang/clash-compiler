@@ -239,6 +239,7 @@ foldTF' bbCtx@(bbInputs -> [_f, (vec, vecType@(Vector n aTy), _isLiteral)]) = do
 foldTF' args =
   error $ "Unexpected number of arguments: " ++ show (length (bbInputs args))
 
+-- index_int :: KnownNat n => Vec n a -> Int -> a
 indexIntVerilog ::  BlackBoxFunction
 indexIntVerilog _isD _primName args _ty = return bb
  where
