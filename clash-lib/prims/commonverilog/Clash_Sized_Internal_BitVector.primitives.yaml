@@ -178,15 +178,10 @@
       m => BitVector n -> BitVector m -> BitVector (n + m)'
     template: ~IF~AND[~SIZE[~TYP[1]],~SIZE[~TYP[2]]]~THEN{~ARG[1],~ARG[2]}~ELSE~IF~SIZE[~TYP[1]]~THEN~ARG[1]~ELSE~ARG[2]~FI~FI
     workInfo: Never
-- BlackBox:
+- BlackBoxHaskell:
     name: Clash.Sized.Internal.BitVector.index#
-    kind: Expression
-    type: |-
-      index# :: KnownNat n  -- ARG[0]
-              => BitVector n -- ARG[1]
-              -> Int         -- ARG[2]
-              -> Bit
-    template: ~VAR[bv][1][~ARG[2]]
+    type: 'index# :: KnownNat n => BitVector n -> Int -> Bit'
+    templateFunction: Clash.Primitives.Sized.BitVector.indexBitVectorCV
 - BlackBox:
     name: Clash.Sized.Internal.BitVector.slice#
     kind: Expression
