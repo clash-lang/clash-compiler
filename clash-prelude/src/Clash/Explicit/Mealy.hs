@@ -3,8 +3,9 @@
                     2017     , Google Inc.
                     2019     , Myrtle Software Ltd
                     2023     , Alex Mason
+                    2026     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Whereas the output of a Moore machine depends on the /previous state/, the
   output of a Mealy machine depends on /current transition/.
@@ -139,7 +140,7 @@ mealy
   -> Enable dom
   -- ^ Global enable
   -> (s -> i -> (s,o))
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -- ^ Transition function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
   -- ^ Initial state
   -> (Signal dom i -> Signal dom o)
@@ -197,7 +198,7 @@ mealyS
   -> Enable dom
   -- ^ Global enable
   -> (i -> State s o)
-  -- ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
+  -- ^ Transition function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
   -> s
   -- ^ Initial state
   -> (Signal dom i -> Signal dom o)
@@ -244,7 +245,7 @@ mealyB
   -> Reset dom
   -> Enable dom
   -> (s -> i -> (s,o))
-  -- ^ Transfer function in mealy machine form: @state -> input -> (newstate,output)@
+  -- ^ Transition function in mealy machine form: @state -> input -> (newstate,output)@
   -> s
   -- ^ Initial state
   -> (Unbundled dom i -> Unbundled dom o)
@@ -264,7 +265,7 @@ mealySB
   -> Reset dom
   -> Enable dom
   -> (i -> State s o)
-  -- ^ Transfer function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
+  -- ^ Transition function in mealy machine handling inputs using @Control.Monad.Strict.State s@.
   -> s
   -- ^ Initial state
   -> (Unbundled dom i -> Unbundled dom o)
