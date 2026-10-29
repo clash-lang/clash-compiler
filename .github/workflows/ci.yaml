@@ -756,7 +756,7 @@ jobs:
     runs-on: ubuntu-slim
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: clash-lang/all-jobs-ok@26ea496e5a73cf53bee713b734bd2a31b1beac50  # v2.0.2
+      - uses: clash-lang/all-jobs-ok@c34d9724b5d6688f88775c3f8883ce893c9f3dd1  # v2.0.3
         with:
           needs: ${{ toJSON(needs) }}
           exclude: |
