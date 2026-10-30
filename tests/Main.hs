@@ -206,6 +206,18 @@ defaultTimeout :: Timeout -> Timeout
 defaultTimeout NoTimeout = mkTimeout (5 * 60 * 1000000) -- 5 minutes
 defaultTimeout userSet = userSet
 
+-- | Synthesis checks for a 1024x32 RAM: it should fit in a single block RAM,
+-- which also absorbs the output registers.
+blockRamSynth :: [Synth]
+blockRamSynth =
+  [ VivadoSynth [("RAMB36E1", 1), ("FD*", 0)]
+  , YosysSynth [("RAMB36E1", 1), ("FD*", 0)]
+  , QuartusSynth
+      [ ("Total block memory bits", 32768)
+      , ("Dedicated logic registers", 0)
+      ]
+  ]
+
 runClashTest :: [(String, String)] -> IO ()
 runClashTest t3105Env = defaultMain
   $ adjustOption defaultTimeout
@@ -615,6 +627,11 @@ runClashTest t3105Env = defaultMain
                          , hdlSim = hdlSim def \\ [Vivado]
                          }
           in runTest "DDRin" _opts
+        , let _opts = def{ buildTargets = BuildSpecific [ "testBenchVec"
+                                                        , "testBenchTree"
+                                                        ]
+                         }
+          in runTest "DDRinVec" _opts
 
           -- XXX: `ddrOut` contains a number of (implicit) parallel, coinciding
           --      processes. Execution for these processes is left undefined in
@@ -961,6 +978,34 @@ runClashTest t3105Env = defaultMain
         , runTest "BlockRam1" def
         , clashTestGroup "BlockRam"
           [ runTest "Blob" def
+          , runTest "ReadEnable" def
+          , runTest "VecPayload" def
+          , runTest "Inference" def
+              { hdlSim=[]
+              , hdlLoad=[]
+              , hdlSynth=blockRamSynth
+              , buildTargets=BuildSpecific
+                  [ "blockRamBV"
+                  , "blockRamUBV"
+                  , "blockRam1BV"
+                  , "trueDualPortBlockRamBV"
+                  , "trueDualPortBlockRamSingleClockBV"
+                  ]
+              }
+          , runTest "InferenceVec" def
+              { hdlSim=[]
+              , hdlLoad=[]
+              , hdlSynth=blockRamSynth
+              , buildTargets=BuildSpecific
+                  [ "blockRamUVec"
+                  , "blockRamUTree"
+                  , "blockRam1Vec"
+                  , "blockRam1Tree"
+                  , "trueDualPortBlockRamVec"
+                  , "trueDualPortBlockRamTree"
+                  , "trueDualPortBlockRamSingleClockVec"
+                  ]
+              }
           ]
         , runTest "AndEnable" def
         , runTest "Ram" def
@@ -984,8 +1029,8 @@ runClashTest t3105Env = defaultMain
         , runTest "Compression" def
         , runTest "DelayedReset" def
         , let _opts = def{ -- Vivado segfaults
-                           hdlLoad=hdlLoad def \\ [Verilator, Vivado]
-                         , hdlSim=hdlSim def \\ [Verilator, Vivado]
+                           hdlLoad=hdlLoad def \\ [Vivado]
+                         , hdlSim=hdlSim def \\ [Vivado]
                          , buildTargets=BuildSpecific [ "testBenchAB"
                                                       , "testBenchBC"]
                          }
@@ -1045,6 +1090,7 @@ runClashTest t3105Env = defaultMain
         , runTest "T2069" def
         , runTest "T3432" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "T3434" def
+        , runTest "T3488" def
         , clashTestGroup "BiSignal"
           [ runTest "Counter" def
           , runTest "CounterHalfTuple" def
@@ -1302,6 +1348,8 @@ autoDetectTools =
   , ("--no-ghdl",       ["ghdl"])
   , ("--no-symbiyosys", ["sby"])
   , ("--no-iverilog",   ["iverilog"])
+  , ("--no-yosys",      ["yosys"])
+  , ("--no-quartus",    ["quartus_syn"])
   ]
 
 -- | Replace @--auto-detect-tools@ in the argument list with @--no-*@ flags for
