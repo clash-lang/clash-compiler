@@ -54,7 +54,7 @@ import Clash.Core.VarEnv (InScopeSet, extendInScopeSet, extendInScopeSetList, mk
 import Clash.Netlist.Util (bindsExistentials)
 import Clash.Normalize.Transformations.Specialize (specialize)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
-import Clash.Rewrite.Combinators (bottomupR)
+import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.StrategyDSL (Transformation, onApp, toTransformation)
 import Clash.Rewrite.Types
   (Transform, TransformContext(..), tcCache)
@@ -163,7 +163,7 @@ makeANF ctx@(TransformContext is0 _) e0 = do
     -- See also Note [ANF InScopeSet]
     let (is2,e1) = freshenTm is0 e0
     ((e2,(bndrs,_)),Monoid.getAny -> hasChanged) <-
-      listen (runStateT (bottomupR collectANF ctx e1) ([],is2))
+      listen (runStateT (go ctx e1) ([],is2))
     case bndrs of
       [] -> if hasChanged then return e2 else return e0
       _  -> do
@@ -171,6 +171,16 @@ makeANF ctx@(TransformContext is0 _) e0 = do
             (srcTicks,nmTicks) = partitionTicks ticks
         -- Ensure that `AppendName` ticks still scope over the entire expression
         changed (mkTicks (Letrec bndrs (mkTicks e3 srcTicks)) nmTicks)
+  where
+    -- All collected bindings are placed outside the traversed expression.
+    -- A nested lambda's parameters would not be in scope there, so leave its
+    -- body alone. 'nonRepANF' specializes lambdas used by primitives and data
+    -- constructors, but lambdas passed to ordinary functions can remain.
+    -- Leading term lambdas are handled separately by 'makeANF' above.
+    go :: HasCallStack => NormRewriteW
+    go _ e@(Lam {}) = return e
+    go _ e@(TyLam {}) = return e
+    go c e = allR go c e >>= collectANF c
 {-# SCC makeANF #-}
 
 type NormRewriteW = Transform (StateT ([LetBinding],InScopeSet) NormalizeSession)

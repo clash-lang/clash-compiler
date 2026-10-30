@@ -345,7 +345,12 @@ runClashTest t3105Env = defaultMain
           }
         ]
       , clashTestGroup "TopEntity"
-        [ runTest "T1033" def{
+        [ runTest "ANFNestedLambda" def{
+            hdlTargets=[Verilog]
+          , clashFlags=["-fclash-debug-invariants"]
+          , expectClashFail=Just (def, "Can't translate non-tycon type")
+          }
+        , runTest "T1033" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "PortProduct \"wrong\" []")
           }
