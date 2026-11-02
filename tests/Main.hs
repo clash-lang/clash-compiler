@@ -345,7 +345,11 @@ runClashTest t3105Env = defaultMain
           }
         ]
       , clashTestGroup "TopEntity"
-        [ runTest "T1033" def{
+        [ runTest "FunctionArgument" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Clash cannot translate function arguments of top entities")
+          }
+        , runTest "T1033" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "PortProduct \"wrong\" []")
           }

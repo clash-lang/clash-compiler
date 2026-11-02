@@ -20,11 +20,11 @@ module Clash.Normalize where
 
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
-import           Control.Monad                    ((>=>), when)
+import           Control.Monad                    ((>=>), forM_, when)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
-import           Data.Either                      (lefts,partitionEithers)
+import           Data.Either                      (lefts,partitionEithers,rights)
 import qualified Data.IntMap                      as IntMap
 import qualified Data.IORef                       as IORef
 import           Clash.Data.UniqMap               (UniqMap)
@@ -65,7 +65,7 @@ import           Clash.Core.Term
 import           Clash.Core.Type                  (Type, splitCoreFunForallTy)
 import           Clash.Core.Util                  (renameIds)
 import           Clash.Core.TyCon (TyConMap)
-import           Clash.Core.Type                  (isPolyTy)
+import           Clash.Core.Type                  (isFunTy, isPolyTy)
 import           Clash.Core.Var                   (Id, Var (..), isLocalId)
 import           Clash.Core.VarEnv
   (VarEnv, elemVarEnv, elemVarSet, eltsVarEnv, emptyInScopeSet, emptyVarEnv,
@@ -202,10 +202,26 @@ normalize' nm = do
                          |]
         in throw (ClashException sp msg msgExtra)
 
-      -- check for unrepresentable result type
       let (args,resTy) = splitCoreFunForallTy tcm ty1
           isTopEnt = nm `elemVarSet` topEnts
           isFunction = not $ null $ lefts args
+
+      -- check for function arguments of top entities
+      when isTopEnt $ forM_ (rights args) $ \argTy ->
+        when (isFunTy tcm argTy) $
+          let msg = $curLoc ++ [i|
+                Clash cannot translate function arguments of top entities, but
+                this top entity has an argument of type:
+
+                  #{showPpr' def{displayUniques=False\} argTy}
+
+                Top entity:
+
+                  #{showPpr' def{displayUniques=False\} nm'}
+                |]
+          in throw (ClashException sp msg Nothing)
+
+      -- check for unrepresentable result type
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
