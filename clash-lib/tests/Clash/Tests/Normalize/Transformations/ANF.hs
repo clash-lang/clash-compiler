@@ -21,7 +21,7 @@ import Clash.Core.Name (NameSort (User), noSrcSpan)
 import Clash.Core.Term
   ( Bind (..), IsMultiPrim (SingleResult), PrimInfo (..)
   , PrimUnfolding (NoUnfolding), Term (..), WorkInfo (WorkVariable), mkApps )
-import Clash.Core.Type (mkFunTy)
+import Clash.Core.Type (Type (..), mkFunTy)
 import Clash.Core.Var (Id, Var (varUniq))
 import Clash.Core.VarEnv (emptyInScopeSet)
 import Clash.Normalize.Transformations.ANF (makeANF, nonRepANF)
@@ -33,10 +33,9 @@ import Clash.Unique (Unique)
 import Clash.Util.Supply (Supply, newSupply)
 
 import Test.Clash.Rewrite
-  ( assertAlphaEq, assertNoFreeLocals, assertNoShadowing, globalId, inScopeOf
-  , intFunTy, intId
-  , intLit, intTy, letBinders, mkDataCon, parseTyConTy, runSingleTransformation
-  , showPprU )
+  ( assertAlphaEq, assertErrorContainsIO, assertNoFreeLocals, assertNoShadowing
+  , globalId, inScopeOf, intFunTy, intId, intLit, intTy, letBinders, mkDataCon
+  , parseTyConTy, runSingleTransformation, showPprU, tyVar )
 
 nonRepANFR :: NormRewrite
 nonRepANFR = $(asRewriteQ nonRepANF)
@@ -144,6 +143,27 @@ anfDoesNotLiftOutOfLambdas = do
   runSingleTransformation def st emptyInScopeSet (nonRepANFR >-> makeANF) tm
     >>= assertNoFreeLocals
 
+-- | Bindings collected from the body of a lambda would end up outside of the
+-- scope of its binder. Normalization should have removed all lambdas, other
+-- than the leading ones, before ANF runs, so ANF rejects them. This runs ANF
+-- on @p arg@, for a global function @p@.
+anfRejectsNestedLambda :: Type -> Term -> Assertion
+anfRejectsNestedLambda argTy arg =
+  assertErrorContainsIO "ANF encountered a nested lambda" $
+    runSingleTransformation def def emptyInScopeSet makeANF (App (Var p) arg)
+ where
+  p = globalId User "p" 99 (mkFunTy argTy intTy)
+
+-- | @\\z -> h z@
+nestedLam :: Term
+nestedLam = Lam z (App (Var hId) (Var z))
+ where
+  z = intId User "z" 71
+
+-- | @/\\a -> 1@
+nestedTyLam :: Term
+nestedTyLam = TyLam (tyVar User "a" 72) (intLit 1)
+
 tests :: TestTree
 tests =
   testGroup
@@ -158,4 +178,8 @@ tests =
         anfDoesNotDuplicateBinders
     , testCase "ANF does not lift expressions out of lambdas"
         anfDoesNotLiftOutOfLambdas
+    , testCase "ANF rejects nested lambdas"
+        (anfRejectsNestedLambda (intFunTy 1) nestedLam)
+    , testCase "ANF rejects nested type lambdas"
+        (anfRejectsNestedLambda (ForAllTy (tyVar User "a" 72) intTy) nestedTyLam)
     ]
