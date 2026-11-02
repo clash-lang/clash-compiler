@@ -41,6 +41,7 @@ import Clash.Core.DataCon (DataCon(..))
 import Clash.Core.HasFreeVars (disjointFreeVars)
 import Clash.Core.HasType
 import Clash.Core.Name (mkUnsafeSystemName, nameOcc)
+import Clash.Core.Pretty (showPpr)
 import Clash.Core.Subst (deshadowLetExpr, freshenTm)
 import Clash.Core.Term
   ( Alt, CoreContext(..), LetBinding, Pat(..), PrimInfo(..), Term(..)
@@ -397,8 +398,20 @@ collectANF ctx (Case subj ty alts) = do
       -- See also Note [ANF InScopeSet]
       return (pId,patExpr)
 
+-- 'makeANF' strips leading lambdas, and normalization specializes or inlines
+-- all other lambdas before ANF runs. The bindings collected from the body of a
+-- lambda would end up outside of the scope of its binder, so encountering one
+-- here means a precondition of ANF was violated.
+collectANF _ e@(Lam {}) = error $ $(curLoc) ++ nestedLambdaMsg e
+collectANF _ e@(TyLam {}) = error $ $(curLoc) ++ nestedLambdaMsg e
+
 collectANF _ e = return e
 {-# SCC collectANF #-}
+
+nestedLambdaMsg :: Term -> String
+nestedLambdaMsg e =
+  "Internal error: ANF encountered a nested lambda. Please report this as an "
+  ++ "issue.\n\nLambda:\n\n" ++ showPpr e
 
 -- | Bring an application of a DataCon or Primitive in ANF, when the argument is
 -- is considered non-representable
