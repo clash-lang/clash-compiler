@@ -796,6 +796,7 @@ runClashTest t3105Env = defaultMain
         , runTest "T3218" def{hdlTargets=[VHDL], hdlSim=[]}
         , outputTest "T3232" def{hdlTargets=[Verilog], hdlSim=[]}
         , outputTest "T3224" def{hdlTargets=[VHDL], hdlSim=[], hdlLoad=[]}
+        , outputTest "T3515_top_level_float" def{hdlTargets=[Verilog], hdlSim=[], hdlLoad=[]}
         , runTest "T3234" def
             { hdlTargets=[Verilog]
             , hdlLoad=[IVerilog]
