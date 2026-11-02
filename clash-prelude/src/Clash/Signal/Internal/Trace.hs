@@ -599,7 +599,7 @@ toTrace sig = Trace
   unsafeToTup (BV mask value) = (mask, value)
 
 -- | Create a 'Signal' from a 'Trace'.
--- This only checks whether the type is correct.
+-- This checks whether the type is compatible. See also @compatible@.
 fromTrace ::
   forall dom a.
   Traceable a =>
