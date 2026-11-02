@@ -454,7 +454,14 @@ inlineCleanupWorker (TransformContext is0 _) _node (bindToList -> binds) body = 
             -> True
             | otherwise
             -> primName pInfo `elem` ["Clash.Explicit.SimIO.bindSimIO#"]
-          Case _ _ [_] -> True
+          -- Projections out of a variable are work-free, so duplicating them
+          -- is fine. Other subjects might do work, e.g. instantiate a
+          -- component, so only inline those if they are used once.
+          Case (stripTicks -> Var _) _ [_] -> True
+          Case _ _ [_]
+            | Just occ <- lookupVarEnv id_ allOccs
+            , occ < 2
+            -> True
           Data _ -> True
           Case _ aTy (_:_:_)
             | TyConApp nm _ <- tyView aTy
