@@ -110,7 +110,7 @@ all2 _ _ _ = False
 countEq
   :: Eq a
   => a
-  --  ^ Needle
+  -- ^ Needle
   -> [a]
   -- ^ Haystack
   -> Int

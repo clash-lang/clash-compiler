@@ -2,8 +2,9 @@
   Copyright  :  (C) 2013-2016, University of Twente,
                     2017     , Google Inc.
                     2019     , Myrtle Software Ltd
+                    2026     , QBayLogic B.V.
   License    :  BSD2 (see the file LICENSE)
-  Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+  Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
   Whereas the output of a Mealy machine depends on /current transition/, the
   output of a Moore machine depends on the /previous state/.
@@ -85,7 +86,7 @@ moore
   -> Reset dom
   -> Enable dom
   -> (s -> i -> s)
-  -- ^ Transfer function in moore machine form: @state -> input -> newstate@
+  -- ^ Transition function in moore machine form: @state -> input -> newstate@
   -> (s -> o)
   -- ^ Output function in moore machine form: @state -> output@
   -> s
@@ -149,7 +150,7 @@ mooreB
   -> Reset dom
   -> Enable dom
   -> (s -> i -> s)
-  -- ^ Transfer function in moore machine form:
+  -- ^ Transition function in moore machine form:
   -- @state -> input -> newstate@
   -> (s -> o)
   -- ^ Output function in moore machine form:

@@ -2,7 +2,7 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2017     , Google Inc.
                   2019     , Myrtle Software Ltd,
-                  2021-2022, QBayLogic B.V.
+                  2021-2026, QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -244,13 +244,13 @@ riseEvery
   -> Enable dom
   -> SNat n
   -> Signal dom Bool
-riseEvery clk rst en SNat = moore clk rst en transfer output 0 (pure ())
+riseEvery clk rst en SNat = moore clk rst en trans output 0 (pure ())
   where
     output :: Index n -> Bool
     output = (== maxBound)
 
-    transfer :: Index n -> () -> Index n
-    transfer s _ = if (s == maxBound) then 0 else s+1
+    trans :: Index n -> () -> Index n
+    trans s _ = if (s == maxBound) then 0 else s+1
 {-# INLINEABLE riseEvery #-}
 
 -- | Oscillate a @'Bool'@ for a given number of cycles, given the starting state.
@@ -264,10 +264,10 @@ oscillate
   -> SNat n
   -> Signal dom Bool
 oscillate clk rst en begin SNat =
-  moore clk rst en transfer snd (0, begin) (pure ())
+  moore clk rst en trans snd (0, begin) (pure ())
  where
-  transfer :: (Index n, Bool) -> () -> (Index n, Bool)
-  transfer (s, i) _ =
+  trans :: (Index n, Bool) -> () -> (Index n, Bool)
+  trans (s, i) _ =
     if s == maxBound
       then (0,   not i) -- reset state and oscillate output
       else (s+1, i)     -- hold current output

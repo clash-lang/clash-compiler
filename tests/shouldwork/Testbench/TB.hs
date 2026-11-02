@@ -13,10 +13,10 @@ topEntity
   -> Reset System
   -> Enable System
   -> Signal System Inp -> Signal System Outp
-topEntity = exposeClockResetEnable (transfer `mealy` initS)
+topEntity = exposeClockResetEnable (trans `mealy` initS)
 {-# OPAQUE topEntity #-}
 
-transfer s i = (i,o)
+trans s i = (i,o)
   where
     o = snd s
 
