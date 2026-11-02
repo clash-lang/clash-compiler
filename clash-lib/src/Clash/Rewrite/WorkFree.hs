@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2020-2021, QBayLogic B.V.
+Copyright   : (C) 2020-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qaylogic.com>
 
@@ -129,6 +129,8 @@ isWorkFree cache bndrs = go True
 isConstant :: Term -> Bool
 isConstant e = case collectArgs e of
   (Data _, args)   -> all (either isConstant (const True)) args
+  (Prim (PrimInfo{primWorkInfo=WorkAlways}), _) -> False
+  (Prim (PrimInfo{primWorkInfo=WorkConstant}), _) -> True
   (Prim _, args) -> all (either isConstant (const True)) args
   (Lam _ _, _)     -> isClosed e
   (Literal _,_)    -> True
