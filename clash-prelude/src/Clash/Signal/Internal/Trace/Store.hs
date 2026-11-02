@@ -249,7 +249,7 @@ loadHeader bs = do
   let (header0,_) = B.span (/=0) bs
   eitherDecode header0
 
--- | Read the file but do not finalize the trace yet
+-- | Read the file but do not finalize the trace yet.
 loadTrace0 ::
   ByteString ->
   Either String (FileHeader,[Value])
@@ -350,6 +350,7 @@ loads bs sim = do
   foldM (\s (n,t) -> addTrace n t s) sim traces
 
 -- | Load a 'Signal' from binary form.
+-- See also @compatible@.
 loadSignal ::
   forall a dom.
   KnownDomain dom =>
@@ -361,6 +362,7 @@ loadSignal bs = do
   fromTrace trc
 
 -- | Load multiple 'Signal's from binary form.
+-- See also @compatible@.
 loadSignals ::
   forall a dom.
   KnownDomain dom =>

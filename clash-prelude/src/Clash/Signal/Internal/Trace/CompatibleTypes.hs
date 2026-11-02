@@ -39,6 +39,7 @@ module Clash.Signal.Internal.Trace.CompatibleTypes (
 ) where
 
 import Data.List (stripPrefix)
+import Data.Maybe (fromMaybe)
 import Language.Haskell.TH.Syntax
 import Language.Haskell.TH.Lib
 
@@ -61,32 +62,46 @@ pattern SYMBOL_BASE = $(litP $ StringL $ init .init $ simpleTyConName @""     )
 -- | Check whether two data types are compatible.
 -- This occurs when both types are the same,
 -- or when they have a compatible tuple/anonymous record structure.
--- For example, @(a,(b,c)) ~ (a,b,c) ~ (a,(b,(c,()))) ~ (L a :&: L b :&: L c)@.
--- Records must have the same field labels.
+--
+-- The following rules apply:
+-- * Nested tuple structure are flattened.
+-- * Unit types ('()') are removed.
+-- * Labeled unit types are also removed (including structures that reduce to unit).
+-- * Two labels must have the same field name, but labeled data can match unlabeled data.
+--
+-- For example:
+-- * @(a,(b,c),())@ is compatible with @((a,b),c)@.
+-- * @(a:=x :&: b:=() :&: c:=y)@ is compatible with @(x,y)@ or even @(x,c:=y)@.
+-- * @"a":=x@ and @"_a":=x@ are not compatible.
+--
+-- This function is aimed at marking types with the same @BitPack@ structure.
+-- Custom bit packings of tuples/anonymous records may result in erroneous compatibility approval.
 compatible :: DataType -> DataType -> Bool
-compatible (DT a     ra   ) (DT b     rb    ) | a == b
-                                              = and $ zipWith compatible ra rb
-compatible (DT LABEL _    ) (DT LABEL _     ) = False -- cut off before removing labels
-compatible (DT TUP2 [a,b] ) (DT TUP2 [c,d]  ) = compatible a c && compatible b d
-compatible x0               y0                = compatible0 x0 y0 || compatible0 y0 x0
-                                                -- ^ asymmetric reductions
+compatible (DT a     ra   ) (DT b     rb   ) | a == b
+                                             = and $ zipWith compatible ra rb
+compatible (DT LABEL _    ) (DT LABEL _    ) = False -- Different labels.
+compatible (DT LABEL [_,a]) b                = compatible a b -- If only one side has a label,
+compatible a                (DT LABEL [_,b]) = compatible a b -- ignore it.
+compatible a                b = case (flattenDTM a, flattenDTM b) of
+  (Nothing, Nothing) -> False -- Nothing changed by flattening
+  (a0, b0) -> compatibles (fromMaybe [a] a0) (fromMaybe [b] b0)
  where
-  -- a:&:b ~ (a,b)
-  compatible0 (DT JOIN [a,b] ) y = compatible (DT TUP2 [a,b]) y
-  -- (a,()) ~ a
-  compatible0 (DT TUP2 [a,DT UNIT []]) b = compatible a b
-  -- (a,b,c,d) ~ (a,(b,c,d))
-  compatible0 (DT tup (a0:args)) y | Just n0 <- stripPrefix TUP_BASE tup
-                                   , n <- read n0
-                                   , n>2 =
-    let tupSmaller = TUP_BASE <> show (n - 1 :: Int)
-    in compatible (DT TUP2 [a0, DT tupSmaller args]) y
+  flattenDTM :: DataType -> Maybe [DataType]
+  flattenDTM (DT JOIN [a,b] ) = Just (flattenDT a <> flattenDT b)
+  flattenDTM (DT tup args   ) | Just n <- stripPrefix TUP_BASE tup
+                              = Just (concatMap flattenDT args)
+  flattenDTM (DT UNIT _     ) = Just [] -- Removed unit types (0-tuples)
+  flattenDTM (DT LABEL [_,a]) = case flattenDT a of
+                                 [] -> Just [] -- Labeled units are also empty.
+                                 _  -> Nothing
+  flattenDTM a                = Nothing
 
-  -- l := a ~ a
-  compatible0 (DT LABEL [_,a]) b = compatible a b
+  flattenDT :: DataType -> [DataType]
+  flattenDT x = case flattenDTM x of
+    Just xs -> xs
+    _       -> [x]
 
-  compatible0 _ _ = False
-
+  compatibles as bs = length as == length bs && (and $ zipWith compatible as bs)
 
 -- | Turn a list of fields and their types into an anonymous record.
 -- @
