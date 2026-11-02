@@ -1040,11 +1040,13 @@ unwantedOptimizationFlags df =
 
 setWantedLanguageExtensions :: GHC.DynFlags -> GHC.DynFlags
 setWantedLanguageExtensions df =
-   foldl' DynFlags.gopt_set
-    (foldl' DynFlags.xopt_unset
-      (foldl' DynFlags.xopt_set df wantedLanguageExtensions)
-      unwantedLanguageExtensions)
-    wantedOptimizations
+   foldl' DynFlags.gopt_unset
+    (foldl' DynFlags.gopt_set
+      (foldl' DynFlags.xopt_unset
+        (foldl' DynFlags.xopt_set df wantedLanguageExtensions)
+        unwantedLanguageExtensions)
+      wantedOptimizations)
+    unwantedOptimizations
  where
   wantedOptimizations =
     [ Opt_CSE -- CSE
@@ -1063,6 +1065,10 @@ setWantedLanguageExtensions df =
     , Opt_Strictness -- Strictness analysis helps with dead-code analysis. However, see [NOTE: CPR breaks Clash]
     , Opt_SpecialiseAggressively -- Needed to compile Fixed point number functions quickly
     , Opt_CrossModuleSpecialise -- Needed to compile Fixed point number functions quickly
+    ]
+
+  unwantedOptimizations =
+    [ Opt_LocalFloatOutTopLevel -- Floats local bindings to the top level, where every use becomes a separate component instance: avoid
     ]
 
 -- | Remove all strictness annotations:
