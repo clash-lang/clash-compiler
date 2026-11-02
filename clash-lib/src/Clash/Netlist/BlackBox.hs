@@ -90,7 +90,7 @@ import           Clash.Core.TyCon              as C (TyConMap, tyConDataCons)
 import           Clash.Core.Util
   (inverseTopSortLetBindings, splitShouldSplit)
 import           Clash.Core.Var                as V
-  (Id, mkLocalId, modifyVarName, varType)
+  (Id, isGlobalId, mkLocalId, modifyVarName, varType)
 import           Clash.Core.VarEnv
   (extendInScopeSet, mkInScopeSet, lookupVarEnv, uniqAway, unitVarSet)
 import {-# SOURCE #-} Clash.Netlist
@@ -1225,7 +1225,9 @@ mkFunInput parentName declType resId e =
                                             ++ " This is a bug in Clash.")
 
                 _ -> error $ $(curLoc) ++ "Cannot make function input for: " ++ showPpr e
-            C.Var fun -> do
+            -- A local variable can share its unique with a global binder, so
+            -- check it's a global before looking it up by its unique
+            C.Var fun | isGlobalId fun -> do
               topAnns <- Lens.use topEntityAnns
               case lookupVarEnv fun topAnns of
                 Just _ ->
