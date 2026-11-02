@@ -126,6 +126,7 @@ import           Clash.Netlist.Util               (checkTopEntityPorts)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
+import qualified Clash.Primitives.Sized.BitVector as P
 import qualified Clash.Primitives.Sized.Signed    as P
 import qualified Clash.Primitives.Sized.ToInteger as P
 import qualified Clash.Primitives.Sized.Vector    as P
@@ -702,6 +703,7 @@ knownBlackBoxFunctions =
     , ('P.bvToIntegerVerilog, P.bvToIntegerVerilog)
     , ('P.clashCompileErrorBBF, P.clashCompileErrorBBF)
     , ('P.foldBBF, P.foldBBF)
+    , ('P.indexBitVectorCV, P.indexBitVectorCV)
     , ('P.indexIntVerilog, P.indexIntVerilog)
     , ('P.indexToIntegerVerilog, P.indexToIntegerVerilog)
     , ('P.indexToIntegerVHDL, P.indexToIntegerVHDL)
