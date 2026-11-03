@@ -41,7 +41,7 @@ module Clash.Signal.Internal.Trace.Store (
 ) where
 
 import Control.Monad (foldM, when)
-import Data.Aeson (encode,eitherDecode,ToJSON,FromJSON)
+import Data.Aeson hiding (Value) --(encode, eitherDecode, ToJSON(..), FromJSON(..), Array)
 import Data.AnonRecords
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Lazy (ByteString)
@@ -99,9 +99,9 @@ data FileHeader = FileHeader
   , offset :: Int
   , width :: Int
   , hasMask :: Bool
-  , signals :: [SignalDescr]
+  , signals :: Either SignalDescr [SignalDescr]
   }
- deriving (Show,Generic,ToJSON,FromJSON)
+ deriving (Show,Generic)
 
 data SignalDescr = SignalDescr
   { name :: String
@@ -110,21 +110,45 @@ data SignalDescr = SignalDescr
   }
  deriving (Show,Generic,ToJSON,FromJSON)
 
+instance ToJSON FileHeader where
+  toJSON FileHeader{..} = object
+    [ "samples" .= samples
+    , "offset"  .= offset
+    , "width"   .= width
+    , "hasMask" .= hasMask
+    , "signals" .= either toJSON toJSON signals
+    ]
+
+instance FromJSON FileHeader where
+  parseJSON = withObject "Header" $ \v -> do
+    samples <- v .: "samples"
+    offset  <- v .: "offset"
+    width   <- v .: "width"
+    hasMask <- v .: "hasMask"
+    signals0 <- v .: "signals"
+    signals <- case signals0 of
+      Array _ -> Right <$> parseJSON signals0
+      _       -> Left <$> parseJSON signals0
+    pure FileHeader{..}
+
 ----------------------------------------------
 --                 STORING                  --
 ----------------------------------------------
 
-storeTrace0 :: (Int,Int) -> [SignalDescr] -> [Value] -> ByteString
+storeTrace0 :: (Int,Int) -> Either SignalDescr [SignalDescr] -> [Value] -> ByteString
 storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
  where
-  width = sum $ map (\SignalDescr{width=w}->w) signals
+  width = sum $ map (\SignalDescr{width=w}->w) $
+    case signals of
+      Left  ds  -> [ds]
+      Right dss -> dss
 
   header = FileHeader
     { samples = stop-start
     , offset = start
     , width
     , hasMask = True
-    , signals = signals
+    , signals
     }
   header0 = encode header
 
@@ -138,7 +162,7 @@ storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
 -- | Store a single trace as a signal dump.
 storeTrace :: String -> (Int,Int) -> Trace -> ByteString
 storeTrace name samples Trace{..} =
-  storeTrace0 samples [SignalDescr{name,width,dataType}] values
+  storeTrace0 samples (Left SignalDescr{name,width,dataType}) values
 
 -- | Store multiple traces in a single binary file.
 -- All traces must have the same clock period.
@@ -153,7 +177,7 @@ storeTraces samples traces = do
     Left
       "Attempting to store multiple traces with different periods in one signal dump file."
 
-  let meta = map descrFromTrace traces
+  let signals = map descrFromTrace traces
       descrFromTrace (name,Trace{width,dataType}) = SignalDescr{name, width, dataType}
       widths = map ((.width) . snd) traces
       ccat vs = foldl
@@ -161,7 +185,7 @@ storeTraces samples traces = do
         (zip widths vs)
       values = map ccat $ transpose $ map ((.values) . snd) traces -- combine values TODO: make more efficient
 
-  Right $ storeTrace0 samples meta values
+  Right $ storeTrace0 samples (Right signals) values
 
 -- | Store a trace in binary form.
 store ::
@@ -215,7 +239,7 @@ storeSignals ::
   -- | Bundle of signals to dump
   (Unbundled dom a) ->
   ByteString
-storeSignals samples sigs = storeTrace0 samples signals values
+storeSignals samples sigs = storeTrace0 samples (Right signals) values
  where
   Trace{values} = toTrace (bundle sigs)
   signals = storeSignalMeta @a
@@ -295,7 +319,9 @@ loadTrace ::
 loadTrace period bs = do
   (header, values) <- loadTrace0 bs
   let FileHeader{width, signals} = header
-      ty = constructRecord $ map (\SignalDescr{name,dataType} -> (name,dataType)) signals
+      ty = case signals of
+        Left  ds  -> ds.dataType
+        Right dss -> constructRecord $ map (\ds -> (ds.name,ds.dataType)) dss
   pure Trace{dataType=ty, period, width, values}
 
 -- | Load multiple traces from a single binary.
@@ -304,7 +330,9 @@ loadTraces period bs = do
   (header, values) <- loadTrace0 bs
 
   let FileHeader{width, signals} = header
-      (names, widths, types) = unzip3 $ map (\(SignalDescr n w t) -> (n, w, t)) signals
+      (names, widths, types) = case signals of
+        Left  ds  -> ([ds.name], [ds.width], [ds.dataType])
+        Right dss -> unzip3 $ map (\ds -> (ds.name, ds.width, ds.dataType)) dss
       cWidths = scanl (+) 0 widths
       ranges = zip cWidths (drop 1 cWidths)
 
@@ -317,7 +345,9 @@ loadTraces period bs = do
         bits = to-from
         go n = (n `shiftR` lo) .&. ((1 `shiftL` bits) - 1)
 
-      valuess = map (\r -> map (slice0 r) values) ranges
+      valuess = case signals of
+        Left  _ -> [values] -- Slicing all values would be inefficient; skip
+        Right _ -> map (\r -> map (slice0 r) values) ranges
       traces = zipWith3 (flip Trace period) types widths valuess
 
   Right $ zip names traces
