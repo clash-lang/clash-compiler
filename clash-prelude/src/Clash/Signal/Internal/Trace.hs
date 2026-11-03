@@ -17,12 +17,12 @@ module Clash.Signal.Internal.Trace (
 
   -- * Traces
   Trace(..),
-  toTrace,fromTrace,
+  toTrace, fromTrace,
 
   -- * Tracing
   trace,
   traceVec,
-  traceReset,traceEnable,
+  traceReset, traceEnable,
 
   -- * Simulation
   Traceable,
@@ -31,12 +31,12 @@ module Clash.Signal.Internal.Trace (
   times,
   Config(..),
   simulate, simulateWith,
-  emptySim,
+  emptySim, emptySim0,
 
   ClockWave,
   clockWave,
 
-  setStartStop,setClockStart,
+  setStartStop, setClockStart, setTimes,
   addTrace,
   fetchTrace, fetch,
 
@@ -57,7 +57,7 @@ module Clash.Signal.Internal.Trace (
 
   -- * Helpers
   simulationTimeRangeToCycles,
-  clockTrace,clockTrace0,
+  clockTrace, clockTrace0,
   domainName, replaceDollar,
 ) where
 
@@ -117,8 +117,8 @@ type ClockWave = (String, Time, ActiveEdge)
 -- | Object containing the simulation configuration
 -- and the traces captured during simulation.
 data Simulation = Simulation
-  { simTimes :: Times
-  , simConfig :: Config
+  { simConfig :: Config
+  , simTimes :: Times
   , simTraces :: TraceMap
   , simTimestamp :: UTCTime
   }
@@ -145,8 +145,10 @@ data Times
 
 -- | Create a time window starting at 0 and ending at the specified time,
 -- with clocks starting after 100ns.
-times :: AtOrForTime -> Times
-times stop =  Times{start = 0, stop, clockStart = TimeNS 100}
+times :: Time -> Times
+times stop = Times{start = 0, stop = At $ stop + clockStart, clockStart}
+ where
+  clockStart = TimeNS 100
 
 data Config
   = Config
@@ -171,12 +173,17 @@ instance Default Config where
 --                SIMULATION                --
 ----------------------------------------------
 
--- | Create an empty simulation from a configuration.
-emptySim :: Config -> IO Simulation
-emptySim config = do
-  simTimestamp <- getCurrentTime
-  pure Simulation
-    { simConfig = config
+-- | Create an empty simulation from a configuration and time settings.
+emptySim :: Config -> Times -> IO Simulation
+emptySim simConfig simTimes = do
+  now <- getCurrentTime
+  pure $ emptySim0 simConfig simTimes now
+
+emptySim0 :: Config -> Times -> UTCTime -> Simulation
+emptySim0 simConfig simTimes simTimestamp =
+  Simulation
+    { simConfig
+    , simTimes
     , simTraces = Map.empty
     , simTimestamp
     }
@@ -207,7 +214,7 @@ simulate ::
   -- | (One of) the outputs of the circuit containing the traces
   Signal dom a ->
   IO (Either String Simulation)
-simulate d = simulateWith def (times $ For $ d + TimeNS 100)
+simulate d = simulateWith def (times d)
 
 -- | Simulate a design by forcefully evaluating an output signal.
 -- Like 'simulate', but with more options.
@@ -258,7 +265,7 @@ simulate0 ref simConfig@Config{..} simTimes@Times{..} clockWaves signals sig = d
   let simTraces = Map.union
         (Map.fromList $ L.map (\(n,p,a) -> (n,clockTrace0 p a)) clockWaves)
         globTraces
-  pure $ Simulation{simTimes, simConfig, simTraces, simTimestamp} <$ evalResult
+  pure $ Simulation{simConfig, simTimes, simTraces, simTimestamp} <$ evalResult
 
 simulationTimeRangeToCycles :: Times -> Time -> (Int,Int)
 simulationTimeRangeToCycles Times{start,stop,clockStart} period =

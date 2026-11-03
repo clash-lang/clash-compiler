@@ -13,7 +13,7 @@ import Test.Tasty
 import Test.Tasty.Hedgehog (testPropertyNamed)
 import Type.Reflection (typeRep)
 
-import Clash.Signal.Trace
+import Clash.Signal.Internal.Trace.OldTrace
 import Clash.Sized.BitVector (BitVector, size#)
 import Hedgehog.Extra (LockstepWalk (..), combinations, lockstepWalk)
 

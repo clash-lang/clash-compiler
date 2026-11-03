@@ -7,20 +7,22 @@ module Clash.Tests.SimVCD where
 
 import Control.Monad (foldM)
 import Control.Monad.Morph (generalize, hoist)
-import Data.Binary (encode)
+import Data.Default (def)
 import Data.Map.Strict (Map)
 import Data.Maybe (isJust)
+import Data.Time.Clock (UTCTime(UTCTime))
+import Data.Time.Calendar (fromGregorian)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Test.Tasty
 import Test.Tasty.Hedgehog (testPropertyNamed)
-import Type.Reflection (typeRep)
 
--- import Clash.Signal.Trace
-import Clash.Signal.Simulation.Internal.Vcd
+import Clash.Signal.Internal.Trace
+import Clash.Signal.Internal.Trace.DataType
+import Clash.Signal.Internal.Trace.Vcd
 import Clash.Sized.BitVector (BitVector, size#)
+import Clash.Time
 import Hedgehog.Extra (LockstepWalk (..), combinations, lockstepWalk)
 
-import qualified Data.List as L
 import qualified Data.Map.Strict as Map
 import qualified Data.Set as Set
 import qualified Hedgehog as H
@@ -55,26 +57,17 @@ parseMetadata ::
 parseMetadata dcs = do
   m0 <- foldM go (M0 Nothing Map.empty Set.empty "") dcs
   case m0 of
+    M0 Nothing   _ _ _              -> Left $ "No $timescale in declarations"
     M0 _         m _ _ | Map.null m -> Left $ "No variables in declarations"
-    M0 Nothing   m _ _              -> Left $ "No $timescale in declarations"
     M0 (Just ts) m _ _              -> Right $ Metadata ts m
  where
 
   -- go timescale variable_prefix variable_map declarations
-  go :: Metadata0 -> DeclarationCommand -> Metadata0
-  go m@M0{timeScaleM = Nothing} (TimeScale (t, u)) = do
-    let
-      scale u0 =
-        case u0 of
-          "s"  -> (* 1000) <$> scale "ms"
-          "ms" -> (* 1000) <$> scale "us"
-          "us" -> (* 1000) <$> scale "ns"
-          "ns" -> (* 1000) <$> scale "ps"
-          "ps" -> Right t
-          "fs" -> Left "$timescale fs unsupported; raw time in ps"
-          _    -> Left $ "Unknown time unit " <> u0
-    t0 <- scale u
-    Right $ m{timeScaleM = Just t0}
+  go :: Metadata0 -> DeclarationCommand -> Either String Metadata0
+  go m@M0{timeScaleM = Nothing} (TimeScale t) = do
+    case t of
+      TimePS ps -> Right m{timeScaleM = Just ps}
+      _ -> Left "$timescale fs unsupported; raw time must bein ps"
   go _ (TimeScale _) = Left "Multiple $timescale sections in declarations"
 
   go m@M0{..} (VarDec v) = do
@@ -222,7 +215,8 @@ multiDomainTrace =
             Gen.int $
               Range.linear 2 4
       -- @common@ scales all periods by a common power of ten factor
-      common <- H.forAll $ fmap (10 ^) $ Gen.integral_ $ Range.constant (0 :: Int) 4
+      common0 <- H.forAll $ fmap (10 ^) $ Gen.integral_ $ Range.constant (0 :: Int) 4
+      let common = TimePS common0
       -- Interesting behavior of multiple signals is captured by the relation between them.
       -- The relation is defined by the ratios between the periods, which depends only on
       -- the prime factors they do not share. Hence, primes are excellent candidates. It
@@ -245,46 +239,41 @@ multiDomainTrace =
         sampleDuration = min 1000 $ product periodFactors + 10 -- unit?
         signalNames =
           take k ["a", "b", "c", "d"] ++ if isJust duplSignal then ["e"] else []
-        periods = map (* common) periodFactors
+        periods = map (`mulTime` common) periodFactors
         periods0
           | Just i <- duplSignal = periods ++ [periods !! i]
           | otherwise = periods
         traceMap = Map.fromAscList $ zipWith (\n p -> (n, oneTrace p)) signalNames periods0
-      VcdFile vcdDecs vcdSims <- H.evalEither $ vcd Simulation{} --dumpVCD1# (0, sampleDuration) traceMap
+      (VcdFile vcdDecs vcdSims, _warn) <- H.evalEither $
+        vcd Simulation
+          { simTimes = times $ sampleDuration `mulTime` common
+          , simConfig = def
+          , simTraces = traceMap
+          , simTimestamp = UTCTime (fromGregorian 2002 5 29) 0
+          }
       Metadata{..} <- H.evalEither $ parseMetadata vcdDecs
       Map.keysSet nameMap H.=== Map.keysSet traceMap
-      -- 'dumpVCD' currently outputs timestamp 0 twice: once for $dumpvars and again for
-      -- the first real value changes. But this is probably a bug; the standard doesn't
-      -- say, and GTKWave and Surfer accept it, but it sounds like it's not well-formed.
-      -- For now, we alter the timestamp for $dumpvars. The timestamp -1 is not valid in a
-      -- VCD file, but we can match on it in our tests.
-      vcdSims0 <-
-        case L.uncons vcdSims of
-          Just (sc, vcdSims1) ->
-            sc H.=== SimulationTime 0 >> pure (SimulationTime (-1) : vcdSims1)
-          Nothing ->
-            failWithMsg "VCDFile has no SimulationCommands"
       let
         -- The end of sampling is defined pretty weirdly in 'dumpVCD' currently
         end = sampleDuration - 2
         signalCorrects =
           map
             ( \(name, (idCode, period, vs)) ->
-                signalCorrect name idCode (period `div` timeScale) end vs
+                signalCorrect name idCode (timeInPS period `div` timeScale) end vs
             )
             $ Map.assocs
             $ Map.intersectionWith
-              (\idCode (_, period, _, vs) -> (idCode, period, vs))
+              (\idCode Trace{period,values} -> (idCode, period, values))
               nameMap
               traceMap
-      lockstepWalk (saneTimestamps : signalCorrects) vcdSims0
+      lockstepWalk (saneTimestamps : signalCorrects) vcdSims
  where
-  oneTrace period =
-    ( encode (typeRep @SignalData)
+  oneTrace period = Trace
+    { dataType = simpleTypeRep @SignalData
     , period
-    , size# (0 :: SignalData)
-    , map (0,) [0 ..]
-    )
+    , width = size# (0 :: SignalData)
+    , values = map (0,) [0 ..]
+    }
 
 tests :: TestTree
 tests =
