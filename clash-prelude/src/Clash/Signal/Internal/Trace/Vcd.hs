@@ -23,11 +23,11 @@ module Clash.Signal.Internal.Trace.Vcd (
 ) where
 
 import Control.Exception.Extra (errorIO)
-import Control.Monad (when)
 import Data.Char (chr, ord)
+import Data.Bifunctor (first)
 import Data.Bits (testBit)
 import Data.List
-  (zip3, zip4, unzip5, concatMap, isInfixOf, partition, splitAt, transpose, uncons)
+  (zip4, unzip5, isInfixOf, partition, transpose, uncons)
 import Data.List.Extra (snoc)
 import Data.List.Split (splitOn)
 import qualified Data.Map as Map
@@ -48,9 +48,8 @@ import Clash.Time (Time(..), timeInFS, absTime, splitTimeUnit)
 import qualified Paths_clash_prelude
 
 -- | A complete VCD file.
--- This includes the contents of the VCD file, as well as warnings
--- from its creation.
-data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand] [String]
+-- This includes the contents of the VCD file.
+data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand]
   deriving (Show)
 
 -- | A VCD declaration command.
@@ -95,9 +94,10 @@ type VcdTime = Integer --TODO: check if Int is faster
 type TimeUnit = String
 
 -- | Create a 'Vcd' object from a 'Simulation'.
+-- Also returns warnings that pop up in the creation of the VCD.
 vcd ::
   Simulation ->
-  Either String VcdFile
+  Either String (VcdFile, [String])
 vcd Simulation
       { simTimes = Times{start, stop, clockStart}
       , simConfig = Config{shiftToZero, warnZeroWidth}
@@ -129,7 +129,7 @@ vcd Simulation
       <> nm
       <> "' contains empty scope names, which is not supported by VCD."
   | otherwise
-  = Right $ VcdFile (headers ++ variables) simulation warnings
+  = Right (VcdFile (headers ++ variables) simulation, warnings)
  where
   offensiveNames = filter (any (not . printable)) allNames
   emptyScopes = filter (\nm -> ".." `isInfixOf` ('.' : nm <> ".")) allNames
@@ -334,7 +334,7 @@ vcd Simulation
 vcdText ::
   Simulation ->
   Either String (Text, [String])
-vcdText sim = (\v@(VcdFile _ _ warn) -> (renderVcd v, warn)) <$> vcd sim
+vcdText sim = (first renderVcd) <$> vcd sim
 
 -- | Create a VCD file for the given traces and simulation configuration,
 -- and write it to a file.
@@ -344,7 +344,7 @@ writeVcd ::
   FilePath ->
   Simulation ->
   IO ()
-writeVcd file sim@Simulation{simConfig=Config{warnZeroWidth}} = do
+writeVcd file sim = do
   case vcdText sim of
     Left e -> withFrozenCallStack $ errorIO e
     Right (text, warnings) -> do
@@ -355,7 +355,7 @@ writeVcd file sim@Simulation{simConfig=Config{warnZeroWidth}} = do
 renderVcd ::
   VcdFile ->
   Text
-renderVcd (VcdFile decl sim _warn) = Text.unlines
+renderVcd (VcdFile decl sim) = Text.unlines
   $  map renderDecl decl
   <> ["$enddefinitions $end\n"]
   <> map renderSim sim

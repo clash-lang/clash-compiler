@@ -426,6 +426,7 @@ test-suite unittests
       binary,
       bytestring,
       containers,
+      data-default  >= 0.7      && < 0.9,
       deepseq,
       hedgehog      >= 1.0.3    && < 1.8,
       hint          >= 0.7      && < 0.10,
@@ -440,7 +441,8 @@ test-suite unittests
       tasty-quickcheck,
       template-haskell,
       temporary,
-      text
+      text,
+      time          >= 1.8     && < 1.15,
 
   Other-Modules:
                  Clash.Tests.AsyncFIFOSynchronizer

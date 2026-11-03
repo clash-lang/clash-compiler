@@ -19,7 +19,7 @@ module Clash.Signal.Trace (
   Config(..),
   simulate, simulateWith,
   emptySim,
-  setStartStop,setClockStart,
+  setStartStop, setClockStart, setTimes,
   fetch,
 
   -- ** Clock signals
