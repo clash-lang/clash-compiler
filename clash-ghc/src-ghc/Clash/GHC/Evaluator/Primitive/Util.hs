@@ -129,6 +129,7 @@ data PrimStepContext = PrimStepContext
   , reduceWHNF' :: Machine -> Term -> Maybe Machine
   , catchDivByZero :: Term -> Term
   , catchErrorCall :: Term -> Term
+  , catchArithException :: Term -> Term
   }
 
 mkPrimStepContext :: TyConMap -> Bool -> PrimInfo -> [Type] -> [Value] -> Machine
@@ -202,6 +203,8 @@ mkPrimStepContext tcm isSubj pInfo tys args mach = PrimStepContext{..}
     catchDivByZero = makeUndefinedIf (==DivideByZero)
 
     catchErrorCall = makeUndefinedIf (const True :: ErrorCall -> Bool)
+
+    catchArithException = makeUndefinedIf (const True :: ArithException -> Bool)
 
 -- | Associate a primitive name with an implementation. The adapter from the
 -- evaluator's calling convention to 'PrimStepContext' lives here so individual
