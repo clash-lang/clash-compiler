@@ -7,6 +7,6 @@ cat <<EOF > ~/.config/attic/config.toml
 default-server = "public"
 
 [servers.public]
-endpoint = "http://diepenheim.local:9200"
+endpoint = "http://diepenheim:9200"
 token = "$ATTIC_AUTH_TOKEN"
 EOF
