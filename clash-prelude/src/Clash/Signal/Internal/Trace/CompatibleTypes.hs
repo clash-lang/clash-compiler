@@ -52,8 +52,8 @@ pattern JOIN        :: String
 pattern JOIN        = $(litP $ StringL $              simpleTyConName @(:&:)  )
 pattern UNIT        :: String
 pattern UNIT        = $(litP $ StringL $              simpleTyConName @()     )
-pattern TUP2        :: String
-pattern TUP2        = $(litP $ StringL $              simpleTyConName @((),()))
+--pattern TUP2        :: String
+--pattern TUP2        = $(litP $ StringL $              simpleTyConName @((),()))
 pattern TUP_BASE    :: String
 pattern TUP_BASE    = $(litP $ StringL $ init       $ simpleTyConName @((),()))
 pattern SYMBOL_BASE :: String
@@ -87,14 +87,14 @@ compatible a                b = case (flattenDTM a, flattenDTM b) of
   (a0, b0) -> compatibles (fromMaybe [a] a0) (fromMaybe [b] b0)
  where
   flattenDTM :: DataType -> Maybe [DataType]
-  flattenDTM (DT JOIN [a,b] ) = Just (flattenDT a <> flattenDT b)
-  flattenDTM (DT tup args   ) | Just n <- stripPrefix TUP_BASE tup
+  flattenDTM (DT JOIN [x,y] ) = Just (flattenDT x <> flattenDT y)
+  flattenDTM (DT tup args   ) | Just _ <- stripPrefix TUP_BASE tup
                               = Just (concatMap flattenDT args)
   flattenDTM (DT UNIT _     ) = Just [] -- Removed unit types (0-tuples)
-  flattenDTM (DT LABEL [_,a]) = case flattenDT a of
+  flattenDTM (DT LABEL [_,x]) = case flattenDT x of
                                  [] -> Just [] -- Labeled units are also empty.
                                  _  -> Nothing
-  flattenDTM a                = Nothing
+  flattenDTM _                = Nothing
 
   flattenDT :: DataType -> [DataType]
   flattenDT x = case flattenDTM x of

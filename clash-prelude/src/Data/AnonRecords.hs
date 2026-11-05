@@ -28,8 +28,7 @@ module Data.AnonRecords (
   (:=)(..),
   pattern (:=), FieldLabelProxy,
   FieldExists,
-  WithField, WithoutField,
-  AccessField(..), InsertField(..), DeleteField(..),
+  AccessField(..), InsertField(..), DeleteField(..), WithoutField,
   AsTuple(..),
 ) where
 
@@ -99,7 +98,7 @@ pattern (:=) p x <- (withFLP -> (p,x)) where
 withFLP :: f:=a -> (FieldLabelProxy f, a)
 withFLP (L x) = (FieldLabelProxy, x)
 
-instance IsLabel f (FieldLabelProxy f) where
+instance (f~f0) => IsLabel f (FieldLabelProxy f0) where
   fromLabel = FieldLabelProxy
 
 
@@ -166,51 +165,64 @@ instance (AccessField f b, FieldExists f a ~ False) => AccessField0 f (a:&:b) Fa
 --              FIELD ADDITION              --
 ----------------------------------------------
 
--- | Returns the record type after a field has been inserted.
-type family WithField (f::Symbol) a r where
-  WithField f a () = f:=a
-  WithField f a (f:=b) = f:=a
-  WithField f a ((f:=b) :&: r) = (f:=a) :&: r
-  WithField f a (l :&: r) = l :&: WithField f a r
+-- -- | Returns the record type after a field has been inserted.
+-- type family WithField (f::Symbol) a r where
+--   WithField f a () = f:=a
+--   WithField f a (f:=b) = f:=a
+--   WithField f a ((f:=b) :&: r) = (f:=a) :&: r
+--   WithField f a (l :&: r) = l :&: WithField f a r
 
--- | Class for inserting fields into records.
 class InsertField f a r where
-  -- | If the record already has a field with the provided name, it is replaced.
-  -- Otherwise, the field is added to the end.
+  type WithField (f::Symbol) a r
   insertField :: a -> r -> WithField f a r
-
 instance InsertField f a () where
-  insertField x _ = L @f x
+  type WithField f a () = f := a
+  insertField x _ = L x
+instance InsertField f a (p :&: q) where
+  type WithField f a (p :&: q) = f := a :&: p :&: q
+  insertField x r = L x :&: r
+instance InsertField f a (f0 := b) where
+  type WithField f a (f0:=b) = f:=a :&: f0:=b
+  insertField x r = L x :&: r
 
-instance (InsertField0 f a (f2:=b) (f==f2)) => InsertField f a (f2:=b) where
-  insertField = insertField0 @f @a @(f2:=b) @(f==f2)
+-- -- | Class for inserting fields into records.
+-- class InsertField f a r where
+--   -- | If the record already has a field with the provided name, it is replaced.
+--   -- Otherwise, the field is added to the end.
+--   insertField :: a -> r -> WithField f a r
 
-instance (InsertField0 f a (f2:=b :&: r) (f==f2)) => InsertField f a (f2:=b :&: r) where
-  insertField = insertField0 @f @a @(f2:=b :&: r) @(f==f2)
+-- instance InsertField f a () where
+--   insertField x _ = L @f x
 
-class InsertField0 f a r (eq::Bool) where
-  insertField0 :: a -> r -> WithField f a r
+-- instance (InsertField0 f a (f2:=b) (f==f2)) => InsertField f a (f2:=b) where
+--   insertField = insertField0 @f @a @(f2:=b) @(f==f2)
 
-instance (WithField f a (f2:=b) ~ (f:=a)) => InsertField0 f a (f2:=b) True where
-  insertField0 x _ = L x
+-- instance (InsertField0 f a (f2:=b :&: r) (f==f2)) => InsertField f a (f2:=b :&: r) where
+--   insertField = insertField0 @f @a @(f2:=b :&: r) @(f==f2)
 
-instance
-  (WithField f a (f2:=b) ~ (f2:=b :&: f:=a)) =>
-  InsertField0 f a (f2:=b) False
-  where
-  insertField0 x r = r :&: L x
+-- class InsertField0 f a r (eq::Bool) where
+--   insertField0 :: a -> r -> WithField f a r
 
-instance
-  (WithField f a (l :&: r) ~ (f:=a :&: r)) =>
-  InsertField0 f a (l :&: r) True
-  where
-  insertField0 x (_ :&: r) = L x :&: r
+-- instance (WithField f a (f2:=b) ~ (f:=a)) => InsertField0 f a (f2:=b) True where
+--   insertField0 x _ = L x
 
-instance
-  (InsertField f a r, WithField f a (l :&: r) ~ (l :&: WithField f a r)) =>
-  InsertField0 f a (l :&: r) False
-  where
-  insertField0 x (l :&: r) = l :&: insertField @f @a @r x r
+-- instance
+--   (WithField f a (f2:=b) ~ (f2:=b :&: f:=a)) =>
+--   InsertField0 f a (f2:=b) False
+--   where
+--   insertField0 x r = r :&: L x
+
+-- instance
+--   (WithField f a (l :&: r) ~ (f:=a :&: r)) =>
+--   InsertField0 f a (l :&: r) True
+--   where
+--   insertField0 x (_ :&: r) = L x :&: r
+
+-- instance
+--   (InsertField f a r, WithField f a (l :&: r) ~ (l :&: WithField f a r)) =>
+--   InsertField0 f a (l :&: r) False
+--   where
+--   insertField0 x (l :&: r) = l :&: insertField @f @a @r x r
 
 
 ----------------------------------------------
