@@ -392,9 +392,6 @@ data ClashOpts = ClashOpts
   -- ^ At what size do we cache normalized work-free top-level binders.
   , opt_edalize :: Bool
   -- ^ Generate an EDAM file for use with Edalize.
-  , opt_renderEnums :: Bool
-  -- ^ Render sum types with all zero-width fields as enums where supported, as
-  -- opposed to rendering them as bitvectors.
   , opt_timescalePrecision :: Period
   -- ^ Timescale precision set in Verilog files. E.g., setting this would sets
   -- the second part of @`timescale 100fs/100fs@.
@@ -448,7 +445,6 @@ defClashOpts
   , opt_aggressiveXOptBB    = False
   , opt_inlineWFCacheLimit  = 10 -- TODO: find "optimal" value
   , opt_edalize             = False
-  , opt_renderEnums         = True
   , opt_timescalePrecision  = Period 100 Fs
   -- XXX: We probe environment variables until we've found a proper solution to
   --      https://github.com/clash-lang/clash-compiler/issues/2762.

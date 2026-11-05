@@ -1,0 +1,10 @@
+CHANGED: Sum types and `Bool` are now rendered as `std_logic_vector` and `std_logic` in VHDL instead of enums.
+
+This includes deprecating the "-fclash-no-render-enums" flag. The flag still is accepted but generates a warning. The flag will be fully removed in a future release.
+
+VHDL Enums have a few problems:
+
+- Unstable bit representations which makes them incompatible with the Clash `BitPack` type class.
+- X-hiding as they cannot take on metavalues.
+
+Partially fixes [#2193](https://github.com/clash-lang/clash-compiler/issues/2193).
