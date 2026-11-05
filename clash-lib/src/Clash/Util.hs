@@ -12,6 +12,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TypeApplications #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -24,6 +25,9 @@ module Clash.Util
 where
 
 import qualified Control.Exception    as Exception
+#if MIN_VERSION_base(4,20,0)
+import Control.Exception.Context       (displayExceptionContext)
+#endif
 import Control.Lens
 import Control.Monad.State            (MonadState,StateT)
 import qualified Control.Monad.State  as State
@@ -32,7 +36,7 @@ import Data.Hashable                  (Hashable)
 import Data.HashMap.Lazy              (HashMap)
 import qualified Data.HashMap.Lazy    as HashMapL
 import qualified Data.List.Extra      as List
-import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes)
+import Data.Maybe                     (fromMaybe, listToMaybe, catMaybes, isJust)
 import Data.Map.Ordered               (OMap)
 import qualified Data.Map.Ordered     as OMap
 import qualified Data.Text            as Text
@@ -50,6 +54,7 @@ import qualified Data.Time.Clock      as Clock
 import qualified Data.Time.Format     as Clock
 import Data.Typeable                  (Typeable)
 import Data.Version                   (Version)
+import System.Exit                    (ExitCode)
 import GHC.Base                       (Int(..),isTrue#,(==#),(+#))
 import GHC.Integer.Logarithms         (integerLogBase#)
 import qualified GHC.LanguageExtensions.Type as LangExt
@@ -80,6 +85,59 @@ instance Show ClashException where
   show (ClashException _ s eM) = s ++ "\n" ++ maybe "" id eM
 
 instance Exception.Exception ClashException
+
+-- | An exception together with the backtrace it was originally thrown with.
+--
+-- Useful when trying to retain backtraces even when exception contexts would
+-- otherwise get thrown away (like @async@ does, at the time of writing).
+data ExceptionWithBacktrace =
+  ExceptionWithBacktrace String Exception.SomeException
+
+instance Show ExceptionWithBacktrace where
+  show (ExceptionWithBacktrace _ e) = show e
+
+instance Exception.Exception ExceptionWithBacktrace where
+  displayException (ExceptionWithBacktrace _ e) = Exception.displayException e
+#if MIN_VERSION_base(4,20,0)
+  -- We are carrying a backtrace already; collecting another one on every
+  -- re-throw only adds noise.
+  backtraceDesired _ = False
+#endif
+
+-- | The backtrace an exception carries, rendered. Empty if it has none.
+exceptionBacktrace :: Exception.SomeException -> String
+exceptionBacktrace e
+  | Just (ExceptionWithBacktrace bt _) <- Exception.fromException e = bt
+#if MIN_VERSION_base(4,20,0)
+  | otherwise = displayExceptionContext (Exception.someExceptionContext e)
+#else
+  -- Before base-4.20 the backtrace is part of 'ErrorCallWithLocation', i.e.
+  -- part of the exception value, and survives re-throws by itself.
+  | otherwise = ""
+#endif
+
+-- | Strip the 'ExceptionWithBacktrace' wrapper, if any, exposing the exception
+-- that was originally thrown to 'Exception.fromException'.
+originalException :: Exception.SomeException -> Exception.SomeException
+originalException e
+  | Just (ExceptionWithBacktrace _ e') <- Exception.fromException e =
+      originalException e'
+  | otherwise = e
+
+-- | Run an action, tagging anything it throws with an explicit backtrace. See
+-- 'ExceptionWithBacktrace'. Exceptions that are part of control flow
+-- ('Exception.ExitCode') or that are thrown at a thread from the outside are
+-- passed through untouched.
+withPreservedBacktrace :: IO a -> IO a
+withPreservedBacktrace act = Exception.catch act $ \e ->
+  if passThrough e
+    then Exception.throwIO e
+    else Exception.throwIO (ExceptionWithBacktrace (exceptionBacktrace e) e)
+ where
+  passThrough e =
+       isJust (Exception.fromException @ExitCode e)
+    || isJust (Exception.fromException @Exception.SomeAsyncException e)
+    || isJust (Exception.fromException @ExceptionWithBacktrace e)
 
 -- | Construct a string pattern match out of the given @TemplateHaskell@ name
 namePat :: TH.Name -> TH.Q TH.Pat
