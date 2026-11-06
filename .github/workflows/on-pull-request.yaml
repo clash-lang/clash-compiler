@@ -11,6 +11,7 @@ jobs:
       flavor: pr
       nightly: false
       mac_windows: true
+      fork_pr: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
       hackage_publish: "no"
     secrets: inherit
 

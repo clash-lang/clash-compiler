@@ -26,5 +26,6 @@ jobs:
       # therefore want to make sure we run on 'master' and the release branches
       # too, so we have a cache for PR's that have those as target branch.
       mac_windows: ${{ github.event_name == 'push' || inputs.mac_windows }}
+      fork_pr: true
       hackage_publish: "no"
-    secrets: inherit
+    # secrets: inherit

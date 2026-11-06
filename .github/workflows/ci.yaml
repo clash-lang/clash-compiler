@@ -13,6 +13,9 @@ on:
       mac_windows:
         required: true
         type: boolean
+      fork_pr:
+        required: true
+        type: boolean
       hackage_publish:
         # Valid values:
         #   - "no": Don't build and upload sdists
@@ -187,6 +190,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).cabal.matrix }}
     steps:
+      - id: alt_secrets
+        run: get-secrets S3_ACCESS_KEY S3_SECRET_KEY
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       # Perhaps we should preinstall these on the container?
@@ -200,13 +206,44 @@ jobs:
           cabal-version: latest
           cabal-update: false
 
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: Restore from cache for fork PR's
+        if: inputs.fork_pr
+        id: ext_pr_cache
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ steps.alt_secrets.outputs.S3_ACCESS_KEY }}
+          secretKey: ${{ steps.alt_secrets.outputs.S3_SECRET_KEY }}
+          bucket: fork-pr-runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Restore from cache
+        if: "!steps.ext_pr_cache.outputs.cache-matched-key"
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
           bucket: runner
           region: local
           use-fallback: false
@@ -231,15 +268,37 @@ jobs:
       - name: Build dependencies
         run: cabal v2-build all -j$(.ci/effective_cpus.sh) --dependencies-only
 
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: >-
+          Save to cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
+        uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
-          reion: local
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
+          bucket: |-
+            ${{ case(
+              inputs.fork_pr,
+                'fork-pr-runner',
+              'runner'
+            ) }}
+          region: local
           use-fallback: false
           retry: false
           key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
@@ -263,6 +322,9 @@ jobs:
     name: Haddock tests
     runs-on: self-hosted
     steps:
+      - id: alt_secrets
+        run: get-secrets S3_ACCESS_KEY S3_SECRET_KEY
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install GHC
@@ -272,13 +334,44 @@ jobs:
           ghc-version: "9.6.7"
           cabal-version: latest
 
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: Restore from cache for fork PR's
+        if: inputs.fork_pr
+        id: ext_pr_cache
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ steps.alt_secrets.outputs.S3_ACCESS_KEY }}
+          secretKey: ${{ steps.alt_secrets.outputs.S3_SECRET_KEY }}
+          bucket: fork-pr-runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Restore from cache
+        if: "!steps.ext_pr_cache.outputs.cache-matched-key"
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
           bucket: runner
           region: local
           use-fallback: false
@@ -299,14 +392,36 @@ jobs:
       - name: Build dependencies
         run: cabal v2-build clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog -O0 --enable-documentation --only-dependencies
 
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: >-
+          Save to cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
+        uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
+          bucket: |-
+            ${{ case(
+              inputs.fork_pr,
+                'fork-pr-runner',
+              'runner'
+            ) }}
           region: local
           use-fallback: false
           retry: false
@@ -320,6 +435,9 @@ jobs:
     name: Stack compilation test
     runs-on: self-hosted
     steps:
+      - id: alt_secrets
+        run: get-secrets S3_ACCESS_KEY S3_SECRET_KEY
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       # Perhaps we should preinstall these on the container?
@@ -332,13 +450,47 @@ jobs:
           stack-no-global: true
           stack-version: latest
 
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: Restore from cache for fork PR's
+        if: inputs.fork_pr
+        id: ext_pr_cache
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ steps.alt_secrets.outputs.S3_ACCESS_KEY }}
+          secretKey: ${{ steps.alt_secrets.outputs.S3_SECRET_KEY }}
+          bucket: fork-pr-runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('stack.yaml', '.github/workflow/ci.yaml', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-stack-
+          # stack-root is set to null for some reason, which in turn breaks the entire stack cache
+          # Hardcoding the stack path... for now
+          # path: ${{ steps.ghc_install.outputs.stack-root }}
+          path: ~/.stack
+
+      - name: Restore from cache
+        if: "!steps.ext_pr_cache.outputs.cache-matched-key"
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
           bucket: runner
           region: local
           use-fallback: false
@@ -366,14 +518,36 @@ jobs:
         run:
           stack build -j$(.ci/effective_cpus.sh) --dependencies-only
 
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: >-
+          Save to cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
+        uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
+          bucket: |-
+            ${{ case(
+              inputs.fork_pr,
+                'fork-pr-runner',
+              'runner'
+            ) }}
           region: local
           use-fallback: false
           retry: false
@@ -391,394 +565,394 @@ jobs:
           stack build -j$(.ci/effective_cpus.sh) --pedantic
 
 
-  packages_common:
-    name: "Build Common (${{ matrix.ghc }}\
-           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }})"
-    needs: ci_recipe
-    runs-on: self-hosted
-    strategy:
-      # If caching fails for one package, then we are still interested in caching other packages
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_common.matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+  # packages_common:
+  #   name: "Build Common (${{ matrix.ghc }}\
+  #          ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }})"
+  #   needs: ci_recipe
+  #   runs-on: self-hosted
+  #   strategy:
+  #     # If caching fails for one package, then we are still interested in caching other packages
+  #     fail-fast: false
+  #     matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_common.matrix }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
+  #     - name: Authenticate cache
+  #       env:
+  #         ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+  #       run: .ci/attic-auth.sh
 
-        # Most clash- related packages depend on these three packages, having them be build
-        # sequentially and then the other packages in parallel speeds up CI
-        #
-        # We upload each build result to the local cache immediately, even if later steps fail it
-        # has some older steps cached, so the re-run goes faster
-        # Although I'm not entirely sure that it works...
-        # Well, it does not cause any harm so might as well keep it
+  #       # Most clash- related packages depend on these three packages, having them be build
+  #       # sequentially and then the other packages in parallel speeds up CI
+  #       #
+  #       # We upload each build result to the local cache immediately, even if later steps fail it
+  #       # has some older steps cached, so the re-run goes faster
+  #       # Although I'm not entirely sure that it works...
+  #       # Well, it does not cause any harm so might as well keep it
 
-      - run: |
-          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude)
-      - run: |
-          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib)
-      - run: |
-          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc)
+  #     - run: |
+  #         nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude
+  #         attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude)
+  #     - run: |
+  #         nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib
+  #         attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib)
+  #     - run: |
+  #         nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc
+  #         attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc)
 
-      - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: |
-          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude \
-            | cachix push clash-lang
-          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib \
-            | cachix push clash-lang
-          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc \
-            | cachix push clash-lang
-
-
-  packages_other:
-    name: "Build Other (${{ matrix.ghc }}\
-           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.package }})"
-    needs: [ci_recipe, packages_common]
-    runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_other.matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
-
-      - name: Build
-        run: nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }}
-
-      - name: Local cache
-        run: attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }})
-
-      - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: |
-          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }} \
-            | cachix push clash-lang
+  #     - name: Cachix
+  #       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+  #       env:
+  #         CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+  #       run: |
+  #         nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude \
+  #           | cachix push clash-lang
+  #         nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib \
+  #           | cachix push clash-lang
+  #         nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc \
+  #           | cachix push clash-lang
 
 
-  developer_shells:
-    name: Build Developer Shells (${{ matrix.ghc }})
-    needs: [ci_recipe, packages_common]
-    runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).developer_shells.matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+  # packages_other:
+  #   name: "Build Other (${{ matrix.ghc }}\
+  #          ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.package }})"
+  #   needs: [ci_recipe, packages_common]
+  #   runs-on: self-hosted
+  #   strategy:
+  #     fail-fast: false
+  #     matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_other.matrix }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
+  #     - name: Authenticate cache
+  #       env:
+  #         ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+  #       run: .ci/attic-auth.sh
 
-      - name: Nix devShell ${{ matrix.ghc }}
-        run: nix build -L .#devShells.x86_64-linux.ghc${{ matrix.ghc }}
+  #     - name: Build
+  #       run: nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }}
 
-      - name: Local cache
-        run: attic push public $(nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }})
+  #     - name: Local cache
+  #       run: attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }})
 
-      - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }} | cachix push clash-lang
-
-
-  packages_testsuite:
-    name: "Packaging clash-testsuite (${{ matrix.ghc }}\
-           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }})"
-    needs: ci_recipe
-    runs-on: self-hosted
-    strategy:
-      # If caching fails for one package, then we are still interested in caching other packages
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_testsuite.matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
-
-      - name: Build clash-testsuite
-        run: |
-          nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug)
-
-      - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
-        env:
-          CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-        run: |
-          nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug \
-            | cachix push clash-lang
+  #     - name: Cachix
+  #       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+  #       env:
+  #         CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+  #       run: |
+  #         nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }} \
+  #           | cachix push clash-lang
 
 
-  running_testsuite:
-    name: "Running clash-testsuite (${{ matrix.ghc }}\
-           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.hdl }})"
-    needs: [ci_recipe, packages_testsuite]
-    runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_testsuite.matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+  # developer_shells:
+  #   name: Build Developer Shells (${{ matrix.ghc }})
+  #   needs: [ci_recipe, packages_common]
+  #   runs-on: self-hosted
+  #   strategy:
+  #     fail-fast: false
+  #     matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).developer_shells.matrix }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
+  #     - name: Authenticate cache
+  #       env:
+  #         ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+  #       run: .ci/attic-auth.sh
 
-      - name: Run clash-testsuite
-        run: |
-          nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}. --no-vivado --no-modelsim
+  #     - name: Nix devShell ${{ matrix.ghc }}
+  #       run: nix build -L .#devShells.x86_64-linux.ghc${{ matrix.ghc }}
 
+  #     - name: Local cache
+  #       run: attic push public $(nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }})
 
-  running_nightly_testsuite:
-    # Name is affected by:
-    #   job.name expression not evaluated when job skipped
-    #   https://github.com/orgs/community/discussions/13261
-    name: "Running nightly clash-testsuite (${{ matrix.ghc }}\
-           ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.hdl }})"
-    if: fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite
-    needs: [ci_recipe, packages_testsuite]
-    runs-on: self-hosted
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite.matrix }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
-
-      - name: Run clash-testsuite
-        run: |
-          . /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-          nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}.tools.Vivado.
+  #     - name: Cachix
+  #       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+  #       env:
+  #         CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+  #       run: nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }} | cachix push clash-lang
 
 
-  hackage_sdist:
-    name: "Hackage: Build sdist"
-    if: inputs.hackage_publish != 'no'
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+  # packages_testsuite:
+  #   name: "Packaging clash-testsuite (${{ matrix.ghc }}\
+  #          ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }})"
+  #   needs: ci_recipe
+  #   runs-on: self-hosted
+  #   strategy:
+  #     # If caching fails for one package, then we are still interested in caching other packages
+  #     fail-fast: false
+  #     matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_testsuite.matrix }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Install GHC
-        id: ghc_install
-        uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
-        with:
-          ghc-version: "9.6.7"
-          cabal-version: latest
+  #     - name: Authenticate cache
+  #       env:
+  #         ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+  #       run: .ci/attic-auth.sh
 
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
-        with:
-          endpoint: "192.168.102.136"
-          port: 9000
-          insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
-          region: local
-          use-fallback: false
-          retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-sdist
-          path: ${{ steps.ghc_install.outputs.cabal-store }}
+  #     - name: Build clash-testsuite
+  #       run: |
+  #         nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug
+  #         attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug)
 
-      - name: Version information
-        run:
-          cabal --version
-
-      - name: Setup
-        run: .ci/gh-setup.sh
-
-      - name: Check version numbers
-        run: .ci/check_versions.sh
-
-      - name: Build clash-prelude sdist
-        run: .ci/build_sdist.sh clash-prelude
-
-      - name: Build clash-prelude-hedgehog sdist
-        run: .ci/build_sdist.sh clash-prelude-hedgehog
-
-      - name: Build clash-lib sdist
-        run: .ci/build_sdist.sh clash-lib
-
-      - name: Build clash-lib-hedgehog sdist
-        run: .ci/build_sdist.sh clash-lib-hedgehog
-
-      - name: Build clash-ghc sdist
-        run: .ci/build_sdist.sh clash-ghc
-
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
-        with:
-          endpoint: "192.168.102.136"
-          port: 9000
-          insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
-          region: local
-          use-fallback: false
-          retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-sdist
-          path: ${{ steps.ghc_install.outputs.cabal-store }}
-
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
-        with:
-          name: sdist
-          # clash-{prelude,lib,...}-$version{-docs,}.tar.gz
-          path: clash-*.tar.gz
-          if-no-files-found: error
-          compression-level: 0
+  #     - name: Cachix
+  #       if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+  #       env:
+  #         CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+  #       run: |
+  #         nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug \
+  #           | cachix push clash-lang
 
 
-  hackage_publish:
-    name: "Hackage: Publish sdist"
-    if: inputs.hackage_publish != 'no'
-    runs-on: self-hosted
-    needs:
-      - hackage_sdist
-      # We want this to run only if all the following jobs all report success.
-      - cabal
-      - cabal_haddock
-      - stack
-      - packages_other
-      - developer_shells
-      - running_testsuite
-      - running_nightly_testsuite
-    env:
-      HACKAGE_RELEASE: ${{ case(inputs.hackage_publish == 'release', 'yes', 'no') }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+  # running_testsuite:
+  #   name: "Running clash-testsuite (${{ matrix.ghc }}\
+  #          ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.hdl }})"
+  #   needs: [ci_recipe, packages_testsuite]
+  #   runs-on: self-hosted
+  #   strategy:
+  #     fail-fast: false
+  #     matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_testsuite.matrix }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
-        with:
-          name: sdist
+  #     - name: Authenticate cache
+  #       env:
+  #         ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+  #       run: .ci/attic-auth.sh
 
-      - name: Install GHC
-        id: ghc_install
-        uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
-        with:
-          ghc-version: "9.6.7"
-          cabal-version: latest
-
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
-        with:
-          endpoint: "192.168.102.136"
-          port: 9000
-          insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
-          region: local
-          use-fallback: false
-          retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-publish
-          path: ${{ steps.ghc_install.outputs.cabal-store }}
-
-      - name: Version information
-        run:
-          cabal --version
-
-      - name: Setup
-        run: .ci/gh-setup.sh
-
-      - name: Publish sdist
-        env:
-          HACKAGE_USERNAME: ${{ secrets.HACKAGE_USERNAME }}
-          HACKAGE_PASSWORD: ${{ secrets.HACKAGE_PASSWORD }}
-          HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
-        # XXX: This GitHub job does not treat the exit code 64 specially like
-        # the GitLab job does/did. Instead of failing allowed-to-fail when
-        # trying to upload a candidate for a released Clash version, we now have
-        # the knob `inputs.hackage_publish` to turn to simply not attempt this
-        # on release branches unless explicitly requested in a workflow dispatch
-        # event.
-        run: |
-          .ci/publish_sdist.sh clash-prelude
-          .ci/publish_sdist.sh clash-prelude-hedgehog
-          .ci/publish_sdist.sh clash-lib
-          .ci/publish_sdist.sh clash-lib-hedgehog
-          .ci/publish_sdist.sh clash-ghc
-
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
-        with:
-          endpoint: "192.168.102.136"
-          port: 9000
-          insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
-          region: local
-          use-fallback: false
-          retry: false
-          key: ${{ runner.os }}-${{ github.ref_name }}-hackage-publish
-          path: ${{ steps.ghc_install.outputs.cabal-store }}
+  #     - name: Run clash-testsuite
+  #       run: |
+  #         nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}. --no-vivado --no-modelsim
 
 
-  all:
-    name: All jobs finished
-    if: ${{ !cancelled() && (inputs.nightly || github.event_name == 'pull_request') }}
-    needs:
-      - ci_recipe
-      - build_mac_windows
-      - cabal
-      - cabal_haddock
-      - stack
-      - packages_common
-      - packages_other
-      - developer_shells
-      - packages_testsuite
-      - running_testsuite
-      - running_nightly_testsuite
-      - hackage_sdist
-      - hackage_publish
-    runs-on: ubuntu-slim
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-      - uses: clash-lang/all-jobs-ok@c34d9724b5d6688f88775c3f8883ce893c9f3dd1  # v2.0.3
-        with:
-          needs: ${{ toJSON(needs) }}
-          exclude: |
-            notify_slack
+  # running_nightly_testsuite:
+  #   # Name is affected by:
+  #   #   job.name expression not evaluated when job skipped
+  #   #   https://github.com/orgs/community/discussions/13261
+  #   name: "Running nightly clash-testsuite (${{ matrix.ghc }}\
+  #          ${{ case(matrix.variant == '', '', ' ') }}${{ matrix.variant }}, ${{ matrix.hdl }})"
+  #   if: fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite
+  #   needs: [ci_recipe, packages_testsuite]
+  #   runs-on: self-hosted
+  #   strategy:
+  #     fail-fast: false
+  #     matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite.matrix }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+  #     - name: Authenticate cache
+  #       env:
+  #         ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+  #       run: .ci/attic-auth.sh
+
+  #     - name: Run clash-testsuite
+  #       run: |
+  #         . /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
+  #         nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}.tools.Vivado.
 
 
-  notify_slack:
-      name: Notify Slack on scheduled failure
-      if: ${{ failure() && inputs.nightly }}
-      needs: all
-      runs-on: ubuntu-slim
-      steps:
-        - name: Post failure notification to Slack
-          uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d  # v4.0.0
-          with:
-            method: chat.postMessage
-            token: ${{ secrets.SLACK_BOT_TOKEN }}
-            payload: |
-              channel: CQR9YG4CT
-              text: "Nightly CI failed on `${{ github.ref_name }}`: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-              blocks:
-                - type: "section"
-                  text:
-                    type: "mrkdwn"
-                    text: "*Nightly CI failed* on `${{ github.ref_name }}` (commit `${{ github.sha }}`)\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+  # hackage_sdist:
+  #   name: "Hackage: Build sdist"
+  #   if: inputs.hackage_publish != 'no'
+  #   runs-on: self-hosted
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+  #     - name: Install GHC
+  #       id: ghc_install
+  #       uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+  #       with:
+  #         ghc-version: "9.6.7"
+  #         cabal-version: latest
+
+  #     - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+  #       with:
+  #         endpoint: "192.168.102.136"
+  #         port: 9000
+  #         insecure: true
+  #         accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+  #         secretKey: "${{ secrets.S3_SECRET_KEY }}"
+  #         bucket: runner
+  #         region: local
+  #         use-fallback: false
+  #         retry: false
+  #         key: ${{ runner.os }}-${{ github.ref_name }}-hackage-sdist
+  #         path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+  #     - name: Version information
+  #       run:
+  #         cabal --version
+
+  #     - name: Setup
+  #       run: .ci/gh-setup.sh
+
+  #     - name: Check version numbers
+  #       run: .ci/check_versions.sh
+
+  #     - name: Build clash-prelude sdist
+  #       run: .ci/build_sdist.sh clash-prelude
+
+  #     - name: Build clash-prelude-hedgehog sdist
+  #       run: .ci/build_sdist.sh clash-prelude-hedgehog
+
+  #     - name: Build clash-lib sdist
+  #       run: .ci/build_sdist.sh clash-lib
+
+  #     - name: Build clash-lib-hedgehog sdist
+  #       run: .ci/build_sdist.sh clash-lib-hedgehog
+
+  #     - name: Build clash-ghc sdist
+  #       run: .ci/build_sdist.sh clash-ghc
+
+  #     - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+  #       with:
+  #         endpoint: "192.168.102.136"
+  #         port: 9000
+  #         insecure: true
+  #         accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+  #         secretKey: "${{ secrets.S3_SECRET_KEY }}"
+  #         bucket: runner
+  #         region: local
+  #         use-fallback: false
+  #         retry: false
+  #         key: ${{ runner.os }}-${{ github.ref_name }}-hackage-sdist
+  #         path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+  #     - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
+  #       with:
+  #         name: sdist
+  #         # clash-{prelude,lib,...}-$version{-docs,}.tar.gz
+  #         path: clash-*.tar.gz
+  #         if-no-files-found: error
+  #         compression-level: 0
+
+
+  # hackage_publish:
+  #   name: "Hackage: Publish sdist"
+  #   if: inputs.hackage_publish != 'no'
+  #   runs-on: self-hosted
+  #   needs:
+  #     - hackage_sdist
+  #     # We want this to run only if all the following jobs all report success.
+  #     - cabal
+  #     - cabal_haddock
+  #     - stack
+  #     - packages_other
+  #     - developer_shells
+  #     - running_testsuite
+  #     - running_nightly_testsuite
+  #   env:
+  #     HACKAGE_RELEASE: ${{ case(inputs.hackage_publish == 'release', 'yes', 'no') }}
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+  #     - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
+  #       with:
+  #         name: sdist
+
+  #     - name: Install GHC
+  #       id: ghc_install
+  #       uses: haskell-actions/setup@0f8e8c99d88aeb3fbfd523f1ef2c6f762d10d64d  # v2.12.1
+  #       with:
+  #         ghc-version: "9.6.7"
+  #         cabal-version: latest
+
+  #     - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+  #       with:
+  #         endpoint: "192.168.102.136"
+  #         port: 9000
+  #         insecure: true
+  #         accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+  #         secretKey: "${{ secrets.S3_SECRET_KEY }}"
+  #         bucket: runner
+  #         region: local
+  #         use-fallback: false
+  #         retry: false
+  #         key: ${{ runner.os }}-${{ github.ref_name }}-hackage-publish
+  #         path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+  #     - name: Version information
+  #       run:
+  #         cabal --version
+
+  #     - name: Setup
+  #       run: .ci/gh-setup.sh
+
+  #     - name: Publish sdist
+  #       env:
+  #         HACKAGE_USERNAME: ${{ secrets.HACKAGE_USERNAME }}
+  #         HACKAGE_PASSWORD: ${{ secrets.HACKAGE_PASSWORD }}
+  #         HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
+  #       # XXX: This GitHub job does not treat the exit code 64 specially like
+  #       # the GitLab job does/did. Instead of failing allowed-to-fail when
+  #       # trying to upload a candidate for a released Clash version, we now have
+  #       # the knob `inputs.hackage_publish` to turn to simply not attempt this
+  #       # on release branches unless explicitly requested in a workflow dispatch
+  #       # event.
+  #       run: |
+  #         .ci/publish_sdist.sh clash-prelude
+  #         .ci/publish_sdist.sh clash-prelude-hedgehog
+  #         .ci/publish_sdist.sh clash-lib
+  #         .ci/publish_sdist.sh clash-lib-hedgehog
+  #         .ci/publish_sdist.sh clash-ghc
+
+  #     - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+  #       with:
+  #         endpoint: "192.168.102.136"
+  #         port: 9000
+  #         insecure: true
+  #         accessKey: "${{ secrets.S3_ACCESS_KEY }}"
+  #         secretKey: "${{ secrets.S3_SECRET_KEY }}"
+  #         bucket: runner
+  #         region: local
+  #         use-fallback: false
+  #         retry: false
+  #         key: ${{ runner.os }}-${{ github.ref_name }}-hackage-publish
+  #         path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+
+  # all:
+  #   name: All jobs finished
+  #   if: ${{ !cancelled() && (inputs.nightly || github.event_name == 'pull_request') }}
+  #   needs:
+  #     - ci_recipe
+  #     - build_mac_windows
+  #     - cabal
+  #     - cabal_haddock
+  #     - stack
+  #     - packages_common
+  #     - packages_other
+  #     - developer_shells
+  #     - packages_testsuite
+  #     - running_testsuite
+  #     - running_nightly_testsuite
+  #     - hackage_sdist
+  #     - hackage_publish
+  #   runs-on: ubuntu-slim
+  #   steps:
+  #     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+  #     - uses: clash-lang/all-jobs-ok@c34d9724b5d6688f88775c3f8883ce893c9f3dd1  # v2.0.3
+  #       with:
+  #         needs: ${{ toJSON(needs) }}
+  #         exclude: |
+  #           notify_slack
+
+
+  # notify_slack:
+  #     name: Notify Slack on scheduled failure
+  #     if: ${{ failure() && inputs.nightly }}
+  #     needs: all
+  #     runs-on: ubuntu-slim
+  #     steps:
+  #       - name: Post failure notification to Slack
+  #         uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d  # v4.0.0
+  #         with:
+  #           method: chat.postMessage
+  #           token: ${{ secrets.SLACK_BOT_TOKEN }}
+  #           payload: |
+  #             channel: CQR9YG4CT
+  #             text: "Nightly CI failed on `${{ github.ref_name }}`: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+  #             blocks:
+  #               - type: "section"
+  #                 text:
+  #                   type: "mrkdwn"
+  #                   text: "*Nightly CI failed* on `${{ github.ref_name }}` (commit `${{ github.sha }}`)\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
