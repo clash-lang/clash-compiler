@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -xou pipefail
 
-# Make sure everything is up-to-date & installing missing dependencies
-sudo apt-get update || exit $?
-sudo apt-get install libtinfo-dev -y || exit $?
-
 GIT_ROOT=$(git rev-parse --show-toplevel)
 [[ $? -ne 0 ]] && exit 1
 CI_DIR=$GIT_ROOT/.ci
