@@ -1528,8 +1528,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   $(namePat 'GHC.Num.Integer.integerLogBase#)
     | Just (a,b) <- integerLiterals args
-    , Just c <- flogBase a b
-    -> (reduce . Literal . WordLiteral . toInteger) c
+    -> reduce $ catchArithException
+         (Literal (WordLiteral (toInteger (W# (GHC.Num.Integer.integerLogBase# a b)))))
 
   $(namePat 'GHC.Float.integerToFloat#)
     | [v] <- args
@@ -1543,8 +1543,9 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
 
   $(namePat 'GHC.Num.naturalLogBase#)
     | Just (a,b) <- naturalLiterals args
-    , Just c <- flogBase a b
-    -> (reduce . Literal . WordLiteral . toInteger) c
+    -> reduce $ catchArithException
+         (Literal (WordLiteral (toInteger
+           (W# (GHC.Num.naturalLogBase# (fromInteger a) (fromInteger b))))))
 
 
   $(namePat 'GHC.Num.Integer.integerToInt#)
@@ -4757,6 +4758,8 @@ ghcPrimStep tcm isSubj pInfo tys args mach = case primName pInfo of
     catchDivByZero = makeUndefinedIf (==DivideByZero)
 
     catchErrorCall = makeUndefinedIf (const True :: ErrorCall -> Bool)
+
+    catchArithException = makeUndefinedIf (const True :: ArithException -> Bool)
 
     -- Implementation shared by every worker of GHC's powImpl, i.e. the
     -- internal function behind '(^)'.
