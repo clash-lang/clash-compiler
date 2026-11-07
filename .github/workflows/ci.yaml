@@ -540,11 +540,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
-
       - name: Run clash-testsuite
         run: |
           nix run .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug -- -j$(.ci/effective_cpus.sh) --hide-successes -p .${{ matrix.hdl }}. --no-vivado --no-modelsim
@@ -564,11 +559,6 @@ jobs:
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite.matrix }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
-
-      - name: Authenticate cache
-        env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
-        run: .ci/attic-auth.sh
 
       - name: Run clash-testsuite
         run: |
