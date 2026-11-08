@@ -112,6 +112,64 @@ tvSubstWithTyEqNoCapture =
       eqTy (VarTy dom) (VarTy a2) `mkFunTy`
         ForAllTy a2 (VarTy dom `mkFunTy` VarTy a2)
 
+-- | 'substWithTyEq' must also substitute in the types of the lambdas between
+-- the type lambda of @dom@ and the equality constraint, such as the implicit
+-- parameters of @HiddenClock dom@. It used to leave @dom@ free there.
+-- https://github.com/clash-lang/clash-compiler/issues/3481
+substWithTyEqEarlierLams :: Assertion
+substWithTyEqEarlierLams = assertAlphaEq expected (substWithTyEq tm)
+ where
+  clk = localId User "clk" 2 (VarTy dom)
+  eq = localId User "eq" 3 (eqTy (VarTy dom) systemTy)
+  -- /\dom -> \(clk :: dom) -> \(eq :: dom ~ System) -> clk
+  tm = TyLam dom (Lam clk (Lam eq (Var clk)))
+
+  clk' = localId User "clk" 2 systemTy
+  eq' = localId User "eq" 3 (eqTy systemTy systemTy)
+  -- \(clk :: System) -> \(eq :: System ~ System) -> clk
+  expected = Lam clk' (Lam eq' (Var clk'))
+
+-- | The type level equivalent of 'substWithTyEqEarlierLams': substituting
+-- @[dom := System]@ in @forall dom. dom -> (dom ~ System) -> dom@ must also
+-- substitute in the argument before the constraint, and in the constraint
+-- itself.
+-- https://github.com/clash-lang/clash-compiler/issues/3481
+tvSubstWithTyEqEarlierArgs :: Assertion
+tvSubstWithTyEqEarlierArgs = assertAlphaEq expected (tvSubstWithTyEq ty)
+ where
+  ty =
+    ForAllTy dom $
+      VarTy dom `mkFunTy` (eqTy (VarTy dom) systemTy `mkFunTy` VarTy dom)
+  expected =
+    systemTy `mkFunTy` (eqTy systemTy systemTy `mkFunTy` systemTy)
+
+-- | 'substWithTyEq' must only substitute in the lambdas in scope of the type
+-- lambda it removes, not in those before it that mention a @dom@ it shadows.
+substWithTyEqShadowed :: Assertion
+substWithTyEqShadowed = assertAlphaEq expected (substWithTyEq tm)
+ where
+  x = localId User "x" 2 (VarTy dom)
+  eq = localId User "eq" 3 (eqTy (VarTy dom) systemTy)
+  -- /\dom -> \(x :: dom) -> /\dom -> \(eq :: dom ~ System) -> x
+  tm = TyLam dom (Lam x (TyLam dom (Lam eq (Var x))))
+
+  eq' = localId User "eq" 3 (eqTy systemTy systemTy)
+  -- /\dom -> \(x :: dom) -> \(eq :: System ~ System) -> x
+  expected = TyLam dom (Lam x (Lam eq' (Var x)))
+
+-- | The type level equivalent of 'substWithTyEqShadowed': in
+-- @forall dom. dom -> forall dom. (dom ~ System) -> dom@, the first argument
+-- refers to the outer @dom@ and must be left alone.
+tvSubstWithTyEqShadowed :: Assertion
+tvSubstWithTyEqShadowed = assertAlphaEq expected (tvSubstWithTyEq ty)
+ where
+  ty =
+    ForAllTy dom $ VarTy dom `mkFunTy`
+      ForAllTy dom (eqTy (VarTy dom) systemTy `mkFunTy` VarTy dom)
+  expected =
+    ForAllTy dom $ VarTy dom `mkFunTy`
+      (eqTy systemTy systemTy `mkFunTy` systemTy)
+
 tests :: TestTree
 tests =
   testGroup
@@ -124,4 +182,12 @@ tests =
         substWithTyEqOrder
     , testCase "tvSubstWithTyEq avoids capture (#1868)"
         tvSubstWithTyEqNoCapture
+    , testCase "substWithTyEq substitutes in earlier lambdas (#3481)"
+        substWithTyEqEarlierLams
+    , testCase "tvSubstWithTyEq substitutes in earlier arguments (#3481)"
+        tvSubstWithTyEqEarlierArgs
+    , testCase "substWithTyEq leaves shadowed type variables alone"
+        substWithTyEqShadowed
+    , testCase "tvSubstWithTyEq leaves shadowed type variables alone"
+        tvSubstWithTyEqShadowed
     ]

@@ -58,7 +58,7 @@ import           Clash.Core.Name         (Name(nameOcc,nameUniq))
 import           Clash.Core.Pretty       (showPpr)
 import           Clash.Core.Subst
   (deShadowTerm, extendTvSubst, mkSubst, substTm, substTy,
-   substId, extendIdSubst)
+   substId, substIdBndr, extendIdSubst)
 import           Clash.Core.Term
 import           Clash.Core.Type
   (Type(ForAllTy,LitTy, VarTy), LitTy(SymTy), TypeView (..), tyView,
@@ -499,16 +499,22 @@ substWithTyEq e0 = go [] False e0
   go args changed (Lam v e)
     | TyConApp (nameUniq -> tcUniq) (tvFirst -> Just (tv, ty)) <- tyView (coreTypeOf v)
     , tcUniq == fromGhcUnique eqTyConKey
-    , Right tv `elem` args
+    , (inner, Right _ : outer) <- List.break (== Right tv) args
     = let
-        tvs = rights args
+        tvs = rights (inner ++ outer)
         subst0 = extendTvSubst (mkSubst $ mkInScopeSet $ mkVarSet tvs) tv ty
-        removedTy = substTy subst0 $ coreTypeOf v
-        subst1 = extendIdSubst subst0 v (TyApp (Prim removedArg) removedTy)
-      in go (Left (substId subst0 v) : (args List.\\ [Right tv])) True (substTm "substWithTyEq e" subst1 e)
+        -- The binders between the type lambda of 'tv' and the constraint can
+        -- mention 'tv' too.
+        (subst1, inner1) = List.mapAccumR substArg subst0 inner
+        removedTy = substTy subst1 $ coreTypeOf v
+        subst2 = extendIdSubst subst1 v (TyApp (Prim removedArg) removedTy)
+      in go (Left (substId subst1 v) : inner1 ++ outer) True (substTm "substWithTyEq e" subst2 e)
     | otherwise = go (Left v : args) changed e
   go args True e = mkAbstraction e (reverse args)
   go _ False _ = e0
+
+  substArg subst (Left v) = Left <$> substIdBndr subst v
+  substArg subst (Right tv) = (subst, Right tv)
 
 -- Type equality (~) is symmetrical, so users could write: (dom ~ System) or (System ~ dom)
 tvFirst :: [Type] -> Maybe (TyVar, Type)
@@ -529,9 +535,13 @@ tvSubstWithTyEq ty0 = go [] False ty0
     | Just (tc,tcArgs) <- splitTyConAppM arg
     , nameUniq tc == fromGhcUnique eqTyConKey
     , Just (tv,ty) <- tvFirst tcArgs
+    , (inner, Left _ : outer) <- List.break (== Left tv) argsOut
     = let
-        argsOut2 = Right arg : (argsOut List.\\ [Left tv])
-        subst = extendTvSubst (mkSubst $ mkInScopeSet $ mkVarSet $ lefts argsOut2) tv ty
+        subst = extendTvSubst (mkSubst $ mkInScopeSet $ mkVarSet $ lefts (inner ++ outer)) tv ty
+        -- The arguments between the forall of 'tv' and the constraint can
+        -- mention 'tv' too.
+        inner1 = fmap (fmap (substTy subst)) inner
+        argsOut2 = Right (substTy subst arg) : inner1 ++ outer
       in go argsOut2 True  (substTy subst tyRes)
     | otherwise = go (Right arg : argsOut) changed tyRes
   go _ False _ = ty0 -- no eq constraints, returning original type

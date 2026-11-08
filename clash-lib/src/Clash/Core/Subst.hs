@@ -50,6 +50,7 @@ module Clash.Core.Subst
   , unsafeSubstTm
   , substAlt
   , substId
+  , substIdBndr
     -- * Variable renaming
   , deShadowTerm
   , deShadowAlt

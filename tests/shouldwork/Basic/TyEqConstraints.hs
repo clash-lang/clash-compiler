@@ -48,3 +48,12 @@ topEntity5 = id
 topEntity6 :: (a ~ Int, HasCallStack, dom ~ System) => Signal dom a -> Signal System Int
 topEntity6 = id
 {-# ANN topEntity6 (defSyn "top6") #-}
+
+-- make sure we substitute in constraints before the equality constraint, see
+-- https://github.com/clash-lang/clash-compiler/issues/3481
+topEntity7
+  :: (HiddenClockResetEnable dom, dom ~ System)
+  => Signal dom Int
+  -> Signal dom Int
+topEntity7 = register 0
+{-# ANN topEntity7 (defSyn "top7") #-}
