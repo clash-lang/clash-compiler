@@ -11,5 +11,6 @@ jobs:
       flavor: nightly
       nightly: true
       mac_windows: false
+      fork_pr: false
       hackage_publish: release
     secrets: inherit

@@ -13,6 +13,9 @@ on:
       mac_windows:
         required: true
         type: boolean
+      fork_pr:
+        required: true
+        type: boolean
       hackage_publish:
         # Valid values:
         #   - "no": Don't build and upload sdists
@@ -187,6 +190,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).cabal.matrix }}
     steps:
+      - id: alt_secrets
+        run: get-secrets S3_ACCESS_KEY S3_SECRET_KEY
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       # Perhaps we should preinstall these on the container?
@@ -200,13 +206,44 @@ jobs:
           cabal-version: latest
           cabal-update: false
 
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: Restore from cache for fork PR's
+        if: inputs.fork_pr
+        id: ext_pr_cache
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ steps.alt_secrets.outputs.S3_ACCESS_KEY }}
+          secretKey: ${{ steps.alt_secrets.outputs.S3_SECRET_KEY }}
+          bucket: fork-pr-runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Restore from cache
+        if: "!steps.ext_pr_cache.outputs.cache-matched-key"
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
           bucket: runner
           region: local
           use-fallback: false
@@ -231,15 +268,37 @@ jobs:
       - name: Build dependencies
         run: cabal v2-build all -j$(.ci/effective_cpus.sh) --dependencies-only
 
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: >-
+          Save to cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
+        uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
-          reion: local
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
+          bucket: |-
+            ${{ case(
+              inputs.fork_pr,
+                'fork-pr-runner',
+              'runner'
+            ) }}
+          region: local
           use-fallback: false
           retry: false
           key: ${{ runner.os }}-${{ github.ref_name }}-cabal-${{ matrix.ghc }}-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
@@ -263,6 +322,9 @@ jobs:
     name: Haddock tests
     runs-on: self-hosted
     steps:
+      - id: alt_secrets
+        run: get-secrets S3_ACCESS_KEY S3_SECRET_KEY
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install GHC
@@ -272,13 +334,44 @@ jobs:
           ghc-version: "9.6.7"
           cabal-version: latest
 
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: Restore from cache for fork PR's
+        if: inputs.fork_pr
+        id: ext_pr_cache
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ steps.alt_secrets.outputs.S3_ACCESS_KEY }}
+          secretKey: ${{ steps.alt_secrets.outputs.S3_SECRET_KEY }}
+          bucket: fork-pr-runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-${{ hashFiles('.ci/cabal.project.local.in', '.github/workflow/ci.yaml', 'cabal.project', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-cabal-haddock-
+          path: ${{ steps.ghc_install.outputs.cabal-store }}
+
+      - name: Restore from cache
+        if: "!steps.ext_pr_cache.outputs.cache-matched-key"
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
           bucket: runner
           region: local
           use-fallback: false
@@ -299,14 +392,36 @@ jobs:
       - name: Build dependencies
         run: cabal v2-build clash-prelude clash-prelude-hedgehog clash-lib clash-lib-hedgehog -O0 --enable-documentation --only-dependencies
 
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: >-
+          Save to cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
+        uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
+          bucket: |-
+            ${{ case(
+              inputs.fork_pr,
+                'fork-pr-runner',
+              'runner'
+            ) }}
           region: local
           use-fallback: false
           retry: false
@@ -320,6 +435,9 @@ jobs:
     name: Stack compilation test
     runs-on: self-hosted
     steps:
+      - id: alt_secrets
+        run: get-secrets S3_ACCESS_KEY S3_SECRET_KEY
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       # Perhaps we should preinstall these on the container?
@@ -332,13 +450,47 @@ jobs:
           stack-no-global: true
           stack-version: latest
 
-      - uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: Restore from cache for fork PR's
+        if: inputs.fork_pr
+        id: ext_pr_cache
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ steps.alt_secrets.outputs.S3_ACCESS_KEY }}
+          secretKey: ${{ steps.alt_secrets.outputs.S3_SECRET_KEY }}
+          bucket: fork-pr-runner
+          region: local
+          use-fallback: false
+          retry: false
+          key: ${{ runner.os }}-${{ github.ref_name }}-stack-${{ hashFiles('stack.yaml', '.github/workflow/ci.yaml', '**/*.cabal' ) }}
+          restore-keys: |
+            ${{ runner.os }}-${{ github.ref_name }}-stack-
+          # stack-root is set to null for some reason, which in turn breaks the entire stack cache
+          # Hardcoding the stack path... for now
+          # path: ${{ steps.ghc_install.outputs.stack-root }}
+          path: ~/.stack
+
+      - name: Restore from cache
+        if: "!steps.ext_pr_cache.outputs.cache-matched-key"
+        uses: tespkg/actions-cache/restore@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+        with:
+          endpoint: "192.168.102.136"
+          port: 9000
+          insecure: true
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
           bucket: runner
           region: local
           use-fallback: false
@@ -366,14 +518,36 @@ jobs:
         run:
           stack build -j$(.ci/effective_cpus.sh) --dependencies-only
 
-      - uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
+      - name: >-
+          Save to cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
+        uses: tespkg/actions-cache/save@e07e2d4953dc8c020d447363e5064e36d04f3cf9  # v1.10.2
         with:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
-          bucket: runner
+          accessKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_ACCESS_KEY,
+              secrets.S3_ACCESS_KEY
+            ) }}
+          secretKey: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.S3_SECRET_KEY,
+              secrets.S3_SECRET_KEY
+            ) }}
+          bucket: |-
+            ${{ case(
+              inputs.fork_pr,
+                'fork-pr-runner',
+              'runner'
+            ) }}
           region: local
           use-fallback: false
           retry: false
@@ -400,12 +574,38 @@ jobs:
       # If caching fails for one package, then we are still interested in caching other packages
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_common.matrix }}
+    env:
+      ATTIC_CACHE: |-
+       ${{ case(
+         inputs.fork_pr,
+           'fork-pr',
+         'public'
+       ) }}
+
     steps:
+      - id: alt_secrets
+        run: get-secrets ATTIC_AUTH_TOKEN
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
+      - name: Install cache for fork PR's
+        if: inputs.fork_pr
+        run: .ci/nix_add_fork_pr_cache.sh
+
+      - name: >-
+          Authenticate cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
+          ATTIC_AUTH_TOKEN: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.ATTIC_AUTH_TOKEN,
+              secrets.ATTIC_AUTH_TOKEN
+            ) }}
         run: .ci/attic-auth.sh
 
         # Most clash- related packages depend on these three packages, having them be build
@@ -418,16 +618,16 @@ jobs:
 
       - run: |
           nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude)
+          attic push "$ATTIC_CACHE" $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-prelude)
       - run: |
           nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib)
+          attic push "$ATTIC_CACHE" $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-lib)
       - run: |
           nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc)
+          attic push "$ATTIC_CACHE" $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-ghc)
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        if: "!inputs.fork_pr && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10')"
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
@@ -447,22 +647,48 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_other.matrix }}
+    env:
+      ATTIC_CACHE: |-
+       ${{ case(
+         inputs.fork_pr,
+           'fork-pr',
+         'public'
+       ) }}
+
     steps:
+      - id: alt_secrets
+        run: get-secrets ATTIC_AUTH_TOKEN
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
+      - name: Install cache for fork PR's
+        if: inputs.fork_pr
+        run: .ci/nix_add_fork_pr_cache.sh
+
+      - name: >-
+          Authenticate cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
+          ATTIC_AUTH_TOKEN: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.ATTIC_AUTH_TOKEN,
+              secrets.ATTIC_AUTH_TOKEN
+            ) }}
         run: .ci/attic-auth.sh
 
       - name: Build
         run: nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }}
 
       - name: Local cache
-        run: attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }})
+        run: attic push "$ATTIC_CACHE" $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.${{ matrix.package }})
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        if: "!inputs.fork_pr && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10')"
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
@@ -477,22 +703,48 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).developer_shells.matrix }}
+    env:
+      ATTIC_CACHE: |-
+       ${{ case(
+         inputs.fork_pr,
+           'fork-pr',
+         'public'
+       ) }}
+
     steps:
+      - id: alt_secrets
+        run: get-secrets ATTIC_AUTH_TOKEN
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
+      - name: Install cache for fork PR's
+        if: inputs.fork_pr
+        run: .ci/nix_add_fork_pr_cache.sh
+
+      - name: >-
+          Authenticate cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
+          ATTIC_AUTH_TOKEN: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.ATTIC_AUTH_TOKEN,
+              secrets.ATTIC_AUTH_TOKEN
+            ) }}
         run: .ci/attic-auth.sh
 
       - name: Nix devShell ${{ matrix.ghc }}
         run: nix build -L .#devShells.x86_64-linux.ghc${{ matrix.ghc }}
 
       - name: Local cache
-        run: attic push public $(nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }})
+        run: attic push "$ATTIC_CACHE" $(nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }})
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        if: "!inputs.fork_pr && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10')"
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: nix path-info .#devShells.x86_64-linux.ghc${{ matrix.ghc }} | cachix push clash-lang
@@ -507,21 +759,47 @@ jobs:
       # If caching fails for one package, then we are still interested in caching other packages
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).packages_testsuite.matrix }}
+    env:
+      ATTIC_CACHE: |-
+       ${{ case(
+         inputs.fork_pr,
+           'fork-pr',
+         'public'
+       ) }}
+
     steps:
+      - id: alt_secrets
+        run: get-secrets ATTIC_AUTH_TOKEN
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
-      - name: Authenticate cache
+      - name: Install cache for fork PR's
+        if: inputs.fork_pr
+        run: .ci/nix_add_fork_pr_cache.sh
+
+      - name: >-
+          Authenticate cache
+          ${{ case(
+            inputs.fork_pr,
+              'for fork PR''s',
+            ''
+          ) }}
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
+          ATTIC_AUTH_TOKEN: |-
+            ${{ case(
+              inputs.fork_pr,
+                steps.alt_secrets.outputs.ATTIC_AUTH_TOKEN,
+              secrets.ATTIC_AUTH_TOKEN
+            ) }}
         run: .ci/attic-auth.sh
 
       - name: Build clash-testsuite
         run: |
           nix build -L .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug
-          attic push public $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug)
+          attic push "$ATTIC_CACHE" $(nix path-info .#clashPackages${{ matrix.variant }}-ghc${{ matrix.ghc }}.clash-testsuite-debug)
 
       - name: Cachix
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10'
+        if: "!inputs.fork_pr && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/1.10')"
         env:
           CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
         run: |
@@ -538,7 +816,14 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_testsuite.matrix }}
     steps:
+      - id: alt_secrets
+        run: get-secrets
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - name: Install cache for fork PR's
+        if: inputs.fork_pr
+        run: .ci/nix_add_fork_pr_cache.sh
 
       - name: Run clash-testsuite
         run: |
@@ -558,6 +843,9 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJSON(needs.ci_recipe.outputs.recipe).running_nightly_testsuite.matrix }}
     steps:
+      - id: alt_secrets
+        run: get-secrets
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Run clash-testsuite
@@ -571,6 +859,9 @@ jobs:
     if: inputs.hackage_publish != 'no'
     runs-on: self-hosted
     steps:
+      - id: alt_secrets
+        run: get-secrets
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - name: Install GHC
@@ -585,8 +876,8 @@ jobs:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ secrets.S3_ACCESS_KEY }}
+          secretKey: ${{ secrets.S3_SECRET_KEY }}
           bucket: runner
           region: local
           use-fallback: false
@@ -624,8 +915,8 @@ jobs:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ secrets.S3_ACCESS_KEY }}
+          secretKey: ${{ secrets.S3_SECRET_KEY }}
           bucket: runner
           region: local
           use-fallback: false
@@ -659,6 +950,9 @@ jobs:
     env:
       HACKAGE_RELEASE: ${{ case(inputs.hackage_publish == 'release', 'yes', 'no') }}
     steps:
+      - id: alt_secrets
+        run: get-secrets
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333  # v8.0.2
@@ -677,8 +971,8 @@ jobs:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ secrets.S3_ACCESS_KEY }}
+          secretKey: ${{ secrets.S3_SECRET_KEY }}
           bucket: runner
           region: local
           use-fallback: false
@@ -716,8 +1010,8 @@ jobs:
           endpoint: "192.168.102.136"
           port: 9000
           insecure: true
-          accessKey: "${{ secrets.S3_ACCESS_KEY }}"
-          secretKey: "${{ secrets.S3_SECRET_KEY }}"
+          accessKey: ${{ secrets.S3_ACCESS_KEY }}
+          secretKey: ${{ secrets.S3_SECRET_KEY }}
           bucket: runner
           region: local
           use-fallback: false
