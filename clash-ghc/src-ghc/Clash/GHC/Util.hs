@@ -13,8 +13,8 @@ import GHC.Utils.Outputable as X (showPprUnsafe, showSDocUnsafe)
 import GHC.Utils.Outputable (SDoc, neverQualify)
 import GHC.Utils.Error (mkErrorMsgEnvelope, mkPlainError)
 import GHC.Plugins
-  (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO,
-   noSrcSpan, text, throwOneError)
+  (DynFlags, SourceError, SrcSpan, ($$), blankLine, empty,
+   isGoodSrcSpan, liftIO, noSrcSpan, text, throwOneError)
 import GHC.Types.Error (mkSimpleUnknownDiagnostic)
 #else
 import GHC.Driver.Errors.Types (GhcMessage(GhcUnknownMessage))
@@ -22,8 +22,8 @@ import GHC.Utils.Outputable as X (showPprUnsafe, showSDocUnsafe)
 import GHC.Utils.Outputable (SDoc, neverQualify)
 import GHC.Utils.Error (mkErrorMsgEnvelope, mkPlainError)
 import GHC.Plugins
-  (DynFlags, SourceError, ($$), blankLine, empty, isGoodSrcSpan, liftIO,
-   noSrcSpan, text, throwOneError)
+  (DynFlags, SourceError, SrcSpan, ($$), blankLine, empty,
+   isGoodSrcSpan, liftIO, noSrcSpan, text, throwOneError)
 import GHC.Types.Error (UnknownDiagnostic(..))
 #endif
 import GHC                (GhcMonad(..), printException)
@@ -32,6 +32,7 @@ import GHC                (GhcMonad(..), printException)
 import Control.Exception  (ErrorCall(..))
 #endif
 import Control.Exception  (Exception(..))
+import Control.Monad.IO.Class (MonadIO)
 import GHC.Exception      (SomeException)
 import System.Exit        (ExitCode(ExitFailure), exitWith)
 
@@ -46,6 +47,17 @@ import Clash.Driver.Types (ClashOpts(..))
 textLines :: String -> SDoc
 textLines s = foldl1 ($$) (map text (lines s))
 
+-- | Throw an error at the given source location. GHC renders it like its own
+-- errors, i.e., with a code snippet if the location is known.
+throwPlainError :: MonadIO m => SrcSpan -> SDoc -> m a
+throwPlainError sp msg =
+  throwOneError $ mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $
+#if MIN_VERSION_ghc(9,8,0)
+    mkSimpleUnknownDiagnostic $ mkPlainError [] msg
+#else
+    UnknownDiagnostic $ mkPlainError [] msg
+#endif
+
 handleClashException
   :: GhcMonad m
   => DynFlags
@@ -56,35 +68,20 @@ handleClashException _df opts e = case fromException e of
   Just (ClashException sp s eM) -> do
     let srcInfo' | isGoodSrcSpan sp = srcInfo
                  | otherwise = empty
-    throwOneError
-#if MIN_VERSION_ghc(9,8,0)
-      (mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
-#else
-      (mkErrorMsgEnvelope sp neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
-#endif
-        (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM))
+    throwPlainError sp
+      (blankLine $$ textLines s $$ blankLine $$ srcInfo' $$ showExtra (opt_errorExtra opts) eM)
   _ -> case fromException e of
 #if !MIN_VERSION_ghc(9,12,0)
     Just (ErrorCallWithLocation _ _) ->
-      throwOneError
-#if MIN_VERSION_ghc(9,8,0)
-        (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
-#else
-        (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
-#endif
-        (text "Clash error call:" $$ textLines (show e)))
+      throwPlainError noSrcSpan
+        (text "Clash error call:" $$ textLines (show e))
     _ -> case fromException e of
 #endif
       Just (e' :: SourceError) -> do
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)
-      _ -> throwOneError
-#if MIN_VERSION_ghc(9,8,0)
-              (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ mkSimpleUnknownDiagnostic $ mkPlainError []
-#else
-              (mkErrorMsgEnvelope noSrcSpan neverQualify $ GhcUnknownMessage $ UnknownDiagnostic $ mkPlainError []
-#endif
-              (text "Other error:" $$ textLines (displayException e)))
+      _ -> throwPlainError noSrcSpan
+              (text "Other error:" $$ textLines (displayException e))
   where
     srcInfo = textLines [i|
       The source location of the error is not exact, only indicative, as it
