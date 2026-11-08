@@ -249,6 +249,10 @@ runClashTest = defaultMain
               primitive for WrongReference.myMultiplyX. These names should be
               the same. |])
           }
+        , runTest "WrongReference" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "WrongReference.hs:22:1: error:")
+          }
         , -- Regression test for #2365: errors in a precompiled module must be
           -- reported as is. 'T2365' is compiled into the clash-testsuite
           -- library and has no source on the search path.
