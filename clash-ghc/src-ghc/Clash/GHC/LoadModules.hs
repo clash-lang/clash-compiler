@@ -2,16 +2,14 @@
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd,
                      2017-2024, Google Inc.
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -36,13 +34,11 @@ import           Clash.Primitives.Types          (UnresolvedPrimitive)
 import           Clash.Util                      (ClashException(..), pkgIdFromTypeable)
 import qualified Clash.Util.Interpolate          as I
 import           Control.Arrow                   (first)
-import           Control.Exception               (SomeException, throw)
+import           Control.Exception               (throw)
 import           Control.Monad                   (forM, join, when)
 import           Data.List.Extra                 (nubSort)
-import           Control.Exception               (Exception, throwIO)
+import           Control.Exception               (throwIO)
 import           Control.Monad                   (foldM)
-import           Control.Monad.Catch             (catch, throwM)
-import           Control.Monad.Catch             as MC (try)
 import           Control.Monad.IO.Class          (liftIO)
 import           Data.Char                       (isDigit)
 #if !MIN_VERSION_ghc(9,14,0)
@@ -121,6 +117,9 @@ import qualified GHC.Utils.Monad as MonadUtils
 import qualified GHC.Utils.Panic as Panic
 import qualified GHC.Serialized as Serialized (deserializeWithData)
 import qualified GHC.Unit.Types as UnitTypes (unitIdString)
+import qualified GHC.Unit.Finder as Finder
+import qualified GHC.Unit.Home as HomeUnit
+import qualified GHC.Types.PkgQual as PkgQual
 import qualified GHC.Tc.Utils.Monad as TcRnMonad
 import qualified GHC.Tc.Types as TcRnTypes
 import qualified GHC.Iface.Tidy as TidyPgm
@@ -187,6 +186,27 @@ getProcessOutput command =
      return (output, exitCode)
 #endif
 
+-- | Should the module given on the command line be loaded from local sources
+-- ('loadLocalModule') rather than from a package database
+-- ('loadExternalModule')?
+--
+-- File paths and modules found in the home unit (i.e., a source file on the
+-- import path) are loaded from local sources. Like in 'GHC.findModule', the
+-- latter take precedence over modules in a package database. Any other module
+-- name is loaded from a package database, including names that cannot be found
+-- at all: 'GHC.findModule' then reports why, including hints such as the module
+-- being part of a hidden package.
+isLocalTarget :: GHC.GhcMonad m => GHC.Target -> m Bool
+isLocalTarget target =
+  case GHC.targetId target of
+    GHC.TargetFile{} -> pure True
+    GHC.TargetModule modName -> do
+      hscEnv <- GHC.getSession
+      res <- liftIO $ Finder.findImportedModule hscEnv modName PkgQual.NoPkgQual
+      pure $ case res of
+        Finder.Found _ m -> HomeUnit.isHomeModule (HscTypes.hsc_home_unit hscEnv) m
+        _ -> False
+
 -- | Search databases for given module
 loadExternalModule
   :: (HasCallStack, GHC.GhcMonad m)
@@ -198,15 +218,13 @@ loadExternalModule
   -- ^ Name passed with @-main-is@, if any. When set, only the transitive
   -- closure of this binder is loaded (instead of the closure of all exports of
   -- the module). See 'loadSeed'.
-  -> m (Either
-          SomeException
-          ( [CoreSyn.CoreBndr]                     -- Root binders
-          , FamInstEnv.FamInstEnv                  -- Local type family instances
-          , GHC.ModuleName                         -- Module name
-          , LoadedBinders
-          , [CoreSyn.CoreBind]                     -- All bindings
-          ) )
-loadExternalModule hdl modName0 mainIsM = MC.try $ do
+  -> m ( [CoreSyn.CoreBndr]                     -- Root binders
+       , FamInstEnv.FamInstEnv                  -- Local type family instances
+       , GHC.ModuleName                         -- Module name
+       , LoadedBinders
+       , [CoreSyn.CoreBind]                     -- All bindings
+       )
+loadExternalModule hdl modName0 mainIsM = do
   let modName1 = GHC.mkModuleName modName0
   foundMod <- GHC.findModule modName1 Nothing
   loadFamilyInstanceModules foundMod
@@ -366,17 +384,15 @@ setupGhc useColor dflagsM idirs = do
 loadLocalModule
   :: GHC.GhcMonad m
   => HDL
-  -> String
-  -- ^ Module name. Can either be a filepath pointing to a .hs file, or a
-  -- qualified module name (example: "Data.List").
+  -> GHC.Target
+  -- ^ Module to load, see 'GHC.guessTarget'
   -> m ( [CoreSyn.CoreBndr]                     -- Root binders
        , FamInstEnv.FamInstEnv                  -- Local type family instances
        , GHC.ModuleName                         -- Module name
        , LoadedBinders
        , [CoreSyn.CoreBind]                     -- All bindings
        )
-loadLocalModule hdl modName = do
-  target <- GHC.guessTarget modName Nothing Nothing
+loadLocalModule hdl target = do
   GHC.setTargets [target]
   modGraph <- GHC.depanal [] False
   let modGraph' = GHC.mapMG disableOptimizationsFlags modGraph
@@ -517,26 +533,6 @@ isTestBenchName = (== "testBench") . varNameString
 isMagicName :: Var.Var -> Bool
 isMagicName v = isTopEntityName v || isTestBenchName v
 
-data LoadModulesException = LoadModulesException
-  { moduleName :: String
-  , externalError :: String
-  , localError :: String
-  } deriving (Exception)
-
-instance Show LoadModulesException where
-  showsPrec :: Int -> LoadModulesException -> ShowS
-  showsPrec _ LoadModulesException{moduleName, externalError, localError} = showString [I.i|
-    Failed to load module '#{moduleName}'.
-
-    Tried to load it from precompiled sources, error was:
-
-      #{externalError}
-
-    Tried to load it from local sources, error was:
-
-      #{localError}
-  |]
-
 loadModules
   :: GHC.Ghc ()
   -- ^ Allows us to have some initial action, such as sharing a linker state
@@ -575,21 +571,12 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
 
     let mainIsM = GHC.mainFunIs =<< dflagsM
+    target <- GHC.guessTarget modName Nothing Nothing
+    isLocal <- isLocalTarget target
     (rootIds, modFamInstEnvs, _rootModule, LoadedBinders{..}, allBinders) <-
-      -- We need to try and load external modules first, because we can't
-      -- recover from errors in 'loadLocalModule'.
-      loadExternalModule hdl modName mainIsM >>= \case
-        Left loadExternalErr -> do
-          catch @_ @SomeException
-            (loadLocalModule hdl modName)
-            (\localError ->
-              throwM
-                (LoadModulesException
-                  { moduleName = modName
-                  , externalError = show loadExternalErr
-                  , localError = show localError
-                  }))
-        Right res -> pure res
+      if isLocal
+        then loadLocalModule hdl target
+        else loadExternalModule hdl modName mainIsM
 
     let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
 
