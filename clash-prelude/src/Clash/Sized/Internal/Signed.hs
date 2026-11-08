@@ -161,10 +161,13 @@ type role Signed nominal
 -- a 'Signed' @n@ number has a range of: [-(2^(@n@-1)) .. 2^(@n@-1)-1] for
 -- @n > 0@. When @n = 0@, both the min and max bound are 0.
 --
--- * __NB__: The usual Haskell method of converting an integral numeric type to
--- another, 'fromIntegral', is not well suited for Clash as it will go through
--- 'Integer' which is arbitrarily bounded in HDL. Instead use
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-- * __NB__: To convert to another number type, use
+-- 'Clash.Class.NumConvert.numConvert' if the target type can hold every value,
+-- 'Clash.Class.NumConvert.maybeNumConvert' if it might not, the
+-- 'Clash.Class.Resize.Resize' class to change the width, and
+-- 'Clash.Class.BitPack.bitCoerce' only to reinterpret the bits. Avoid
+-- 'fromIntegral': it goes through 'Integer', which has a fixed width in HDL.
+-- See "Clash.Class.NumConvert" for an overview with examples.
 -- * __NB__: The 'Num' operators perform @wrap-around@ on overflow. If you want
 -- saturation on overflow, check out the 'SaturatingNum' class.
 --
