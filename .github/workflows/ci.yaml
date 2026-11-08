@@ -405,7 +405,7 @@ jobs:
 
       - name: Authenticate cache
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
         run: .ci/attic-auth.sh
 
         # Most clash- related packages depend on these three packages, having them be build
@@ -452,7 +452,7 @@ jobs:
 
       - name: Authenticate cache
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
         run: .ci/attic-auth.sh
 
       - name: Build
@@ -482,7 +482,7 @@ jobs:
 
       - name: Authenticate cache
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
         run: .ci/attic-auth.sh
 
       - name: Nix devShell ${{ matrix.ghc }}
@@ -512,7 +512,7 @@ jobs:
 
       - name: Authenticate cache
         env:
-          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_SECRET }}
+          ATTIC_AUTH_TOKEN: ${{ secrets.ATTIC_AUTH_TOKEN }}
         run: .ci/attic-auth.sh
 
       - name: Build clash-testsuite
