@@ -2,7 +2,7 @@
 
 [![Pipeline status](https://gitlab.com/clash-lang/clash-compiler/badges/master/pipeline.svg)](https://gitlab.com/clash-lang/clash-compiler/commits/master)
 [![Hackage](https://img.shields.io/hackage/v/clash-ghc.svg)](https://hackage.haskell.org/package/clash-ghc)
-[![Documentation Status](https://readthedocs.org/projects/clash-lang/badge/?version=latest)](https://clash-lang.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/clash-lang/badge/?version=latest)](https://docs.clash-lang.org/)
 
 Clash is a functional hardware description language that borrows both
 its syntax and semantics from the functional programming language
