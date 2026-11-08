@@ -432,7 +432,7 @@ runClashTest t3105Env = defaultMain
         }
       , runTest "RecursiveDatatype" def{
           hdlTargets=[VHDL]
-        , expectClashFail=Just (def, "This bndr has a non-representable return type and can't be normalized:")
+        , expectClashFail=Just (def, "This binder has a non-representable return type and can't be normalized:")
         }
 --        Disabled, due to it eating gigabytes of memory:
 --      , runTest "RecursivePoly" def{
@@ -821,6 +821,11 @@ runClashTest t3105Env = defaultMain
         , outputTest "T3056" def{hdlTargets=[Verilog]}
         , outputTest "T3516_isConstant_WorkInfo" def{hdlTargets=[Verilog]}
         , runTest "T3495_iterateI_arg_type" def{hdlTargets=[Verilog]}
+        , runTest "T3521_nonrep_function_result" def{
+            hdlTargets=[Verilog]
+          , hdlSim=[]
+          , expectClashFail=Just (def, "This binder has a non-representable return type and can't be normalized")
+          }
         ] <>
         if compiledWith == Cabal then
           -- This tests fails without environment files present, which are only
