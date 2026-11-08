@@ -11,6 +11,7 @@ jobs:
       flavor: pr
       nightly: false
       mac_windows: true
+      fork_pr: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
       hackage_publish: "no"
     secrets: inherit
 
@@ -19,6 +20,9 @@ jobs:
     name: Check qlog entries
     runs-on: self-hosted
     steps:
+      - id: alt_secrets
+        run: get-secrets
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Find and check changed entries
         env:
