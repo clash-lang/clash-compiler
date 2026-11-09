@@ -28,7 +28,7 @@ module Clash.Signal.Trace (
 
   -- ** Tracing
   trace,
-  traceVec, traceRec, RecTraces(..),
+  traceVec,
   traceReset, traceEnable,
 
   -- ** Traces
@@ -51,7 +51,6 @@ module Clash.Signal.Trace (
   store,
   stores,
   storeSignal,
-  storeSignals,
   storeTrace,
   storeTraces,
 
