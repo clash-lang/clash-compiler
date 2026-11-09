@@ -43,7 +43,7 @@ import Control.Monad (foldM, when)
 import Data.Aeson hiding (Value) --(encode, eitherDecode, ToJSON(..), FromJSON(..), Array)
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Lazy (ByteString)
-import Data.List (transpose)
+import Data.List (transpose, zipWith4)
 import GHC.Bits (shiftL, shiftR, (.|.), (.&.))
 import GHC.Generics (Generic)
 import GHC.Natural (Natural)
@@ -155,13 +155,24 @@ storeTrace0 (start,stop) signals values = header0 <> "\n\0" <> rawValues
   natToBytes n = map (\x -> fromIntegral (n `shiftR` (8*x))) [0..k-1] -- TODO: more efficient implementation?
 
 -- | Store a single trace as a signal dump.
-storeTrace :: String -> (Int,Int) -> Trace -> ByteString
+storeTrace ::
+  forall t.
+  TraceSystem t =>
+  String ->
+  (Int,Int) ->
+  Trace t ->
+  ByteString
 storeTrace name samples Trace{..} =
   storeTrace0 samples (Left SignalDescr{name,width,dataType}) values
 
 -- | Store multiple traces in a single binary file.
 -- All traces must have the same clock period.
-storeTraces :: (Int,Int) -> [(String,Trace)] -> Either String ByteString
+storeTraces ::
+  forall t.
+  TraceSystem t =>
+  (Int, Int) ->
+  [(String, Trace t)] ->
+  Either String ByteString
 storeTraces samples traces = do
   let same (a:r@(b:_)) = a==b && (same r)
       same _ = True
@@ -184,9 +195,11 @@ storeTraces samples traces = do
 
 -- | Store a trace in binary form.
 store ::
+  forall t.
+  TraceSystem t =>
   -- | Name of trace to dump
   String ->
-  Simulation ->
+  Simulation t ->
   Either String ByteString
 store name sim@Simulation{simTimes} = do
   trc <- fetchTrace name sim
@@ -196,9 +209,11 @@ store name sim@Simulation{simTimes} = do
 -- | Store multiple traces into a single binary.
 -- All traces must have the same clock period.
 stores ::
+  forall t.
+  TraceSystem t =>
   -- | Names of traces to dump
   [String] ->
-  Simulation ->
+  Simulation t ->
   Either String ByteString
 stores names sim@Simulation{simTimes} = do
   traces <- mapM (\n -> fetchTrace n sim) names
@@ -210,9 +225,10 @@ stores names sim@Simulation{simTimes} = do
 
 -- | Store a 'Signal' in binary form.
 storeSignal ::
-  forall dom a.
+  forall t dom a.
+  TraceSystem t =>
   KnownDomain dom =>
-  Traceable a =>
+  Traceable t a =>
   -- | Name of trace to dump
   String ->
   -- | Range of samples to dump
@@ -220,7 +236,7 @@ storeSignal ::
   -- | The signal to dump
   Signal dom a ->
   ByteString
-storeSignal name samples signal = storeTrace name samples $ toTrace signal
+storeSignal name samples signal = storeTrace name samples $ toTrace @t signal
 
 
 ----------------------------------------------
@@ -277,19 +293,26 @@ loadTrace0 bs = do
 
 -- | Convert binary data into a trace with the given clock period.
 loadTrace ::
+  forall t.
+  TraceSystem t =>
   Period ->
   ByteString ->
-  Either String Trace
+  Either String (Trace t)
 loadTrace period bs = do
   (header, values) <- loadTrace0 bs
   let FileHeader{width, signals} = header
       ty = case signals of
         Left  ds  -> ds.dataType
         Right dss -> constructTuple $ map (.dataType) dss
-  pure Trace{dataType=ty, period, width, values}
+  pure Trace{dataType=ty, period, width, values, meta = loadMeta @t ()}
 
 -- | Load multiple traces from a single binary.
-loadTraces :: Period -> ByteString -> Either String [(String,Trace)]
+loadTraces ::
+  forall t.
+  TraceSystem t =>
+  Period ->
+  ByteString ->
+  Either String [(String, Trace t)]
 loadTraces period bs = do
   (header, values) <- loadTrace0 bs
 
@@ -312,33 +335,35 @@ loadTraces period bs = do
       valuess = case signals of
         Left  _ -> [values] -- Slicing all values would be inefficient; skip
         Right _ -> map (\r -> map (slice0 r) values) ranges
-      traces = zipWith3 (flip Trace period) types widths valuess
+      traces = zipWith4 (flip Trace period) types widths valuess $ repeat (loadMeta @t ())
 
   Right $ zip names traces
 
 -- | Load a trace from binary form.
 load ::
-  forall dom.
+  forall t dom.
+  TraceSystem t =>
   KnownDomain dom =>
   -- | The name to use for the signal
   String ->
   -- | The binary data
   ByteString ->
   -- | The 'Simulation' to add the signal to
-  Simulation ->
-  Either String Simulation
+  Simulation t ->
+  Either String (Simulation t)
 load name bs sim = do
   trc <- loadTrace (clockPeriodTime @dom) bs
   addTrace name trc sim
 
 -- | Load multiple traces from a single binary.
 -- The traces will be loaded into a single domain.
-loads
-  :: forall dom
-   . KnownDomain dom
-  => ByteString
-  -> Simulation
-  -> Either String Simulation
+loads ::
+  forall t dom.
+  TraceSystem t =>
+  KnownDomain dom =>
+  ByteString ->
+  Simulation t ->
+  Either String (Simulation t)
 loads bs sim = do
   traces <- loadTraces (clockPeriodTime @dom) bs
   foldM (\s (n,t) -> addTrace n t s) sim traces
@@ -346,24 +371,26 @@ loads bs sim = do
 -- | Load a 'Signal' from binary form.
 -- See also @compatible@.
 loadSignal ::
-  forall a dom.
+  forall t dom a.
+  TraceSystem t =>
   KnownDomain dom =>
-  Traceable a =>
+  Traceable t a =>
   ByteString ->
   Either String (Signal dom a)
 loadSignal bs = do
-  trc <- loadTrace (clockPeriodTime @dom) bs
-  fromTrace trc
+  trc <- loadTrace @t (clockPeriodTime @dom) bs
+  fromTrace @t trc
 
 -- | Load multiple 'Signal's from binary form.
 -- See also @compatible@.
 loadSignals ::
-  forall a dom.
+  forall t dom a.
+  TraceSystem t =>
   KnownDomain dom =>
-  Traceable a =>
+  Traceable t a =>
   Bundle a =>
   ByteString ->
   Either String (Unbundled dom a)
 loadSignals bs = do
-  sig <- loadSignal @a @dom bs
+  sig <- loadSignal @t @dom @a bs
   pure $ unbundle sig

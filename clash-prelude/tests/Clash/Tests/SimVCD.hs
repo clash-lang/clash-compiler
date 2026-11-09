@@ -244,12 +244,13 @@ multiDomainTrace =
           | Just i <- duplSignal = periods ++ [periods !! i]
           | otherwise = periods
         traceMap = Map.fromAscList $ zipWith (\n p -> (n, oneTrace p)) signalNames periods0
-      (VcdFile vcdDecs vcdSims, _warn) <- H.evalEither $
-        vcd Simulation
+      (VcdFile vcdDecs vcdSims _, _warn) <- H.evalEither $
+        vcd @() Simulation
           { simTimes = times $ sampleDuration `mulTime` common
           , simConfig = def
           , simTraces = traceMap
           , simTimestamp = UTCTime (fromGregorian 2002 5 29) 0
+          , simMeta = ()
           }
       Metadata{..} <- H.evalEither $ parseMetadata vcdDecs
       Map.keysSet nameMap H.=== Map.keysSet traceMap
@@ -273,6 +274,7 @@ multiDomainTrace =
     , period
     , width = size# (0 :: SignalData)
     , values = map (0,) [0 ..]
+    , meta = ()
     }
 
 tests :: TestTree
