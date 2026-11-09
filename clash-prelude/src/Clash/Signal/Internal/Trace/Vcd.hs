@@ -1,9 +1,11 @@
-
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE OverloadedRecordDot #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -49,8 +51,12 @@ import qualified Paths_clash_prelude
 
 -- | A complete VCD file.
 -- This includes the contents of the VCD file.
-data VcdFile = VcdFile [DeclarationCommand] [SimulationCommand]
-  deriving (Show)
+data VcdFile t = VcdFile
+  { declationCommands :: [DeclarationCommand]
+  , simulationCommands :: [SimulationCommand]
+  , meta :: VcdMeta t
+  }
+deriving instance (Show (VcdMeta t)) => Show (VcdFile t)
 
 -- | A VCD declaration command.
 data DeclarationCommand
@@ -96,8 +102,10 @@ type TimeUnit = String
 -- | Create a 'Vcd' object from a 'Simulation'.
 -- Also returns warnings that pop up in the creation of the VCD.
 vcd ::
-  Simulation ->
-  Either String (VcdFile, [String])
+  forall t.
+  TraceSystem t =>
+  Simulation t ->
+  Either String (VcdFile t, [String])
 vcd Simulation
       { simTimes = Times{start, stop, clockStart}
       , simConfig = Config{shiftToZero, warnZeroWidth}
@@ -129,7 +137,7 @@ vcd Simulation
       <> nm
       <> "' contains empty scope names, which is not supported by VCD."
   | otherwise
-  = Right (VcdFile (headers ++ variables) simulation, warnings)
+  = Right (VcdFile (headers ++ variables) simulation (vcdMeta @t ()), warnings)
  where
   offensiveNames = filter (any (not . printable)) allNames
   emptyScopes = filter (\nm -> ".." `isInfixOf` ('.' : nm <> ".")) allNames
@@ -332,7 +340,9 @@ vcd Simulation
 -- Zero-width signals are not included, and instead warnings for these signals
 -- are returned.
 vcdText ::
-  Simulation ->
+  forall t.
+  TraceSystem t =>
+  Simulation t ->
   Either String (Text, [String])
 vcdText sim = (first renderVcd) <$> vcd sim
 
@@ -340,22 +350,26 @@ vcdText sim = (first renderVcd) <$> vcd sim
 -- and write it to a file.
 -- Errors if the VCD generation fails.
 writeVcd ::
+  forall t.
   HasCallStack =>
+  TraceSystem t =>
   FilePath ->
-  Simulation ->
+  Simulation t ->
   IO ()
 writeVcd file sim = do
-  case vcdText sim of
+  case vcd sim of
     Left e -> withFrozenCallStack $ errorIO e
-    Right (text, warnings) -> do
+    Right (vcdFile, warnings) -> do
+      let text = renderVcd vcdFile
       mapM_ (hPutStrLn stderr) warnings
       Data.Text.IO.writeFile file text
+      writeVcdMeta @t file vcdFile.meta
 
 -- | Render a 'Vcd' object as 'Text'.
 renderVcd ::
-  VcdFile ->
+  VcdFile t ->
   Text
-renderVcd (VcdFile decl sim) = Text.unlines
+renderVcd (VcdFile decl sim _) = Text.unlines
   $  map renderDecl decl
   <> ["$enddefinitions $end\n"]
   <> map renderSim sim
