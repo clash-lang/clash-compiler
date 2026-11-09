@@ -27,6 +27,7 @@ module Clash.Signal.Internal.Trace.Store (
   store,
   stores,
   storeSignal,
+  storeSignals,
 
   -- * Loading
   loadHeader,
@@ -41,14 +42,18 @@ module Clash.Signal.Internal.Trace.Store (
 
 import Control.Monad (foldM, when)
 import Data.Aeson hiding (Value) --(encode, eitherDecode, ToJSON(..), FromJSON(..), Array)
+import Data.AnonRecords
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Lazy (ByteString)
 import Data.List (transpose)
+import Data.Typeable
 import GHC.Bits (shiftL, shiftR, (.|.), (.&.))
 import GHC.Generics (Generic)
 import GHC.Natural (Natural)
+import GHC.TypeLits (KnownSymbol, symbolVal, natVal)
 
-import Clash.Signal (KnownDomain, Signal, Bundle, Unbundled, unbundle)
+import Clash.Class.BitPack
+import Clash.Signal (KnownDomain, Signal, Bundle, Unbundled, bundle, unbundle)
 import Clash.Time (clockPeriodTime)
 
 import Clash.Signal.Internal.Trace
@@ -222,6 +227,37 @@ storeSignal ::
   ByteString
 storeSignal name samples signal = storeTrace name samples $ toTrace signal
 
+-- | Store multiple 'Signal's in binary form.
+storeSignals ::
+  forall dom a.
+  KnownDomain dom =>
+  StoreSignals a =>
+  Traceable a =>
+  Bundle a =>
+  -- | Range of samples to dump
+  (Int,Int) ->
+  -- | Bundle of signals to dump
+  (Unbundled dom a) ->
+  ByteString
+storeSignals samples sigs = storeTrace0 samples (Right signals) values
+ where
+  Trace{values} = toTrace (bundle sigs)
+  signals = storeSignalMeta @a
+
+-- | Helper class to get signal information from anonymous records.
+-- Extending could allow tuples to be stored,
+-- though the subsignals would be nameless (enumerated).
+class StoreSignals a where
+  storeSignalMeta :: [SignalDescr]
+instance (KnownSymbol x, BitPack a, Typeable a) => StoreSignals (x := Signal dom a) where
+  storeSignalMeta =
+    [ SignalDescr
+      { name = symbolVal (Proxy @x)
+      , width = fromInteger $ natVal (Proxy @(BitSize a))
+      , dataType = simpleTypeRep @a } ]
+instance (StoreSignals a, StoreSignals b) => StoreSignals (a :&: b) where
+  storeSignalMeta = storeSignalMeta @a <> storeSignalMeta @b
+
 
 ----------------------------------------------
 --                 LOADING                  --
@@ -285,7 +321,7 @@ loadTrace period bs = do
   let FileHeader{width, signals} = header
       ty = case signals of
         Left  ds  -> ds.dataType
-        Right dss -> constructTuple $ map (.dataType) dss
+        Right dss -> constructRecord $ map (\ds -> (ds.name,ds.dataType)) dss
   pure Trace{dataType=ty, period, width, values}
 
 -- | Load multiple traces from a single binary.

@@ -23,7 +23,7 @@ module Clash.Signal.Internal.Trace (
 
   -- * Tracing
   trace,
-  traceVec,
+  traceVec, traceRec, RecTraces(..),
   traceReset, traceEnable,
 
   -- * Simulation
@@ -77,10 +77,11 @@ import Data.Map (Map)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import Data.Typeable (Typeable, Proxy(..))
 import GHC.Natural (Natural)
-import GHC.TypeLits (KnownNat, natVal, symbolVal)
+import GHC.TypeLits (KnownNat, natVal, KnownSymbol, symbolVal)
 import System.IO (hPutStrLn, stderr)
 import System.IO.Unsafe (unsafePerformIO)
 
+import Data.AnonRecords
 import Clash.Class.BitPack (BitPack(..), BitSize)
 import Clash.XException (NFDataX(rnfX), undefined)
 import Clash.Signal
@@ -88,7 +89,7 @@ import Clash.Signal
   ActiveEdge(..),
   Signal, sample, sampleN_lazy, fromList,
   Reset, Enable, fromEnable, unsafeFromReset,
-  unbundle)
+  Bundle, Unbundled, unbundle)
 import Clash.Signal.Internal (VDomainConfiguration(..), vDomain)
 import Clash.Sized.Internal.BitVector (Bit, BitVector(BV))
 import Clash.Sized.Vector (Vec, toList)
@@ -528,6 +529,55 @@ traceVec0 name sig glob =
   right (Right x) = x
   right (Left e) = registerErr e glob
 {-# OPAQUE traceVec0 #-}
+
+-- | Trace all values in an anonymous record signal individually.
+traceRec ::
+  forall dom rec.
+  KnownDomain dom =>
+  Bundle rec =>
+  RecTraces (Unbundled dom rec) =>
+  String ->
+  Signal dom rec ->
+  Signal dom rec
+traceRec name sig =
+  unsafePerformIO
+    $ atomicModifyIORef' globalDataRef (\g -> (traceRec0 name sig g, sig))
+{-# OPAQUE traceRec #-}
+
+traceRec0 ::
+  forall dom rec.
+  KnownDomain dom =>
+  Bundle rec =>
+  RecTraces (Unbundled dom rec) =>
+  String ->
+  Signal dom rec ->
+  GlobalData ->
+  GlobalData
+traceRec0 name sig glob =
+  registerTraces
+    $ registerFound found
+    $ registerMsg ("Found record signal " <> fullName)
+    $ glob
+ where
+  (fields,traces) = unzip $ recTraces $ unbundle sig
+  fullName = replaceDollar (domainName @dom) name
+  names = map ((name <> ".") <>) fields
+  fullNames = map (replaceDollar (domainName @dom)) names
+  found = if fullName == name then name:names else [name, fullName]<>names<>fullNames
+  registerTraces g = right $ foldM (flip ($)) g $ zipWith registerTrace fullNames traces
+
+  right (Right x) = x
+  right (Left e) = registerErr e glob
+{-# OPAQUE traceRec0 #-}
+
+-- | Helper class to extract traces from an anonymous record of signals.
+class RecTraces a where
+  -- | Convert a record of signals into a list of labeled traces.
+  recTraces :: a -> [(String,Trace)]
+instance (RecTraces a, RecTraces b) => RecTraces (a :&: b) where
+  recTraces (a :&: b) = recTraces a <> recTraces b
+instance (KnownDomain dom, Traceable a, KnownSymbol l) => RecTraces (l := Signal dom a) where
+  recTraces (_ := s) = [(symbolVal (Proxy @l),toTrace s)]
 
 -- | Like 'trace', but operates on a 'Reset'
 traceReset ::

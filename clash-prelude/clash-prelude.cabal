@@ -306,6 +306,9 @@ Library
                       Clash.Tutorial
                       Clash.Examples
                       Clash.Examples.Internal
+
+                      Data.AnonRecords
+                      Data.Internal.TH.AnonRecords
   other-modules:
                       Clash.Class.AutoReg.Instances
                       Clash.Clocks.Internal

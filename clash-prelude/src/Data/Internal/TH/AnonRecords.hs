@@ -1,0 +1,89 @@
+{- |
+Copyright  :  (C) 2026, QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
+
+A TH function for deriving 'Data.AnonRecord.AsTuple' instances.
+-}
+
+{-# OPTIONS_HADDOCK hide #-}
+
+module Data.Internal.TH.AnonRecords where
+
+import Control.Monad (replicateM)
+import Language.Haskell.TH
+
+-- | Derive 'Data.AnonRecord.AsTuple' implementations for tuples in the specified range.
+deriveAsTuple :: Int -> Int -> DecsQ
+deriveAsTuple minSize _
+  | minSize < 2
+  = error "Cannot derive AsTuple for tuples of size 1 or smaller"
+deriveAsTuple minSize maxSize = do
+  let asTuple = ConT $ mkName "AsTuple"
+      tupledT = ConT $ mkName "Tupled"
+
+      fieldT  = ConT $ mkName ":="
+      prodT   = ConT $ mkName ":&:"
+      fieldE  = ConE $ mkName "L"
+      prodE   = ConE $ mkName ":&:"
+      fieldN  =        mkName "L"
+      prodN   =        mkName ":&:"
+
+      mkRecordT [(f,a)] = AppT (AppT fieldT f) a
+      mkRecordT (a:as)  = AppT (AppT prodT $ mkRecordT [a]) $ mkRecordT as
+      mkRecordT []      = error "(unreachable) cannot construct empty record"
+
+      mkRecordE [a]     = AppE fieldE a
+      mkRecordE (a:as)  = AppE (AppE prodE $ mkRecordE [a]) $ mkRecordE as
+      mkRecordE []      = error "(unreachable) cannot construct empty record"
+
+      mkRecordP [a]     = ConP fieldN [] [a]
+      mkRecordP (a:as)  = ConP prodN [] [mkRecordP [a], mkRecordP as]
+      mkRecordP []      = error "(unreachable) cannot construct empty record"
+
+  fieldNames <- replicateM maxSize (newName "f")
+  typeNames  <- replicateM maxSize (newName "a")
+  valNames   <- replicateM maxSize (newName "x")
+
+  pure $ flip map [minSize .. maxSize] $ \tupleNum ->
+    let fields = map VarT $ take tupleNum fieldNames
+        types  = map VarT $ take tupleNum  typeNames
+        vals   =            take tupleNum   valNames
+
+        tupleT0 = foldl AppT (TupleT tupleNum) types
+        recordT = mkRecordT $ zip fields types
+
+        context = []
+        instTy = AppT asTuple recordT
+
+        tupleP = TupP $ map VarP vals
+        tupleE = TupE $ map (Just . VarE) vals
+
+        recordP = mkRecordP $ map VarP vals
+        recordE = mkRecordE $ map VarE vals
+
+        tupled =
+          TySynInstD $
+          TySynEqn
+            Nothing
+            (AppT tupledT recordT)
+            tupleT0
+
+        toTuple =
+          FunD
+            (mkName "toTuple")
+            [ Clause
+                [recordP]
+                (NormalB tupleE)
+                []
+            ]
+
+        fromTuple =
+          FunD
+            (mkName "fromTuple")
+            [ Clause
+                [tupleP]
+                (NormalB recordE)
+                []
+            ]
+     in InstanceD Nothing context instTy [tupled, toTuple, fromTuple]
