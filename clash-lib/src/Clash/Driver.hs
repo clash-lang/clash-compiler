@@ -101,7 +101,7 @@ import           Clash.Core.HasType
 import           Clash.Core.Name                  (Name (..))
 import           Clash.Core.Pretty                (PrettyOptions(..), showPpr')
 import           Clash.Core.Type
-  (Type(ForAllTy, LitTy, AnnType), TypeView(..), tyView, mkFunTy, LitTy(SymTy))
+  (Type(ForAllTy, LitTy, AnnType), TypeView(..), coreView, tyView, mkFunTy, LitTy(SymTy))
 import           Clash.Core.TyCon                 (TyConMap)
 import           Clash.Core.Util                  (shouldSplit)
 import           Clash.Core.Var
@@ -122,7 +122,8 @@ import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types
   (IdentifierText, BlackBox (..), Component (..), FilteredHWType, HWMap, SomeBackend (..),
    TopEntityT(..), TemplateFunction, ComponentMap, findClocks, ComponentMeta(..))
-import           Clash.Netlist.Util               (checkTopEntityPorts)
+import           Clash.Netlist.Util
+  (ExpandError(..), checkTopEntityPorts, expandErrorMessage)
 import           Clash.Normalize                  (checkNonRecursive, cleanupGraph,
                                                    normalize, runNormalization)
 import           Clash.Normalize.Util             (callGraph, tvSubstWithTyEq)
@@ -160,6 +161,10 @@ splitTopAnn
 splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
   t{t_inputs=go typ t_inputs}
  where
+  superfluous :: Maybe PortName -> Int -> [PortName] -> a
+  superfluous ppM n ps =
+    throw (ClashException sp (expandErrorMessage (SuperfluousPortNames ppM n ps)) Nothing)
+
   go :: Type -> [PortName] -> [PortName]
   go _ [] = []
   go (tyView -> FunTy a res) (p:ps)
@@ -174,15 +179,19 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
     case shouldSplit tcm a of
       Just (_,_,argTys@(_:_:_)) ->
         -- Port must be split up into 'n' pieces.. can it?
+        let n = length argTys in
         case p of
-          PortProduct nm portNames0 ->
-            let
-              n = length argTys
-              newPortNames = map (PortName . show) [(0::Int)..]
-              portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
-              newLam = foldr1 mkFunTy (argTys ++ [res])
-            in
-              go newLam (take n portNames1 ++ ps)
+          PortProduct nm portNames0
+            -- More port names given than pieces the signal is split into.
+            -- 'take n' below would silently drop the superfluous names (#2243).
+            | length portNames0 > n -> superfluous (Just p) n (drop n portNames0)
+            | otherwise ->
+              let
+                newPortNames = map (PortName . show) [(0::Int)..]
+                portNames1 = map (prependName nm) (portNames0 ++ newPortNames)
+                newLam = foldr1 mkFunTy (argTys ++ [res])
+              in
+                go newLam (take n portNames1 ++ ps)
           PortName nm ->
             throw (flip (ClashException sp) Nothing $ [I.i|
               Couldn't separate clock, reset, or enable from a product type due
@@ -199,7 +208,14 @@ splitTopAnn tcm sp typ@(tyView -> FunTy {}) t@Synthesize{t_inputs} =
         -- No need to split the port, carrying on..
         p : go res ps
   go (ForAllTy _tyVar ty) ps = go ty ps
-  go _ty ps = ps
+  go ty ps
+    -- More port names given than the top entity has arguments. This is checked
+    -- here rather than (only) in 'expandTopEntity', because the latter would
+    -- count the dummy port names inserted above. Types that might still turn
+    -- out to be functions after normalization are left to 'expandTopEntity'.
+    | FunTy {} <- tyView (coreView tcm ty) = ps
+    | ForAllTy {} <- coreView tcm ty = ps
+    | otherwise = superfluous Nothing (length t_inputs - length ps) ps
 
   prependName :: String -> PortName -> PortName
   prependName "" pn = pn
