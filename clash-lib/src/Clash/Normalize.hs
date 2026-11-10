@@ -24,7 +24,7 @@ import           Control.Monad                    ((>=>), when)
 import           Control.Monad.IO.Class           (liftIO)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
-import           Data.Either                      (lefts,partitionEithers)
+import           Data.Either                      (lefts,partitionEithers,rights)
 import qualified Data.IntMap                      as IntMap
 import qualified Data.IORef                       as IORef
 import           Clash.Data.UniqMap               (UniqMap)
@@ -205,7 +205,7 @@ normalize' nm = do
       -- check for unrepresentable result type
       let (args,resTy) = splitCoreFunForallTy tcm ty1
           isTopEnt = nm `elemVarSet` topEnts
-          isFunction = not $ null $ lefts args
+          isFunction = not $ null $ rights args
       resTyRep <- not <$> isUntranslatableType False resTy
       if resTyRep
          then do
@@ -226,7 +226,7 @@ normalize' nm = do
             -- Throw an error for unrepresentable topEntities and functions
             when (isTopEnt || isFunction) $
               let msg = $(curLoc) ++ [i|
-                    This bndr has a non-representable return type and can't be normalized:
+                    This binder has a non-representable return type and can't be normalized:
                     #{showPpr' def{displayUniques=False\} nm'}
                     |]
               in throw (ClashException sp msg Nothing)
