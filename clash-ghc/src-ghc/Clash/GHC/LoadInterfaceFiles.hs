@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2013-2016, University of Twente,
                      2016-2017, Myrtle Software Ltd
-                     2022-2024, QBayLogic B.V.
+                     2022-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
@@ -394,7 +394,7 @@ getUnresolvedPrimitives hdl (target, prim) | hdl `elem` primHdls prim =
               primName = Text.unpack (name primOrErr) in
 
           if primName /= targetName1
-          then inlineNameError targetName1 primName
+          then inlineNameError targetName0 targetName1 primName
           else pure [Left primOrErr]
 
     InlinePrimitive _ contentOrFp ->
@@ -416,11 +416,13 @@ getUnresolvedPrimitives hdl (target, prim) | hdl `elem` primHdls prim =
               primName = Text.unpack (name primOrErr) in
 
           if primName /= targetName1
-          then inlineNameError targetName1 primName
+          then inlineNameError targetName0 targetName1 primName
           else pure [Left primOrErr]
  where
-  inlineNameError targetName primName =
-    error $ concat
+  -- Points at the definition of the annotated function if it was compiled
+  -- from source. Names loaded from interface files have no source location.
+  inlineNameError targetName0 targetName primName =
+    throwPlainError (Name.nameSrcSpan targetName0) $ Outputable.text $ concat
       [ "Function " ++ targetName ++ " was annotated with an inline "
       , "primitive for " ++ primName ++ ". These names "
       , "should be the same." ]
