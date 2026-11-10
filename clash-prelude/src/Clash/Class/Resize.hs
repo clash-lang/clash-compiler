@@ -36,6 +36,8 @@ import Clash.Sized.Internal (formatRange)
 import GHC.TypeLits (OrderingI(EQI, GTI), cmpNat)
 
 -- | Coerce a value to be represented by a different number of bits
+--
+-- To convert to a different type, see "Clash.Class.NumConvert".
 class Resize (f :: Nat -> Type) where
   -- | A sign-preserving resize operation
   --
@@ -82,9 +84,10 @@ checkIntegralSimOnly Proxy v =
 --
 -- * __NB__: Check only affects simulation. I.e., no checks will be inserted
 -- into the generated HDL
--- * __NB__: 'fromIntegral' is not well suited for Clash as it will go through
--- 'Integer' which is arbitrarily bounded in HDL. Instead use
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-- * __NB__: 'fromIntegral' goes through 'Integer', which has a fixed width in
+-- HDL. Prefer 'Clash.Class.NumConvert.numConvert' or
+-- 'Clash.Class.NumConvert.maybeNumConvert'. See "Clash.Class.NumConvert" for an
+-- overview of conversions between number types.
 checkedFromIntegral ::
   forall a b.
   HasCallStack =>

@@ -42,5 +42,8 @@ import Clash.Sized.Internal.Index
 --
 -- 'bv2i' on the other hand will /never/ fail at run-time, because the
 -- 'BitVector' argument determines the size.
+--
+-- See "Clash.Class.NumConvert" for an overview of conversions between number
+-- types.
 bv2i :: KnownNat n => BitVector n -> Index (2^n)
 bv2i = unpack#
