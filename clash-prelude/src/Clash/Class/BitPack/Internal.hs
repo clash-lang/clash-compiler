@@ -272,6 +272,11 @@ isLike x y =
 {-# INLINE[1] bitCoerce #-}
 -- | Coerce a value from one type to another through its bit representation.
 --
+-- This keeps the bit pattern, not the numeric value. To keep the value, use
+-- 'Clash.Class.NumConvert.numConvert' or
+-- 'Clash.Class.NumConvert.maybeNumConvert'. See "Clash.Class.NumConvert" for an
+-- overview of conversions between number types.
+--
 -- >>> pack (-5 :: Signed 6)
 -- 0b11_1011
 -- >>> bitCoerce (-5 :: Signed 6) :: Unsigned 6

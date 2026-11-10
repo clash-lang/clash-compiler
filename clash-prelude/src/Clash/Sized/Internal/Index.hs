@@ -164,10 +164,13 @@ type role Index nominal
 -- *** Exception: X: Clash.Sized.Index: result 8 is out of bounds: [0..7]
 -- ...
 --
--- __NB__: The usual Haskell method of converting an integral numeric type to
--- another, 'fromIntegral', is not well suited for Clash as it will go through
--- 'Integer' which is arbitrarily bounded in HDL. Instead use
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-- __NB__: To convert to another number type, use
+-- 'Clash.Class.NumConvert.numConvert' if the target type can hold every value,
+-- 'Clash.Class.NumConvert.maybeNumConvert' if it might not, the
+-- 'Clash.Class.Resize.Resize' class to change the width, and
+-- 'Clash.Class.BitPack.bitCoerce' only to reinterpret the bits. Avoid
+-- 'fromIntegral': it goes through 'Integer', which has a fixed width in HDL.
+-- See "Clash.Class.NumConvert" for an overview with examples.
 --
 -- Index has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --

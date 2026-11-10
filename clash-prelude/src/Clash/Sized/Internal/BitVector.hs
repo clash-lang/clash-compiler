@@ -234,10 +234,13 @@ type role BitVector nominal
 -- * Bit indices are descending
 -- * 'Num' instance performs /unsigned/ arithmetic.
 --
--- __NB__: The usual Haskell method of converting an integral numeric type to
--- another, 'fromIntegral', is not well suited for Clash as it will go through
--- 'Integer' which is arbitrarily bounded in HDL. Instead use
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-- __NB__: To convert to another number type, use
+-- 'Clash.Class.NumConvert.numConvert' if the target type can hold every value,
+-- 'Clash.Class.NumConvert.maybeNumConvert' if it might not, the
+-- 'Clash.Class.Resize.Resize' class to change the width, and
+-- 'Clash.Class.BitPack.bitCoerce' only to reinterpret the bits. Avoid
+-- 'fromIntegral': it goes through 'Integer', which has a fixed width in HDL.
+-- See "Clash.Class.NumConvert" for an overview with examples.
 --
 -- BitVector has the <https://downloads.haskell.org/ghc/latest/docs/html/users_guide/exts/roles.html type role>
 --
@@ -261,10 +264,13 @@ data BitVector (n :: Nat) =
 
 -- | A single bit
 --
--- __NB__: The usual Haskell method of converting an integral numeric type to
--- another, 'fromIntegral', is not well suited for Clash as it will go through
--- 'Integer' which is arbitrarily bounded in HDL. Instead use
--- 'Clash.Class.BitPack.bitCoerce' and the 'Resize' class.
+-- __NB__: To convert to another number type, use
+-- 'Clash.Class.NumConvert.numConvert' if the target type can hold every value,
+-- 'Clash.Class.NumConvert.maybeNumConvert' if it might not, the
+-- 'Clash.Class.Resize.Resize' class to change the width, and
+-- 'Clash.Class.BitPack.bitCoerce' only to reinterpret the bits. Avoid
+-- 'fromIntegral': it goes through 'Integer', which has a fixed width in HDL.
+-- See "Clash.Class.NumConvert" for an overview with examples.
 data Bit =
   -- | The constructor, 'Bit', and  the fields, 'unsafeMask#' and 'unsafeToInteger#', are not
   -- synthesizable.
