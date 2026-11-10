@@ -46,11 +46,9 @@ import Language.Haskell.TH.Lib
 import Clash.Signal.Internal.Trace.DataType
 
 pattern UNIT        :: String
-pattern UNIT        = $(litP $ StringL $              simpleTyConName @()     )
---pattern TUP2        :: String
---pattern TUP2        = $(litP $ StringL $              simpleTyConName @((),()))
+pattern UNIT        = $(litP $ StringL $        simpleTyConName @()     )
 pattern TUP_BASE    :: String
-pattern TUP_BASE    = $(litP $ StringL $ init       $ simpleTyConName @((),()))
+pattern TUP_BASE    = $(litP $ StringL $ init $ simpleTyConName @((),()))
 
 -- | Check whether two data types are compatible.
 -- This occurs when both types are the same,
