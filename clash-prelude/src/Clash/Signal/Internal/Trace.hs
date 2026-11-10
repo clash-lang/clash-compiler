@@ -51,7 +51,6 @@ module Clash.Signal.Internal.Trace (
 
   -- * Internal
   GlobalData(..),
-  globalDataRef,
 
   simulate0,
   forceEvaluateSignal,
@@ -75,6 +74,7 @@ import Prelude hiding (undefined)
 import Control.Exception (evaluate)
 import Control.Monad (foldM, when)
 import Control.Monad.Except (ExceptT(..), runExceptT)
+import qualified Data.Aeson as Aeson
 import Data.Default (Default(..))
 import Data.Either.Extra (maybeToEither)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
@@ -115,22 +115,35 @@ class (TraceableFor t ClockVal) => TraceSystem t where
   type GlobMeta t
   type VcdMeta t
   type TraceableFor t a :: Constraint
+
+  globalDataRef :: IORef (GlobalData t)
+
+  -- | Metadata when converting a 'Signal' to a 'Trace'.
   traceMeta :: forall a. TraceableFor t a => TraceMeta t
-  -- Create vcd metadata from a bunch of simulation stuff
-  -- TODO: change input types
 
-  emptySimMeta :: SimMeta t
-  fromGlobMeta :: GlobMeta t -> SimMeta t
-
+  -- | Initialise global ref metadata.
   emptyGlobMeta :: GlobMeta t
+  -- | Convert global meta data to simulation meta data.
+  fromGlobMeta :: GlobMeta t -> SimMeta t
+  -- | Initialise simulation meta data.
+  emptySimMeta :: SimMeta t
+  emptySimMeta = fromGlobMeta @t (emptyGlobMeta @t)
 
+  -- | Create vcd metadata from a bunch of simulation stuff
+  -- TODO: change input types
   vcdMeta :: () -> VcdMeta t
-  -- Write the vcd metadata if needed. The file name is that of the VCD file.
+
+  -- | Write the vcd metadata if needed. The file name is that of the VCD file.
   writeVcdMeta :: String -> VcdMeta t -> IO ()
   writeVcdMeta _ _ = pure ()
-  -- When reading a signal dump file, there is no meta(?)
-  -- TODO
-  loadMeta :: () -> TraceMeta t
+
+  -- | When writing a signal dump file, convert the trace metadata to dump metadata.
+  storeMeta :: TraceMeta t -> Aeson.Value
+  -- | When reading a signal dump file, convert the metadata to trace metadata.
+  loadMeta :: Aeson.Value -> TraceMeta t
+  -- | When reading a signal dump file with multiple signals as one trace,
+  -- convert the metadata to trace metadata.
+  loadMetas :: [(String,Aeson.Value)] -> TraceMeta t
 
 instance TraceSystem () where
   type TraceMeta () = ()
@@ -138,12 +151,26 @@ instance TraceSystem () where
   type GlobMeta () = ()
   type VcdMeta () = ()
   type TraceableFor () a = ()
+
+  globalDataRef = unsafePerformIO (newIORef gd)
+   where
+    gd = GlobalData
+      { globTraces = Map.empty
+      , globFound = []
+      , globMessages = []
+      , globError = Nothing
+      , globFirstRun = True
+      , globMeta = emptyGlobMeta @()
+      }
+  {-# OPAQUE globalDataRef #-}
+
   traceMeta = ()
-  vcdMeta _ = ()
-  loadMeta _ = ()
-  emptySimMeta = ()
-  fromGlobMeta = id
   emptyGlobMeta = ()
+  fromGlobMeta = id
+  vcdMeta _ = ()
+  storeMeta _ = Aeson.Null
+  loadMeta _ = ()
+  loadMetas _ = ()
 
 ----------------------------------------------
 --                   BASE                   --
@@ -246,19 +273,6 @@ emptySim0 simConfig simTimes simTimestamp =
     , simMeta = emptySimMeta @t
     }
 
-globalDataRef :: forall t. TraceSystem t =>IORef (GlobalData t)
-globalDataRef = unsafePerformIO (newIORef gd)
- where
-  gd = GlobalData
-    { globTraces = Map.empty
-    , globFound = []
-    , globMessages = []
-    , globError = Nothing
-    , globFirstRun = True
-    , globMeta = emptyGlobMeta @t
-    }
-{-# OPAQUE globalDataRef #-}
-
 -- | Simulate a design by forcefully evaluating an output signal.
 simulate ::
   forall t dom a.
@@ -294,7 +308,7 @@ simulateWith ::
   -- | (One of) the outputs of the circuit containing the traces
   Signal dom a ->
   IO (Either String (Simulation t))
-simulateWith = simulate0 globalDataRef
+simulateWith = simulate0 (globalDataRef @t)
 
 -- | Internal simulation function that takes the global reference as a parameter.
 simulate0 ::
@@ -527,7 +541,7 @@ trace ::
   Signal dom a
 trace name sig =
   unsafePerformIO
-    $ atomicModifyIORef' globalDataRef (\g -> (trace0 @t @dom name (toTrace sig) g, sig))
+    $ atomicModifyIORef' (globalDataRef @t) (\g -> (trace0 @t @dom name (toTrace sig) g, sig))
 {-# OPAQUE trace #-}
 
 trace0 ::
@@ -563,7 +577,7 @@ traceVec ::
   Signal dom (Vec n a)
 traceVec name sig =
   unsafePerformIO
-    $ atomicModifyIORef' globalDataRef (\g -> (traceVec0 @t name sig g,sig))
+    $ atomicModifyIORef' (globalDataRef @t) (\g -> (traceVec0 @t name sig g,sig))
 {-# OPAQUE traceVec #-}
 
 traceVec0 ::

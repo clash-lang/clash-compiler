@@ -41,9 +41,11 @@ module Clash.Signal.Internal.Trace.Store (
 
 import Control.Monad (foldM, when)
 import Data.Aeson hiding (Value) --(encode, eitherDecode, ToJSON(..), FromJSON(..), Array)
+import qualified Data.Aeson
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Lazy (ByteString)
 import Data.List (transpose, zipWith4)
+import Data.Maybe (fromMaybe)
 import GHC.Bits (shiftL, shiftR, (.|.), (.&.))
 import GHC.Generics (Generic)
 import GHC.Natural (Natural)
@@ -76,6 +78,7 @@ The header looking something like:
                       # but should be easy to combine into other formats,
                       # like (named) tuples
       "width": 12,    # widths must add up
+      "meta": <json>  # optional metadata field
     },
     {
       "name": "b",
@@ -102,8 +105,9 @@ data SignalDescr = SignalDescr
   { name :: String
   , width :: Int
   , dataType :: DataType
+  , jsonMeta :: Data.Aeson.Value
   }
- deriving (Show,Generic,ToJSON,FromJSON)
+ deriving (Show,Generic)
 
 instance ToJSON FileHeader where
   toJSON FileHeader{..} = object
@@ -125,6 +129,22 @@ instance FromJSON FileHeader where
       Array _ -> Right <$> parseJSON signals0
       _       -> Left <$> parseJSON signals0
     pure FileHeader{..}
+
+instance ToJSON SignalDescr where
+  toJSON SignalDescr{..} = object
+    ( [ "name"     .= name
+      , "width"    .= width
+      , "dataType" .= dataType
+      ] <> (if jsonMeta/=Null then ["meta" .= jsonMeta] else []) )
+
+instance FromJSON SignalDescr where
+  parseJSON = withObject "SignalDescr" $ \v -> do
+    name     <- v .: "name"
+    width    <- v .: "width"
+    dataType <- v .: "dataType"
+    metaM <- v .:? "meta"
+    let jsonMeta = fromMaybe Null metaM
+    pure SignalDescr{..}
 
 ----------------------------------------------
 --                 STORING                  --
@@ -163,7 +183,10 @@ storeTrace ::
   Trace t ->
   ByteString
 storeTrace name samples Trace{..} =
-  storeTrace0 samples (Left SignalDescr{name,width,dataType}) values
+  storeTrace0
+    samples
+    (Left SignalDescr{name, width, dataType, jsonMeta = storeMeta @t meta})
+    values
 
 -- | Store multiple traces in a single binary file.
 -- All traces must have the same clock period.
@@ -184,7 +207,8 @@ storeTraces samples traces = do
       "Attempting to store multiple traces with different periods in one signal dump file."
 
   let signals = map descrFromTrace traces
-      descrFromTrace (name,Trace{width,dataType}) = SignalDescr{name, width, dataType}
+      descrFromTrace (name,Trace{width,dataType,meta}) =
+        SignalDescr{name, width, dataType, jsonMeta = storeMeta @t meta}
       widths = map ((.width) . snd) traces
       ccat vs = foldl
         (\(v,m) (w,(v0,m0)) -> ((v `shiftL` w).|.v0, (m `shiftL` w).|.m0)) (0,0)
@@ -301,10 +325,15 @@ loadTrace ::
 loadTrace period bs = do
   (header, values) <- loadTrace0 bs
   let FileHeader{width, signals} = header
-      ty = case signals of
-        Left  ds  -> ds.dataType
-        Right dss -> constructTuple $ map (.dataType) dss
-  pure Trace{dataType=ty, period, width, values, meta = loadMeta @t ()}
+  pure $ case signals of
+    Left ds -> Trace
+      { dataType=ds.dataType
+      , meta = loadMeta @t ds.jsonMeta
+      , ..}
+    Right dss -> Trace
+      { dataType = constructTuple $ map (.dataType) dss
+      , meta = loadMetas @t $ map (\ds -> (ds.name,ds.jsonMeta)) dss
+      , ..}
 
 -- | Load multiple traces from a single binary.
 loadTraces ::
@@ -335,7 +364,10 @@ loadTraces period bs = do
       valuess = case signals of
         Left  _ -> [values] -- Slicing all values would be inefficient; skip
         Right _ -> map (\r -> map (slice0 r) values) ranges
-      traces = zipWith4 (flip Trace period) types widths valuess $ repeat (loadMeta @t ())
+      metas = case signals of
+        Left  ds  -> [loadMeta @t ds.jsonMeta]
+        Right dss -> map (loadMeta @t . (.jsonMeta)) dss
+      traces = zipWith4 (flip Trace period) types widths valuess metas
 
   Right $ zip names traces
 
