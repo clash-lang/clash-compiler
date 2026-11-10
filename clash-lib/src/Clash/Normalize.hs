@@ -204,7 +204,7 @@ normalize' nm = do
 
       let (args,resTy) = splitCoreFunForallTy tcm ty1
           isTopEnt = nm `elemVarSet` topEnts
-          isFunction = not $ null $ lefts args
+          isFunction = not $ null $ rights args
 
       -- check for function arguments of top entities
       when isTopEnt $ forM_ (rights args) $ \argTy ->
@@ -242,7 +242,7 @@ normalize' nm = do
             -- Throw an error for unrepresentable topEntities and functions
             when (isTopEnt || isFunction) $
               let msg = $(curLoc) ++ [i|
-                    This bndr has a non-representable return type and can't be normalized:
+                    This binder has a non-representable return type and can't be normalized:
                     #{showPpr' def{displayUniques=False\} nm'}
                     |]
               in throw (ClashException sp msg Nothing)
