@@ -78,6 +78,7 @@ library
     shouldwork/Issues/T3291-precompiled
     shouldwork/Issues/T3461-precompiled
     shouldwork/TopEntity/precompiled
+    shouldfail/BlackBox/precompiled
 
   exposed-modules:
     Test.Tasty.Clash
@@ -110,6 +111,9 @@ library
 
     -- From tests/shouldwork/TopEntity/precompiled
     T3297a
+
+    -- From tests/shouldfail/BlackBox/precompiled
+    T2365
 
   other-modules:
     Paths_clash_testsuite

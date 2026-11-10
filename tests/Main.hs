@@ -213,6 +213,34 @@ runClashTest = defaultMain
           , expectClashFail=Just (def, "is not a module name or a source file")
           }
         ]
+      , clashTestGroup "LoadModules"
+        [ -- GHC's source snippets are only shown if Clash reports GHC's errors
+          -- as is.
+          runTest "TypeError" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "6 | topEntity = ()")
+          }
+        , runTest "SyntaxError" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "1 | module SyntaxError here")
+          }
+        , runTest "Does.Not.Exist" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Could not find module")
+          }
+        , runTest "Does.Not.Exist" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "NOT:Tried to load it")
+          }
+        , runTest "DoesNotExist.hs" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Can't find DoesNotExist.hs")
+          }
+        , runTest "DoesNotExist.hs" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "NOT:Tried to load it")
+          }
+        ]
       , clashTestGroup "BlackBox"
         [ runTest "WrongReference" def{
             hdlTargets=[VHDL]
@@ -220,6 +248,25 @@ runClashTest = defaultMain
               Function WrongReference.myMultiply was annotated with an inline
               primitive for WrongReference.myMultiplyX. These names should be
               the same. |])
+          }
+        , runTest "WrongReference" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "WrongReference.hs:22:1: error:")
+          }
+        , -- Regression test for #2365: errors in a precompiled module must be
+          -- reported as is. 'T2365' is compiled into the clash-testsuite
+          -- library and has no source on the search path.
+          runTest "T2365" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-package", "clash-testsuite"]
+          , expectClashFail=Just (def, Text.pack [I.i|
+              Function T2365.myId was annotated with an inline primitive for
+              T2365.myIdX. These names should be the same. |])
+          }
+        , runTest "T2365" def{
+            hdlTargets=[VHDL]
+          , clashFlags=["-package", "clash-testsuite"]
+          , expectClashFail=Just (def, "NOT:local sources")
           }
         , runTest "NamedSymbolsAndNumberedSymbols" def{
             hdlTargets=[VHDL]
