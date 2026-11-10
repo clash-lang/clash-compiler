@@ -115,6 +115,7 @@ import qualified GHC.Driver.Main as HscMain
 import qualified GHC.Iface.Load as IfaceLoad
 import qualified GHC.Utils.Monad as MonadUtils
 import qualified GHC.Utils.Panic as Panic
+import           GHC.Utils.Misc (looksLikeModuleName)
 import qualified GHC.Serialized as Serialized (deserializeWithData)
 import qualified GHC.Unit.Types as UnitTypes (unitIdString)
 import qualified GHC.Unit.Finder as Finder
@@ -186,26 +187,32 @@ getProcessOutput command =
      return (output, exitCode)
 #endif
 
--- | Should the module given on the command line be loaded from local sources
--- ('loadLocalModule') rather than from a package database
--- ('loadExternalModule')?
+-- | Resolve a target to load from local sources ('loadLocalModule'), or return
+-- 'Nothing' to load it from a package database ('loadExternalModule').
 --
--- File paths and modules found in the home unit (i.e., a source file on the
--- import path) are loaded from local sources. Like in 'GHC.findModule', the
--- latter take precedence over modules in a package database. Any other module
--- name is loaded from a package database, including names that cannot be found
--- at all: 'GHC.findModule' then reports why, including hints such as the module
--- being part of a hidden package.
-isLocalTarget :: GHC.GhcMonad m => GHC.Target -> m Bool
-isLocalTarget target =
-  case GHC.targetId target of
-    GHC.TargetFile{} -> pure True
-    GHC.TargetModule modName -> do
+-- Resolve module names before 'GHC.guessTarget', which also looks for files in
+-- the working directory even when it is excluded from the import path. Sources
+-- on the import path still take precedence over packages, as in 'GHC.findModule'.
+-- If lookup fails, allow a local filename without an extension; otherwise let
+-- 'GHC.findModule' report the missing module, including hidden-package hints.
+findLocalTarget :: GHC.GhcMonad m => String -> m (Maybe GHC.Target)
+findLocalTarget targetName
+  | looksLikeModuleName targetName = do
       hscEnv <- GHC.getSession
-      res <- liftIO $ Finder.findImportedModule hscEnv modName PkgQual.NoPkgQual
-      pure $ case res of
-        Finder.Found _ m -> HomeUnit.isHomeModule (HscTypes.hsc_home_unit hscEnv) m
-        _ -> False
+      res <- liftIO $ Finder.findImportedModule hscEnv
+        (GHC.mkModuleName targetName) PkgQual.NoPkgQual
+      case res of
+        Finder.Found _ m
+          | HomeUnit.isHomeModule (HscTypes.hsc_home_unit hscEnv) m -> localTarget
+          | otherwise -> pure Nothing
+        _ -> do
+          target <- GHC.guessTarget targetName Nothing Nothing
+          pure $ case GHC.targetId target of
+            GHC.TargetFile{} -> Just target
+            GHC.TargetModule{} -> Nothing
+  | otherwise = localTarget
+ where
+  localTarget = Just <$> GHC.guessTarget targetName Nothing Nothing
 
 -- | Search databases for given module
 loadExternalModule
@@ -571,12 +578,11 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
     MonadUtils.liftIO $ putStrLn $ "GHC: Setting up GHC took: " ++ setupStartDiff
 
     let mainIsM = GHC.mainFunIs =<< dflagsM
-    target <- GHC.guessTarget modName Nothing Nothing
-    isLocal <- isLocalTarget target
+    localTarget <- findLocalTarget modName
     (rootIds, modFamInstEnvs, _rootModule, LoadedBinders{..}, allBinders) <-
-      if isLocal
-        then loadLocalModule hdl target
-        else loadExternalModule hdl modName mainIsM
+      case localTarget of
+        Just target -> loadLocalModule hdl target
+        Nothing -> loadExternalModule hdl modName mainIsM
 
     let allBinderIds = map fst (CoreSyn.flattenBinds allBinders)
 
