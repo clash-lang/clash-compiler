@@ -24,7 +24,6 @@
 module Clash.Driver where
 
 import           Control.Concurrent               (MVar, modifyMVar, modifyMVar_, newMVar, withMVar)
-import           Control.Concurrent.Async         (mapConcurrently_)
 import           Control.DeepSeq
 import           Control.Exception                (evaluate, throw, Exception)
 import qualified Control.Monad                    as Monad
@@ -142,6 +141,7 @@ import           Clash.Unique                     (Unique, getUnique, fromGhcUni
 import           Clash.Util
   (ClashException(..), reportTimeDiff,
    wantedLanguageExtensions, unwantedLanguageExtensions, curLoc)
+import           Clash.Util.Exception             (mapConcurrentlyWithBacktrace_)
 import           Clash.Util.Graph                 (reverseTopSort)
 import qualified Clash.Util.Interpolate           as I
 import qualified Clash.Util.Supply                as Supply
@@ -350,7 +350,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
     let
       maybeMapConcurrently_
-        | opt_concurrentTopEntities opts = mapConcurrently_
+        | opt_concurrentTopEntities opts = mapConcurrentlyWithBacktrace_
         | otherwise = mapM_
 
     maybeMapConcurrently_ (go compNames idSet edamFiles ioLock deps topEntityMap) tes

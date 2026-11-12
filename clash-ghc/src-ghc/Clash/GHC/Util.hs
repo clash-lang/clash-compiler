@@ -37,6 +37,7 @@ import GHC.Exception      (SomeException)
 import System.Exit        (ExitCode(ExitFailure), exitWith)
 
 import Clash.Util         (ClashException(..))
+import Clash.Util.Exception (exceptionBacktrace)
 import Clash.Util.Interpolate (i)
 import Clash.Driver.Types (ClashOpts(..))
 
@@ -81,8 +82,14 @@ handleClashException _df opts e = case fromException e of
         GHC.printException e'
         liftIO $ exitWith (ExitFailure 1)
       _ -> throwPlainError noSrcSpan
-              (text "Other error:" $$ textLines (displayException e))
+              (text "Other error:" $$ textLines (displayException e) $$ backtrace)
   where
+    -- Since base-4.21 (GHC 9.12), displayException omits the exception context,
+    -- so print it separately. On GHC 9.10 it already includes the context.
+    backtrace = case exceptionBacktrace e of
+      [] -> empty
+      ctx -> blankLine $$ textLines ctx
+
     srcInfo = textLines [i|
       The source location of the error is not exact, only indicative, as it
       is acquired after optimizations. The actual location of the error can be

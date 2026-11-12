@@ -151,7 +151,7 @@ Library
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 1.2,
                       array,
-                      async                   >= 2.2.0    && < 2.3,
+                      async                   >= 2.2.5    && < 2.3,
                       attoparsec              >= 0.10.4.0 && < 0.15,
                       base                    >= 4.18     && < 5,
                       base16-bytestring       >= 0.1.1    && < 1.1,
@@ -310,6 +310,7 @@ Library
                       Clash.Unique
                       Clash.Util
                       Clash.Util.Eq
+                      Clash.Util.Exception
                       Clash.Util.Graph
                       Clash.Util.Interpolate
                       Clash.Util.Supply
@@ -446,6 +447,7 @@ test-suite unittests
                  Clash.Tests.Driver.Manifest
                  Clash.Tests.Netlist
                  Clash.Tests.Netlist.Id
+                 Clash.Tests.Util.Exception
                  Clash.Tests.Util.Interpolate
                  Clash.Tests.Normalize
                  Clash.Tests.Normalize.Transformations
