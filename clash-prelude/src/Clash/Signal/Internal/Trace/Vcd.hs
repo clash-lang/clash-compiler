@@ -22,6 +22,10 @@ module Clash.Signal.Internal.Trace.Vcd (
   vcdCommand,
   iso8601Format,
   printable,
+  -- * 'vcd' internals for custom implementations
+  findChangesSimple,
+  combineChangesPerDom,
+  zipTimed, treeFold,
 ) where
 
 import Control.Exception.Extra (errorIO)
@@ -40,12 +44,13 @@ import qualified Data.Text.IO
 import Data.Time.Clock (UTCTime)
 import Data.Time.Format (formatTime, defaultTimeLocale)
 import qualified Data.Version
-import GHC.Exts (groupWith)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import System.IO (hPutStrLn, stderr)
 
 import Clash.Signal.Internal.Trace
+import Clash.Signal.Internal.Trace.VcdTypes
 import Clash.Time (Time(..), timeInFS, absTime, splitTimeUnit)
+
 
 import qualified Paths_clash_prelude
 
@@ -57,47 +62,6 @@ data VcdFile t = VcdFile
   , meta :: VcdMeta t
   }
 deriving instance (Show (VcdMeta t)) => Show (VcdFile t)
-
--- | A VCD declaration command.
-data DeclarationCommand
-  = Version String                   -- ^ The (Clash) version used to generate the VCD.
-  | Date UTCTime                     -- ^ The timestamp the VCD was created.
-  | TimeScale Time                   -- ^ The unit of the VCD time stamps.
-                                     -- Must be 1, 10 or 100 and an appropriate unit.
-  | VarDec Var                       -- ^ Variable declaration.
-  | Scope Scope [DeclarationCommand] -- ^ A closed scope declaration.
-  | Comment String                   -- ^ A comment.
-  deriving (Show)
-
--- | A VCD simulation command.
-data SimulationCommand
-  = SimulationTime VcdTime     -- ^ Timestamp.
-  | DumpVars [ValueChange]     -- ^ The initial values of variables.
-  | ValueChanges [ValueChange] -- ^ Value changes.
- deriving (Show)
-
--- | A VCD Variable.
-data Var
-  = Var
-  { varSize      :: Width  -- ^ Bit width.
-  , varIDCode    :: IDCode -- ^ Variable ID (typically one character).
-  , varReference :: String -- ^ Variable name.
-  }
-  deriving (Show)
-
--- | A change to a variable's value.
-data ValueChange
-  = ValueChange
-  { changeSize   :: Width  -- ^ Bit width of the value.
-  , changeIDCode :: IDCode -- ^ ID of the variable that changed.
-  , changeValue  :: Value  -- ^ The new value.
-  }
-  deriving (Show)
-
-type Scope = String
-type IDCode = String
-type VcdTime = Integer --TODO: check if Int is faster
-type TimeUnit = String
 
 -- | Create a 'Vcd' object from a 'Simulation'.
 -- Also returns warnings that pop up in the creation of the VCD.
@@ -124,7 +88,7 @@ vcd Simulation
          "VCD: Start time was "
       <> show start
       <> ", but cannot be negative without shifting the start to 0."
-  | null names
+  | null allTraces
   = Left "VCD: No traces found."
   | (nm:_) <- offensiveNames
   = Left $
@@ -137,7 +101,7 @@ vcd Simulation
       <> nm
       <> "' contains empty scope names, which is not supported by VCD."
   | otherwise
-  = Right (VcdFile (headers ++ variables) simulation (vcdMeta @t ()), warnings)
+  = assemble <$> processed
  where
   offensiveNames = filter (any (not . printable)) allNames
   emptyScopes = filter (\nm -> ".." `isInfixOf` ('.' : nm <> ".")) allNames
@@ -146,7 +110,7 @@ vcd Simulation
 
   -- (slightly more complex so we can cut out zero-width traces
   -- while keeping them for the signal declarations, so we can add comments)
-  allLabels = concatMap (\s -> map (snoc s) alphabet) ("": labels)
+  allLabels = concatMap (\s -> map (snoc s) alphabet) ("": allLabels)
     where alphabet = map chr [33..126]
 
   allTraces = Map.toAscList traceMap
@@ -155,8 +119,8 @@ vcd Simulation
   (nonUnitTraces, unitTraces) =
     partition (\(_l,(_n,t)) -> t.width>0) $ zip allLabels allTraces
 
-  (labels,names,periods,widths,valuess) = unzip5
-    $ map (\(l,(n,Trace{..})) -> (l,n,period,width,values)) nonUnitTraces
+  --(labels,names,periods,widths,valuess,metas) = unzip6
+  --  $ map (\(l,(n,Trace{..})) -> (l,n,period,width,values,meta)) nonUnitTraces
 
   unitTraceNames = map (fst . snd) unitTraces
   warnings =
@@ -168,17 +132,20 @@ vcd Simulation
 
   ----------- VCD FILE CONSTRUCTION ------------
 
-  headers =
-    [ Date simTimestamp
-    , Version $ Data.Version.showVersion Paths_clash_prelude.version
-    , TimeScale $ TimeFS vcdTimeScaleFS
-    ]
+  assemble (initialValues,changes,meta,warn) =
+    (VcdFile (headers ++ variables) simulation meta, warn <> warnings)
+   where
+    headers =
+      [ Date simTimestamp
+      , Version $ vcdVersion @t
+      , TimeScale $ TimeFS vcdTimeScaleFS
+      ]
 
-  simulation =
-    [ SimulationTime vStart
-    , DumpVars initialValues ]
-    <> changes
-    <> [SimulationTime vStop]
+    simulation =
+      [ SimulationTime vStart
+      , DumpVars initialValues ]
+      <> changes
+      <> [SimulationTime vStop]
 
   ------------ SIGNAL DECLARATIONS -------------
 
@@ -186,7 +153,7 @@ vcd Simulation
    where
     varScopes = map (\(n,w,l) -> mkScope (splitOn "." n) w l)
       -- $ sort -- automatically sorted because `names` comes from map keys
-      $ zip3 names widths labels
+      $ zip3 allNames (map ((.width) . snd) allTraces) allLabels
 
   -- essentially x:xs
   addScope :: DeclarationCommand -> [DeclarationCommand] -> [DeclarationCommand]
@@ -200,6 +167,7 @@ vcd Simulation
 
   mkScope :: [String] -> Width -> IDCode -> DeclarationCommand
   mkScope [] _ _ = error "(unreachable) empty signal name"
+  mkScope [varReference] 0 _ = Comment $ "Omitted 0-bit trace " <> varReference
   mkScope [varReference] varSize varIDCode = VarDec $ Var{..}
   mkScope (n:ns) w l = Scope n [mkScope ns w l]
 
@@ -217,7 +185,7 @@ vcd Simulation
 
   -}
 
-  simTimeScaleFS = foldl1 gcd $ map timeInFS periods
+  simTimeScaleFS = foldl1 gcd $ map timeInFS (map (\(_,(_,t)) -> t.period) nonUnitTraces)
 
   vcdTimeScaleFS = largestPow10 1
     $ foldl1 gcd
@@ -240,104 +208,15 @@ vcd Simulation
 
   --------------- SIGNAL VALUES ----------------
 
-  {-
-  - group signals by period
-  - per domain, slice:
-    - slice based on time
-    - take the initial samples
-    - compare samples to only get changes
-  -}
-
-  -- [(period in VCDTime,([widths))]
-  domains :: [(Period,([Width],[IDCode],[[Value]]))]
-  domains =
-    map
-      (\traces -> (fst $ unsafeHead traces, unzip3 $ map snd traces))
-      $ groupWith fst
-      $ zip periods
-      $ zip3 widths labels valuess
-
-  unsafeHead (x:_) = x
-  unsafeHead [] = error "(unreachable) cannot take head of empty list"
-
-  changesPerDomain :: [([ValueChange],[(VcdTime,[ValueChange])])]
-  changesPerDomain = map findChanges domains
-
-  initialValues :: [ValueChange]
-  initialValues = concatMap fst changesPerDomain
-
-  -- essentially merge sort with nested merging on equal values
-  blocks :: [(VcdTime, [ValueChange])]
-  blocks =
-    treeFold zipTimed
-      (map snd changesPerDomain :: [[(VcdTime,[ValueChange])]])
-
-  changes :: [SimulationCommand]
-  changes = concatMap (\(t,cs) -> [SimulationTime t, ValueChanges cs]) blocks
-
-  -- TODO: small to large merging is better, but this is likely sufficient
-
-  -- | Merge items with the given function using a binary tree.
-  -- A linear fold would incur quadratic runtime.
-  treeFold :: (a -> a -> a) -> [a] -> a
-  treeFold f0 xs0 = treeFold0 (length xs0) f0 xs0
-   where
-    treeFold0 _ _ []  = error "treeFold used on empty sequence" -- unreachable for us
-    treeFold0 _ _ [x] = x
-    treeFold0 l f xs  = treeFold0 l0 f as `f` treeFold0 (l - l0) f bs
-     where
-      l0 = l `div` 2
-      (as, bs) = splitAt l0 xs
-
-  -- | Zip two lists of timestamped lists of changes.
-  -- A single merge in the merge sort
-  zipTimed :: [(VcdTime,[a])] -> [(VcdTime,[a])] -> [(VcdTime,[a])]
-  zipTimed aa [] = aa
-  zipTimed [] bb = bb
-  zipTimed aa@((ta,va):as) bb@((tb,vb):bs) =
-    case compare ta tb of
-      LT -> (ta,    va) : zipTimed as bb
-      EQ -> (ta,va<>vb) : zipTimed as bs
-      GT -> (tb,    vb) : zipTimed aa bs
-
-  -- Find changes in a list of signals with equal period
-  findChanges
-    :: (Period,([Width],[String],[[Value]]))
-    -> ([ValueChange],[(VcdTime,[ValueChange])])
-  findChanges (period,(widths0,labels0,valuess0)) = (initial0, samples0)
-    where
-      clkEdges :: [VcdTime]
-      clkEdges = [vClockStart, vClockStart + period0 ..]
-       where
-        period0 = timeInFS period `div` vcdTimeScaleFS
-
-      -- group by clock cycle and add timestamps (the initial value starts at -inf)
-      valuessFrom :: [(VcdTime,[Value])]
-      valuessFrom = zip (-1000000000000:clkEdges) $ transpose valuess0
-        --TODO: minBound, but we're using integers, which are unbounded :/
-
-      skipStart :: [(VcdTime,[Value])]
-      skipStart = map fst $ dropWhile ((<= vStart) . snd) $ zip valuessFrom clkEdges
-
-      ((_,initial) , rest) = fromMaybe (error "(unreachable) finite signal") $ uncons skipStart
-
-      samples :: [(VcdTime,[Value])]
-      samples = takeWhile ((< vStop) . fst) rest
-
-      filterChanges (_ta,va) (tb,vb) =
-        (tb
-        , [ValueChange w l b | (a,b,w,l) <- zip4 va vb widths0 labels0, a /= b]
-        )
-
-      initial0 :: [ValueChange]
-      initial0 = zipWith3 ValueChange widths0 labels0 initial
-
-      samples0 :: [(VcdTime,[ValueChange])]
-      samples0 = filter (not . null . snd) $ zipWith filterChanges skipStart samples
+  processed = vcdProcess @t
+    vcdTimeScaleFS
+    (vStart,vClockStart,vStop)
+    (map (\(l,(n,t))->(l,n,t)) nonUnitTraces) --labels names periods widths valuess metas
 
 
 -- | Create a VCD file for the given traces and simulation configuration.
--- Zero-width signals are not included, and instead warnings for these signals
+--
+-- Zero-width signals are not included, and if `warnZeroWidth` is one, warnings for these signals
 -- are returned.
 vcdText ::
   forall t.
@@ -348,7 +227,8 @@ vcdText sim = (first renderVcd) <$> vcd sim
 
 -- | Create a VCD file for the given traces and simulation configuration,
 -- and write it to a file.
--- Errors if the VCD generation fails.
+--
+-- Warnings are printed. Errors if the VCD generation fails.
 writeVcd ::
   forall t.
   HasCallStack =>
@@ -363,7 +243,6 @@ writeVcd file sim = do
       let text = renderVcd vcdFile
       mapM_ (hPutStrLn stderr) warnings
       Data.Text.IO.writeFile file text
-      writeVcdMeta @t file vcdFile.meta
 
 -- | Render a 'Vcd' object as 'Text'.
 renderVcd ::

@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -67,6 +68,7 @@ module Clash.Signal.Internal.Trace (
   simulationTimeRangeToCycles,
   clockTrace, clockTrace0,
   domainName, replaceDollar,
+  simOnly,
 ) where
 
 import Prelude hiding (undefined)
@@ -80,10 +82,12 @@ import Data.Either.Extra (maybeToEither)
 import Data.IORef (IORef, atomicModifyIORef', newIORef, readIORef)
 import Data.Kind (Constraint)
 import qualified Data.List as L
+import Data.List (unzip4)
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Time.Clock (UTCTime, getCurrentTime)
 import Data.Typeable (Typeable, Proxy(..))
+import GHC.Exts (groupWith)
 import GHC.Generics (Generic)
 import GHC.Natural (Natural)
 import GHC.TypeLits (KnownNat, natVal, symbolVal)
@@ -91,7 +95,7 @@ import System.IO (hPutStrLn, stderr)
 import System.IO.Unsafe (unsafePerformIO)
 
 import Clash.Class.BitPack (BitPack(..), BitSize)
-import Clash.XException (NFDataX(rnfX), undefined)
+import Clash.Magic (clashSimulation)
 import Clash.Signal
   (KnownDomain, SDomainConfiguration(..), knownDomain,
   ActiveEdge(..),
@@ -102,8 +106,15 @@ import Clash.Signal.Internal (VDomainConfiguration(..), vDomain)
 import Clash.Sized.Internal.BitVector (Bit, BitVector(BV))
 import Clash.Sized.Vector (Vec, toList)
 import Clash.Time (Time(..), timeInFS, AtOrForTime(..), absTime, clockPeriodTime)
+import Clash.XException (NFDataX(rnfX), undefined)
 
+import Clash.Signal.Internal.Trace.VcdTypes
 import Clash.Signal.Internal.Trace.CompatibleTypes (DataType, compatible, simpleTypeRep)
+
+#ifdef CABAL
+import           Data.Version          (showVersion)
+import qualified Paths_clash_prelude
+#endif
 
 ----------------------------------------------
 --               POLYMORPHISM               --
@@ -119,7 +130,7 @@ class (TraceableFor t ClockVal) => TraceSystem t where
   globalDataRef :: IORef (GlobalData t)
 
   -- | Metadata when converting a 'Signal' to a 'Trace'.
-  traceMeta :: forall a. TraceableFor t a => TraceMeta t
+  traceMeta :: TraceableFor t a => TraceMeta t
 
   -- | Initialise global ref metadata.
   emptyGlobMeta :: GlobMeta t
@@ -129,13 +140,18 @@ class (TraceableFor t ClockVal) => TraceSystem t where
   emptySimMeta :: SimMeta t
   emptySimMeta = fromGlobMeta @t (emptyGlobMeta @t)
 
-  -- | Create vcd metadata from a bunch of simulation stuff
-  -- TODO: change input types
-  vcdMeta :: () -> VcdMeta t
+  -- | The version name to be used in VCD files
+  vcdVersion :: String
 
-  -- | Write the vcd metadata if needed. The file name is that of the VCD file.
-  writeVcdMeta :: String -> VcdMeta t -> IO ()
-  writeVcdMeta _ _ = pure ()
+  -- | The main processing step of the VCD file.
+  -- The function is provided with the time scale and slice, named and labeled traces,
+  -- and returns the initial values, simulation commands for the changes,
+  -- the metadata for the 'VcdFile', and a list of warnings.
+  vcdProcess ::
+    VcdTime ->
+    (VcdTime, VcdTime, VcdTime) ->
+    [(IDCode, String, Trace t)] ->
+    Either String ([ValueChange], [SimulationCommand], VcdMeta t, [String])
 
   -- | When writing a signal dump file, convert the trace metadata to dump metadata.
   storeMeta :: TraceMeta t -> Aeson.Value
@@ -167,7 +183,14 @@ instance TraceSystem () where
   traceMeta = ()
   emptyGlobMeta = ()
   fromGlobMeta = id
-  vcdMeta _ = ()
+
+#ifdef CABAL
+  vcdVersion = "Clash " <> showVersion Paths_clash_prelude.version
+#else
+  vcdVersion = "development version"
+#endif
+  vcdProcess v vt traces = (\(i,c) -> (i,c,(),[])) <$> vcdProcessSimple v vt traces
+
   storeMeta _ = Aeson.Null
   loadMeta _ = ()
   loadMetas _ = ()
@@ -175,10 +198,6 @@ instance TraceSystem () where
 ----------------------------------------------
 --                   BASE                   --
 ----------------------------------------------
-
-type Period = Time
-type Width = Int
-type Value = (Natural, Natural) -- (mask, value)
 
 data Trace t = Trace
   { dataType :: DataType
@@ -539,7 +558,7 @@ trace ::
   String ->
   Signal dom a ->
   Signal dom a
-trace name sig =
+trace name = simOnly $ \sig ->
   unsafePerformIO
     $ atomicModifyIORef' (globalDataRef @t) (\g -> (trace0 @t @dom name (toTrace sig) g, sig))
 {-# OPAQUE trace #-}
@@ -575,7 +594,7 @@ traceVec ::
   String ->
   Signal dom (Vec n a) ->
   Signal dom (Vec n a)
-traceVec name sig =
+traceVec name = simOnly $ \sig ->
   unsafePerformIO
     $ atomicModifyIORef' (globalDataRef @t) (\g -> (traceVec0 @t name sig g,sig))
 {-# OPAQUE traceVec #-}
@@ -665,7 +684,7 @@ clockTrace0 (TimeFS t) edge
     { dataType = simpleTypeRep @ClockVal
     , period = TimeFS halfPeriod
     , width = 1
-    , values = L.cycle $ L.map (unsafeToTup . pack) bits
+    , values = cycle $ L.map (unsafeToTup . pack) bits
     , meta = traceMeta @t @ClockVal
     }
   | otherwise = error "Cannot create clock trace for odd periods (in fs)"
@@ -743,6 +762,47 @@ fetch name sim = fetchTrace name sim >>= fromTrace
 
 
 ----------------------------------------------
+--                   VCD                    --
+----------------------------------------------
+
+-- | Take the time parameters and traces, and create
+vcdProcessSimple ::
+  VcdTime ->
+  (VcdTime,VcdTime,VcdTime) ->
+  [(IDCode,String,Trace t)] ->
+  Either String ([ValueChange],[SimulationCommand])
+vcdProcessSimple
+    vcdTimeScaleFS
+    vTimes
+    traces
+  = Right (initialValues, changes)
+ where
+  {-
+  - group signals by period
+  - per period (domain), slice:
+    - slice based on time
+    - take the initial samples
+    - compare samples to only get changes
+  -}
+
+  (labels,periods,widths,valuess) = unzip4
+    $ map (\(l,_n,Trace{..}) -> (l,period,width,values)) traces
+
+  domains :: [(Period,([Width],[IDCode],[[Value]]))]
+  domains =
+    map
+      (\traces -> (fst $ unsafeHead traces, unzip3 $ map snd traces))
+      $ groupWith fst
+      $ zip periods
+      $ zip3 widths labels valuess
+
+  unsafeHead (x:_) = x
+  unsafeHead [] = error "(unreachable) cannot take head of empty list"
+
+  (initialValues,changes) =
+    combineChangesPerDom $ map (findChangesSimple vcdTimeScaleFS vTimes) domains
+
+----------------------------------------------
 --                   MISC                   --
 ----------------------------------------------
 
@@ -760,3 +820,9 @@ replaceDollar :: String -> String -> String
 replaceDollar _ "" = ""
 replaceDollar n ('$':rest) = n <> replaceDollar n rest
 replaceDollar n (c:rest) = c : replaceDollar n rest
+
+-- | Run function on signal only in simulation
+simOnly :: (s->s) -> s -> s
+simOnly f sig = if clashSimulation then
+    f sig
+  else sig
