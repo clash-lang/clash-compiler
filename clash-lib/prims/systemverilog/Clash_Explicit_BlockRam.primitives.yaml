@@ -61,7 +61,7 @@
         -> Signal dom a
     template: |-
       // blockRamU begin,
-      ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LIT[5]-1];
+      logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_RAM][1] [0:~LIT[5]-1];
       logic [~SIZE[~TYP[9]]-1:0] ~GENSYM[~RESULT_q][2];~IF ~ISACTIVEENABLE[4] ~THEN
       always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
@@ -104,10 +104,10 @@
         -> Signal dom a
     template: |-
       // blockRam1 begin,
-      ~TYPO ~GENSYM[~RESULT_RAM][1] [0:~LIT[5]-1];
+      logic [~SIZE[~TYP[10]]-1:0] ~GENSYM[~RESULT_RAM][1] [0:~LIT[5]-1];
       logic [~SIZE[~TYP[10]]-1:0] ~GENSYM[~RESULT_q][2];
       initial begin
-        ~SYM[1] = '{default: ~CONST[6]};
+        ~SYM[1] = '{default: ~TOBV[~CONST[6]][~TYP[6]]};
       end~IF ~ISACTIVEENABLE[4] ~THEN
       always @(~IF~ACTIVEEDGE[Rising][0]~THENposedge~ELSEnegedge~FI ~ARG[3]) begin : ~GENSYM[~COMPNAME_blockRam][3]~IF ~VIVADO ~THEN
         if (~ARG[4]) begin
