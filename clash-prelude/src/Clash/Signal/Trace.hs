@@ -98,7 +98,6 @@ import GHC.Stack (HasCallStack)
 import GHC.TypeLits (KnownNat)
 
 import qualified Clash.Signal.Internal.Trace as Trace
-import qualified Clash.Signal.Internal.Trace.Vcd as Vcd
 import qualified Clash.Signal.Internal.Trace.Store as Store
 import qualified Clash.Signal.Internal.Trace.DataType as DataType
 import qualified Clash.Signal.Internal.Trace.OldTrace as Old
@@ -259,7 +258,7 @@ type TraceMap = Trace.TraceMap ()
 vcdText ::
   Simulation ->
   Either String (Text, [String])
-vcdText = Vcd.vcdText @()
+vcdText = Trace.vcdText @()
 
 -- | Create a VCD file for the given traces and simulation configuration,
 -- and write it to a file.
@@ -269,7 +268,7 @@ writeVcd ::
   FilePath ->
   Simulation ->
   IO ()
-writeVcd = Vcd.writeVcd @()
+writeVcd = Trace.writeVcd @()
 
 -- | Store a trace in binary form.
 store ::

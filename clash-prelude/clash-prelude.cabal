@@ -270,8 +270,6 @@ Library
                       Clash.Signal.Internal.Trace.CompatibleTypes
                       Clash.Signal.Internal.Trace.OldTrace
                       Clash.Signal.Internal.Trace.Store
-                      Clash.Signal.Internal.Trace.Vcd
-                      Clash.Signal.Internal.Trace.VcdTypes
 
                       Clash.Sized.BitVector
                       Clash.Sized.Fixed

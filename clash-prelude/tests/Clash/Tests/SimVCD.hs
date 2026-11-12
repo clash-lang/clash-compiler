@@ -18,7 +18,6 @@ import Test.Tasty.Hedgehog (testPropertyNamed)
 
 import Clash.Signal.Internal.Trace
 import Clash.Signal.Internal.Trace.DataType
-import Clash.Signal.Internal.Trace.Vcd
 import Clash.Sized.BitVector (BitVector, size#)
 import Clash.Time
 import Hedgehog.Extra (LockstepWalk (..), combinations, lockstepWalk)
