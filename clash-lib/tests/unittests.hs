@@ -13,6 +13,7 @@ import qualified Clash.Tests.Driver.Manifest
 import qualified Clash.Tests.Netlist.Id
 import qualified Clash.Tests.Normalize.Transformations
 import qualified Clash.Tests.Rewrite.StrategyDSL
+import qualified Clash.Tests.Util.Exception
 import qualified Clash.Tests.Util.Interpolate
 import qualified Test.Clash.Rewrite
 
@@ -34,6 +35,7 @@ tests = testGroup "Unittests"
   , Clash.Tests.Netlist.Id.tests
   , Clash.Tests.Normalize.Transformations.tests
   , Clash.Tests.Rewrite.StrategyDSL.tests
+  , Clash.Tests.Util.Exception.tests
   , Clash.Tests.Util.Interpolate.tests
   , Test.Clash.Rewrite.tests
   ]
