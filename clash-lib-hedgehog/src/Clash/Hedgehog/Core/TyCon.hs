@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -138,7 +138,7 @@ genAlgTyConFrom range tcm = do
              -- TODO Generate NewTyCon
            ]
 
-  let tc = AlgTyCon (nameUniq name) name kn arity rhs False
+  let tc = AlgTyCon (nameUniq name) name kn arity rhs False Nothing
 
   canGenDataKinds >>= \case
     True ->

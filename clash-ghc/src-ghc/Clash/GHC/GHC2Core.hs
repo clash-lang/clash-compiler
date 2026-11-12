@@ -109,19 +109,19 @@ import GHC.Data.Pair (Pair (..))
 import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
 import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
-   isNewTyCon, isPrimTyCon, isTupleTyCon,
+   isNewTyCon, isPrimTyCon, isTupleTyCon, isFamInstTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
-   tyConDataCons, tyConKind,
+   tyConDataCons, tyConKind, tyConTyVars,
 #if MIN_VERSION_ghc(9,14,0)
-   tyConTyVars,
    isUnaryClassTyCon,
 #endif
    tyConUnique, isClassTyCon,
    isPromotedDataCon_maybe)
 import GHC.Core.TyCon (ExpandSynResult (..))
-import GHC.Core.Type (tyConAppFunTy_maybe)
+import GHC.Core.Type
+  (tyConAppFunTy_maybe, mkFamilyTyConApp, splitAppTy_maybe, anyFreeVarsOfType)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
-import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing)
+import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing, mkTyVarTy)
 import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
 import GHC.Types.Var
   (Id, TyVar, Var, VarBndr (..), idDetails, isTyVar, varName, varType,
@@ -318,7 +318,8 @@ makeTyCon tc = tycon
           tcKind <- coreToType (tyConKind tc)
           tcRhsM <- makeAlgTyConRhs tc $ algTyConRhs tc
           case tcRhsM of
-            Just tcRhs ->
+            Just tcRhs -> do
+              familyInst <- mkDataFamilyInst
               return
                 C.AlgTyCon
                 { C.tyConUniq   = C.nameUniq tcName
@@ -327,8 +328,33 @@ makeTyCon tc = tycon
                 , C.tyConArity  = tcArity
                 , C.algTcRhs    = tcRhs
                 , C.isClassTc   = isClassTyCon tc
+                , C.tyConFamilyInst = familyInst
                 }
             Nothing -> return (C.PrimTyCon (C.nameUniq tcName) tcName tcKind tcArity)
+
+        -- Keep the relationship to the source family even when GHC has
+        -- lowered applications to this representation constructor. Use the
+        -- structural converter at the family head so this mapping does not
+        -- immediately reduce back to the representation (#3548).
+        mkDataFamilyInst
+          | isFamInstTyCon tc = do
+              let allTvs = tyConTyVars tc
+                  (tvs, familyTy) = etaReduceFamily (reverse allTvs)
+                    (mkFamilyTyConApp tc (map mkTyVarTy allTvs))
+              tvs' <- mapM coreToTyVar tvs
+              familyTy' <- coreToType' familyTy
+              pure (Just (tvs', familyTy'))
+          | otherwise = pure Nothing
+
+        -- Also support higher-kinded uses of the representation constructor:
+        -- R:TaggedBool is already equivalent to Tagged @Bool, before a label
+        -- is supplied. Structured or repeated indices must retain their binders.
+        etaReduceFamily (v:vs) ty
+          | Just (fun, TyVarTy v') <- splitAppTy_maybe ty
+          , v == v'
+          , not (anyFreeVarsOfType (== v) fun)
+          = etaReduceFamily vs fun
+        etaReduceFamily vs ty = (reverse vs, ty)
 
         mkFunTyCon = do
           tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
@@ -364,6 +390,7 @@ makeTyCon tc = tycon
                 , C.tyConArity  = tcArity
                 , C.algTcRhs    = tcDc
                 , C.isClassTc   = isClassTyCon tc
+                , C.tyConFamilyInst = Nothing
                 }
             _ -> error "impossible"
 
