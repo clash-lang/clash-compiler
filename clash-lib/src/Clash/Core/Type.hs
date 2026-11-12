@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
                      2017     , Google Inc.
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -32,6 +32,7 @@ module Clash.Core.Type
   , tyView
   , coreView
   , coreView1
+  , dataFamilyView
   , mkTyConTy
   , mkFunTy
   , mkPolyFunTy
@@ -264,6 +265,15 @@ newTyConInstRhs (tvs,ty) tys
   where
     (tys1, tys2) = splitAtList tvs tys
 
+-- | Recover the source family application of a representation constructor.
+-- For example, @R:TaggedBool label@ becomes @Tagged Bool label@. The mapping
+-- can also restore structured indices, e.g. @R:FMaybe a@ becomes @F (Maybe a)@.
+dataFamilyView :: TyConMap -> Type -> Maybe Type
+dataFamilyView tcm (tyView -> TyConApp tc args) = do
+  inst <- dataFamilyInst =<< UniqMap.lookup tc tcm
+  newTyConInstRhs inst args
+dataFamilyView _ _ = Nothing
+
 -- | Make a function type of an argument and result type
 mkFunTy :: Type -> Type -> Type
 mkFunTy t1 = AppTy (AppTy (ConstTy Arrow) t1)
@@ -442,12 +452,21 @@ funSubst tcm (Just s) = uncurry go
       -- So this is why, whenever we match against a type variable, we first
       -- check if there is already a substitution defined for this type variable,
       -- and if so, the applied type, and the type in the substitution should match.
-      Just ty' | ty' `aeqType` ty -> Just s
+      Just ty' | ty' `aeqType` ty
+               || familyType ty' `aeqType` familyType ty -> Just s
       _ -> Nothing
 
     -- Only look through annotations in RHS after the VarTy case, so we can
     -- preserve annotations in the substitution created by the VarTy case above
     go t1 (AnnType _ t2) = go t1 t2
+
+    -- A generic family equation may still mention the source data family,
+    -- while a concrete argument (or another equation) uses its representation.
+    -- Compare their family applications without changing the representation
+    -- used elsewhere in Core.
+    go t1 t2
+      | Just t1' <- dataFamilyView tcm t1 = go t1' t2
+      | Just t2' <- dataFamilyView tcm t2 = go t1 t2'
 
     -- [Note] funSubst FunTy
     --
@@ -481,6 +500,16 @@ funSubst tcm (Just s) = uncurry go
       | l1 == l2 = Just s
 
     go _ _ = Nothing
+
+    -- Repeated variables need equality rather than another pattern match:
+    -- neither occurrence may introduce new substitutions. Look through family
+    -- representations recursively, including nested family arguments.
+    familyType ty
+      | Just ty' <- dataFamilyView tcm ty = familyType ty'
+    familyType (AppTy f a) = AppTy (familyType f) (familyType a)
+    familyType (ForAllTy v ty) = ForAllTy v (familyType ty)
+    familyType (AnnType attrs ty) = AnnType attrs (familyType ty)
+    familyType ty = ty
 
 {- [Note: Eager type families]
 
@@ -714,6 +743,13 @@ normalizeType tcMap = go
       -> mkTyConApp tcNm (map go args)
       | otherwise
       -> case UniqMap.find tcNm tcMap of
+          -- Keep a newtype-family representation until a representation view
+          -- is requested. Erasing it to its payload would lose the family
+          -- identity needed for later matching; ordinary data-family
+          -- representations can follow the normal normalization path.
+          tc@AlgTyCon{algTcRhs = NewTyCon{}}
+             | isJust (dataFamilyInst tc)
+             -> mkTyConApp tcNm (map go args)
           AlgTyCon {algTcRhs = (NewTyCon _ nt)}
              -> case newTyConInstRhs nt args of
                   Just ty' -> go ty'
