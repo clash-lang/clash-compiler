@@ -556,15 +556,15 @@ convertReset clkA clkB rstA0 = rstB1
       _                          -> not <$> rstA1
   rstA3 =
     case resetKind @domA of
-      SSynchronous -> delay clkA enableGen assertedA rstA2
+      SSynchronous -> delay clkA enableGen assertedB rstA2
       _            -> rstA2
   rstB0 = unsafeToReset $ unsafeSynchronizer clkA clkB rstA3
   rstB1 =
     case (sameDomain @domA @domB) of
       Just Refl -> rstA0
       Nothing   -> resetSynchronizer clkB rstB0
-  assertedA :: Bool
-  assertedA =
-    case resetPolarity @domA of
+  assertedB :: Bool
+  assertedB =
+    case resetPolarity @domB of
       SActiveHigh -> True
       SActiveLow  -> False
