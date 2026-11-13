@@ -186,7 +186,7 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 -- 'resetSynchronizer' implements the following circuit for asynchronous domains:
 --
 -- >                                   rst
--- >   --------------------------------------+
+-- >   --------------------+-----------------+
 -- >                       |                 |
 -- >                  +----v----+       +----v----+
 -- >     deasserted   |         |       |         |
@@ -196,7 +196,7 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 -- >              |   |         |   |   |         |
 -- >              |   +---------+   |   +---------+
 -- >      clk     |                 |
--- >   -----------------------------+
+-- >   -----------+-----------------+
 --
 -- This corresponds to figure 3d at <https://www.embedded.com/asynchronous-reset-synchronization-and-distribution-challenges-and-solutions/>
 --
@@ -210,7 +210,7 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 -- >              |   |         |   |   |         |
 -- >              |   +---------+   |   +---------+
 -- >      clk     |                 |
--- >   -----------------------------+
+-- >   -----------+-----------------+
 --
 resetSynchronizer
   :: forall dom
@@ -532,11 +532,38 @@ holdResetAsync clk en sn@SNat rst = rstOut
 
 
 -- | Convert between different types of reset, adding a synchronizer when
--- the domains are not the same. See 'resetSynchronizer' for further details
--- about reset synchronization.
+-- the domains are not the same.
 --
 -- If @domA@ has 'Synchronous' resets, a flip-flop is inserted in @domA@ to
--- filter glitches. This adds one @domA@ clock cycle delay.
+-- filter glitches. This adds one @domA@ clock cycle delay. The reset then only
+-- reaches @domB@ while @domA@'s clock is running. If @domA@ has 'Asynchronous'
+-- resets, the reset is passed on as is, so it must be free of glitches.
+--
+-- The synchronizer delays deassertion by two @domB@ clock cycles, so @domB@
+-- leaves reset later than @domA@. If @domB@ has 'Synchronous' resets,
+-- assertion is delayed as well. See 'resetSynchronizer' for further details
+-- about reset synchronization.
+--
+-- __NB__: If @domB@ has 'Synchronous' resets, the synchronizer in @domB@ only
+-- samples the incoming reset on @domB@'s clock edges. A reset assertion in
+-- @domA@ that is too short, e.g. a single cycle when @domA@ is faster than
+-- @domB@, can therefore be missed entirely. To be reliably observed, the reset
+-- in @domA@ should be asserted for at least 1.5 @domB@ clock periods, so that
+-- one @domB@ clock edge samples it well away from its transitions. This is
+-- not needed if @domB@ has 'Asynchronous' resets, as those are asserted
+-- asynchronously.
+--
+-- __NB__: The following only concerns the unusual case of a @domA@ with
+-- 'Synchronous' resets and no initial (or \"power up\") values for memory
+-- elements ('Unknown'), combined with a @domB@ /with/ initial values
+-- ('Defined'). The glitch filter flip-flop inserted in @domA@ then starts in an
+-- undefined state, while @domB@ starts in reset. @domB@ can therefore briefly
+-- leave reset at power-up if its clock ticks before the first @domA@ clock edge
+-- at which the reset in @domA@ is asserted (twice if @domB@ has 'Asynchronous'
+-- resets). This is harmless unless @domB@ has effects that its reset does not
+-- undo, such as writes to memory elements without a reset or to other domains.
+-- In that case, make sure @domA@'s clock runs whenever @domB@'s clock does, or
+-- combine the result with a power-on reset generated in @domB@.
 convertReset
   :: forall domA domB
    . ( KnownDomain domA
@@ -556,15 +583,15 @@ convertReset clkA clkB rstA0 = rstB1
       _                          -> not <$> rstA1
   rstA3 =
     case resetKind @domA of
-      SSynchronous -> delay clkA enableGen assertedA rstA2
+      SSynchronous -> register clkA rstA0 enableGen assertedB (pure (not assertedB))
       _            -> rstA2
   rstB0 = unsafeToReset $ unsafeSynchronizer clkA clkB rstA3
   rstB1 =
     case (sameDomain @domA @domB) of
       Just Refl -> rstA0
       Nothing   -> resetSynchronizer clkB rstB0
-  assertedA :: Bool
-  assertedA =
-    case resetPolarity @domA of
+  assertedB :: Bool
+  assertedB =
+    case resetPolarity @domB of
       SActiveHigh -> True
       SActiveLow  -> False
