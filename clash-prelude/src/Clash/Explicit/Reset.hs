@@ -556,7 +556,7 @@ convertReset clkA clkB rstA0 = rstB1
       _                          -> not <$> rstA1
   rstA3 =
     case resetKind @domA of
-      SSynchronous -> delay clkA enableGen assertedB rstA2
+      SSynchronous -> register clkA rstA0 enableGen assertedB (pure (not assertedB))
       _            -> rstA2
   rstB0 = unsafeToReset $ unsafeSynchronizer clkA clkB rstA3
   rstB1 =
