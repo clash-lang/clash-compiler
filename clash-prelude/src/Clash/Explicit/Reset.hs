@@ -186,7 +186,7 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 -- 'resetSynchronizer' implements the following circuit for asynchronous domains:
 --
 -- >                                   rst
--- >   --------------------------------------+
+-- >   --------------------+-----------------+
 -- >                       |                 |
 -- >                  +----v----+       +----v----+
 -- >     deasserted   |         |       |         |
@@ -196,7 +196,7 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 -- >              |   |         |   |   |         |
 -- >              |   +---------+   |   +---------+
 -- >      clk     |                 |
--- >   -----------------------------+
+-- >   -----------+-----------------+
 --
 -- This corresponds to figure 3d at <https://www.embedded.com/asynchronous-reset-synchronization-and-distribution-challenges-and-solutions/>
 --
@@ -210,7 +210,7 @@ unsafeAndReset (unsafeFromReset -> rst0) (unsafeFromReset -> rst1) =
 -- >              |   |         |   |   |         |
 -- >              |   +---------+   |   +---------+
 -- >      clk     |                 |
--- >   -----------------------------+
+-- >   -----------+-----------------+
 --
 resetSynchronizer
   :: forall dom
