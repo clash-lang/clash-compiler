@@ -1,10 +1,63 @@
 {-|
-
-
-
-
+Copyright  :  (C) 2026     , QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 This module is intended to be imported qualified.
+
+Utilities for tracing signals and dumping them in various ways.
+Conceptually, traces are captured signals. They hold type information as metadata,
+but are otherwise untyped.
+
+Traces can be created from signals directly, or captured by inserting 'trace' and friends
+into a design and simulating it. The 'simulate' and 'simulateWith' functions can be used
+to force evaluation and return the traces found as part of a 'Simulation' object.
+In addition to these traces, 'Simulation' stores config options and timing information.
+
+A 'Simulation' can be used to generate a VCD file (see 'vcdWrite'). Keep in mind that
+since traces capture the full signal, the timing information on the 'Simulation' may be
+modified after simulating to change which values end up in the VCD.
+
+Traces with the same clock period can be stored in signal dump files (see @store@, @load@
+and friends). This is often useful if a test requires input signals that are
+computationally heavy to obtain.
+
+
+Example usage:
+
+@
+import Clash.Prelude
+import qualified Clash.Signal.Trace as T
+
+-- | Count and wrap around
+subCounter :: SystemClockResetEnable => Signal System (Index 3)
+subCounter = T.trace "sub" counter
+  where
+    counter =
+      register 0 (fmap succ' counter)
+
+    succ' c
+      | c == maxBound = 0
+      | otherwise     = c + 1
+
+-- | Count, but only when my subcounter is wrapping around
+mainCounter :: SystemClockResetEnable => Signal System (Signed 64)
+mainCounter = T.trace "main" counter
+  where
+    counter =
+      register 0 (fmap succ' $ bundle (subCounter,counter))
+
+    succ' (sc, c)
+      | sc == maxBound = c + 1
+      | otherwise      = c
+
+-- | Collect traces, and dump them to a VCD file.
+main :: IO ()
+main = do
+  let cntrOut = exposeClockResetEnable mainCounter systemClockGen systemResetGen enableGen
+  sim <- assertRight =<< T.simulate (clockCycles @System 100) [T.clockWave @System "clk"] ["main", "sub"] cntrOut
+  T.writeVcd "mainCounter.vcd" sim
+@
 
 -}
 

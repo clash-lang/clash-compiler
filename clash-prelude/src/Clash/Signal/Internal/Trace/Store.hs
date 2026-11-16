@@ -1,4 +1,7 @@
-{- |
+{-|
+Copyright  :  (C) 2026     , QBayLogic B.V.
+License    :  BSD2 (see the file LICENSE)
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Module for storing traces in files.
 
