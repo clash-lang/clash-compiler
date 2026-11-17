@@ -22,6 +22,7 @@ Module for storing traces in files.
 module Clash.Signal.Internal.Trace.Store (
   FileHeader(..),
   SignalDescr(..),
+  pprHeader,
 
   -- * Storing
   storeTrace0,
@@ -47,7 +48,7 @@ import Data.Aeson hiding (Value) --(encode, eitherDecode, ToJSON(..), FromJSON(.
 import qualified Data.Aeson
 import qualified Data.ByteString.Lazy as B
 import Data.ByteString.Lazy (ByteString)
-import Data.List (transpose, zipWith4)
+import Data.List (intercalate, transpose, zipWith4)
 import Data.Maybe (fromMaybe)
 import GHC.Bits (shiftL, shiftR, (.|.), (.&.))
 import GHC.Generics (Generic)
@@ -148,6 +149,29 @@ instance FromJSON SignalDescr where
     metaM <- v .:? "meta"
     let jsonMeta = fromMaybe Null metaM
     pure SignalDescr{..}
+
+pprHeader :: FileHeader -> String
+pprHeader FileHeader{..} =
+  "SIGNAL DUMP FILE INFO\n"<>
+  "  Samples: "<>show samples<>"\n"<>
+  "  Offset: "<>show offset<>"\n"<>
+  "  Bit width: "<>show width<>"\n"<>
+  "  Undefined bits: "<>(if hasMask then "yes" else "no")<>"\n"<>
+  ( case signals of
+      Left sig ->
+        "  Contains one signal:\n"<>pprSig sig
+      Right sigs ->
+        "  Contains multiple signals:\n"<>intercalate "\n" (map pprSig sigs)
+  )
+ where
+  pprSig :: SignalDescr -> String
+  pprSig SignalDescr{width=width0,..} =
+    "  - "<>name<>":\n"<>
+    "      Bits: "<>show width0<>"\n"<>
+    "      Type:\n"<>pprDT 8 dataType<>
+    "      Meta: "<>show jsonMeta
+  pprDT :: Int -> DataType -> String
+  pprDT i (DT n sub) = replicate i ' ' <> n <> "\n" <> concatMap (pprDT (i+2)) sub
 
 ----------------------------------------------
 --                 STORING                  --

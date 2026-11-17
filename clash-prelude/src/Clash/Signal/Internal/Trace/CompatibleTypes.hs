@@ -56,21 +56,16 @@ pattern TUP_BASE    = $(litP $ StringL $ init $ simpleTyConName @((),()))
 
 -- | Check whether two data types are compatible.
 -- This occurs when both types are the same,
--- or when they have a compatible tuple/anonymous record structure.
+-- or when they have a compatible tuple structure.
 --
 -- The following rules apply:
 -- * Nested tuple structure are flattened.
 -- * Unit types ('()') are removed.
--- * Labeled unit types are also removed (including structures that reduce to unit).
--- * Two labels must have the same field name, but labeled data can match unlabeled data.
 --
--- For example:
--- * @(a,(b,c),())@ is compatible with @((a,b),c)@.
--- * @(a:=x :&: b:=() :&: c:=y)@ is compatible with @(x,y)@ or even @(x,c:=y)@.
--- * @"a":=x@ and @"_a":=x@ are not compatible.
+-- For example, @(a,(b,c),())@ is compatible with @((a,b),c)@.
 --
 -- This function is aimed at marking types with the same @BitPack@ structure.
--- Custom bit packings of tuples/anonymous records may result in erroneous compatibility approval.
+-- Custom bit packings of tuples may result in erroneous compatibility approval.
 compatible :: DataType -> DataType -> Bool
 compatible (DT a     ra   ) (DT b     rb   ) | a == b
                                              = and $ zipWith compatible ra rb

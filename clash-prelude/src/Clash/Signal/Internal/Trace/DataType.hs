@@ -38,11 +38,11 @@ import GHC.Generics
 import Type.Reflection
 import Data.Char (isAlphaNum)
 
+-- | A simple type representation.
 data DataType = DT String [DataType] deriving (Show,Generic,ToJSON,FromJSON)
 
 -- | Get a @DataType@ representation of a type.
 -- This amounts to the toplevel type, and a list of all its type arguments.
--- Note that this does not directly specify anything about the data type.
 simpleTypeRep :: forall a. Typeable a => DataType
 simpleTypeRep = pretty $ Data.Typeable.typeRep $ Proxy @a
  where

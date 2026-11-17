@@ -124,6 +124,9 @@ module Clash.Signal.Trace (
   Store.SignalDescr(..),
   DataType.DataType(..),
   Store.loadHeader,
+  Store.pprHeader,
+  DataType.simpleTypeRep,
+  Compat.compatible,
 
   -- * Deprecated tracing functions
   -- ** Simple
@@ -153,12 +156,13 @@ import GHC.TypeLits (KnownNat)
 import qualified Clash.Signal.Internal.Trace as Trace
 import qualified Clash.Signal.Internal.Trace.Store as Store
 import qualified Clash.Signal.Internal.Trace.DataType as DataType
+import qualified Clash.Signal.Internal.Trace.CompatibleTypes as Compat
 import qualified Clash.Signal.Internal.Trace.OldTrace as Old
 
 
 type Traceable a = (NFDataX a, BitPack a, Typeable a)
-
 type Simulation = Trace.Simulation ()
+type TraceMap = Trace.TraceMap ()
 
 -- | Simulate a design by forcefully evaluating an output signal.
 -- If a list of signal names is provided, the simulation will stop early
@@ -213,7 +217,7 @@ setClockStart = Trace.setClockStart @()
 setTimes :: Trace.Times -> Simulation -> Simulation
 setTimes = Trace.setTimes @()
 
--- | Retrieve a 'Signal' from the captured traces.
+-- | Retrieve a 'Signal' from the captured traces in a 'Simulation'.
 fetch ::
   forall dom a.
   KnownDomain dom =>
@@ -225,6 +229,7 @@ fetch = Trace.fetch @() @dom
 
 -- | Trace a 'Signal'.
 -- This converts the signal to a trace, and stores it in global storage.
+-- To access the traces, see 'simulate'.
 trace ::
   forall dom a.
   KnownDomain dom =>
@@ -234,7 +239,7 @@ trace ::
   Signal dom a
 trace = Trace.trace @()
 
--- | Trace all values in a vector signal individually.
+-- | Trace all values in a vector signal individually. See 'trace'.
 traceVec ::
   forall dom a n.
   KnownDomain dom =>
@@ -245,7 +250,7 @@ traceVec ::
   Signal dom (Vec n a)
 traceVec = Trace.traceVec @()
 
--- | Like 'trace', but operates on a 'Reset'
+-- | Like 'trace', but operates on a 'Reset'.
 traceReset ::
   KnownDomain dom =>
   -- | Name of signal in the simulation output
@@ -255,7 +260,7 @@ traceReset ::
   Reset dom
 traceReset = Trace.traceReset @()
 
--- Like traceReset for enables
+-- Like 'trace', but operates on an 'Enable'.
 traceEnable ::
   KnownDomain dom =>
   String ->
@@ -274,7 +279,7 @@ toTrace ::
 toTrace = Trace.toTrace @()
 
 -- | Create a 'Signal' from a 'Trace'.
--- This checks whether the type is compatible. See also @compatible@.
+-- This checks whether the type is compatible. See @compatible@.
 fromTrace ::
   Traceable a =>
   Trace ->
@@ -289,7 +294,7 @@ addTrace ::
   Either String Simulation
 addTrace = Trace.addTrace @()
 
--- | Retrieve a captured 'Trace'.
+-- | Retrieve a captured 'Trace' from a 'Simulation'.
 fetchTrace ::
   String ->
   Simulation ->
@@ -297,13 +302,13 @@ fetchTrace ::
 fetchTrace = Trace.fetchTrace @()
 
 -- | Create a clock trace from a domain.
+-- Keep in mind that clock traces can be generated automatically by 'simulation'.
 clockTrace ::
   forall dom.
   KnownDomain dom =>
   Trace
 clockTrace = Trace.clockTrace @() @dom
 
-type TraceMap = Trace.TraceMap ()
 
 -- | Create a VCD file for the given traces and simulation configuration.
 -- Zero-width signals are not included, and instead warnings for these signals
