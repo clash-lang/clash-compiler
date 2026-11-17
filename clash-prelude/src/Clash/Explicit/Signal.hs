@@ -41,17 +41,19 @@ domain looks like:
 @
 
 Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, an instance of 'KnownDomain' should be
-made. Clash provides a standard implementation, called 'System', that is
-configured as follows:
+provides. In order to specify a domain, instances of 'KnownClockDomain' and
+'KnownDomain' should be made. Clash provides a standard implementation, called
+'System', that is configured as follows:
 
 @
-instance KnownDomain System where
-  type DomainPeriod System        = 10000
-  type DomainActiveEdge System    = 'Rising
-  type DomainResetKind System     = 'Asynchronous
-  type DomainInitBehavior System  = 'Defined
-  type DomainResetPolarity System = 'ActiveHigh
+instance KnownClockDomain System where
+  type ClockPeriod System        = 10000
+  type ClockActiveEdge System    = 'Rising
+  type ClockResetKind System     = 'Asynchronous
+  type ClockInitBehavior System  = 'Defined
+  type ClockResetPolarity System = 'ActiveHigh
+
+instance KnownDomain System
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -157,8 +159,24 @@ module Clash.Explicit.Signal
   , BiSignalDefault(..)
     -- * Domain
   , Domain
+  , ClockDomain
+  , sameDomain
+  , switchDomain
+  , switchClockDomain
+  , switchResetDomain
+  , switchEnableDomain
+  , SupportsSwitchingTo
+  , EligibleDomainSwitch
   , KnownDomain(..)
+  , KnownClockDomain(..)
   , KnownConfiguration
+    -- ** Domain projections
+  , DomainPeriod
+  , DomainPeriodFraction
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
@@ -321,22 +339,24 @@ import           Clash.XException
 >>> import qualified Data.List as L
 >>> :{
 data Dom2 :: Domain
-instance KnownDomain Dom2 where
-  type DomainPeriod Dom2        = 2
-  type DomainActiveEdge Dom2    = 'Rising
-  type DomainResetKind Dom2     = 'Asynchronous
-  type DomainInitBehavior Dom2  = 'Defined
-  type DomainResetPolarity Dom2 = 'ActiveHigh
+instance KnownClockDomain Dom2 where
+  type ClockPeriod Dom2        = 2
+  type ClockActiveEdge Dom2    = 'Rising
+  type ClockResetKind Dom2     = 'Asynchronous
+  type ClockInitBehavior Dom2  = 'Defined
+  type ClockResetPolarity Dom2 = 'ActiveHigh
+instance KnownDomain Dom2
 :}
 
 >>> :{
 data Dom7 :: Domain
-instance KnownDomain Dom7 where
-  type DomainPeriod Dom7        = 7
-  type DomainActiveEdge Dom7    = 'Rising
-  type DomainResetKind Dom7     = 'Asynchronous
-  type DomainInitBehavior Dom7  = 'Defined
-  type DomainResetPolarity Dom7 = 'ActiveHigh
+instance KnownClockDomain Dom7 where
+  type ClockPeriod Dom7        = 7
+  type ClockActiveEdge Dom7    = 'Rising
+  type ClockResetKind Dom7     = 'Asynchronous
+  type ClockInitBehavior Dom7  = 'Defined
+  type ClockResetPolarity Dom7 = 'ActiveHigh
+instance KnownDomain Dom7
 :}
 
 >>> let clk2 = clockGen @Dom2

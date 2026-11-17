@@ -40,17 +40,19 @@ domain looks like:
 @
 
 Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, an instance of 'KnownDomain' should be
-made. Clash provides an implementation 'System' with some common options
-chosen:
+provides. In order to specify a domain, instances of 'KnownClockDomain' and
+'KnownDomain' should be made. Clash provides an implementation 'System' with
+some common options chosen:
 
 @
-instance KnownDomain System where
-  type DomainPeriod System        = 10000
-  type DomainActiveEdge System    = 'Rising
-  type DomainResetKind System     = 'Asynchronous
-  type DomainInitBehavior System  = 'Defined
-  type DomainResetPolarity System = 'ActiveHigh
+instance KnownClockDomain System where
+  type ClockPeriod System        = 10000
+  type ClockActiveEdge System    = 'Rising
+  type ClockResetKind System     = 'Asynchronous
+  type ClockInitBehavior System  = 'Defined
+  type ClockResetPolarity System = 'ActiveHigh
+
+instance KnownDomain System
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -90,13 +92,22 @@ module Clash.Signal
   , BiSignalDefault(..)
     -- * Domain
   , Domain
+  , ClockDomain
   , sameDomain
   , switchDomain
   , switchClockDomain
   , switchResetDomain
   , switchEnableDomain
   , KnownDomain(..)
+  , KnownClockDomain(..)
   , KnownConfiguration
+    -- ** Domain projections
+  , DomainPeriod
+  , DomainPeriodFraction
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)

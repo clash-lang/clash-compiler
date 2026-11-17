@@ -72,12 +72,13 @@ data ClashEnv = ClashEnv
   }
 
 data KnownDomainTyConUniques = KnownDomainTyConUniques
-  { domainPeriodTCU         :: Unique
-  , domainActiveEdgeTCU     :: Unique
-  , domainResetKindTCU      :: Unique
-  , domainInitBehaviorTCU   :: Unique
-  , domainResetPolarityTCU  :: Unique
-  , domainPeriodFractionTCU :: Unique
+  { clockDomainOfTCU       :: Unique
+  , clockPeriodTCU         :: Unique
+  , clockActiveEdgeTCU     :: Unique
+  , clockResetKindTCU      :: Unique
+  , clockInitBehaviorTCU   :: Unique
+  , clockResetPolarityTCU  :: Unique
+  , clockPeriodFractionTCU :: Unique
   }
 
 data ClashDesign = ClashDesign

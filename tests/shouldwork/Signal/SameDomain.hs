@@ -16,20 +16,24 @@ newtype WrappedSystem = WrappedSystem System
 createDomain vSystem{vName="WrappedSystem"}
 
 type FunDom = Int -> Int
-instance KnownDomain FunDom where
-  type DomainPeriod        FunDom = 10000
-  type DomainActiveEdge    FunDom = 'Rising
-  type DomainResetKind     FunDom = 'Asynchronous
-  type DomainInitBehavior  FunDom = 'Defined
-  type DomainResetPolarity FunDom = 'ActiveHigh
+instance KnownClockDomain FunDom where
+  type ClockPeriod        FunDom = 10000
+  type ClockActiveEdge    FunDom = 'Rising
+  type ClockResetKind     FunDom = 'Asynchronous
+  type ClockInitBehavior  FunDom = 'Defined
+  type ClockResetPolarity FunDom = 'ActiveHigh
+
+instance KnownDomain FunDom
 
 type AppDom = Int -> Int -> String
-instance KnownDomain AppDom where
-  type DomainPeriod        AppDom = 10000
-  type DomainActiveEdge    AppDom = 'Rising
-  type DomainResetKind     AppDom = 'Asynchronous
-  type DomainInitBehavior  AppDom = 'Defined
-  type DomainResetPolarity AppDom = 'ActiveHigh
+instance KnownClockDomain AppDom where
+  type ClockPeriod        AppDom = 10000
+  type ClockActiveEdge    AppDom = 'Rising
+  type ClockResetKind     AppDom = 'Asynchronous
+  type ClockInitBehavior  AppDom = 'Defined
+  type ClockResetPolarity AppDom = 'ActiveHigh
+
+instance KnownDomain AppDom
 
 checkDomains
   :: forall domA domB

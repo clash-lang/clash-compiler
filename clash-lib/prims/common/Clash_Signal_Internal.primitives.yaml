@@ -22,9 +22,33 @@
     name: Clash.Signal.Internal.joinSignal#
     primType: Function
     workInfo: Never
-- Primitive:
-    name: Clash.Signal.Internal.switchDomain
-    primType: Function
+- BlackBox:
+    name: Clash.Signal.Internal.switchDomain#
+    kind: Expression
+    type: 'switchDomain# ::
+      Signal domA a -> Signal domB a'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Signal.Internal.switchClockDomain#
+    kind: Expression
+    type: 'switchClockDomain# ::
+      Clock domA -> Clock domB'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Signal.Internal.switchResetDomain#
+    kind: Expression
+    type: 'switchResetDomain# ::
+      Reset domA -> Reset domB'
+    template: ~ARG[0]
+    workInfo: Never
+- BlackBox:
+    name: Clash.Signal.Internal.switchEnableDomain#
+    kind: Expression
+    type: 'switchEnableDomain# ::
+      Enable domA -> Enable domB'
+    template: ~ARG[0]
     workInfo: Never
 - Primitive:
     name: Clash.Signal.Internal.sameDomain

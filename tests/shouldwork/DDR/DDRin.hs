@@ -4,6 +4,7 @@
 
 module DDRin where
 
+import GHC.Real
 import Clash.Explicit.Prelude
 import Clash.Explicit.DDR
 import Clash.Explicit.Testbench
@@ -24,8 +25,17 @@ The four variants defined here are all the combinations of
 -}
 
 topEntityGeneric
-  :: ( KnownConfiguration fast ('DomainConfiguration fast fPeriod fractionFast edge reset init polarity)
-     , KnownConfiguration slow ('DomainConfiguration slow (2*fPeriod) fractionSlow edge reset init polarity) ) -- note: 2*fraction may be greater than 1
+  :: ( KnownConfiguration fast
+         ( 'DomainConfiguration fast
+              fPeriod (fNumer :% fDenom)
+              edge reset init polarity
+         )
+     , KnownConfiguration slow
+         ( 'DomainConfiguration slow
+              (2*fPeriod) ((2*fNumer) :% fDenom)
+              edge reset init polarity
+         )
+     )
   => Clock slow
   -> Reset slow
   -> Enable slow
