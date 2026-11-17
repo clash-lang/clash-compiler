@@ -674,29 +674,32 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
          where
           g s inst =
             if qualifiedNameString (FamInstEnv.fi_fam inst) `elem`
-                 map show [ ''DomainPeriod         , ''DomainActiveEdge
-                          , ''DomainResetKind      , ''DomainInitBehavior
-                          , ''DomainResetPolarity  , ''DomainPeriodFraction
+                 map show [ ''ClockDomainOf      , ''ClockPeriod
+                          , ''ClockActiveEdge    , ''ClockResetKind
+                          , ''ClockInitBehavior  , ''ClockResetPolarity
+                          , ''ClockPeriodFraction
                           ]
             then UniqDSet.addOneToUniqDSet s
                    $ FamInstEnv.famInstTyCon inst
             else s
 
         mKnownDomainTyConUniques
-          | [ domainActiveEdgeTC
-             , domainInitBehaviorTC
-             , domainPeriodTC
-             , domainPeriodFractionTC
-             , domainResetKindTC
-             , domainResetPolarityTC
+          | [ clockActiveEdgeTC
+             , clockDomainOfTC
+             , clockInitBehaviorTC
+             , clockPeriodTC
+             , clockPeriodFractionTC
+             , clockResetKindTC
+             , clockResetPolarityTC
              ] <- knownTyCons
           = Just KnownDomainTyConUniques
-             { domainPeriodTCU         = fromTC domainPeriodTC
-             , domainActiveEdgeTCU     = fromTC domainActiveEdgeTC
-             , domainResetKindTCU      = fromTC domainResetKindTC
-             , domainInitBehaviorTCU   = fromTC domainInitBehaviorTC
-             , domainResetPolarityTCU  = fromTC domainResetPolarityTC
-             , domainPeriodFractionTCU = fromTC domainPeriodFractionTC
+             { clockDomainOfTCU       = fromTC clockDomainOfTC
+             , clockPeriodTCU         = fromTC clockPeriodTC
+             , clockActiveEdgeTCU     = fromTC clockActiveEdgeTC
+             , clockResetKindTCU      = fromTC clockResetKindTC
+             , clockInitBehaviorTCU   = fromTC clockInitBehaviorTC
+             , clockResetPolarityTCU  = fromTC clockResetPolarityTC
+             , clockPeriodFractionTCU = fromTC clockPeriodFractionTC
              }
           | otherwise = Nothing
          where

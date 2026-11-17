@@ -197,11 +197,18 @@ ghcTypeToHWType mkdtcus iw = go
          | occ == "Clash.Signal.Internal.KnownDomain"
          , [dom] <- args
          , [dc] <- tyConDataCons (UniqMap.find tc m)
+         , [ _typeable, _knownClockDomain
+           ] <- substArgTys dc args
+         -> domCfg mkdtcus m dom $ Void . Just . KnownDomain
+
+         | occ == "Clash.Signal.Internal.KnownClockDomain"
+         , [cdom] <- args
+         , [dc] <- tyConDataCons (UniqMap.find tc m)
          , [ _typeable          , _knownNat           , _positiveNat
            , _knownFraction     , _knownActiveEdge    , _knownResetKind
            , _knownInitBehavior , _knownResetPolarity
            ] <- substArgTys dc args
-         -> domCfg mkdtcus m dom $ Void . Just . KnownDomain
+         -> clockDomCfg mkdtcus m cdom $ Void . Just . KnownDomain
 
          | occ == "Clash.Signal.Internal.Clock"
          , [dom] <- args
@@ -399,14 +406,33 @@ domCfg ::
   (VDomainConfiguration -> HWType) ->
    ExceptT String (MaybeT (State TTState)) FilteredHWType
 domCfg mkdTCUs m dom c
+  | Just KnownDomainTyConUniques{clockDomainOfTCU=cdomOfTCU} <- mkdTCUs
+  , Just cdom <- resolveCdom cdomOfTCU
+  = clockDomCfg mkdTCUs m cdom c
+  | otherwise = ExceptT $ MaybeT $ pure Nothing
+ where
+  resolveCdom u =
+    normalizeType m . (`mkTyConApp` [dom]) . tyConName
+      <$> UniqMap.lookup u m
+
+-- | Resolve the domain configuration of a physical clock domain type, i.e.
+-- a type for which the @Clock*@ type families of
+-- 'Clash.Signal.Internal.KnownClockDomain' reduce directly.
+clockDomCfg ::
+  Maybe KnownDomainTyConUniques ->
+  TyConMap ->
+  Type ->
+  (VDomainConfiguration -> HWType) ->
+   ExceptT String (MaybeT (State TTState)) FilteredHWType
+clockDomCfg mkdTCUs m cdom c
   | Just KnownDomainTyConUniques{..} <- mkdTCUs
-  , Just periodTy   <- resolve domainPeriodTCU
-  , Just fracTy     <- resolve domainPeriodFractionTCU
-  , Just edgeTy     <- resolve domainActiveEdgeTCU
-  , Just rstKindTy  <- resolve domainResetKindTCU
-  , Just initTy     <- resolve domainInitBehaviorTCU
-  , Just polarityTy <- resolve domainResetPolarityTCU
-  = do vName          <- domTag m dom
+  , Just periodTy   <- resolve clockPeriodTCU
+  , Just fracTy     <- resolve clockPeriodFractionTCU
+  , Just edgeTy     <- resolve clockActiveEdgeTCU
+  , Just rstKindTy  <- resolve clockResetKindTCU
+  , Just initTy     <- resolve clockInitBehaviorTCU
+  , Just polarityTy <- resolve clockResetPolarityTCU
+  = do vName          <- domTag m cdom
        period         <- domPeriod m periodTy
        frac           <- domPeriodFraction m fracTy
        vActiveEdge    <- domEdge m edgeTy
@@ -415,12 +441,12 @@ domCfg mkdTCUs m dom c
        vResetPolarity <- domResetPolarity m polarityTy
        let vPeriod = period + frac
            conf = VDomainConfiguration{..}
-       modify $ second $ insert dom conf
+       modify $ second $ insert cdom conf
        return $ FilteredHWType (c conf) []
   | otherwise = ExceptT $ MaybeT $ pure Nothing
  where
   resolve u =
-    normalizeType m . (`mkTyConApp` [dom]) . tyConName
+    normalizeType m . (`mkTyConApp` [cdom]) . tyConName
       <$> UniqMap.lookup u m
 
 domEdge
