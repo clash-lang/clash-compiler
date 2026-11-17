@@ -1,5 +1,67 @@
 # Changelog for the Clash project
 
+## 1.10.4 - *17 Nov, 2026*
+
+### Changed:
+
+- Clash now derives more names in the generated HDL from the source code:
+
+  * Arguments of data constructors are named after the record field they are passed to, e.g. `c$baudCount` instead of `c$app_arg` for the second field of `Tx { txState, baudCount }`.
+  * Arguments of functions are named after the function and its parameter, e.g. `c$txStep_s` for the state of `mealy txStep`.
+  * Case alternatives are named after the constructor they match, e.g. `c$x_case_Idle` instead of `c$x_case_alt` for the alternative `Idle -> ...` of `x = case s of ...`.
+  * Pattern bindings such as `(nextState, output) = ...` are named after their variables, e.g. `nextState_output` instead of `ds`.
+  * Variables made up by GHC, such as `eta`, are named after the parameter of the user-defined function they're passed to. This also names ports of top entities without a `Synthesize` annotation.
+  * User-written names are kept when they are aliases of variables Clash made up. For example, `dSCL` in `let dSCL = fst _dI2C` now names the register holding that field.
+
+  [#3503](https://github.com/clash-lang/clash-compiler/pull/3503)
+- Fields of SystemVerilog structs for records are now named after the record fields, e.g. `baudCount` instead of `Tx_sel1` for the field `baudCount` of a record `Tx`. When a record field isn't a valid SystemVerilog identifier, such as a keyword like `input` or a name with a `'`, the struct's fields are named like `Tx_sel1_baudCount` instead. Fields of tuples and other products without field names keep names like `Tuple2_sel0`.
+  [#3503](https://github.com/clash-lang/clash-compiler/pull/3503)
+- Removing unused declarations no longer shuffles the order of the remaining declarations in the generated HDL.
+  [#3503](https://github.com/clash-lang/clash-compiler/pull/3503)
+- Comparing constructors of enumerations with derived `==`, such as `mode == Done`, no longer produces an `Int`-wide signal named `c$case_scrut` in the HDL.
+  [#3503](https://github.com/clash-lang/clash-compiler/pull/3503)
+- Alternatives of case statements in the generated HDL now mention the constructor they match in a comment, e.g. `2'b00 : busy = 1'b0; // Idle`.
+  [#3503](https://github.com/clash-lang/clash-compiler/pull/3503)
+- Signals holding a record field that the HDL matches on are now named after the record and the field, e.g. `s_mode` for the field `mode` of a signal `s`.
+  [#3503](https://github.com/clash-lang/clash-compiler/pull/3503)
+- Clash now reports errors in the module it compiles directly, instead of wrapping them in a message about loading the module from both precompiled and local sources.
+  [#2365](https://github.com/clash-lang/clash-compiler/issues/2365) [#2680](https://github.com/clash-lang/clash-compiler/issues/2680)
+- Improved the documentation on converting between number types.
+  [#3537](https://github.com/clash-lang/clash-compiler/pull/3537)
+- The error for an inline primitive with a mismatched name now points at the annotated function.
+  [#2365](https://github.com/clash-lang/clash-compiler/issues/2365)
+
+### Fixed:
+
+- Clash's internal `split#` unfolding now returns zero for zero-width halves, matching its Haskell counterpart.
+  [#3490](https://github.com/clash-lang/clash-compiler/pull/3490)
+- `GHC.Num.Integer.integerLogBase#` and `GHC.Num.Natural.naturalLogBase#` are now constant folded accurately, even in cases where these functions return errors.
+  [#3492](https://github.com/clash-lang/clash-compiler/pull/3492)
+- Unhandled `error` calls are reported with their `HasCallStack` backtrace again on GHC 9.12 and later.
+  [#3449](https://github.com/clash-lang/clash-compiler/pull/3449)
+- Errors raised while compiling top entities concurrently now report the backtrace they were thrown with, instead of one pointing into `async`.
+  [#3449](https://github.com/clash-lang/clash-compiler/pull/3449)
+- Clash no longer takes quadratic or exponential time to compile designs that use `iterateI` with a function that inspects its argument more than once, e.g. `iterateI (\(Just n) -> if n == maxBound then Nothing else Just (n + 1)) (Just 0)`, when the resulting vector is consumed by functions such as `takeI` or `foldr`.
+  [#3477](https://github.com/clash-lang/clash-compiler/issues/3477) [#3539](https://github.com/clash-lang/clash-compiler/pull/3539)
+- Clash now reports an error when `clash-lib`'s `mkFunInput` gets called with a local variable as its function input.
+  [#3499](https://github.com/clash-lang/clash-compiler/pull/3499)
+- The VHDL backend now generates valid VHDL for entities without ports, such as a top entity whose ports are all zero-width. This can be helpful when creating self-contained VHDL test benches.
+  [#3500](https://github.com/clash-lang/clash-compiler/pull/3500)
+- Clash's evaluator no longer produces an `SNat` newtype constructor when evaluating `withSomeSNat`.
+  [#3491](https://github.com/clash-lang/clash-compiler/pull/3491)
+- Clash no longer crashes on `iterateI` with functions such as `map f` or `resize`.
+  [#3495](https://github.com/clash-lang/clash-compiler/issues/3495)
+- Constant `BitVector` indices in Verilog and SystemVerilog are now rendered as plain integers, avoiding `64'sd` prefixes that caused warnings in tools such as Verilator.
+  [#3056](https://github.com/clash-lang/clash-compiler/issues/3056)
+- Clash no longer duplicates components whose result is projected out of more than once.
+  [#3517](https://github.com/clash-lang/clash-compiler/issues/3517) [#3519](https://github.com/clash-lang/clash-compiler/pull/3519)
+- Clash no longer duplicates components when applying a primitive to another instantiation of a primitive in certain situations.
+  [#3516](https://github.com/clash-lang/clash-compiler/issues/3516) [#3518](https://github.com/clash-lang/clash-compiler/pull/3518)
+- Clash now reports a clear error for functions returning a non-representable type that it can't inline away.
+  [#3521](https://github.com/clash-lang/clash-compiler/issues/3521)
+- Generating Verilog or SystemVerilog for `BitVector` indexing now uses the built-in blackbox function directly, avoiding unnecessary interpreter sessions that slowed compilation and could crash the compiler.
+  [#3522](https://github.com/clash-lang/clash-compiler/pull/3522)
+
 ## 1.10.3 - *14 Oct, 2026*
 
 ### Added:
