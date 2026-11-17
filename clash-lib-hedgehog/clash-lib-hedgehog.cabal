@@ -1,7 +1,7 @@
 cabal-version:      2.2
 
 name:               clash-lib-hedgehog
-version:            1.10.3
+version:            1.10.4
 synopsis:           Hedgehog Generators for clash-lib
 description:        Hedgehog Generators for clash-lib
 bug-reports:        https://github.com/clash-lang/clash-compiler/issues
@@ -67,4 +67,4 @@ library
     transformers              >= 0.5.2.0 && < 0.7,
     ghc                       >= 9.6.0   && < 9.15,
 
-    clash-lib                 == 1.10.3,
+    clash-lib                 == 1.10.4,
