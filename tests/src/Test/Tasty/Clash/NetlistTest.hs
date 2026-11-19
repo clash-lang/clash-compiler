@@ -88,7 +88,7 @@ runToNetlistStage target f src = do
       evaluator
       teNames supplyN te
 
-  fmap (\(_,x,_) -> force (P.map snd (OMap.assocs x))) $
+  fmap (\(_,x,_,_) -> force (P.map snd (OMap.assocs x))) $
     netlistFrom
       (env, domains, transformedBindings, tes2, compNames, te, initIs)
  where
