@@ -33,6 +33,7 @@ import           Control.Monad.Extra              (whenM, ifM, unlessM)
 import           Control.Monad.State              (evalState, get)
 import           Control.Monad.State.Strict       (State)
 import qualified Control.Monad.State.Strict       as State
+import           Control.Monad.Trans.State.Lazy   (runState)
 import qualified Crypto.Hash.SHA256               as Sha256
 import           Data.Bifunctor                   (first, second)
 import           Data.ByteString                  (ByteString)
@@ -455,7 +456,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
 
       -- 3. Normalize topEntity
       supplyN <- Supply.newSupply
-      (transformedBindings, domains) <-
+      (transformedBindings, domains0) <-
         normalizeEntity env bindingsMap typeTrans peEval
                         eval topEntityNames supplyN topEntity
 
@@ -465,16 +466,19 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
       withMVar ioLockV . const $
         putStrLn ("Clash: Normalization took " ++ prepNormDiff)
 
-      let hdlState1 = setDomainConfigurations domains hdlState0
+      let hdlState1 = setDomainConfigurations domains0 hdlState0
 
       -- 4. Generate netlist for topEntity
-      (topComponent, netlist) <- modifyMVar seenV $ \seen -> do
-        (topComponent, netlist, seen') <-
+      (topComponent, netlist, backend1) <- modifyMVar seenV $ \seen -> do
+        (topComponent, netlist, seen', backend0) <-
           -- TODO My word, this has far too many arguments.
           genNetlist env peEval isTb transformedBindings topEntityMap compNames
             typeTrans ite (SomeBackend hdlState1) seen hdlDir prefixM topEntity
 
-        pure (seen', (topComponent, netlist))
+        pure (seen', (topComponent, netlist, backend0))
+
+      let domains1 = case backend1 of
+            SomeBackend be -> fst $ runState domainConfigurations be
 
       netlistTime <- netlist `deepseq` Clock.getCurrentTime
       let normNetDiff = reportTimeDiff netlistTime normTime
@@ -511,7 +515,7 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         depBindings = mapMaybe (flip lookupVarEnvDirectly bindingsMap) depUniques
         depIds = map bindingId depBindings
 
-        manifest = mkManifest hdlState1 opts topComponent components depIds
+        manifest = mkManifest hdlState1 domains1 opts topComponent components depIds
                               filesAndDigests1 topHashWithSubHashes
       writeManifest manPath manifest
 

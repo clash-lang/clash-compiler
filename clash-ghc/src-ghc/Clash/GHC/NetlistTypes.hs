@@ -157,6 +157,7 @@ ghcTypeToHWType mkdtcus iw = go
                                                -> returnN (Void Nothing)
 
          | occ == "Clash.Signal.Internal.Signal" ->
+             domCfg mkdtcus m (args !! 0) Clock
              ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (args !! 1)
 
          | occ == "Clash.Signal.BiSignal.BiSignalIn" -> do

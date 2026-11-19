@@ -114,12 +114,12 @@ genNetlist
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
-  -> IO (Component, ComponentMap, IdentifierSet)
+  -> IO (Component, ComponentMap, IdentifierSet, SomeBackend)
 genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
   ((_meta, topComponent), s) <-
     runNetlistMonad env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
       $ genComponent topEntity
-  return (topComponent, _components s, seen1)
+  return (topComponent, _components s, seen1, _backend s)
  where
   (componentNames_, seen1) =
     genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals

@@ -32,6 +32,8 @@ import           Data.Char (toLower)
 import           Data.Either (fromRight)
 #endif
 import           Data.Hashable (hash)
+import qualified Data.HashMap.Strict as HashMap
+import           Data.HashMap.Strict (HashMap)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe (catMaybes)
 import           Data.Monoid (Ap(getAp))
@@ -177,7 +179,7 @@ data Manifest
     --
     -- This list is reverse topologically sorted. I.e., a component might depend
     -- on any component listed before it, but not after it.
-  , domains :: [VDomainConfiguration]
+  , domains :: HashMap Text VDomainConfiguration
     -- ^ Domains encountered in design
   , transitiveDependencies :: [Text]
     -- ^ Dependencies of this design (fully qualified binder names). Is a
@@ -230,16 +232,17 @@ instance ToJSON Manifest where
             -- TODO: Add Edam like fields
           ]
         | (fName, fHash) <- fileNames]
-      , "domains" .=
-        [ Aeson.object
-          [ "name" .= vName
-          , "period" .= ((\(Period p) -> p) vPeriod)
-          , "active_edge" .= show vActiveEdge
-          , "reset_kind" .= show vResetKind
-          , "init_behavior" .= show vInitBehavior
-          , "reset_polarity" .= show vResetPolarity
-          ]
-        | VDomainConfiguration{..} <- domains ]
+      , "domains" .= HashMap.fromList
+        [ ( cdomNm
+          , Aeson.object
+            [ "period" .= ((\(Period p) -> p) vPeriod)
+            , "active_edge" .= show vActiveEdge
+            , "reset_kind" .= show vResetKind
+            , "init_behavior" .= show vInitBehavior
+            , "reset_polarity" .= show vResetPolarity
+            ]
+          )
+        | (cdomNm, VDomainConfiguration{..}) <- HashMap.toList domains ]
       , "dependencies" .= Aeson.object
         [ "transitive" .= transitiveDependencies ]
       ]
@@ -289,13 +292,13 @@ instance FromJSON Manifest where
         <*> v .: "components"
         <*> (topComponent >>= (.: "name"))
         <*> parseFiles v
-        <*> (v .: "domains" >>= mapM parseDomain)
+        <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
         <*> (v .: "dependencies" >>= (.: "transitive"))
    where
-    parseDomain :: Aeson.Object -> Parser VDomainConfiguration
-    parseDomain v =
+    parseDomain :: Text -> Aeson.Object -> Parser VDomainConfiguration
+    parseDomain nm v =
       VDomainConfiguration
-        <$> v .: "name"
+        <$> pure (Text.unpack nm)
         <*> (Period <$> (v .: "period"))
         <*> parseWithRead "active_edge" v
         <*> parseWithRead "reset_kind" v
@@ -345,6 +348,8 @@ mkManifest ::
   Backend backend =>
   -- | Backend used to lookup port type names
   backend ->
+  -- | Domains encountered in design
+  DomainMap ->
   -- | Options Clash was run with
   ClashOpts ->
   -- | Component of top entity
@@ -359,7 +364,7 @@ mkManifest ::
   (ByteString, DebugSubHashes) ->
   -- | New manifest
   Manifest
-mkManifest backend ClashOpts{..} Component{..} components deps files (topHash, subHashes) = Manifest
+mkManifest backend domains ClashOpts{..} Component{..} components deps files (topHash, subHashes) = Manifest
   { manifestHash = topHash
   , manifestDebugSubHashes = if opt_debugManifestHash then Just subHashes else Nothing
   , ports = inPorts <> inOutPorts <> outPorts
@@ -367,7 +372,7 @@ mkManifest backend ClashOpts{..} Component{..} components deps files (topHash, s
   , topComponent = Id.toText componentName
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit)
-  , domains = Map.elems $ evalState domainConfigurations backend
+  , domains = HashMap.fromList $ map (\v -> (Text.pack $ vName v,v)) $ Map.elems domains
   , transitiveDependencies = map (nameOcc . varName) deps
   }
  where
