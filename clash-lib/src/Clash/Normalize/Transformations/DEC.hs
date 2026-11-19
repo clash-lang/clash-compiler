@@ -58,7 +58,7 @@ import Data.Text.Extra (showt)
 import GHC.Stack (HasCallStack)
 import qualified Language.Haskell.TH as TH
 
-import GHC.Core.Make (chunkify, mkChunkified)
+import GHC.Builtin.WiredIn.Types (chunkify, mkChunkified)
 
 import GHC.Settings.Constants (mAX_TUPLE_SIZE)
 

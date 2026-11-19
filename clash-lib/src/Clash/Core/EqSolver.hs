@@ -20,7 +20,7 @@ import Clash.Core.Var
 import Clash.Core.VarEnv (VarSet, elemVarSet, emptyVarSet, mkVarSet)
 import Clash.Unique (fromGhcUnique)
 import Clash.Core.DataCon (dcUniq)
-import GHC.Builtin.Names
+import GHC.Builtin.KnownKeys
   (unsafeReflDataConKey, eqPrimTyConKey, eqTyConKey, typeNatAddTyFamNameKey)
 
 -- | Data type that indicates what kind of solution (if any) was found

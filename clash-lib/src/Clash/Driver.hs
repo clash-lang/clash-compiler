@@ -82,7 +82,7 @@ import           System.IO.Temp
 import           Text.Trifecta.Result
   (Result(Success, Failure), _errDoc)
 
-import           GHC.Builtin.Names                 (eqTyConKey, ipClassKey)
+import           GHC.Builtin.KnownKeys             (eqTyConKey, ipClassKey)
 
 import           GHC.Types.SrcLoc                  (SrcSpan)
 import           GHC.BasicTypes.Extra             ()

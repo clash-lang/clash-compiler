@@ -46,7 +46,7 @@ import           Data.Text               (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Extra as Text
 
-import           GHC.Builtin.Names       (eqTyConKey)
+import           GHC.Builtin.KnownKeys   (eqTyConKey)
 
 import           Clash.Annotations.Primitive (extractPrim)
 import           Clash.Core.FreeVars

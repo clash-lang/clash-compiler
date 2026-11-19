@@ -57,7 +57,7 @@ import           Data.Text.Extra                  (showt)
 import qualified GHC.Classes
 import           GHC.Stack                        (HasCallStack)
 
-import           GHC.Builtin.Names
+import           GHC.Builtin.KnownKeys
   (boolTyConKey, typeNatAddTyFamNameKey, typeNatMulTyFamNameKey,
    typeNatSubTyFamNameKey)
 import           GHC.Types.SrcLoc                 (wiredInSrcSpan)

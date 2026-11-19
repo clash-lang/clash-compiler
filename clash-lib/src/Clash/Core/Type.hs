@@ -79,10 +79,10 @@ import           Data.Maybe             (fromMaybe)
 import           Data.Text.Extra        (showt)
 
 -- GHC API
-import           GHC.Builtin.Names
+import           GHC.Builtin.KnownKeys
   (typeCharCmpTyFamNameKey, typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey,
    typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey)
-import           GHC.Builtin.Names
+import           GHC.Builtin.KnownKeys
   (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,

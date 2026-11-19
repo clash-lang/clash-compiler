@@ -37,7 +37,7 @@ import           GHC.Real
   (divZeroError, overflowError, ratioZeroDenominatorError, underflowError)
 import           GHC.Stack                     (HasCallStack)
 
-import           GHC.Builtin.Names       (ipClassKey)
+import           GHC.Builtin.KnownKeys   (ipClassKey)
 
 import Clash.Core.DataCon
 import Clash.Core.EqSolver

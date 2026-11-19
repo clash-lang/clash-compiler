@@ -41,7 +41,7 @@ module Clash.Core.TysPrim
   )
 where
 
-import           GHC.Builtin.Names
+import           GHC.Builtin.KnownKeys
 
 import           GHC.Base hiding (Type, TyCon)
 import           Data.Text.Extra (showt)
