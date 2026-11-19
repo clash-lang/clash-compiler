@@ -41,14 +41,19 @@ domain looks like:
 @
 
 Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, an instance of 'KnownDomain' should be
-made. Clash provides a standard implementation, called 'System', that is
-configured as follows:
+provides. In order to specify a domain, instances of 'KnownClockDomain' and
+'KnownDomain' should be made. Clash provides a standard implementation, called
+'System', that is configured as follows:
 
 @
-instance KnownDomain 'System' where
-  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = 'SDomainConfiguration' SSymbol SNat 'SRising' 'SAsynchronous' 'SDefined' 'SActiveHigh'
+instance KnownClockDomain System where
+  type ClockPeriod System        = 10000
+  type ClockActiveEdge System    = 'Rising
+  type ClockResetKind System     = 'Asynchronous
+  type ClockInitBehavior System  = 'Defined
+  type ClockResetPolarity System = 'ActiveHigh
+
+instance KnownDomain System
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -154,8 +159,24 @@ module Clash.Explicit.Signal
   , BiSignalDefault(..)
     -- * Domain
   , Domain
+  , ClockDomain
+  , sameDomain
+  , switchDomain
+  , switchClockDomain
+  , switchResetDomain
+  , switchEnableDomain
+  , SupportsSwitchingTo
+  , EligibleDomainSwitch
   , KnownDomain(..)
+  , KnownClockDomain(..)
   , KnownConfiguration
+    -- ** Domain projections
+  , DomainPeriod
+  , DomainPeriodFraction
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
@@ -166,12 +187,6 @@ module Clash.Explicit.Signal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
     -- *** Convenience types #conveniencetypes#
     -- $conveniencetypes
 
@@ -200,6 +215,7 @@ module Clash.Explicit.Signal
     -- ** Domain utilities
   , VDomainConfiguration(..)
   , vDomain
+  , knownDomain
   , createDomain
   , knownVDomain
   , clockPeriod
@@ -322,19 +338,27 @@ import           Clash.XException
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L
 >>> :{
-instance KnownDomain "Dom2" where
-  type KnownConf "Dom2" = 'DomainConfiguration "Dom2" 2 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+data Dom2 :: Domain
+instance KnownClockDomain Dom2 where
+  type ClockPeriod Dom2        = 2
+  type ClockActiveEdge Dom2    = 'Rising
+  type ClockResetKind Dom2     = 'Asynchronous
+  type ClockInitBehavior Dom2  = 'Defined
+  type ClockResetPolarity Dom2 = 'ActiveHigh
+instance KnownDomain Dom2
 :}
 
 >>> :{
-instance KnownDomain "Dom7" where
-  type KnownConf "Dom7" = 'DomainConfiguration "Dom7" 7 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+data Dom7 :: Domain
+instance KnownClockDomain Dom7 where
+  type ClockPeriod Dom7        = 7
+  type ClockActiveEdge Dom7    = 'Rising
+  type ClockResetKind Dom7     = 'Asynchronous
+  type ClockInitBehavior Dom7  = 'Defined
+  type ClockResetPolarity Dom7 = 'ActiveHigh
+instance KnownDomain Dom7
 :}
 
->>> type Dom2 = "Dom2"
->>> type Dom7 = "Dom7"
 >>> let clk2 = clockGen @Dom2
 >>> let clk7 = clockGen @Dom7
 >>> let en2 = enableGen @Dom2

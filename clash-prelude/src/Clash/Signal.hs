@@ -40,14 +40,19 @@ domain looks like:
 @
 
 Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, an instance of 'KnownDomain' should be
-made. Clash provides an implementation 'System' with some common options
-chosen:
+provides. In order to specify a domain, instances of 'KnownClockDomain' and
+'KnownDomain' should be made. Clash provides an implementation 'System' with
+some common options chosen:
 
 @
-instance KnownDomain 'System' where
-  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+instance KnownClockDomain System where
+  type ClockPeriod System        = 10000
+  type ClockActiveEdge System    = 'Rising
+  type ClockResetKind System     = 'Asynchronous
+  type ClockInitBehavior System  = 'Defined
+  type ClockResetPolarity System = 'ActiveHigh
+
+instance KnownDomain System
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -87,9 +92,22 @@ module Clash.Signal
   , BiSignalDefault(..)
     -- * Domain
   , Domain
+  , ClockDomain
   , sameDomain
+  , switchDomain
+  , switchClockDomain
+  , switchResetDomain
+  , switchEnableDomain
   , KnownDomain(..)
+  , KnownClockDomain(..)
   , KnownConfiguration
+    -- ** Domain projections
+  , DomainPeriod
+  , DomainPeriodFraction
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
@@ -100,12 +118,8 @@ module Clash.Signal
   , SResetPolarity(..)
   , DomainConfiguration(..)
   , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
+  , SupportsSwitchingTo
+  , EligibleDomainSwitch
     -- *** Convenience types
     -- $conveniencetypes
 
@@ -118,6 +132,7 @@ module Clash.Signal
   , Microseconds
   , Nanoseconds
   , Picoseconds
+  , Period(..)
   -- **** Time conversions
   , DomainToHz
   , HzToPeriod
@@ -134,6 +149,7 @@ module Clash.Signal
     -- ** Domain utilities
   , VDomainConfiguration(..)
   , vDomain
+  , knownDomain
   , createDomain
   , knownVDomain
   , clockPeriod
@@ -175,23 +191,27 @@ module Clash.Signal
   , exposeClock
   , withClock
   , hasClock
+  , switchHiddenClockDomain
     -- ** Hidden reset
   , HiddenReset
   , hideReset
   , exposeReset
   , withReset
   , hasReset
+  , switchHiddenResetDomain
     -- ** Hidden enable
   , HiddenEnable
   , hideEnable
   , exposeEnable
   , withEnable
   , hasEnable
+  , switchHiddenEnableDomain
     -- ** Hidden clock, reset, and enable
   , HiddenClockResetEnable
   , hideClockResetEnable
   , exposeClockResetEnable
   , withClockResetEnable
+  , switchHiddenClockResetEnableDomain
   , SystemClockResetEnable
     -- * Basic circuit functions
   , andEnable
@@ -699,6 +719,14 @@ hasClock
 hasClock = fromLabel @(HiddenClockName dom)
 {-# INLINE hasClock #-}
 
+-- | Switches the domain of a hidden clock. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchHiddenClockDomain ::
+  (EligibleDomainSwitch domA domB, HiddenClock domA) =>
+  (HiddenClock domB => r) -> r
+switchHiddenClockDomain = withClock $ switchClockDomain hasClock
+{-# INLINE switchHiddenClockDomain #-}
+
 {- | Expose a hidden 'Reset' argument of a component, so it can be applied
 explicitly.
 
@@ -779,6 +807,14 @@ hasReset
   => Reset dom
 hasReset = fromLabel @(HiddenResetName dom)
 {-# INLINE hasReset #-}
+
+-- | Switches the domain of a hidden reset. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchHiddenResetDomain ::
+  (EligibleDomainSwitch domA domB, HiddenReset domA) =>
+  (HiddenReset domB => r) -> r
+switchHiddenResetDomain = withReset $ switchResetDomain hasReset
+{-# INLINE switchHiddenResetDomain #-}
 
 {- | Expose a hidden 'Enable' argument of a component, so it can be applied
 explicitly.
@@ -863,6 +899,14 @@ hasEnable
   => Enable dom
 hasEnable = fromLabel @(HiddenEnableName dom)
 {-# INLINE hasEnable #-}
+
+-- | Switches the domain of a hidden enable. See 'switchDomain' for
+-- further details on domain switching in particular.
+switchHiddenEnableDomain ::
+  (EligibleDomainSwitch domA domB, HiddenEnable domA) =>
+  (HiddenEnable domB => r) -> r
+switchHiddenEnableDomain = withEnable $ switchEnableDomain hasEnable
+{-# INLINE switchHiddenEnableDomain #-}
 
 {- | Merge enable signal with signal of bools by applying the boolean AND
 operation.
@@ -1016,6 +1060,18 @@ withClockResetEnable
 withClockResetEnable =
   \clk rst en f -> withClock clk (withReset rst (withEnable en f))
 {-# INLINE withClockResetEnable #-}
+
+-- | Switches the domain of a hidden clock, reset, and enable. See
+-- 'switchDomain' for further details on domain switching in
+-- particular.
+switchHiddenClockResetEnableDomain ::
+  (EligibleDomainSwitch domA domB, HiddenClockResetEnable domA) =>
+  (HiddenClockResetEnable domB => r) -> r
+switchHiddenClockResetEnableDomain =
+  withClockResetEnable (switchClockDomain hasClock)
+                       (switchResetDomain hasReset)
+                       (switchEnableDomain hasEnable)
+{-# INLINE switchHiddenClockResetEnableDomain #-}
 
 -- * Basic circuit functions
 

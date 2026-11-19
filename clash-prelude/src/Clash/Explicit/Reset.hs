@@ -56,7 +56,6 @@ import           Clash.Class.Num (satSucc, SaturationMode(SatBound))
 import           Clash.Explicit.Signal
 import           Clash.Explicit.Synchronizer (dualFlipFlopSynchronizer)
 import           Clash.Promoted.Nat
-import           Clash.Signal.Internal
 import           Clash.Sized.Index (Index)
 
 import           GHC.Stack (HasCallStack)

@@ -39,6 +39,17 @@ createDomain vSystem{vName="H77", vPeriod=hzToPeriod 77}
 createDomain vSystem{vName="F1", vPeriod=20}
 createDomain vSystem{vName="F6", vPeriod=250}
 
+-- | A virtual partitioning of a domain: @Secure dom@ designates the same
+-- physical clock domain as @dom@ and can hence be switched to and from at no
+-- hardware cost. Exercises the 'ClockDomainOf' projection of 'KnownDomain'.
+data Secure (dom :: Domain)
+
+instance KnownDomain dom => KnownDomain (Secure dom) where
+  type ClockDomainOf (Secure dom) = ClockDomainOf dom
+
+type instance (Secure System) `SupportsSwitchingTo` System = 'True
+type instance System `SupportsSwitchingTo` (Secure System) = 'True
+
 main :: IO ()
 main = defaultMain tests
 
@@ -79,7 +90,25 @@ tests =
       , testCase "case_F1_F6" case_F1_F6
       , testCase "case_F6_F1" case_F6_F1
       ]
+    , testGroup "switchDomain"
+      [ testCase "into virtual domain" case_switchDomainInto
+      , testCase "out of virtual domain" case_switchDomainOutOf
+      ]
     ]
+
+-- | 'switchDomain' into a virtual partitioning of System is an identity on
+-- the signal's values.
+case_switchDomainInto :: Assertion
+case_switchDomainInto = do
+  let s = fromList [1, 2, 3] :: Signal System Int
+  sampleN @(Secure System) 3 (switchDomain s) @?= [1, 2, 3]
+
+-- | 'switchDomain' out of a virtual partitioning of System is an identity on
+-- the signal's values.
+case_switchDomainOutOf :: Assertion
+case_switchDomainOutOf = do
+  let s = fromList [4, 5, 6] :: Signal (Secure System) Int
+  sampleN @System 3 (switchDomain s) @?= [4, 5, 6]
 
 -- | Asserts that static clocks behave the same as dynamic clocks with a static
 -- period signal passed into it.
@@ -94,8 +123,8 @@ case_dynamicStaticEq = do
     -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
     -- of using 'hzToFs'), to prevent rounding errors between periods of the
     -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (1000 * hzToPeriod 11)
-    fs77 = Femtoseconds (1000 * hzToPeriod 77)
+    fs11 = Femtoseconds (1000 * floor (hzToPeriod @Rational 11))
+    fs77 = Femtoseconds (1000 * floor (hzToPeriod @Rational 77))
 
     dclk11 = dynamicClockGen @H11 (pure fs11)
     dclk77 = dynamicClockGen @H77 (pure fs77)
@@ -150,8 +179,8 @@ case_dynamicHasEffect = do
     -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
     -- of using 'hzToFs'), to prevent rounding errors between periods of the
     -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (1000 * hzToPeriod 11)
-    fs77lying = Femtoseconds (1000 * hzToPeriod 78)
+    fs11 = Femtoseconds (1000 * floor (hzToPeriod @Rational 11))
+    fs77lying = Femtoseconds (1000 * floor (hzToPeriod @Rational 78))
 
     clk11 = clockGen @H11
     clk77 = clockGen @H77

@@ -50,10 +50,14 @@ import Clash.Signal.Internal
 >>> import Clash.Explicit.Prelude
 >>> import Clash.Explicit.DDR
 >>> :{
-type DDR = "DDR" :: Domain
-instance KnownDomain "DDR" where
-  type KnownConf "DDR" = 'DomainConfiguration "DDR" 5000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+data DDR :: Domain
+instance KnownClockDomain DDR where
+  type ClockPeriod DDR        = 5000
+  type ClockActiveEdge DDR    = 'Rising
+  type ClockResetKind DDR     = 'Asynchronous
+  type ClockInitBehavior DDR  = 'Defined
+  type ClockResetPolarity DDR = 'ActiveHigh
+instance KnownDomain DDR
 :}
 
 -}
@@ -115,7 +119,7 @@ ddrIn#
   -> a
   -> Signal domDDR a
   -> Signal dom (a,a)
-ddrIn# (Clock _ Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 i2 =
+ddrIn# (Clock Nothing) (unsafeToActiveHigh -> hRst) (fromEnable -> ena) i0 i1 i2 =
   case resetKind @domDDR of
     SAsynchronous ->
       goAsync
@@ -305,8 +309,8 @@ ddrForwardClock#
   => Clock domIn
   -> Signal domDDR Bit
   -> Clock domOut
-ddrForwardClock# (Clock SSymbol periods) ddrSignal =
-  Clock (ddrSignal `seq` SSymbol) (unsafeCoerce periods)
+ddrForwardClock# (Clock periods) ddrSignal =
+  Clock (ddrSignal `seq` unsafeCoerce periods)
 {-# OPAQUE ddrForwardClock# #-}
 {-# ANN ddrForwardClock# (
   let

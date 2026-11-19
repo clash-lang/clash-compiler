@@ -32,8 +32,9 @@ import           Data.Char (toLower)
 import           Data.Either (fromRight)
 #endif
 import           Data.Hashable (hash)
-import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
+import           Data.HashMap.Strict (HashMap)
+import qualified Data.Map.Strict as Map
 import           Data.Maybe (catMaybes)
 import           Data.Monoid (Ap(getAp))
 import qualified Data.Text as Text
@@ -52,7 +53,7 @@ import           System.Directory (listDirectory, doesFileExist)
 import           Text.Read (readMaybe)
 
 import           Clash.Annotations.TopEntity.Extra ()
-import           Clash.Backend (Backend (hdlType), Usage (External))
+import           Clash.Backend (Backend(..), Usage (External))
 import           Clash.Core.Name (nameOcc)
 import           Clash.Driver.Bool (OverridingBool(..))
 import           Clash.Driver.Types
@@ -65,7 +66,7 @@ import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
-import           Clash.Signal (VDomainConfiguration(..))
+import           Clash.Signal (VDomainConfiguration(..), Period(..))
 import           Clash.Util.Graph (callGraphBindings)
 
 data PortDirection
@@ -232,16 +233,16 @@ instance ToJSON Manifest where
           ]
         | (fName, fHash) <- fileNames]
       , "domains" .= HashMap.fromList
-        [ ( domNm
+        [ ( cdomNm
           , Aeson.object
-            [ "period" .= vPeriod
+            [ "period" .= ((\(Period p) -> p) vPeriod)
             , "active_edge" .= show vActiveEdge
             , "reset_kind" .= show vResetKind
             , "init_behavior" .= show vInitBehavior
             , "reset_polarity" .= show vResetPolarity
             ]
           )
-        | (domNm, VDomainConfiguration{..}) <- HashMap.toList domains ]
+        | (cdomNm, VDomainConfiguration{..}) <- HashMap.toList domains ]
       , "dependencies" .= Aeson.object
         [ "transitive" .= transitiveDependencies ]
       ]
@@ -298,7 +299,7 @@ instance FromJSON Manifest where
     parseDomain nm v =
       VDomainConfiguration
         <$> pure (Text.unpack nm)
-        <*> (v .: "period")
+        <*> (Period <$> (v .: "period"))
         <*> parseWithRead "active_edge" v
         <*> parseWithRead "reset_kind" v
         <*> parseWithRead "init_behavior" v
@@ -335,7 +336,7 @@ mkManifestPort backend portId portType portDir = ManifestPort{..}
   mpWidth = typeSize portType
   mpDirection = portDir
   mpIsClock = case portType of {Clock _ -> True; ClockN _ -> True; _ -> False}
-  mpDomain = hwTypeDomain portType
+  mpDomain = Text.pack . vName <$> hwTypeDomain portType
   mpTypeName = flip evalState backend $ getAp $ do
      LText.toStrict . renderOneLine <$> hdlType (External mpName) portType
 
@@ -348,7 +349,7 @@ mkManifest ::
   -- | Backend used to lookup port type names
   backend ->
   -- | Domains encountered in design
-  HashMap Text VDomainConfiguration ->
+  DomainMap ->
   -- | Options Clash was run with
   ClashOpts ->
   -- | Component of top entity
@@ -371,7 +372,7 @@ mkManifest backend domains ClashOpts{..} Component{..} components deps files (to
   , topComponent = Id.toText componentName
   , fileNames = files
   , successFlags = (opt_inlineLimit, opt_specLimit)
-  , domains = domains
+  , domains = HashMap.fromList $ map (\v -> (Text.pack $ vName v,v)) $ Map.elems domains
   , transitiveDependencies = map (nameOcc . varName) deps
   }
  where
