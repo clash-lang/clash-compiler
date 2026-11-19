@@ -157,7 +157,7 @@ ghcTypeToHWType mkdtcus iw = go
                                                -> returnN (Void Nothing)
 
          | occ == "Clash.Signal.Internal.Signal" -> do
-             domCfg2 mkdtcus m (args !! 0)
+             _ <- domCfg mkdtcus m (args !! 0) Clock
              ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (args !! 1)
 
          | occ == "Clash.Signal.BiSignal.BiSignalIn" -> do
@@ -416,21 +416,6 @@ domCfg mkdTCUs m dom c
     normalizeType m . (`mkTyConApp` [dom]) . tyConName
       <$> UniqMap.lookup u m
 
-domCfg2 ::
-  Maybe KnownDomainTyConUniques ->
-  TyConMap ->
-  Type ->
-  ExceptT String (MaybeT (State TTState)) ()
-domCfg2 mkdTCUs m dom
-  | Just KnownDomainTyConUniques{clockDomainOfTCU=cdomOfTCU} <- mkdTCUs
-  , Just cdom <- resolveCdom cdomOfTCU
-  = clockDomCfg2 mkdTCUs m cdom
-  | otherwise = ExceptT $ MaybeT $ pure $ Just $ Left "Could not find KnownDomain instance for signal"
- where
-  resolveCdom u =
-    normalizeType m . (`mkTyConApp` [dom]) . tyConName
-      <$> UniqMap.lookup u m
-
 -- | Resolve the domain configuration of a physical clock domain type, i.e.
 -- a type for which the @Clock*@ type families of
 -- 'Clash.Signal.Internal.KnownClockDomain' reduce directly.
@@ -460,36 +445,6 @@ clockDomCfg mkdTCUs m cdom c
        modify $ second $ insert cdom conf
        return $ FilteredHWType (c conf) []
   | otherwise = ExceptT $ MaybeT $ pure Nothing
- where
-  resolve u =
-    normalizeType m . (`mkTyConApp` [cdom]) . tyConName
-      <$> UniqMap.lookup u m
-
-clockDomCfg2 ::
-  Maybe KnownDomainTyConUniques ->
-  TyConMap ->
-  Type ->
-  ExceptT String (MaybeT (State TTState)) ()
-clockDomCfg2 mkdTCUs m cdom
-  | Just KnownDomainTyConUniques{..} <- mkdTCUs
-  , Just periodTy   <- resolve clockPeriodTCU
-  , Just fracTy     <- resolve clockPeriodFractionTCU
-  , Just edgeTy     <- resolve clockActiveEdgeTCU
-  , Just rstKindTy  <- resolve clockResetKindTCU
-  , Just initTy     <- resolve clockInitBehaviorTCU
-  , Just polarityTy <- resolve clockResetPolarityTCU
-  = do vName          <- domTag m cdom
-       period         <- domPeriod m periodTy
-       frac           <- domPeriodFraction m fracTy
-       vActiveEdge    <- domEdge m edgeTy
-       vResetKind     <- domResetKind m rstKindTy
-       vInitBehavior  <- domInitBehavior m initTy
-       vResetPolarity <- domResetPolarity m polarityTy
-       let vPeriod = period + frac
-           conf = VDomainConfiguration{..}
-       modify $ second $ insert cdom conf
-       return ()
-  | otherwise = ExceptT $ MaybeT $ pure $ Just $ Left "Could not find KnownDomain instance for signal"
  where
   resolve u =
     normalizeType m . (`mkTyConApp` [cdom]) . tyConName
