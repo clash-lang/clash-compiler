@@ -9,6 +9,7 @@ import qualified Data.ByteString.Base16 as Base16
 import Data.Coerce (coerce)
 import Data.Either (fromRight)
 import Data.Text (Text)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
@@ -37,16 +38,19 @@ genDigest = Base16.encode . Text.encodeUtf8 . coerce @ArbitraryText <$> Q.arbitr
 genString :: Q.Gen FilePath
 genString = Text.unpack . coerce @ArbitraryText <$> Q.arbitrary
 
-genDomain :: Q.Gen VDomainConfiguration
+genDomain :: Q.Gen (Text, VDomainConfiguration)
 genDomain = do
   nm <- coerce @(Q.Gen ArbitraryText) Q.arbitrary
-  VDomainConfiguration
-    <$> pure (Text.unpack nm)
-    <*> (fromIntegral @Int . abs <$> Q.arbitraryBoundedIntegral)
-    <*> Q.elements [Rising, Falling]
-    <*> Q.elements [Synchronous, Asynchronous]
-    <*> Q.elements [Defined, Unknown]
-    <*> Q.elements [ActiveHigh, ActiveLow]
+  dom <-
+    VDomainConfiguration
+      <$> pure (Text.unpack nm)
+      <*> (fromIntegral @Int . abs <$> Q.arbitraryBoundedIntegral)
+      <*> Q.elements [Rising, Falling]
+      <*> Q.elements [Synchronous, Asynchronous]
+      <*> Q.elements [Defined, Unknown]
+      <*> Q.elements [ActiveHigh, ActiveLow]
+
+  pure (nm, dom)
 
 genPort :: Q.Gen ManifestPort
 genPort =
@@ -77,7 +81,7 @@ genManifest =
     <*> coerce @(Q.Gen [ArbitraryText]) @(Q.Gen [Text]) Q.arbitrary -- comp names
     <*> coerce @(Q.Gen ArbitraryText)   @(Q.Gen Text)   Q.arbitrary -- top name
     <*> Q.listOf ((,) <$> genString <*> genDigest) -- files
-    <*> Q.listOf genDomain -- domains
+    <*> (HashMap.fromList <$> Q.listOf genDomain) -- domains
     <*> coerce @(Q.Gen [ArbitraryText]) @(Q.Gen [Text]) Q.arbitrary -- dependencies
 
 tests :: TestTree
