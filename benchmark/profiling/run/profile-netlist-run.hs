@@ -62,7 +62,7 @@ benchFile idirs src = do
       hdlDir     = fromMaybe "." (opt_hdlDir (envOpts env)) </>
                          Clash.Backend.name hdlState' </>
                          takeWhile (/= '.') topEntityS
-  (netlist,_,_) <-
+  (netlist,_,_,_) <-
     genNetlist env ghcEvaluator False transformedBindings topEntityMap compNames
                (ghcTypeToHWType Nothing (opt_intWidth (envOpts env)))
                ite (SomeBackend hdlState') seen hdlDir prefixM topEntity
