@@ -39,7 +39,7 @@ import qualified Control.Lens                  as Lens
 import           Control.Monad                 (unless, replicateM, zipWithM)
 import           Control.Monad.Extra           (concatMapM)
 import           Data.Bifunctor                (first, second)
-import           Data.Either                   (lefts, partitionEithers)
+import           Data.Either                   (lefts, rights, partitionEithers)
 import           Data.Foldable                 (for_)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
@@ -100,7 +100,7 @@ import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal
-  ( ActiveEdge(..), VDomainConfiguration(..) )
+  ( ActiveEdge(..), VDomainConfiguration(..), sameDomain )
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
 import qualified Clash.Warning                 as W
@@ -574,6 +574,12 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               [Right _, Right _,Left scrut] -> mkDataToTag declType assignTy scrut
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 #endif
+
+          | pNm == showt 'sameDomain -> do
+              (_, sp) <- Lens.use curCompNm
+              let msg = "Cannot determine sameDomain at compile time for "
+                     ++ unwords (map showPpr (rights args))
+              throw (ClashException sp msg Nothing)
 
           | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
               resM <- resBndr1 True dst

@@ -177,7 +177,7 @@ genFunTyConFrom tcm = do
   let (argKns, resKn) = splitFunForallTy kn
   substs <- genSubsts name (rights argKns) resKn
 
-  let tc = FunTyCon (nameUniq name) name kn arity substs
+  let tc = FunTyCon (nameUniq name) name kn arity False substs
   pure (UniqMap.singleton name tc)
  where
   genSubsts :: TyConName -> [Kind] -> Kind -> CoreGenT m [([Type], Type)]

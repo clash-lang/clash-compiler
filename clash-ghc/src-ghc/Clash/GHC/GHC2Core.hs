@@ -103,13 +103,13 @@ import GHC.Types.Literal (Literal (..), LitNumType (..), literalType)
 import GHC.Unit.Module (moduleName, moduleNameString)
 import GHC.Types.Name
   (Name, nameModule_maybe, nameOccName, nameUnique, nameStableString, getSrcSpan)
-import GHC.Builtin.Names  (integerTyConKey, naturalTyConKey)
+import GHC.Builtin.Names  (fUNTyConKey, integerTyConKey, naturalTyConKey)
 import GHC.Types.Name.Occurrence (occNameFS, occNameString)
 import GHC.Data.Pair (Pair (..))
 import GHC.Types.SrcLoc (SrcSpan (..), isGoodSrcSpan)
 import GHC.Core.TyCon
   (AlgTyConRhs (..), TyCon, tyConName, algTyConRhs, isAlgTyCon, isFamilyTyCon,
-   isNewTyCon, isPrimTyCon, isTupleTyCon, isFamInstTyCon,
+   isNewTyCon, isPrimTyCon, isTupleTyCon, isFamInstTyCon, isDataFamilyTyCon,
    isClosedSynFamilyTyConWithAxiom_maybe, expandSynTyCon_maybe, tyConArity,
    tyConDataCons, tyConKind, tyConTyVars,
 #if MIN_VERSION_ghc(9,14,0)
@@ -119,7 +119,7 @@ import GHC.Core.TyCon
    isPromotedDataCon_maybe)
 import GHC.Core.TyCon (ExpandSynResult (..))
 import GHC.Core.Type
-  (tyConAppFunTy_maybe, mkFamilyTyConApp, splitAppTy_maybe, anyFreeVarsOfType)
+  (tyConAppFunTy_maybe, mkFamilyTyConApp, splitAppTy_maybe, anyFreeVarsOfType, splitTyConApp_maybe)
 import GHC.Core.Type (mkTvSubstPrs, substTy, coreView)
 import GHC.Core.TyCo.Rep (Coercion (..), TyLit (..), Type (..), scaledThing, mkTyVarTy)
 import GHC.Types.Unique (Uniquable (..), Unique, getKey, hasKey)
@@ -373,6 +373,7 @@ makeTyCon tc = tycon
             , C.tyConName  = tcName
             , C.tyConKind  = tcKind
             , C.tyConArity = tcArity
+            , C.isDataFamily = isDataFamilyTyCon tc
             , C.tyConSubst = substs
             }
 
@@ -1143,7 +1144,7 @@ coreToType'
   -> C2C C.Type
 coreToType' (TyVarTy tv) = C.VarTy <$> coreToTyVar tv
 coreToType' (TyConApp tc args)
-  | Just (FunTy _ _ ty1 ty2) <- tyConAppFunTy_maybe tc args = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+  | Just fun@FunTy{} <- tyConAppFunTy_maybe tc args = coreToType' fun
   | otherwise     = case expandSynTyCon_maybe tc args of
                       ExpandsSyn substs synTy remArgs -> do
                         let substs' = mkTvSubstPrs substs
@@ -1155,7 +1156,13 @@ coreToType' (TyConApp tc args)
                         C.mkTyConApp <$> (pure tcName) <*> mapM coreToType args
 coreToType' (ForAllTy (Bndr tv _) ty)   = C.ForAllTy <$> coreToTyVar tv <*> coreToType ty
 -- TODO: save the distinction between => and ->
-coreToType' (FunTy _ _ ty1 ty2)             = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
+coreToType' fun@(FunTy _ _ ty1 ty2)
+  -- sameDomain observes the multiplicity of arrows used as domain indices.
+  | Just (tc, args) <- splitTyConApp_maybe fun, tc `hasKey` fUNTyConKey = do
+      tcName <- coreToName tyConName tyConUnique qualifiedNameString tc
+      tyConMap %= C.insertIfAbsent tcName tc
+      C.mkTyConApp tcName <$> mapM coreToType args
+  | otherwise = C.mkFunTy <$> coreToType ty1 <*> coreToType ty2
 coreToType' (LitTy tyLit)    = return $ C.LitTy (coreToTyLit tyLit)
 coreToType' (AppTy ty1 ty2)  = C.AppTy <$> coreToType ty1 <*> coreToType' ty2
 coreToType' (CastTy t (Refl{})) = coreToType' t

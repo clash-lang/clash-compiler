@@ -298,7 +298,7 @@ instance PrettyPrec TyCon where
     PromotedDataCon _ _ _ _ dc ->
       fmap ("promoted" <+>) (pprPrec prec dc)
 
-    FunTyCon _ nm kn _ ss -> do
+    FunTyCon{tyConName=nm, tyConKind=kn, tyConSubst=ss} -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)

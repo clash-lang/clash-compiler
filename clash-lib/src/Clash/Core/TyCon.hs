@@ -68,6 +68,7 @@ data TyCon
   , tyConName   :: !TyConName      -- ^ Name of the TyCon
   , tyConKind   :: !Kind           -- ^ Kind of the TyCon
   , tyConArity  :: !Int            -- ^ Number of type arguments
+  , isDataFamily :: !Bool          -- ^ Data families have nominally distinct applications
   , tyConSubst  :: [([Type],Type)] -- ^ List of: ([LHS match types], RHS type)
   }
   -- | Primitive TyCons

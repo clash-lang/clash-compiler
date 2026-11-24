@@ -84,7 +84,7 @@ import           GHC.Builtin.Names
   (typeCharCmpTyFamNameKey, typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey,
    typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey)
 import           GHC.Builtin.Names
-  (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
+  (fUNTyConKey, integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,
    ordLTDataConName, ordEQDataConName, ordGTDataConName,
@@ -176,6 +176,10 @@ type KiName     = Name Kind
 -- unsaturated. This can happen in instance heads, or in the eta-reduced
 -- representation of newtypes. So what are those additional 2 arguments compared to
 -- the "normal" function type? They're the kinds of argument and result type.
+--
+-- GHC function types retain the full FUN mult argRep resRep arg res
+-- application for nominal family matching. Expose the same FunTy view for
+-- term rewrites without allocating an argument list on this common path.
 tyView :: Type -> TypeView
 -- XXX: this is a manually unrolled version of:
 --
@@ -208,6 +212,8 @@ tyView tOrig = case tOrig of
         AppTy l3 argK -> case l3 of
           ConstTy (TyCon tc) -> TyConApp tc [argK,resK,arg,res]
           ConstTy Arrow -> FunTy arg res -- See Note [Arrow arguments]
+          AppTy (ConstTy (TyCon tc)) _
+            | nameUniq tc == fromGhcUnique fUNTyConKey -> FunTy arg res
           _ -> case go [argK,resK,arg,res] l3 of
             (ConstTy (TyCon tc),args)
               -> TyConApp tc args

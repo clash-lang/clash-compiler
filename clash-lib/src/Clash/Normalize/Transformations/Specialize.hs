@@ -41,7 +41,7 @@ import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
 import Control.Monad.Extra (orM)
 import qualified Control.Monad.Writer as Writer (listen)
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (first)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
@@ -456,7 +456,9 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
 
-  let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
+  -- A specialized type argument can become a domain. Its newtype identity
+  -- and arrow multiplicity must survive until sameDomain sees it.
+  let specArg = first (normalizeTermTypes tcm) specArgIn
       -- Create binders and variable references for free variables in 'specArg'
       -- (specBndrsIn,specVars) :: ([Either Id TyVar], [Either Term Type])
       (specBndrsIn,specVars) = specArgBndrsAndVars specArg

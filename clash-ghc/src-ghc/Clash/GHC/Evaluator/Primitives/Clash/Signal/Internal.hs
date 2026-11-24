@@ -8,8 +8,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-
 module Clash.GHC.Evaluator.Primitives.Clash.Signal.Internal
   ( primitives
   ) where
@@ -18,7 +16,9 @@ import           Data.Text           (Text)
 
 import           Clash.Core.Evaluator.Types
 import Clash.Core.Term (Term (..), mkApps)
-import Clash.Core.Type (Type (..), TypeView (..), tyView)
+import Clash.Core.Type (TypeView (..), tyView)
+import Clash.GHC.Domain (isConcreteDomain, normalizeDomain)
+import Clash.Core.Util (primCo, substArgTys)
 import Clash.Core.TyCon (tyConDataCons)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Util (textNameLit)
@@ -32,40 +32,20 @@ primitives =
   [ primStepEntry $(textNameLit 'Clash.Signal.Internal.sameDomain) $ \case
       PrimStepContext{..}
         | [domA, domB] <- tys
-        , ForAllTy
-            _tyVar_domA
-            ( ForAllTy
-                _tyVar_domB
-                ( AppTy
-                    _ -- KnownDomain domA ->
-                    ( AppTy
-                        _ -- KnownDoman domB ->
-                        ( AppTy
-                            maybeTy
-                            ( AppTy
-                                ( AppTy
-                                    eqTy
-                                    _varTy_domA
-                                )
-                                _varTy_domB
-                            )
-                        )
-                    )
-                )
-            ) <- ty
-        ->  let eqTy2 = AppTy (AppTy eqTy domA) domB
-                maybeEqTy = AppTy maybeTy eqTy2
-
-                TyConApp maybeEqTcNm _ = tyView maybeEqTy
-                TyConApp eqTcNm _ = tyView eqTy2
-
-                (Just maybeEqTc) = UniqMap.lookup maybeEqTcNm tcm
-                (Just eqTc) = UniqMap.lookup eqTcNm tcm
-                [nothingDc,justDc] = tyConDataCons maybeEqTc
-                [reflDc] = tyConDataCons eqTc
-             in if domA==domB then
-                    reduce $ mkApps (Data justDc) [Right eqTy2, Left $ mkApps (Data reflDc) [Right domA, Right domB]]
-                  else
-                    reduce $ mkApps (Data nothingDc) [Right eqTy2]
+        , TyConApp maybeTc [eqTy] <- tyView (getResultTy tcm ty tys)
+        , TyConApp eqTc eqArgs <- tyView eqTy
+        , Just maybeCon <- UniqMap.lookup maybeTc tcm
+        , [nothingDc, justDc] <- tyConDataCons maybeCon
+        , let a = normalizeDomain tcm domA
+              b = normalizeDomain tcm domB
+        -> if a == b then do
+             eqCon <- UniqMap.lookup eqTc tcm
+             [reflDc] <- pure (tyConDataCons eqCon)
+             [coTy] <- pure (substArgTys reflDc eqArgs)
+             let refl = mkApps (Data reflDc) (map Right eqArgs ++ [Left (primCo coTy)])
+             reduce (mkApps (Data justDc) [Right eqTy, Left refl])
+           else if isConcreteDomain tcm a && isConcreteDomain tcm b then
+             reduce (mkApps (Data nothingDc) [Right eqTy])
+           else Nothing
       _ -> Nothing
   ]

@@ -1,11 +1,16 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LinearTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module SameDomain where
 
+import Clash.Annotations.SynthesisAttributes (Annotate, Attr(..))
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 import Clash.Signal (sameDomain)
+import Data.Kind (Type)
+import Type.Reflection (Typeable)
 import Data.Type.Equality ((:~:)(Refl))
 
 createDomain vSystem{vName="OtherSystem"}
@@ -13,27 +18,15 @@ createDomain vSystem{vName="OtherSystem"}
 type SystemAlias = System
 
 newtype WrappedSystem = WrappedSystem System
-createDomain vSystem{vName="WrappedSystem"}
 
-type FunDom = Int -> Int
-instance KnownClockDomain FunDom where
-  type ClockPeriod        FunDom = 10000
-  type ClockActiveEdge    FunDom = 'Rising
-  type ClockResetKind     FunDom = 'Asynchronous
-  type ClockInitBehavior  FunDom = 'Defined
-  type ClockResetPolarity FunDom = 'ActiveHigh
+data family FamilyTag (a :: Type)
+data instance FamilyTag Bool
+instance KnownDomain (FamilyTag Bool) where
+  type ClockDomainOf (FamilyTag Bool) = System
 
-instance KnownDomain FunDom
-
-type AppDom = Int -> Int -> String
-instance KnownClockDomain AppDom where
-  type ClockPeriod        AppDom = 10000
-  type ClockActiveEdge    AppDom = 'Rising
-  type ClockResetKind     AppDom = 'Asynchronous
-  type ClockInitBehavior  AppDom = 'Defined
-  type ClockResetPolarity AppDom = 'ActiveHigh
-
-instance KnownDomain AppDom
+data Tagged (a :: Type)
+instance Typeable a => KnownDomain (Tagged a) where
+  type ClockDomainOf (Tagged a) = System
 
 checkDomains
   :: forall domA domB
@@ -43,16 +36,34 @@ checkDomains
 checkDomains input = case sameDomain @domA @domB of
   Just Refl -> input
   Nothing -> not input
+{-# OPAQUE checkDomains #-}
 
-topEntity :: Bool -> Vec 7 Bool
+-- Return the equality witness across a component boundary.
+witness :: Bool -> Maybe (System :~: System)
+witness x = if x then sameDomain @System @System else Nothing
+{-# OPAQUE witness #-}
+
+-- A clock dictionary can supply a value to an opaque component.
+periodValue :: forall dom. KnownDomain dom => Bool -> Unsigned 16
+periodValue x = if x then snatToNum (clockPeriod @dom) else 7
+{-# OPAQUE periodValue #-}
+
+topEntity :: Bool -> Vec 12 Bool
 topEntity input =
      checkDomains @System @System input
-  :> checkDomains @System @OtherSystem input
-  :> checkDomains @OtherSystem @System input
+  :> not (checkDomains @System @OtherSystem input)
+  :> not (checkDomains @OtherSystem @System input)
   :> checkDomains @System @SystemAlias input
-  :> checkDomains @System @WrappedSystem input
-  :> checkDomains @System @FunDom input
-  :> checkDomains @FunDom @AppDom input
+  :> not (checkDomains @(Tagged System) @(Tagged OtherSystem) input)
+  :> not (checkDomains @(Tagged System) @(Tagged WrappedSystem) input)
+  :> not (checkDomains @(Tagged (Int %1 -> Int)) @(Tagged (Int -> Int)) input)
+  :> checkDomains @(Tagged (Int `Annotate` 'BoolAttr "keep" 'True)) @(Tagged Int) input
+  :> not (checkDomains @(Tagged (FamilyTag Int)) @(Tagged (FamilyTag Bool)) input)
+  :> checkDomains @(FamilyTag Bool) @(FamilyTag Bool) input
+  :> (case witness input of
+        Just Refl -> True
+        Nothing -> False)
+  :> (periodValue @System input == 10000)
   :> Nil
 {-# OPAQUE topEntity #-}
 
@@ -60,10 +71,7 @@ testBench :: Signal System Bool
 testBench = done
  where
   input = stimuliGenerator clk rst (False :> True :> Nil)
-  expected =
-       (False :> True :> True :> False :> True :> True :> True :> Nil)
-    :> (True :> False :> False :> True :> False :> False :> False :> Nil)
-    :> Nil
+  expected = repeat False :> repeat True :> Nil
   done = outputVerifier' clk rst expected (topEntity <$> input)
   clk = tbSystemClockGen (not <$> done)
   rst = systemResetGen
