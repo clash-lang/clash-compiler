@@ -69,7 +69,7 @@ data ClashEnv = ClashEnv
   , envPrimitives  :: CompiledPrimMap
   , envCustomReprs :: CustomReprs
   , envDomainTCUs  :: Maybe KnownDomainTyConUniques
-  }
+  } deriving (Generic, NFData)
 
 data KnownDomainTyConUniques = KnownDomainTyConUniques
   { clockDomainOfTCU       :: Unique
@@ -79,7 +79,7 @@ data KnownDomainTyConUniques = KnownDomainTyConUniques
   , clockInitBehaviorTCU   :: Unique
   , clockResetPolarityTCU  :: Unique
   , clockPeriodFractionTCU :: Unique
-  }
+  } deriving (Generic, NFData)
 
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
