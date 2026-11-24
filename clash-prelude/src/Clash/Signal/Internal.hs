@@ -502,10 +502,11 @@ type family Numerator (r :: Ratio a) :: a where
 type family Denominator (r :: Ratio a) :: a where
   Denominator (_ :% x) = x
 
--- | A value-level witness for a type-level ratio over natural numbers.
+-- | A value-level witness for the fractional part of a clock period,
+-- between zero (inclusive) and one (exclusive).
 data SRatioNat (r :: Ratio Nat) where
   SRatioNat ::
-    (KnownNat numerator, KnownNat denominator, 1 <= denominator) =>
+    (KnownNat numerator, KnownNat denominator, 1 <= denominator, numerator + 1 <= denominator) =>
     SRatioNat (numerator :% denominator)
 
 instance Show (SRatioNat r) where
@@ -540,11 +541,11 @@ deriving instance Show (SDomainConfiguration dom conf)
 
 type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
 
--- | Evidence for the period fraction to be known.
+-- | Evidence for a known clock period fraction in the interval [0, 1).
 class KnownFraction (fraction :: Ratio Nat) where
   knownFraction :: SRatioNat fraction
 instance
-  (KnownNat numerator, KnownNat denominator, 1 <= denominator) =>
+  (KnownNat numerator, KnownNat denominator, 1 <= denominator, numerator + 1 <= denominator) =>
   KnownFraction (numerator :% denominator)
  where
   knownFraction = SRatioNat

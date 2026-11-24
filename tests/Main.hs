@@ -390,6 +390,10 @@ runClashTest t3105Env = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Couldn't match type")
           }
+        , runTest "ImproperClockFraction" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "In the instance declaration for")
+          }
         , clashTestVariants "BareClock"
           [ clashTestVariants target
             [ runTest "InvalidClockPort" def{

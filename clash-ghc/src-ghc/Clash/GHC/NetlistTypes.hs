@@ -373,8 +373,9 @@ domPeriodFraction (tyView -> TyConApp tc [_, nTy, dTy])
   | (nameOcc tc `elem` ["GHC.Internal.Real.:%","GHC.Real.:%"])
   , LitTy (NumTy n) <- nTy
   , LitTy (NumTy d) <- dTy
-  , n >= 0, d > 0
-  = pure (Period (fromInteger n % fromInteger d))
+  = if 0 <= n && n < d
+    then pure (Period (fromInteger n % fromInteger d))
+    else throwE $ "ClockPeriodFraction must be in [0, 1), got " ++ show n ++ "/" ++ show d
 domPeriodFraction ty = throwE
   $ "Internal error. Cannot translate domain period fraction:\n"
  ++ show (tyView ty)
