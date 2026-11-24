@@ -25,6 +25,8 @@ import Data.Ratio                       ((%))
 import Data.Text                        (pack)
 import Data.Text.Extra                  (showt)
 import Control.Arrow                    (second)
+import Control.Monad                    (void)
+import Control.Monad.Trans.Class        (lift)
 import Control.Monad.State.Strict       (State, modify)
 import Control.Monad.Trans.Except
   (Except, ExceptT (..), mapExceptT, runExceptT, throwE)
@@ -83,6 +85,9 @@ ghcTypeToHWType mkdtcus iw = go
   where
     -- returnN :: HWType ->
     returnN t = return (FilteredHWType t [])
+
+    recordSignalDomain m dom = lift $ lift $ void $ runMaybeT $ runExceptT $
+      domCfg mkdtcus m dom Clock
 
     go ::
       CustomReprs ->
@@ -155,9 +160,9 @@ ghcTypeToHWType mkdtcus iw = go
          | occ `elem` ["GHC.Prim.~#", "GHC.Internal.Prim.~#"]
                                                -> returnN (Void Nothing)
 
-         | occ == "Clash.Signal.Internal.Signal" -> do
-             _ <- domCfg mkdtcus m (args !! 0) Clock
-             ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (args !! 1)
+         | occ == "Clash.Signal.Internal.Signal", [dom, el] <- args -> do
+             recordSignalDomain m dom
+             ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m el
 
          | occ == "Clash.Signal.BiSignal.BiSignalIn" -> do
              szTy <- case args of
