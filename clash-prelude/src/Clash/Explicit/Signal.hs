@@ -199,6 +199,7 @@ module Clash.Explicit.Signal
   , Microseconds
   , Nanoseconds
   , Picoseconds
+  , Period(..)
   -- **** Time conversions
   , DomainToHz
   , HzToPeriod

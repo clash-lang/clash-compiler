@@ -222,6 +222,7 @@ import Data.Hashable              (Hashable)
 import Data.Int                   (Int64)
 import Data.Maybe                 (isJust)
 import Data.Proxy                 (Proxy(..))
+import qualified Text.Read as Read
 import Data.Type.Equality         ((:~:), testEquality)
 import GHC.Generics               (Generic)
 import GHC.Magic                  (noinline)
@@ -230,7 +231,7 @@ import GHC.Types                  (Type)
 import GHC.TypeError              (Assert, TypeError, ErrorMessage(..))
 import GHC.TypeLits               (Div, KnownNat, Nat, type (<=), type (*), type (-))
 import GHC.TypeLits.Extra         (DivRU)
-import GHC.Real                   (Ratio(..), (%))
+import GHC.Real                   (Ratio(..), (%), ratioPrec)
 import GHC.Records                (HasField(getField))
 import Language.Haskell.TH.Syntax hiding (Type) -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
@@ -762,7 +763,7 @@ data XilinxSystem
 -- | A precise period given in picoseconds.
 newtype Period = Period (Ratio Nat)
   deriving stock   ( Lift )
-  deriving newtype ( NFDataX, NFData, ShowX, Eq, Ord, Read, Binary
+  deriving newtype ( NFDataX, NFData, ShowX, Eq, Ord, Binary
                    , Enum, Num, Real, RealFrac, Fractional, Hashable
                    )
 
@@ -772,6 +773,30 @@ instance Show Period where
     | n `div` m == 0 = show n <> "/" <> show m <> " ps"
     | otherwise      = show (n `div` m) <> " + "
                     <> show (n `mod` m) <> "/" <> show m <> " ps"
+
+-- Accept earlier clock configurations with a bare Natural or a Ratio.
+instance Read Period where
+  readPrec = Read.parens withSuffix Read.<++ (fromIntegral <$> natural)
+   where
+    natural = Read.readPrec :: Read.ReadPrec Natural
+    withSuffix = do
+      whole <- natural
+      part <- Read.lexP
+      case part of
+        Read.Ident "ps" -> pure (fromIntegral whole)
+        Read.Symbol "%" -> Read.prec ratioPrec (fraction whole)
+        Read.Symbol "/" -> fraction whole <* ps
+        Read.Symbol "+" -> do
+          n <- natural
+          Read.Symbol "/" <- Read.lexP
+          (fromIntegral whole +) <$> fraction n <* ps
+        _ -> Read.pfail
+    ps = do
+      Read.Ident "ps" <- Read.lexP
+      pure ()
+    fraction n = do
+      d <- Read.step natural
+      if d == 0 then Read.pfail else pure (Period (n % d))
 
 -- Some notes on the `Integral Period` instance given below:
 --

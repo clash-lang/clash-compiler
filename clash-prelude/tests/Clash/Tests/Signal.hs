@@ -32,6 +32,7 @@ import           Clash.Signal.Internal
 import           Control.Arrow.Transformer.Automaton
   (Automaton(..))
 import           Control.Exception              (evaluate)
+import           Text.Read (readMaybe)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
@@ -41,6 +42,8 @@ createDomain vSystem{vName="H77", vPeriod=hzToPeriod 77}
 createDomain vSystem{vName="F1", vPeriod=20}
 createDomain vSystem{vName="DDR10", vPeriod=10}
 createDomain vSystem{vName="F6", vPeriod=250}
+
+createDomain vSystem{vName="FractionalClock", vPeriod=20.5}
 
 -- | A virtual partitioning of a domain: @Secure dom@ designates the same
 -- physical clock domain as @dom@ and can hence be switched to and from at no
@@ -95,7 +98,7 @@ tests =
           let testClk = clockGen @F1
               periods = fromList (P.cycle [Femtoseconds 10000, Femtoseconds 30000])
               enabled = E.unsafeSynchronizer testClk circuitClk (pure True)
-              circuitClk = tbDynamicClockGen @F6 periods enabled
+              circuitClk = tbDynamicClockGen @FractionalClock periods enabled
           in P.take 6 (clockTicks testClk circuitClk)
                @?= [ClockAB, ClockB, ClockA, ClockAB, ClockB, ClockA]
       , testCase "DDR forwarded clock with synchronized waveform" $
@@ -110,6 +113,22 @@ tests =
       , testCase "case_F1_F6" case_F1_F6
       , testCase "case_F6_F1" case_F6_F1
       ]
+    , testCase "read and show clock configurations" $
+        mapM_ (\cfg -> readMaybe (show cfg) @?= Just cfg)
+          [vSystem, vFractionalClock, vSystem{vPeriod=1/2}]
+    , testCase "read legacy clock configurations" $ do
+        let oldSystem = "VDomainConfiguration {vName = \"System\", vPeriod = 10000, " <>
+              "vActiveEdge = Rising, vResetKind = Asynchronous, " <>
+              "vInitBehavior = Defined, vResetPolarity = ActiveHigh}"
+            complete p s = [x :: E.Period | (x, "") <- readsPrec p s]
+        readMaybe oldSystem @?= Just vSystem
+        readMaybe @E.Period "(10000)" @?= Just 10000
+        complete 7 "2 % 4" @?= [1/2]
+        complete 8 "(2 % 4)" @?= [1/2]
+        complete 8 "2 % 4" @?= []
+    , testCase "read rejects zero clock period denominators" $
+        mapM_ (\s -> readMaybe @E.Period s @?= Nothing)
+          ["1 % 0", "1/0 ps", "2 + 1/0 ps"]
     , testGroup "switchDomain"
       [ testCase "into virtual domain" case_switchDomainInto
       , testCase "out of virtual domain" case_switchDomainOutOf
