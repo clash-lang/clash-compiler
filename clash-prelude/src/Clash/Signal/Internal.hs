@@ -1419,6 +1419,7 @@ instance Typeable dom => Show (Clock dom) where
 -- | The negative or inverted phase of a differential clock signal. HDL
 -- generation will treat it the same as 'Clock', except that no @create_clock@
 -- command is issued in the SDC file for 'ClockN'. Used in 'DiffClock'.
+type role ClockN nominal
 newtype ClockN (dom :: Domain) = ClockN { clockNTag :: Proxy dom }
 
 instance Typeable dom => Show (ClockN dom) where

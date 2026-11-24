@@ -378,7 +378,11 @@ runClashTest t3105Env = defaultMain
           }
         ]
       , clashTestGroup "Signal"
-        [ runTest "FractionalDDR" def{
+        [ runTest "CoerceClockN" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "arising from a use of")
+          }
+        , runTest "FractionalDDR" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Couldn't match type")
           }
