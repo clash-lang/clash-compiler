@@ -776,6 +776,9 @@ zeroWidthTypeElem tcm ty = do
      , [LitTy (NumTy 0)] <- args
      -> return (unsignedZW tcNm args)
 
+     -- ClockN wraps Proxy in Haskell but carries a clock in HDL.
+     | nameOcc tcNm == "Clash.Signal.Internal.ClockN" -> Nothing
+
      -- Any other zero-width type should only have a single data constructor
      -- where all fields are also zero-width.
      | otherwise

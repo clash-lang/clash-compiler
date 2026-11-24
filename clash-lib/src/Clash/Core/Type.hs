@@ -745,11 +745,12 @@ normalizeType tcMap = go
   go ty = case tyView ty of
     TyConApp tcNm args
       -- These Clash types are implemented with newtypes.
-      -- We need to keep these newtypes because they define the width of the numbers.
+      -- Keep their HDL widths. ClockN is a wire although it wraps Proxy.
       | nameOcc tcNm == "Clash.Sized.Internal.BitVector.Bit" ||
         nameOcc tcNm == "Clash.Sized.Internal.BitVector.BitVector" ||
         nameOcc tcNm == "Clash.Sized.Internal.Index.Index"         ||
         nameOcc tcNm == "Clash.Sized.Internal.Signed.Signed"       ||
+        nameOcc tcNm == "Clash.Signal.Internal.ClockN" ||
         nameOcc tcNm == "Clash.Sized.Internal.Unsigned.Unsigned"
       -> mkTyConApp tcNm (map go args)
       | otherwise

@@ -399,6 +399,13 @@ isSignalType tcm ty = go HashSet.empty ty
 
     go _ _ = False
 
+-- ClockN wraps Proxy in Haskell but represents a clock port in HDL.
+portTypeView :: TyConMap -> Type -> TypeView
+portTypeView tcm ty
+  | v@(TyConApp tc _) <- tyView ty, nameOcc tc == "Clash.Signal.Internal.ClockN" = v
+  | Just inner <- coreView1 tcm ty = portTypeView tcm inner
+  | otherwise = tyView ty
+
 -- | Determines whether given type is an (alias of en) Enable line.
 isEnable
   :: TyConMap
@@ -414,8 +421,7 @@ isClockOrReset
   :: TyConMap
   -> Type
   -> Bool
-isClockOrReset m (coreView1 m -> Just ty)    = isClockOrReset m ty
-isClockOrReset _ (tyView -> TyConApp tcNm _) = case nameOcc tcNm of
+isClockOrReset m (portTypeView m -> TyConApp tcNm _) = case nameOcc tcNm of
   "Clash.Signal.Internal.Clock" -> True
   "Clash.Signal.Internal.ClockN" -> True
   "Clash.Signal.Internal.Reset" -> True
@@ -618,7 +624,7 @@ shouldSplit
 shouldSplit tcm (tyView ->  TyConApp (nameOcc -> "Clash.Explicit.SimIO.SimIO") [tyArg]) =
   -- We also look through `SimIO` to find things like Files
   shouldSplit tcm tyArg
-shouldSplit tcm ty = shouldSplit0 tcm (tyView (coreView tcm ty))
+shouldSplit tcm ty = shouldSplit0 tcm (portTypeView tcm ty)
 
 -- | Worker of 'shouldSplit', works on 'TypeView' instead of 'Type'
 shouldSplit0
@@ -631,7 +637,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   , let dcArgs = substArgTys dc tyArgs
   , let dcArgsLen = length dcArgs
   , dcArgsLen > 1
-  , let dcArgVs = map (tyView . coreView tcm) dcArgs
+  , let dcArgVs = map (portTypeView tcm) dcArgs
   = if any shouldSplitTy dcArgVs && not (isHidden tcNm tyArgs) then
       Just ( mkApps (Data dc) . (map Right tyArgs ++) . map Left
            , Projections
@@ -647,7 +653,7 @@ shouldSplit0 tcm (TyConApp tcNm tyArgs)
   , n > 1
   , Just tc <- UniqMap.lookup tcNm tcm
   , [nil,cons] <- tyConDataCons tc
-  = if shouldSplitTy (tyView (coreView tcm argTy)) then
+  = if shouldSplitTy (portTypeView tcm argTy) then
       Just ( mkVec nil cons argTy n
            , Projections (\is0 subj -> mapM (mkVecSelector is0 subj) [0..n-1])
            , replicate (fromInteger n) argTy)
