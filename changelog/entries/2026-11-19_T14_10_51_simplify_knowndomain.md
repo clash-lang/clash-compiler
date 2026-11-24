@@ -47,12 +47,22 @@ and `switchHiddenClockResetEnableDomain`.
 
 # CHANGED
 Domains no longer specify the hardware parameters directly.
-Instead, a `KnownDomain` instance has a type `ClockDomainOf`,
-which must have a `KnownClockDomain` instance.
-By default, this is the same as the domain.
+The open type family `ClockDomainOf` selects the physical clock for each logical domain.
+Its result must have a `KnownClockDomain` instance. A physical clock maps to itself.
+
+Clock domains are now Haskell types. Replace `Signal "System" a` with
+`Signal System a`. For a custom domain, `createDomain vSystem{vName="Fast"}`
+declares the type and its instances. To migrate a handwritten `KnownDomain`
+instance, declare `data Fast`, set `type instance ClockDomainOf Fast = Fast`,
+move the clock properties from `KnownConf` to the associated types of
+`KnownClockDomain Fast`, and add `instance KnownDomain Fast`.
 
 # CHANGED
-Clock periods are now of the fractional type `Period`, rather than an integer number of picoseconds.
+`vPeriod` now holds a `Period` in picoseconds, including any fractional part.
+Use `hzToPeriod @Period freq` for an exact period or
+`floor (hzToPeriod @Period freq)` for the former whole-picosecond result.
+`clockPeriod @dom` gives the whole picoseconds. Use
+`vPeriod (knownVDomain @dom)` for the complete period.
 
 # CHANGED
 In `clash-manifest.json`, use a clock port's `domain` field to look up its

@@ -4,6 +4,7 @@ import Clash.Explicit.Prelude
 import GHC.Real (Ratio((:%)))
 
 data Fast
+type instance ClockDomainOf Fast = Fast
 instance KnownClockDomain Fast where
   type ClockPeriod Fast = 2
   type ClockPeriodFraction Fast = 3 :% 2

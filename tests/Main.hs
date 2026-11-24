@@ -403,7 +403,9 @@ runClashTest t3105Env = defaultMain
               }
             ]
           | (target, message) <-
-              [ ("populatedMarker", "expected a data type with no constructors")
+              [ ("improperFraction", "ClockPeriodFraction must be in [0, 1)")
+              , ("indirectProjection", "A physical clock domain must map to itself")
+              , ("populatedMarker", "expected a data type with no constructors")
               ]
           ]
         , runTest "MAC" def{

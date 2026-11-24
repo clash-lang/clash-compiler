@@ -52,6 +52,7 @@ import Clash.Signal.Internal
 >>> import Clash.Explicit.DDR
 >>> :{
 data DDR :: Domain
+type instance ClockDomainOf DDR = DDR
 instance KnownClockDomain DDR where
   type ClockPeriod DDR        = 5000
   type ClockActiveEdge DDR    = 'Rising

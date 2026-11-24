@@ -20,6 +20,7 @@ instance Typeable t => KnownClockDomain (Key t) where
   type ClockInitBehavior (Key t) = 'Defined
   type ClockResetPolarity (Key t) = 'ActiveHigh
 
+type instance ClockDomainOf (Key t) = Key t
 instance Typeable t => KnownDomain (Key t)
 
 topEntity :: Clock (Key One) -> Clock (Key Two) -> Bool -> Bool

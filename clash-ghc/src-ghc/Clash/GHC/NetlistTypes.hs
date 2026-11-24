@@ -437,6 +437,9 @@ domainConfig normalize ids m kind dom c = do
       checkMarker physical
       pure physical
   let resolve = resolveAt cdom
+  self <- resolve clockDomainOfTCU
+  unless (self == cdom) $
+    throwE $ "A physical clock domain must map to itself: " ++ showPpr cdom
   period         <- domPeriod =<< resolve clockPeriodTCU
   frac           <- domPeriodFraction =<< resolve clockPeriodFractionTCU
   vActiveEdge    <- domEdge =<< resolve clockActiveEdgeTCU

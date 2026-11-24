@@ -16,7 +16,9 @@ module Clash.Signal.Internal.Ambiguous
 import           Clash.Signal.Internal
 import           Clash.Promoted.Nat         (SNat)
 
--- | Get the clock period from a KnownDomain context
+-- | Get the whole number of picoseconds in the clock period, rounded down.
+-- For the exact period, including fractional picoseconds, use
+-- @'vPeriod' ('knownVDomain' \@dom)@.
 clockPeriod
   :: forall dom period
    . (KnownDomain dom, DomainPeriod dom ~ period)

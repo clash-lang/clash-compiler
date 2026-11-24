@@ -56,7 +56,9 @@ module Clash.Signal.Internal
   , switchResetDomain#
   , switchEnableDomain
   , switchEnableDomain#
-  , KnownDomain(..)
+  , KnownDomain
+  , ClockDomainOf
+  , clockDomainOfSelf
   , KnownClockDomain(..)
   , KnownConf
   , KnownConfiguration
@@ -225,7 +227,7 @@ import Data.Int                   (Int64)
 import Data.Maybe                 (isJust)
 import Data.Proxy                 (Proxy(..))
 import qualified Text.Read as Read
-import Data.Type.Equality         ((:~:), testEquality)
+import Data.Type.Equality         ((:~:)(Refl), testEquality)
 import GHC.Generics               (Generic)
 import GHC.Magic                  (noinline)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
@@ -584,13 +586,34 @@ type KnownConf dom = 'DomainConfiguration dom
   (DomainInitBehavior dom)
   (DomainResetPolarity dom)
 
+-- | The physical clock domain that supplies a domain's hardware configuration.
+-- Each 'KnownClockDomain' maps to itself. A type used solely to supply a
+-- clock configuration only needs this equation and a 'KnownClockDomain' instance.
+type family ClockDomainOf (dom :: Domain) :: ClockDomain
+
+-- Keep the proof in a dictionary field. A bare equality superclass makes
+-- GHC treat every hidden-clock continuation as a GADT match, preventing
+-- it from inferring the result type of e.g. withClock clk (register ...).
+class SameClockDomain a b where
+  clockDomainEquality :: a :~: b
+instance SameClockDomain d d where
+  clockDomainEquality = Refl
+
+-- | A physical clock domain designates itself. Match on 'Refl' to use the
+-- equality in polymorphic code.
+clockDomainOfSelf :: forall d. KnownClockDomain d => ClockDomainOf d :~: d
+clockDomainOfSelf = clockDomainEquality
+
 -- | A 'KnownClockDomain' constraint indicates that all hardware-level
 -- properties of a /physical clock domain/ are known.
 --
+-- A synthesized physical clock domain is an empty data type.
 -- A clock domain is the hardware-level part of a 'Domain'. Multiple domains
 -- may designate the same clock domain through 'ClockDomainOf'; such domains
 -- describe /virtual/ partitionings of a single physical clock domain and can
 -- be converted into each other at no hardware cost with 'switchDomain'.
+-- A physical clock domain must designate itself. 'clockDomainOfSelf'
+-- provides the corresponding equality witness.
 class
   ( Typeable cdom
   , KnownNat (ClockPeriod cdom)
@@ -600,6 +623,7 @@ class
   , KnownResetKind (ClockResetKind cdom)
   , KnownInitBehavior (ClockInitBehavior cdom)
   , KnownResetPolarity (ClockResetPolarity cdom)
+  , SameClockDomain (ClockDomainOf cdom) cdom
   ) =>
   KnownClockDomain (cdom :: ClockDomain)
  where
@@ -616,8 +640,8 @@ class
 --
 -- A 'Domain' is a more general concept than a physical clock domain: every
 -- domain designates a physical clock domain through 'ClockDomainOf', but
--- distinct domains may share one. A domain that /is/ a physical clock domain
--- designates itself
+-- distinct domains may share one. Applying 'ClockDomainOf' a second time
+-- gives the same physical clock domain.
 --
 -- Domains that add structure on top of an existing domain leave the clock
 -- domain untouched and forward the projection instead. For example, a virtual
@@ -626,8 +650,8 @@ class
 -- @
 -- data Secure (lvl :: SecurityLevel) (dom :: Domain)
 --
--- instance KnownDomain dom => KnownDomain (Secure lvl dom) where
---   type ClockDomainOf (Secure lvl dom) = ClockDomainOf dom
+-- type instance ClockDomainOf (Secure lvl dom) = ClockDomainOf dom
+-- instance (Typeable lvl, KnownDomain dom) => KnownDomain (Secure lvl dom)
 -- @
 --
 -- Signals in @Secure lvl dom@ are clocked by exactly the same physical clock
@@ -638,12 +662,8 @@ class
   , KnownClockDomain (ClockDomainOf dom)
   ) =>
   KnownDomain (dom :: Domain)
- where
-  -- | The physical clock domain this domain designates.
-  type ClockDomainOf dom :: ClockDomain
-  type ClockDomainOf dom = dom
 
--- | The clock period associated with @dom@, in /ps/
+-- | Whole picoseconds in the clock period. See also 'DomainPeriodFraction'.
 type DomainPeriod (dom :: Domain) =
   ClockPeriod (ClockDomainOf dom)
 
@@ -706,6 +726,7 @@ instance KnownClockDomain System where
   type ClockInitBehavior System  = 'Defined
   type ClockResetPolarity System = 'ActiveHigh
 
+type instance ClockDomainOf System = System
 instance KnownDomain System
 
 -- | System instance with defaults set for Xilinx FPGAs
@@ -716,6 +737,7 @@ instance KnownClockDomain XilinxSystem where
   type ClockInitBehavior XilinxSystem  = 'Defined
   type ClockResetPolarity XilinxSystem = 'ActiveHigh
 
+type instance ClockDomainOf XilinxSystem = XilinxSystem
 instance KnownDomain XilinxSystem
 
 -- | System instance with defaults set for Intel FPGAs
@@ -726,6 +748,7 @@ instance KnownClockDomain IntelSystem where
   type ClockInitBehavior IntelSystem  = 'Defined
   type ClockResetPolarity IntelSystem = 'ActiveHigh
 
+type instance ClockDomainOf IntelSystem = IntelSystem
 instance KnownDomain IntelSystem
 
 -- | Convenience value to allow easy "subclassing" of System domain. Should
@@ -780,6 +803,8 @@ vXilinxSystem = vDomain (knownDomain @XilinxSystem)
 data XilinxSystem
 
 -- | A precise period given in picoseconds.
+-- Converting a 'Period' with 'fromIntegral' discards fractional picoseconds,
+-- while 'toRational' preserves them.
 newtype Period = Period (Ratio Nat)
   deriving stock   ( Lift )
   deriving newtype ( NFDataX, NFData, ShowX, Eq, Ord, Binary
@@ -979,8 +1004,8 @@ isValidDomainName _ = False
 --
 -- > vSystem10 = knownVDomain @System10
 --
--- It will also make @System10@ an instance of 'KnownClockDomain' and
--- 'KnownDomain'.
+-- It also defines @type instance ClockDomainOf System10 = System10@ and
+-- makes @System10@ an instance of both 'KnownClockDomain' and 'KnownDomain'.
 --
 -- If either identifier is already in scope it will not be generated a second time.
 -- Note: This can be useful for example when documenting a new domain:
@@ -1028,11 +1053,11 @@ createDomain cfg@VDomainConfiguration{} =
           ]
         | not vHelperExists
         ]
-      , [ -- KnownClockDomain instance (ex: instance KnownClockDomain System where ...)
-          InstanceD Nothing [] kcdType
+      , [ mkTySynInstD ''ClockDomainOf [ConT name] (ConT name)
+          -- KnownClockDomain instance (ex: instance KnownClockDomain System where ...)
+        , InstanceD Nothing [] kcdType
             [kpImpl, kfImpl, keImpl, krImpl, kiImpl, koImpl]
-          -- KnownDomain instance (ex: instance KnownDomain System); the
-          -- default for ClockDomainOf makes the domain designate itself
+          -- KnownDomain instance (ex: instance KnownDomain System)
         , InstanceD Nothing [] kdType []
         ]
       ]

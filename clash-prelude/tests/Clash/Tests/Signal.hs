@@ -52,8 +52,8 @@ createDomain vSystem{vName="FractionalClock", vPeriod=20.5}
 -- hardware cost. Exercises the 'ClockDomainOf' projection of 'KnownDomain'.
 data Secure (dom :: Domain)
 
-instance KnownDomain dom => KnownDomain (Secure dom) where
-  type ClockDomainOf (Secure dom) = ClockDomainOf dom
+type instance ClockDomainOf (Secure dom) = ClockDomainOf dom
+instance KnownDomain dom => KnownDomain (Secure dom)
 
 type instance (Secure System) `SupportsSwitchingTo` System = 'True
 type instance System `SupportsSwitchingTo` (Secure System) = 'True

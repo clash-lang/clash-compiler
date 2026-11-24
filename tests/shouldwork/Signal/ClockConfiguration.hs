@@ -13,13 +13,12 @@ import System.FilePath ((</>))
 createDomain vSystem{vName="Fast", vPeriod=5000.5, vActiveEdge=Falling}
 
 data Tagged a
-instance KnownClockDomain a => KnownDomain (Tagged a) where
-  type ClockDomainOf (Tagged a) = a
+type instance ClockDomainOf (Tagged a) = a
+instance KnownClockDomain a => KnownDomain (Tagged a)
 
 createDomain vSystem{vName="SignalOnly", vPeriod=27123}
 data Wire
-instance KnownDomain Wire where
-  type ClockDomainOf Wire = SignalOnly
+type instance ClockDomainOf Wire = SignalOnly
 data Unclocked
 
 topEntity

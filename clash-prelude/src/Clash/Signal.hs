@@ -25,6 +25,7 @@ active edge, reset behavior and initial values. 'KnownConf' gives the complete
 The built-in 'System' supplies its own clock configuration.
 
 @
+type instance ClockDomainOf System = System
 instance KnownClockDomain System where
   type ClockPeriod System        = 10000
   type ClockActiveEdge System    = 'Rising
@@ -78,7 +79,9 @@ module Clash.Signal
   , switchClockDomain
   , switchResetDomain
   , switchEnableDomain
-  , KnownDomain(..)
+  , KnownDomain
+  , ClockDomainOf
+  , clockDomainOfSelf
   , KnownClockDomain(..)
   , KnownConfiguration
     -- ** Domain projections

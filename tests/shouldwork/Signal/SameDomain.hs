@@ -21,12 +21,12 @@ newtype WrappedSystem = WrappedSystem System
 
 data family FamilyTag (a :: Type)
 data instance FamilyTag Bool
-instance KnownDomain (FamilyTag Bool) where
-  type ClockDomainOf (FamilyTag Bool) = System
+type instance ClockDomainOf (FamilyTag Bool) = System
+instance KnownDomain (FamilyTag Bool)
 
 data Tagged (a :: Type)
-instance Typeable a => KnownDomain (Tagged a) where
-  type ClockDomainOf (Tagged a) = System
+type instance ClockDomainOf (Tagged a) = System
+instance Typeable a => KnownDomain (Tagged a)
 
 checkDomains
   :: forall domA domB
