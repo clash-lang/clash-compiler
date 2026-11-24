@@ -1145,7 +1145,8 @@ runClashTest t3105Env = defaultMain
         , runTest "T3432" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "T3434" def
         , clashTestGroup "BiSignal"
-          [ runTest "Counter" def
+          [ outputTest "BusClock" def{hdlTargets=[Verilog]}
+          , runTest "Counter" def
           , runTest "CounterHalfTuple" def
           , runTest "CounterHalfTupleRev" def
           , outputTest "T2472" def{hdlTargets=[VHDL]}

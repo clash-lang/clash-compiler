@@ -487,8 +487,9 @@ generateHDL env design hdlState typeTrans peEval eval mainTopEntity startTime = 
         putStrLn ("Clash: Netlist generation took " ++ normNetDiff)
 
       -- 5. Generate topEntity wrapper
+      let hdlState2 = setDomainConfigurations domains1 hdlState1
       (hdlDocs, dfiles, mfiles) <- withMVar seenV $ \seen ->
-        pure $! createHDL hdlState1 opts modNameT seen netlist topComponent topNmT
+        pure $! createHDL hdlState2 opts modNameT seen netlist topComponent topNmT
 
       -- TODO: Data files should go into their own directory
       -- FIXME: Files can silently overwrite each other

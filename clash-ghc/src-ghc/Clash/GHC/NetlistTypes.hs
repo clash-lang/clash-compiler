@@ -99,7 +99,14 @@ ghcTypeToHWType mkdtcus iw = go
       return (FilteredHWType (Annotated attrs typ') areVoids)
 
     go reprs m ty@(tyView -> TyConApp tc args) = runMaybeT . runExceptT $
-      let occ = nameOcc tc in
+      let occ = nameOcc tc
+          biSignal wrap = case args of
+            [_, dom, szTy] -> do
+              recordSignalDomain m dom
+              sz <- liftE (tyNatSize m szTy)
+              returnN (wrap (BitVector (fromInteger sz)))
+            _ -> throwE $ $(curLoc) ++ show occ ++ " TC has unexpected amount of arguments"
+      in
       if | occ == showt ''Int8                  -> returnN (Signed 8)
          | occ == showt ''Int16                 -> returnN (Signed 16)
          | occ == showt ''Int32                 -> returnN (Signed 32)
@@ -164,21 +171,11 @@ ghcTypeToHWType mkdtcus iw = go
              recordSignalDomain m dom
              ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m el
 
-         | occ == "Clash.Signal.BiSignal.BiSignalIn" -> do
-             szTy <- case args of
-               [_, _, szTy] -> pure szTy
-               _ -> throwE $ $(curLoc) ++ "BiSignalIn TC has unexpected amount of arguments"
-             let fType ty1 = FilteredHWType ty1 []
-             (fType . BiDirectional In . BitVector . fromInteger) <$>
-               liftE (tyNatSize m szTy)
+         | occ == "Clash.Signal.BiSignal.BiSignalIn" ->
+             biSignal (BiDirectional In)
 
-         | occ == "Clash.Signal.BiSignal.BiSignalOut" -> do
-             szTy <- case args of
-               [_, _, szTy] -> pure szTy
-               _ -> throwE $ $(curLoc) ++ "BiSignalOut TC has unexpected amount of arguments"
-             let fType ty1 = FilteredHWType ty1 []
-             (fType . Void . Just . BiDirectional Out . BitVector . fromInteger) <$>
-               liftE (tyNatSize m szTy)
+         | occ == "Clash.Signal.BiSignal.BiSignalOut" ->
+             biSignal (Void . Just . BiDirectional Out)
 
          -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration.
          -- Constraint-tuple type constructors are internal names that move
