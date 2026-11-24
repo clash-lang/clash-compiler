@@ -41,7 +41,6 @@ import qualified GHC.STRef
 import qualified GHC.Stack.Types
 import GHC.Word                         (Word8, Word16, Word32, Word64)
 import Language.Haskell.TH.Syntax       (showName)
-import qualified Type.Reflection
 
 import Clash.Driver.Types               (KnownDomainTyConUniques(..))
 import Clash.Core.DataCon               (DataCon (..))
@@ -320,9 +319,6 @@ ghcTypeToHWType mkdtcus iw = go
          | occ == "Clash.Explicit.SimIO.SimIO"
          , a0:_ <- args ->
              ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m a0
-
-         -- Similarly, discard runtime type representations.
-         | occ == showt ''Type.Reflection.TypeRep -> returnN (Void Nothing)
 
          | occ == "Clash.Explicit.SimIO.File" -> returnN FileType
 

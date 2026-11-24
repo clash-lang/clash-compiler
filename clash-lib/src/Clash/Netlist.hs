@@ -1024,6 +1024,9 @@ mkDcApplication
     -- ^ DataCon Arguments
     -> NetlistMonad (Expr,[Declaration])
     -- ^ Returned expression and a list of generate BlackBox declarations
+-- The dictionary's type supplies all clock metadata. Its Typeable superclass
+-- has no hardware representation.
+mkDcApplication _ [Void (Just (KnownDomain _))] _ _ _ = pure (Noop, [])
 mkDcApplication declType [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache

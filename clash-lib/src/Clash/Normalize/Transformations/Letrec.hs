@@ -77,6 +77,7 @@ import Clash.Netlist.Util (splitNormalized)
 import Clash.Normalize.Primitives (removedArg)
 import Clash.Normalize.Transformations.Reduce (reduceBinders)
 import Clash.Normalize.Types (NormRewrite, NormalizeSession)
+import Clash.Signal.Internal (sameDomain)
 import Clash.Primitives.Types (Primitive(..), UsedArguments(..))
 import Clash.Rewrite.StrategyDSL
   ( Transformation, anyConstructor, onAppNode, onCase, onLet, onLetNode
@@ -161,6 +162,9 @@ removeUnusedExprSpine _ e@(collectArgsTicks -> (p@(Prim pInfo),args,ticks)) = do
   let
     usedArgs0 =
       case Monad.join (extractPrim <$> bbM) of
+        -- The evaluator decides nominal domain equality from the two type
+        -- arguments. A dictionary may itself contain an opaque TypeRep.
+        Just Primitive{} | primName pInfo == Text.showt 'sameDomain -> Just []
         Just (BlackBoxHaskell{usedArguments}) ->
           case usedArguments of
             UsedArguments used -> Just used

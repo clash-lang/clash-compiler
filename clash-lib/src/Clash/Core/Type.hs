@@ -48,6 +48,7 @@ module Clash.Core.Type
   , isTypeFamilyApplication
   , isFunTy
   , isClassTy
+  , isClockEvidence
   , applyFunTy
   , findFunSubst
   , reduceTypeFamily
@@ -101,6 +102,7 @@ import {-# SOURCE #-} Clash.Core.Subst
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import qualified Clash.Data.UniqMap as UniqMap
+import qualified Clash.Signal.Internal as Signal
 import           Clash.Unique (fromGhcUnique)
 import           Clash.Util
 
@@ -799,3 +801,13 @@ isClassTy tcm (tyView -> TyConApp tcNm _) =
     Just (AlgTyCon {isClassTc}) -> isClassTc
     _ -> False
 isClassTy _ _ = False
+
+-- | A superclass selector may return clock evidence directly or as part of a
+-- hidden clock/reset/enable tuple. Other products can contain runtime fields.
+isClockEvidence :: TyConMap -> Type -> Bool
+isClockEvidence tcm ty = case tyView ty of
+  TyConApp tc args
+    | nameOcc tc == showt ''Signal.KnownDomain -> True
+    | nameOcc tc == showt ''Signal.KnownClockDomain -> True
+    | isClassTy tcm ty -> any (isClockEvidence tcm) args
+  _ -> False

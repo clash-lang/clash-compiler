@@ -103,7 +103,7 @@ import           Clash.Core.TermLiteral (termToDataError)
 import           Clash.Core.TyCon
   (TyCon (FunTyCon), TyConName, TyConMap, tyConDataCons)
 import           Clash.Core.Type
-  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, normalizeType,
+  (LitTy (..), Type (..), TyVar, TypeView (..), coreView, coreView1, isClockEvidence, normalizeType,
    splitCoreFunForallTy, splitTyConAppM, stripAnnTypes, tyView)
 import           Clash.Core.Util
   (splitShouldSplit, substArgTys, tyLitShow)
@@ -680,7 +680,7 @@ representableTypeState
 representableTypeState builtInTranslation reprs stringRepresentable m ty = do
   eshty <- coreTypeToHWType' builtInTranslation reprs m ty
   doms1 <- gets snd
-  return $ (, doms1) $ either (const False) isRepresentable eshty
+  return (not (isClockEvidence m ty) && either (const False) isRepresentable eshty, doms1)
   where
     isRepresentable hty = case hty of
       String            -> stringRepresentable

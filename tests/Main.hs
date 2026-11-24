@@ -334,6 +334,10 @@ runClashTest t3105Env = defaultMain
           , clashFlags=["-package-id", testsuiteUnitId]
           , expectClashFail=Just (def, "NOT:local sources")
           }
+        , runTest "TypeRepFingerprint" def{
+            hdlTargets=[Verilog]
+          , expectClashFail=Just (def, "Typeable.Internal")
+          }
         , runTest "NamedSymbolsAndNumberedSymbols" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "~SYM[mySymbol] uses the same name as previously used in ~GENSYM")
