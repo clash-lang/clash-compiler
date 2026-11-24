@@ -100,9 +100,9 @@ module Clash.Signal.Trace
 
 -- Clash:
 import           Clash.Annotations.Primitive (hasBlackBox)
-import           Clash.Signal.Internal (fromList)
+import           Clash.Signal.Internal (fromList, Period, sDomainPeriod)
 import           Clash.Signal
-  (KnownDomain, SDomainConfiguration(..), Signal, knownDomain, bundle, unbundle)
+  (KnownDomain, Signal, knownDomain, bundle, unbundle)
 import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)
@@ -124,7 +124,7 @@ import           Data.IORef
 #if !MIN_VERSION_base(4,20,0)
 import           Data.List             (foldl')
 #endif
-import           Data.List             (foldl1', unzip4, transpose, uncons)
+import           Data.List             (foldl1', genericReplicate, unzip4, transpose, uncons)
 import           Data.List.Extra       (snoc)
 import qualified Data.Map.Strict       as Map
 import           Data.Maybe            (fromMaybe, catMaybes)
@@ -142,7 +142,6 @@ import qualified Data.Version
 import qualified Paths_clash_prelude
 #endif
 
-type Period   = Int
 type Changed  = Bool
 type Value    = (Natural, Natural) -- (Mask, Value)
 type Width    = Int
@@ -170,14 +169,14 @@ mkTrace signal = sample (unsafeToTup . pack <$> signal)
 -- | Trace a single signal. Will emit an error if a signal with the same name
 -- was previously registered.
 traceSignal#
-  :: forall dom a
+  :: forall dom a p
    . ( BitPack a
      , NFDataX a
-     , Typeable a )
+     , Typeable a, Real p )
   => IORef TraceMap
   -- ^ Map to store the trace
-  -> Int
-  -- ^ The associated clock period for the trace
+  -> p
+  -- ^ The associated clock period in picoseconds for the trace
   -> String
   -- ^ Name of signal in the VCD output
   -> Signal dom a
@@ -191,7 +190,7 @@ traceSignal# traceMap period traceName signal =
       ( Map.insert
           traceName
           ( encode (typeRep @a)
-          , period
+          , realToFrac period
           , width
           , mkTrace signal)
           m
@@ -204,15 +203,15 @@ traceSignal# traceMap period traceName signal =
 -- a different trace. If the trace name already exists, this function will emit
 -- an error.
 traceVecSignal#
-  :: forall dom n a
+  :: forall dom n a p
    . ( KnownNat n
      , BitPack a
      , NFDataX a
-     , Typeable a )
+     , Typeable a, Real p )
   => IORef TraceMap
   -- ^ Map to store the traces
-  -> Int
-  -- ^ Associated clock period for the trace
+  -> p
+  -- ^ Associated clock period in picoseconds for the trace
   -> String
   -- ^ Name of signal in the VCD output. Will be appended by _0, _1, ..., _n.
   -> Signal dom (Vec (n+1) a)
@@ -243,11 +242,8 @@ traceSignal
   -> Signal dom a
   -- ^ Signal to trace
   -> Signal dom a
-traceSignal traceName signal =
-  case knownDomain @dom of
-    SDomainConfiguration{sPeriod} ->
-      unsafePerformIO $
-        traceSignal# traceMap# (snatToNum sPeriod) traceName signal
+traceSignal traceName signal = unsafePerformIO $
+  traceSignal# traceMap# (sDomainPeriod (knownDomain @dom)) traceName signal
 {-# OPAQUE traceSignal #-}
 {-# ANN traceSignal hasBlackBox #-}
 
@@ -268,7 +264,7 @@ traceSignal1
   -- ^ Signal to trace
   -> Signal dom a
 traceSignal1 traceName signal =
-  unsafePerformIO (traceSignal# traceMap# 1 traceName signal)
+  unsafePerformIO (traceSignal# traceMap# (1 :: Int) traceName signal)
 {-# OPAQUE traceSignal1 #-}
 {-# ANN traceSignal1 hasBlackBox #-}
 
@@ -291,11 +287,8 @@ traceVecSignal
   -> Signal dom (Vec (n+1) a)
   -- ^ Signal to trace
   -> Signal dom (Vec (n+1) a)
-traceVecSignal traceName signal =
-  case knownDomain @dom of
-    SDomainConfiguration{sPeriod} ->
-      unsafePerformIO $
-        traceVecSignal# traceMap# (snatToNum sPeriod) traceName signal
+traceVecSignal traceName signal = unsafePerformIO $
+  traceVecSignal# traceMap# (sDomainPeriod (knownDomain @dom)) traceName signal
 {-# OPAQUE traceVecSignal #-}
 {-# ANN traceVecSignal hasBlackBox #-}
 
@@ -318,14 +311,14 @@ traceVecSignal1
   -- ^ Signal to trace
   -> Signal dom (Vec (n+1) a)
 traceVecSignal1 traceName signal =
-  unsafePerformIO $ traceVecSignal# traceMap# 1 traceName signal
+  unsafePerformIO $ traceVecSignal# traceMap# (1 :: Int) traceName signal
 {-# OPAQUE traceVecSignal1 #-}
 {-# ANN traceVecSignal1 hasBlackBox #-}
 
 data VCDFile = VCDFile [DeclarationCommand] [SimulationCommand]
   deriving (Show)
 
-type VCDTime = Int
+type VCDTime = Integer
 
 type IDCode = String
 
@@ -369,11 +362,12 @@ data ValueChange
 iso8601Format :: UTCTime -> String
 iso8601Format = formatTime defaultTimeLocale "%Y-%m-%dT%H:%M:%S"
 
-toPeriodMap :: TraceMap -> Map.Map Period [(String, Width, [Value])]
+-- Clock simulation and VCD timestamps both have femtosecond resolution.
+toPeriodMap :: TraceMap -> Map.Map Integer [(String, Width, [Value])]
 toPeriodMap m = foldl' go Map.empty (Map.assocs m)
   where
     go periodMap (traceName, (_rep, period, width, values)) =
-      Map.alter (Just . go') period periodMap
+      Map.alter (Just . go') (floor (1000 * period)) periodMap
         where
           go' = ((traceName, width, values):) . (fromMaybe [])
 
@@ -397,6 +391,8 @@ dumpVCD1# (offset, cycles) traceMap
       error $ "dumpVCD: cycles was " ++ show cycles ++ ", but cannot be negative."
   | null traceMap =
       error $ "dumpVCD: no traces found. Extend the given trace names."
+  | any (\(_, p, _, _) -> p > 0 && p < 0.001) traceMap =
+      Left "A fractional VCD clock period must be at least one femtosecond."
   | (nm:_) <- offensiveNames =
       Left $ unwords [ "Trace '" ++ nm ++ "' contains"
                      , "non-printable ASCII characters, which is not"
@@ -404,7 +400,7 @@ dumpVCD1# (offset, cycles) traceMap
   | otherwise =
       Right
         ( VCDFile
-            [ TimeScale timescale PS
+            [ timeScale
             , Vars [Var w l n | (w, l, n) <- zip3 widths labels traceNames]
             ]
             ( [ SimulationTime 0
@@ -421,7 +417,10 @@ dumpVCD1# (offset, cycles) traceMap
    where
     alphabet = map chr [33..126]
 
-  timescale = foldl1' gcd (Map.keys periodMap)
+  sampleStep = foldl1' gcd (Map.keys periodMap)
+  (timeScale, ticksPerSample)
+    | sampleStep `mod` 1000 == 0 = (TimeScale (sampleStep `div` 1000) PS, 1)
+    | otherwise = (TimeScale 1 FS, sampleStep)
   periodMap = toPeriodMap traceMap
 
   -- Normalize traces until they have the "same" period. That is, assume
@@ -442,9 +441,9 @@ dumpVCD1# (offset, cycles) traceMap
       (\(a, (b, c, d)) -> (a, b, c, d))
       (flattenMap periodMap)
 
-  periods' = map (`quot` timescale) periods
+  periods' = map (`quot` sampleStep) periods
   valuess' = map slice $ zipWith normalize periods' valuess
-  normalize period (initial:values) = initial : concatMap (replicate period) values
+  normalize period (initial:values) = initial : concatMap (genericReplicate period) values
   normalize _      []               = []
   slice values = drop offset $ take cycles values
 
@@ -461,7 +460,7 @@ dumpVCD1# (offset, cycles) traceMap
   changed []     = []
 
   bodyParts :: [Maybe [SimulationCommand]]
-  bodyParts = zipWith go [0 ..] (map bodyPart (Data.List.transpose tails))
+  bodyParts = zipWith go [0, ticksPerSample ..] (map bodyPart (Data.List.transpose tails))
    where
     go :: VCDTime -> Maybe [SimulationCommand] -> Maybe [SimulationCommand]
     go t vc = fmap (SimulationTime t :) vc
