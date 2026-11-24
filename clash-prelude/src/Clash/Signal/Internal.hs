@@ -1192,9 +1192,9 @@ Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
-string refers to a single /synthesis domain/. A synthesis domain describes the
-behavior of certain aspects of memory elements in it.
+The parameter /dom/ is a Haskell type of kind 'Domain'. 'ClockDomainOf' maps a
+'KnownDomain' to its physical clock. 'KnownConf' describes the clock period,
+active edge, reset behavior and initial values for memory elements in /dom/.
 
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
 so do __not__ do that!
@@ -1481,29 +1481,29 @@ clockGen = tbClockGen (pure True)
 -- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Slow\", vPeriod=20}
 --
 -- topEntity
---   :: 'Clock' \"Fast\"
---   -> 'Reset' \"Fast\"
---   -> 'Enable' \"Fast\"
---   -> 'Clock' \"Slow\"
---   -> 'Signal' \"Fast\" (Unsigned 8)
---   -> 'Signal' \"Slow\" (Unsigned 8, Unsigned 8)
+--   :: 'Clock' Fast
+--   -> 'Reset' Fast
+--   -> 'Enable' Fast
+--   -> 'Clock' Slow
+--   -> 'Signal' Fast (Unsigned 8)
+--   -> 'Signal' Slow (Unsigned 8, Unsigned 8)
 -- topEntity clk1 rst1 en1 clk2 i =
 --   let h = register clk1 rst1 en1 0 (register clk1 rst1 en1 0 i)
 --       l = register clk1 rst1 en1 0 i
 --   in  unsafeSynchronizer clk1 clk2 (bundle (h, l))
 --
 -- testBench
---   :: 'Signal' \"Slow\" Bool
+--   :: 'Signal' Slow Bool
 -- testBench = done
 --   where
 --     testInput      = 'Clash.Explicit.Testbench.stimuliGenerator' clkA1 rstA1 $('Clash.Sized.Vector.listToVecTH' [1::Unsigned 8,2,3,4,5,6,7,8])
 --     expectedOutput = 'Clash.Explicit.Testbench.outputVerifier'   clkB2 rstB2 $('Clash.Sized.Vector.listToVecTH' [(0,0) :: (Unsigned 8, Unsigned 8),(1,2),(3,4),(5,6),(7,8)])
 --     done           = expectedOutput (topEntity clkA1 rstA1 enableGen clkB2 testInput)
 --     notDone        = not \<$\> done
---     clkA1          = 'tbClockGen' \@\"Fast\" (unsafeSynchronizer clkB2 clkA1 notDone)
---     clkB2          = 'tbClockGen' \@\"Slow\" notDone
---     rstA1          = 'Clash.Signal.resetGen' \@\"Fast\"
---     rstB2          = 'Clash.Signal.resetGen' \@\"Slow\"
+--     clkA1          = 'tbClockGen' \@Fast (unsafeSynchronizer clkB2 clkA1 notDone)
+--     clkB2          = 'tbClockGen' \@Slow notDone
+--     rstA1          = 'Clash.Signal.resetGen' \@Fast
+--     rstB2          = 'Clash.Signal.resetGen' \@Slow
 -- @
 tbClockGen
   :: KnownDomain testDom

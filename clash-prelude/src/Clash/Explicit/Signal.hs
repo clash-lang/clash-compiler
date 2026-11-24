@@ -10,40 +10,20 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 Clash has synchronous 'Signal's in the form of:
 
 @
-'Signal' (dom :: 'GHC.TypeLits.Symbol') a
+'Signal' (dom :: 'Domain') a
 @
 
 Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
-string refers to a single /synthesis domain/. A synthesis domain describes the
-behavior of certain aspects of memory elements in it. More specifically, a
-domain looks like:
+For synthesis, /dom/ is a data type with no constructors. It may have type
+parameters. For a 'KnownDomain', 'ClockDomainOf' identifies the physical
+clock that supplies its clock period,
+active edge, reset behavior and initial values. 'KnownConf' gives the complete
+'DomainConfiguration' for /dom/. Multiple domains may share a physical clock.
 
-@
-'DomainConfiguration'
-  { _name:: 'GHC.TypeLits.Symbol'
-  -- ^ Domain name
-  , _period :: 'GHC.TypeLits.Nat'
-  -- ^ Clock period in \/ps\/
-  , _edge :: 'ActiveEdge'
-  -- ^ Active edge of the clock
-  , _reset :: 'ResetKind'
-  -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-  , _init :: 'InitBehavior'
-  -- ^ Whether the initial (or "power up") value of memory elements is
-  -- unknown/undefined, or configurable to a specific value
-  , _polarity :: 'ResetPolarity'
-  -- ^ Whether resets are active high or active low
-  }
-@
-
-Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, instances of 'KnownClockDomain' and
-'KnownDomain' should be made. Clash provides a standard implementation, called
-'System', that is configured as follows:
+The built-in 'System' supplies its own clock configuration.
 
 @
 instance KnownClockDomain System where
@@ -88,8 +68,8 @@ types are encoded in a synthesis domain. For the following examples we assume
 the following exist:
 
 @
-'DomainConfiguration' \"SyncExample\" _period _edge 'Synchronous' _init
-'DomainConfiguration' \"AsyncExample\" _period _edge 'Asynchronous' _init
+'createDomain' 'vSystem'{vName=\"SyncExample\", vResetKind='Synchronous'}
+'createDomain' 'vSystem'{vName=\"AsyncExample\", vResetKind='Asynchronous'}
 @
 
 See the previous section on how to use domains.
@@ -100,7 +80,7 @@ can potentially introduce situations prone to meta-stability:
     *   /Reset situation 1/:
 
         @
-        f :: 'Reset' \"SyncExample\" -> 'Reset' \"SyncExample\" -> ..
+        f :: 'Reset' SyncExample -> 'Reset' SyncExample -> ..
         f x y = ..
         @
 
@@ -111,7 +91,7 @@ can potentially introduce situations prone to meta-stability:
     *   /Reset situation 2/:
 
         @
-        g :: 'Reset' \"AsyncExample\" -> 'Reset' \"AsyncExample\" -> ..
+        g :: 'Reset' AsyncExample -> 'Reset' AsyncExample -> ..
         g x y = ..
         @
 

@@ -16,33 +16,13 @@ Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
-string refers to a single /synthesis domain/. A synthesis domain describes the
-behavior of certain aspects of memory elements in it. More specifically, a
-domain looks like:
+For synthesis, /dom/ is a data type with no constructors. It may have type
+parameters. For a 'KnownDomain', 'ClockDomainOf' identifies the physical
+clock that supplies its clock period,
+active edge, reset behavior and initial values. 'KnownConf' gives the complete
+'DomainConfiguration' for /dom/. Multiple domains may share a physical clock.
 
-@
-'DomainConfiguration'
-  { _name :: 'Domain'
-  -- ^ Domain name
-  , _period :: 'Clash.Promoted.Nat.Nat'
-  -- ^ Clock period in \/ps\/
-  , _activeEdge :: 'ActiveEdge'
-  -- ^ Active edge of the clock
-  , _resetKind :: 'ResetKind'
-  -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-  , _initBehavior :: 'InitBehavior'
-  -- ^ Whether the initial (or "power up") value of memory elements is
-  -- unknown/undefined, or configurable to a specific value
-  , _resetPolarity :: ResetPolarity
-  -- ^ Whether resets are active high or active low
-  }
-@
-
-Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, instances of 'KnownClockDomain' and
-'KnownDomain' should be made. Clash provides an implementation 'System' with
-some common options chosen:
+The built-in 'System' supplies its own clock configuration.
 
 @
 instance KnownClockDomain System where
