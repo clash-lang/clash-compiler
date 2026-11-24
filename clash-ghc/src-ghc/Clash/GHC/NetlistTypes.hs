@@ -25,7 +25,7 @@ import Data.Ratio                       ((%))
 import Data.Text                        (pack, unpack)
 import Data.Text.Extra                  (showt)
 import Control.Arrow                    (second)
-import Control.Monad                    (void)
+import Control.Monad                    (unless, void)
 import Control.Monad.State.Strict       (State, modify)
 import Control.Monad.Trans.Class        (lift)
 import Control.Monad.Trans.Except
@@ -53,7 +53,7 @@ import Clash.Core.Type
   ( ConstTy(..), LitTy (..), Type (..), TypeView (..)
   , tyView, mkTyConApp
   )
-import Clash.GHC.Domain (normalizeDomain, normalizeDomainBounded)
+import Clash.GHC.Domain (isEmptyDomain, normalizeDomain, normalizeDomainBounded)
 import Clash.Core.Util                  (tyNatSize)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
@@ -423,11 +423,18 @@ domainConfig normalize ids m kind dom c = do
       resolveAt marker u = do
         tc <- maybe missing pure (UniqMap.lookup u m)
         normalize (mkTyConApp (tyConName tc) [marker])
+      checkMarker marker = unless (isEmptyDomain m marker) $
+        throwE $ "Cannot resolve clock domain " ++ showPpr marker
+              ++ ": expected a data type with no constructors"
   KnownDomainTyConUniques{..} <- maybe missing pure ids
   marker <- normalize dom
+  checkMarker marker
   cdom <- case kind of
     Physical -> pure marker
-    Logical -> resolveAt marker clockDomainOfTCU
+    Logical -> do
+      physical <- resolveAt marker clockDomainOfTCU
+      checkMarker physical
+      pure physical
   let resolve = resolveAt cdom
   period         <- domPeriod =<< resolve clockPeriodTCU
   frac           <- domPeriodFraction =<< resolve clockPeriodFractionTCU

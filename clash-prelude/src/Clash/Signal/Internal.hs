@@ -610,8 +610,8 @@ class
   type ClockPeriodFraction cdom :: Ratio Nat
   type ClockPeriodFraction cdom = 0 :% 1
 
--- | A 'KnownDomain' constraint indicates that a circuit's behavior depends on
--- some properties of a domain. See 'DomainConfiguration' for more information.
+-- | For synthesis, declare a domain as a data type with no constructors.
+-- It may have type parameters, as in the @Secure@ example below.
 --
 -- A 'Domain' is a more general concept than a physical clock domain: every
 -- domain designates a physical clock domain through 'ClockDomainOf', but

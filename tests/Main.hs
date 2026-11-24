@@ -390,6 +390,18 @@ runClashTest t3105Env = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Couldn't match type")
           }
+        , clashTestVariants "BareClock"
+          [ clashTestVariants target
+            [ runTest "InvalidClockPort" def{
+                hdlTargets=[VHDL]
+              , clashFlags=["-main-is", target]
+              , expectClashFail=Just (def, message)
+              }
+            ]
+          | (target, message) <-
+              [ ("populatedMarker", "expected a data type with no constructors")
+              ]
+          ]
         , runTest "MAC" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")

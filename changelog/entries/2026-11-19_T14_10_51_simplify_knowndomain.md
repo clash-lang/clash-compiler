@@ -6,7 +6,7 @@ prs: [3163]
 
 # Major Domain overhaul
 Clash's `Domain`-system has had a major overhaul. The most important changes are:
-- Domains are not longer `Symbol`s. Instead, they can be any type.
+- Synthesis domains are empty data types. Their type parameters can distinguish logical domains sharing a clock.
 - Domains are now split between a regular domain and a clock domain.
   The clock domain represents everything connected to the same hardware clock.
   Domains are built on top of these:

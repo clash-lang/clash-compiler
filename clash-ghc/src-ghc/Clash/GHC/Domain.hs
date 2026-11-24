@@ -2,7 +2,7 @@
 
 -- | Nominal type reduction shared by sameDomain and physical clock lookup.
 module Clash.GHC.Domain
-  ( normalizeDomain, normalizeDomainBounded, isConcreteDomain
+  ( isEmptyDomain, normalizeDomain, normalizeDomainBounded, isConcreteDomain
   ) where
 
 import Control.Monad.State.Strict (StateT(..), evalStateT)
@@ -10,7 +10,7 @@ import Data.Functor.Identity (runIdentity)
 
 import Clash.Core.HasType (inferCoreKindOf)
 import Clash.Core.Subst (substTyWith)
-import Clash.Core.TyCon (TyCon(..), TyConMap)
+import Clash.Core.TyCon (AlgTyConRhs(DataTyCon), TyCon(..), TyConMap)
 import Clash.Core.Type
   (Type(..), TypeView(..), TyVar, dataFamilyView, mkTyConApp,
    reduceTypeFamily, tyView)
@@ -64,6 +64,16 @@ matchTypes tcm = go []
     | Just FunTyCon{isDataFamily=False, tyConArity} <- UniqMap.lookup tc tcm =
         length args <= tyConArity
   stuckHead _ = False
+
+-- | A domain is an empty data declaration, possibly indexed. For a data
+-- family, inspect the representation of this particular instance.
+isEmptyDomain :: TyConMap -> Type -> Bool
+isEmptyDomain tcm (tyView -> TyConApp tc args) = case UniqMap.lookup tc tcm of
+  Just AlgTyCon{algTcRhs=DataTyCon []} -> True
+  Just FunTyCon{isDataFamily=True, tyConSubst} ->
+    maybe False (isEmptyDomain tcm) (matchDomainEquation tcm tyConSubst args)
+  _ -> False
+isEmptyDomain _ _ = False
 
 -- | Nominal domain identity retains newtypes and arrow multiplicities, and
 -- observes the source application of a data family rather than its representation.
