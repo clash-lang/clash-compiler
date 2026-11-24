@@ -1113,6 +1113,7 @@ runClashTest t3105Env = defaultMain
         , runTest "Oversample" def
             { hdlTargets = [Verilog, SystemVerilog] }
         , outputTest "ClockConfiguration" def{hdlTargets=[Verilog]}
+        , outputTest "PhysicalClockKeys" def{hdlTargets=[Verilog]}
         , runTest "SameDomain" def
         , runTest "RegisterAR" def
         , runTest "RegisterSR" def

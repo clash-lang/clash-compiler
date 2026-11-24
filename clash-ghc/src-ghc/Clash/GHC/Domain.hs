@@ -2,8 +2,11 @@
 
 -- | Nominal type reduction shared by sameDomain and physical clock lookup.
 module Clash.GHC.Domain
-  ( normalizeDomain, isConcreteDomain
+  ( normalizeDomain, normalizeDomainBounded, isConcreteDomain
   ) where
+
+import Control.Monad.State.Strict (StateT(..), evalStateT)
+import Data.Functor.Identity (runIdentity)
 
 import Clash.Core.HasType (inferCoreKindOf)
 import Clash.Core.Subst (substTyWith)
@@ -65,22 +68,33 @@ matchTypes tcm = go []
 -- | Nominal domain identity retains newtypes and arrow multiplicities, and
 -- observes the source application of a data family rather than its representation.
 normalizeDomain :: TyConMap -> Type -> Type
-normalizeDomain tcm = go
+normalizeDomain tcm = runIdentity . normalize (pure ()) tcm
+
+-- | Optional signal metadata must not require an unbounded family reduction.
+normalizeDomainBounded :: Int -> TyConMap -> Type -> Maybe Type
+normalizeDomainBounded budget tcm t =
+  evalStateT (normalize tick tcm t) budget
  where
-  go ty = case tyView ty of
-    TyConApp tc args ->
-      let args' = map go args
-          app = mkTyConApp tc args'
-      in case UniqMap.lookup tc tcm of
+  tick = StateT $ \remaining ->
+    if remaining > 0 then Just ((), remaining - 1) else Nothing
+
+normalize :: Monad m => m () -> TyConMap -> Type -> m Type
+normalize tick tcm = go
+ where
+  go ty = tick >> case tyView ty of
+    TyConApp tc args -> do
+      args' <- mapM go args
+      let app = mkTyConApp tc args'
+      case UniqMap.lookup tc tcm of
         Just FunTyCon{isDataFamily=False, tyConArity, tyConSubst}
           | length args' >= tyConArity
           , Just result <- reduce app tyConSubst args' -> go result
         _ | Just source <- dataFamilyView tcm app -> go source
-          | otherwise -> app
-    _ | AppTy f a <- ty -> AppTy (go f) (go a)
-    OtherType (ForAllTy v t) -> ForAllTy v (go t)
+          | otherwise -> pure app
+    _ | AppTy f a <- ty -> AppTy <$> go f <*> go a
+    OtherType (ForAllTy v t) -> ForAllTy v <$> go t
     OtherType (AnnType _ t) -> go t
-    _ -> ty
+    _ -> pure ty
 
   reduce app [] args
     | all isLiteral args = reduceTypeFamily tcm app

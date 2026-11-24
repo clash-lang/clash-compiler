@@ -55,10 +55,17 @@ By default, this is the same as the domain.
 Clock periods are now of the fractional type `Period`, rather than an integer number of picoseconds.
 
 # CHANGED
-`VDomainConfiguration` now uses stable names for the `vName` field. These are also used
-in the manifest.
+In `clash-manifest.json`, use a clock port's `domain` field to look up its
+physical clock in `domains`. Keys include the qualified type identity.
+Whole periods are JSON numbers. For a fractional period, divide the object's
+`numerator` by its `denominator` to obtain picoseconds.
+
+In blackbox templates, `~TAG[n]` expands to the qualified manifest key for
+the physical clock domain of argument `n`. The key can contain punctuation
+and spaces. For a local HDL identifier, use `~GENSYM[monitor][0]` at its
+declaration and `~SYM[0]` at each reference.
 
 # CHANGED
-It was previously possible to create signals with "fake" domains,
-as long as the domain details were never needed (i.e. there were no clocks etc. for the domain).
-This is no longer the case.
+Signals and bidirectional pins can carry data without a clock configuration. When
+Clash can resolve their physical clock, it records that clock in the manifest.
+Clock ports require a resolvable configuration.
