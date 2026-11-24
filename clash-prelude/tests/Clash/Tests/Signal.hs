@@ -27,7 +27,9 @@ import           Clash.Explicit.Testbench       (biTbClockGen)
 import           Clash.Prelude                  hiding (sample)
 
 import           Clash.Signal.Internal
-  (ClockAB(..), clockTicks, Femtoseconds(..), dynamicClockGen, sample, head#, tbDynamicClockGen)
+  (ClockAB(..), clockTicks, Femtoseconds(..), dynamicClockGen, hzToFs, sample, head#,
+   SRatioNat(..), sDomainPeriod, tbDynamicClockGen)
+import           GHC.Real (Ratio((:%)))
 
 import           Control.Arrow.Transformer.Automaton
   (Automaton(..))
@@ -90,7 +92,10 @@ tests =
       , testCase "satPred SatBound" case_satPredSatBound
       ]
     , testGroup "unsafeSynchronizer"
-      [ testCase "static testbench clock with synchronized enable" $
+      [ testCase "static fractional clock edges" $
+          P.take 5 (clockTicks (clockGen @F1) (clockGen @FractionalClock))
+            @?= [ClockAB, ClockA, ClockB, ClockA, ClockB]
+      , testCase "static testbench clock with synchronized enable" $
           let (testClk, circuitClk) = biTbClockGen @F1 @F6 (pure True)
           in P.take 5 (clockTicks testClk circuitClk)
                @?= [ClockAB, ClockA, ClockA, ClockA, ClockA]
@@ -131,6 +136,12 @@ tests =
     , testCase "read rejects zero clock period denominators" $
         mapM_ (\s -> readMaybe @E.Period s @?= Nothing)
           ["1 % 0", "1/0 ps", "2 + 1/0 ps"]
+    , testCase "clock fractions need not be in lowest terms" $ do
+        let period :: SRatioNat f -> E.Period
+            period f = sDomainPeriod (SDomainConfiguration (SNat @2) f
+                                       SRising SAsynchronous SDefined SActiveHigh)
+        period (SRatioNat :: SRatioNat (2 :% 4)) @?= 2.5
+        period (SRatioNat :: SRatioNat (0 :% 7)) @?= 2
     , testGroup "switchDomain"
       [ testCase "into virtual domain" case_switchDomainInto
       , testCase "out of virtual domain" case_switchDomainOutOf
@@ -161,11 +172,8 @@ case_dynamicStaticEq = do
     clk11 = clockGen @H11
     clk77 = clockGen @H77
 
-    -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
-    -- of using 'hzToFs'), to prevent rounding errors between periods of the
-    -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (1000 * floor (hzToPeriod @Rational 11))
-    fs77 = Femtoseconds (1000 * floor (hzToPeriod @Rational 77))
+    fs11 = hzToFs 11
+    fs77 = hzToFs 77
 
     dclk11 = dynamicClockGen @H11 (pure fs11)
     dclk77 = dynamicClockGen @H77 (pure fs77)
@@ -217,11 +225,8 @@ case_dynamicHasEffect = do
   let
     sampleMagicN = P.take 500 . sample
 
-    -- We construct periods in a roundabout way (i.e., using 'hzToPeriod' instead
-    -- of using 'hzToFs'), to prevent rounding errors between periods of the
-    -- static clocks and the periods of the dynamic clocks.
-    fs11 = Femtoseconds (1000 * floor (hzToPeriod @Rational 11))
-    fs77lying = Femtoseconds (1000 * floor (hzToPeriod @Rational 78))
+    fs11 = hzToFs 11
+    fs77lying = hzToFs 78
 
     clk11 = clockGen @H11
     clk77 = clockGen @H77

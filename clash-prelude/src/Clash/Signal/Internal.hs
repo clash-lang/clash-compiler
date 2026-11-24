@@ -61,6 +61,7 @@ module Clash.Signal.Internal
   , KnownConf
   , KnownConfiguration
   , knownDomain
+  , sDomainPeriod
   , KnownResetPolarity(..)
   , KnownInitBehavior(..)
   , KnownResetKind(..)
@@ -911,7 +912,7 @@ vDomain ::
   VDomainConfiguration
 vDomain cfg@SDomainConfiguration{} = VDomainConfiguration
   { vName = show $ typeRep @dom
-  , vPeriod = snatToNum cfg.sPeriod + periodFraction cfg.sPeriodFraction
+  , vPeriod = sDomainPeriod cfg
   , vActiveEdge = case cfg.sActiveEdge of
       SRising -> Rising
       SFalling -> Falling
@@ -925,6 +926,11 @@ vDomain cfg@SDomainConfiguration{} = VDomainConfiguration
       SActiveHigh -> ActiveHigh
       SActiveLow -> ActiveLow
   }
+
+-- | Clock period in picoseconds, including the fractional part.
+sDomainPeriod :: SDomainConfiguration dom conf -> Period
+sDomainPeriod cfg@SDomainConfiguration{} =
+  snatToNum cfg.sPeriod + periodFraction cfg.sPeriodFraction
  where
   periodFraction :: forall (srn :: Ratio Nat). SRatioNat srn -> Period
   periodFraction SRatioNat = Period
@@ -2575,9 +2581,10 @@ clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
   toEither (Clock maybePeriods)
     | Just periods <- maybePeriods =
         Right (unFemtosecondsSignal periods)
-    | SDomainConfiguration{sPeriod} <- knownDomain @dom =
-        -- Convert to femtoseconds - dynamic clocks use them
-        Left (1000 * snatToNum sPeriod)
+    | otherwise =
+        -- Dynamic clocks count femtoseconds. Quantize only after scaling
+        -- the entire period, including its fractional picoseconds.
+        Left (floor (1000 * sDomainPeriod (knownDomain @dom)))
 
   -- Coerce whole signal instead of `fmap coerce` to prevent useless constructor
   -- packing and unpacking.
