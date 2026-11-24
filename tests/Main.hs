@@ -378,7 +378,11 @@ runClashTest t3105Env = defaultMain
           }
         ]
       , clashTestGroup "Signal"
-        [ runTest "MAC" def{
+        [ runTest "FractionalDDR" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Couldn't match type")
+          }
+        , runTest "MAC" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
           }

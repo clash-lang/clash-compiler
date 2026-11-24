@@ -49,7 +49,7 @@ iddr
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => BitPack a
   => Clock dom
@@ -68,7 +68,7 @@ iddr#
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => KnownNat n
   => Clock dom
@@ -95,7 +95,7 @@ oddr
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => BitPack a
   => Clock dom
@@ -114,7 +114,7 @@ oddr#
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => KnownNat n
   => Clock dom

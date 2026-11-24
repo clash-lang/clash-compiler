@@ -104,6 +104,7 @@ module Clash.Signal
     -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction
+  , DomainPeriodMultiple
   , DomainActiveEdge
   , DomainResetKind
   , DomainInitBehavior

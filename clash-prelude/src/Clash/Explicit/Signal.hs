@@ -173,6 +173,7 @@ module Clash.Explicit.Signal
     -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction
+  , DomainPeriodMultiple
   , DomainActiveEdge
   , DomainResetKind
   , DomainInitBehavior

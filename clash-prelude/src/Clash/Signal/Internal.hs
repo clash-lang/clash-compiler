@@ -70,6 +70,7 @@ module Clash.Signal.Internal
   -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction
+  , DomainPeriodMultiple
   , DomainActiveEdge
   , DomainResetKind
   , DomainInitBehavior
@@ -658,6 +659,11 @@ type PeriodNumerator dom = ScaledPeriod (DomainPeriod dom) (DomainPeriodFraction
 -- decompose the arithmetic in a polymorphic ClockDivider constraint.
 type family ScaledPeriod (whole :: Nat) (fraction :: Ratio Nat) :: Nat where
   ScaledPeriod whole (n :% d) = whole * d + n
+
+-- | The period of @slow@ is exactly @n@ times the period of @fast@.
+type DomainPeriodMultiple slow n fast =
+  (PeriodNumerator slow * PeriodDenominator fast)
+    ~ (n * PeriodNumerator fast * PeriodDenominator slow)
 
 -- | The active clock edge associated with @dom@
 type DomainActiveEdge (dom :: Domain) =

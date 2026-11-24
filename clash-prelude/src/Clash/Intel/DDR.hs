@@ -47,7 +47,7 @@ altddioIn
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => BitPack a
   => SSymbol deviceFamily
@@ -72,7 +72,7 @@ altddioIn#
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => KnownNat n
   => SSymbol deviceFamily
@@ -99,7 +99,7 @@ altddioOut
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => BitPack a
   => SSymbol deviceFamily
@@ -124,7 +124,7 @@ altddioOut#
    . HasCallStack
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
+  => DomainPeriodMultiple dom 2 domDDR
   => DomainActiveEdge dom ~ 'Rising
   => KnownNat n
   => SSymbol deviceFamily
