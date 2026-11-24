@@ -58,6 +58,7 @@ module Clash.Signal.Internal
   , switchEnableDomain#
   , KnownDomain
   , ClockDomainOf
+  , SameClockDomain(..)
   , clockDomainOfSelf
   , KnownClockDomain(..)
   , KnownConf
@@ -72,6 +73,11 @@ module Clash.Signal.Internal
   -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction
+  , PeriodNumerator
+  , PeriodDenominator
+  , ScaledPeriod
+  , Numerator
+  , Denominator
   , DomainPeriodMultiple
   , DomainActiveEdge
   , DomainResetKind
@@ -591,6 +597,10 @@ type KnownConf dom = 'DomainConfiguration dom
 -- clock configuration only needs this equation and a 'KnownClockDomain' instance.
 type family ClockDomainOf (dom :: Domain) :: ClockDomain
 
+-- | Equality evidence for a physical clock domain and its 'ClockDomainOf'
+-- projection.
+-- Use 'clockDomainOfSelf' to obtain the equality supplied by 'KnownClockDomain'.
+--
 -- Keep the proof in a dictionary field. A bare equality superclass makes
 -- GHC treat every hidden-clock continuation as a GADT match, preventing
 -- it from inferring the result type of e.g. withClock clk (register ...).
@@ -671,12 +681,16 @@ type DomainPeriod (dom :: Domain) =
 type DomainPeriodFraction (dom :: Domain) =
   ClockPeriodFraction (ClockDomainOf dom)
 
--- Express the complete period as a ratio without requiring the fraction in
--- a user-defined clock configuration to be in lowest terms.
+-- | Denominator of the complete clock period in picoseconds. The ratio need
+-- not be in lowest terms; use together with 'PeriodNumerator'.
 type PeriodDenominator dom = Denominator (DomainPeriodFraction dom)
+
+-- | Numerator of the complete clock period in picoseconds. Includes both the
+-- whole and fractional parts; use together with 'PeriodDenominator'.
 type PeriodNumerator dom = ScaledPeriod (DomainPeriod dom) (DomainPeriodFraction dom)
 
--- Wait for the fraction to be known before asking the KnownNat solver to
+-- | Numerator of a whole period plus a fractional period. Wait for the
+-- fraction to be known before asking the KnownNat solver to
 -- decompose the arithmetic in a polymorphic ClockDivider constraint.
 type family ScaledPeriod (whole :: Nat) (fraction :: Ratio Nat) :: Nat where
   ScaledPeriod whole (n :% d) = whole * d + n

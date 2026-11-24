@@ -153,6 +153,7 @@ module Clash.Explicit.Signal
   , clockDomainOfSelf
   , KnownClockDomain(..)
   , KnownConfiguration
+  , KnownConf
     -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction

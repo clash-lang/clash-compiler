@@ -84,6 +84,7 @@ module Clash.Signal
   , clockDomainOfSelf
   , KnownClockDomain(..)
   , KnownConfiguration
+  , KnownConf
     -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction
