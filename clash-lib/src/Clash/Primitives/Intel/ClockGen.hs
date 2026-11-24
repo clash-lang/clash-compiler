@@ -16,6 +16,7 @@ module Clash.Primitives.Intel.ClockGen where
 
 import Control.Monad.State
 import Data.List (zip4)
+import Data.Ratio (numerator, denominator)
 import Data.List.Infinite (Infinite(..), (...))
 import Data.Maybe (fromMaybe)
 import Data.Text.Prettyprint.Doc.Extra
@@ -154,9 +155,11 @@ altpllQsysTemplate bbCtx
     clkFreq p = periodToHz p / 1e6 :: Double
 
     clkOutPeriods = map clkPeriod kdOuts
-    clkLcms = map (lcm clkInPeriod) clkOutPeriods
-    clkMults = zipWith quot clkLcms clkOutPeriods
-    clkDivs = map (`quot` clkInPeriod) clkLcms
+    ratios = map ((toRational clkInPeriod /) . toRational) clkOutPeriods
+    clkMults = map numerator ratios
+    clkDivs = map denominator ratios
+    -- ALTPLL takes its input period in integer picoseconds.
+    clkInPeriodPs = round clkInPeriod :: Integer
     clkOutFreqs = map clkFreq clkOutPeriods
 
     qsysParams = TextS.intercalate "\n  "
@@ -215,7 +218,7 @@ altpllQsysTemplate bbCtx
         <parameter name="BANDWIDTH_TYPE" value="AUTO" />
         #{qsysParams}
         <parameter name="COMPENSATE_CLOCK" value="CLK0" />
-        <parameter name="INCLK0_INPUT_FREQUENCY" value="#{clkInPeriod}" />
+        <parameter name="INCLK0_INPUT_FREQUENCY" value="#{clkInPeriodPs}" />
         <parameter name="OPERATION_MODE" value="NORMAL" />
         <parameter name="PLL_TYPE" value="AUTO" />
         <parameter name="PORT_ARESET" value="PORT_USED" />
@@ -229,7 +232,7 @@ altpllQsysTemplate bbCtx
           CT\#PLL_TYPE AUTO
           CT\#OPERATION_MODE NORMAL
           CT\#COMPENSATE_CLOCK CLK0
-          CT\#INCLK0_INPUT_FREQUENCY #{clkInPeriod}
+          CT\#INCLK0_INPUT_FREQUENCY #{clkInPeriodPs}
           CT\#PORT_INCLK0 PORT_USED
           CT\#PORT_ARESET PORT_USED
           CT\#BANDWIDTH_TYPE AUTO

@@ -1348,6 +1348,8 @@ runClashTest t3105Env = defaultMain
             }
           ]
         ]
+      , clashTestGroup "Intel"
+        [ outputTest "AltPll" def{hdlTargets=[Verilog]} ]
       , clashTestGroup "Xilinx"
         [ let _opts = def{ hdlLoad=[Vivado]
                          , hdlSim=[Vivado]
