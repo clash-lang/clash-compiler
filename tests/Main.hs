@@ -1052,6 +1052,16 @@ runClashTest t3105Env = defaultMain
         , runTest "HoldResetAsync" def
         , runTest "HoldResetSync" def
         , runTest "ResetGen" def
+        , runTest "FractionalClockTiming" def
+        , clashTestVariants "ClockPrecision"
+          [ clashTestVariants precision
+            [ runTest "FractionalClockTiming" def
+                { hdlTargets = [Verilog, SystemVerilog]
+                , clashFlags = ["-fclash-timescale-precision", precision]
+                }
+            ]
+          | precision <- ["10fs", "1fs"]
+          ]
         ,
           -- TODO: we do not support memory files in Vivado
           --

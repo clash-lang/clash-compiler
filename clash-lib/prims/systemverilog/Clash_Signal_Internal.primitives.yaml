@@ -96,8 +96,8 @@
     template: |-
       // ~IF~ISACTIVEENABLE[1]~THENtbClockGen~ELSEclockGen~FI begin
       // pragma translate_off
-      // 1 = 0.1ps
-      localparam ~GENSYM[half_period][0] = (~PERIOD[0]0 / 2);
+      // Parse the period as whole femtoseconds before converting to 100 fs units.
+      localparam realtime ~GENSYM[clock_period][0] = ~PERIOD[0]e3 * 0.01;
       always begin
         ~RESULT = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
         #~LONGESTPERIOD0 forever begin
@@ -110,9 +110,12 @@
           end
           ~ELSE~FI
           ~RESULT = ~ ~RESULT;
-          #~SYM[0];
-          ~RESULT = ~ ~RESULT;
-          #~SYM[0];
+          // Schedule both delays from the active edge so that rounding the
+          // half period to simulator precision cannot change the full period.
+          fork
+            #(~SYM[0] / 2.0) ~RESULT = ~ ~RESULT;
+            #~SYM[0];
+          join
         end
       end
       // pragma translate_on
@@ -167,10 +170,12 @@
     template: |-
       // resetGen begin
       // pragma translate_off
-      localparam ~GENSYM[reset_period][0] = ~LONGESTPERIOD0 - 10 + (~LIT[2] * ~PERIOD[0]0);
+      localparam realtime ~GENSYM[clock_period][0] = ~PERIOD[0]e3 * 0.01;
       initial begin
         #1 ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
-        #~SYM[0] ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
+        #(~LONGESTPERIOD0 - 10);
+        repeat (~LIT[2]) #~SYM[0];
+        ~RESULT = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
       end
       // pragma translate_on
       // resetGen end

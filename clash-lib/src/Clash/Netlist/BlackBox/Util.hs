@@ -51,6 +51,7 @@ import           Data.Bitraversable              (bitraverse)
 import           Data.Bool                       (bool)
 import           Data.Coerce                     (coerce)
 import           Data.Containers.ListUtils       (nubOrd)
+import           Data.Fixed                      (Fixed(MkFixed), E3, showFixed)
 import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.HashMap.Strict             as HashMap
@@ -596,11 +597,8 @@ renderElem b (Period n) = do
   let (_, ty, _) = bbInputs b !! n
   case stripVoid ty of
     KnownDomain dom ->
-      -- TODO: better utilize the fact that periods are of type
-      -- rational now. We should not rely on blindly appending `0`s in
-      -- the primitive files for creating a multiple of the period any
-      -- more, but use more precise numbers instead.
-      return $ const $ Text.pack $ show $ toInteger $ vPeriod dom
+      let ps = MkFixed (floor (1000 * vPeriod dom)) :: Fixed E3
+      in return $ const $ Text.pack $ showFixed True ps
     _ ->
       error $ $(curLoc) ++ "Period: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
 
