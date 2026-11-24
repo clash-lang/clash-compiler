@@ -130,6 +130,9 @@ fractionalClocks = do
                  (pure 0) (pure True) (pure 0) (fromList [1 :: Int ..])
   sampleN 8 (maybeIsX <$> values) @?=
     [Nothing, Just 1, Just 2, Just 3, Just 4, Just 4, Just 5, Just 6]
+  [snatToNum (SNat @(DomainToHz WriteDom)), snatToNum (SNat @(DomainToHz ReadDom))]
+    @?= L.map (floor @Rational @Integer . periodToHz . vPeriod) [vWriteDom, vReadDom]
+  snatToNum (SNat @(PeriodToCycles WriteDom 5)) @?= (2 :: Integer)
 
 tests :: TestTree
 tests = testGroup "Ram"

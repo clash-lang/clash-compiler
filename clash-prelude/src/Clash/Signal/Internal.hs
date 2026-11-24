@@ -230,7 +230,7 @@ import GHC.Magic                  (noinline)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.Types                  (Type)
 import GHC.TypeError              (Assert, TypeError, ErrorMessage(..))
-import GHC.TypeLits               (Div, KnownNat, Nat, type (<=), type (*), type (-))
+import GHC.TypeLits               (Div, KnownNat, Nat, type (<=), type (+), type (*), type (-))
 import GHC.TypeLits.Extra         (DivRU)
 import GHC.Real                   (Ratio(..), (%), ratioPrec)
 import GHC.Records                (HasField(getField))
@@ -476,13 +476,14 @@ type Picoseconds  (ps :: Nat) = ps
 -- errors.
 type HzToPeriod (hz :: Nat) = Seconds 1 `Div` hz
 
--- | The domain's clock frequency in hertz, calculated based on the period stored in
--- picoseconds. This might lead to rounding errors.
-type DomainToHz (dom :: Domain) = PeriodToHz (DomainPeriod dom)
+-- | The domain's clock frequency in hertz, rounded down to a whole hertz.
+type DomainToHz (dom :: Domain) =
+  (Seconds 1 * PeriodDenominator dom) `Div` PeriodNumerator dom
 
 -- | Number of clock cycles required at the clock frequency of @dom@ before a minimum
--- @period@ has passed
-type PeriodToCycles (dom :: Domain) (period :: Nat) =  period `DivRU` DomainPeriod dom
+-- @period@ in picoseconds has passed, rounded up to a whole cycle.
+type PeriodToCycles (dom :: Domain) (period :: Nat) =
+  (period * PeriodDenominator dom) `DivRU` PeriodNumerator dom
 
 -- | Converts a period in picoseconds to a frequency in hertz. This might lead to rounding
 -- errors.
@@ -647,6 +648,16 @@ type DomainPeriod (dom :: Domain) =
 -- | The rational fraction of the clock period associated with @dom@
 type DomainPeriodFraction (dom :: Domain) =
   ClockPeriodFraction (ClockDomainOf dom)
+
+-- Express the complete period as a ratio without requiring the fraction in
+-- a user-defined clock configuration to be in lowest terms.
+type PeriodDenominator dom = Denominator (DomainPeriodFraction dom)
+type PeriodNumerator dom = ScaledPeriod (DomainPeriod dom) (DomainPeriodFraction dom)
+
+-- Wait for the fraction to be known before asking the KnownNat solver to
+-- decompose the arithmetic in a polymorphic ClockDivider constraint.
+type family ScaledPeriod (whole :: Nat) (fraction :: Ratio Nat) :: Nat where
+  ScaledPeriod whole (n :% d) = whole * d + n
 
 -- | The active clock edge associated with @dom@
 type DomainActiveEdge (dom :: Domain) =
