@@ -5,12 +5,9 @@ import           System.Environment           (getArgs)
 import           Data.Binary (encode)
 import qualified Data.ByteString.Lazy as B
 import           Data.List                    (partition)
-import           Data.HashMap.Lazy            (HashMap)
-import           Data.Text                    (Text)
 
 import           Clash.Driver.Types           (ClashEnv(..), ClashDesign(..))
 import           Clash.Netlist.Types          (TopEntityT(topId))
-import           Clash.Signal.Internal        (VDomainConfiguration(..))
 
 import           SerialiseInstances
 import           BenchmarkCommon
@@ -42,10 +39,10 @@ prepareFile idirs fIn = do
                    , envCustomReprs clashEnv
                    , topNames
                    , topName
-                   , (mempty :: HashMap Text VDomainConfiguration) --TODO --envDomains clashEnv
+                   , envDomainTCUs clashEnv
                    )
 
       putStrLn $ "Serialising to : " ++ fOut
-      B.writeFile fOut $ encode inputs
+      B.writeFile fOut $ encode (inputs :: NormalizationInputs)
       putStrLn "Done"
     _ -> error "no top entities"

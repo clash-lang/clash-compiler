@@ -79,7 +79,7 @@ data KnownDomainTyConUniques = KnownDomainTyConUniques
   , clockInitBehaviorTCU   :: Unique
   , clockResetPolarityTCU  :: Unique
   , clockPeriodFractionTCU :: Unique
-  } deriving (Generic, NFData)
+  } deriving (Generic, NFData, Binary)
 
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
