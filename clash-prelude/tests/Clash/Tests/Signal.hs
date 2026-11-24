@@ -113,6 +113,8 @@ tests =
       , testCase "case_F1_F6" case_F1_F6
       , testCase "case_F6_F1" case_F6_F1
       ]
+    , testCase "periodToHz result type application" $
+        periodToHz @Double (10000 :: Natural) @?= 1e8
     , testCase "read and show clock configurations" $
         mapM_ (\cfg -> readMaybe (show cfg) @?= Just cfg)
           [vSystem, vFractionalClock, vSystem{vPeriod=1/2}]

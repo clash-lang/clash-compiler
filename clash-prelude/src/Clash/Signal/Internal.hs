@@ -2480,26 +2480,14 @@ hzToFs freq
 -- >>> periodToHz 5000
 -- 2.0e8
 --
--- Note that if @p@ in @periodToHz ('fromIntegral' p)@ is negative,
--- @fromIntegral@ will give an @'Control.Exception.Underflow' ::
--- t'Control.Exception.ArithException'@ without a call stack, making debugging
--- cumbersome.
+-- Before Clash 1.8, this function returned a 'Ratio' 'Natural'. Use a type
+-- application to select that result for a period in whole picoseconds:
 --
--- Before Clash 1.12, this function always received a 'Natural'. To get the
--- old behavior of the function use a type application:
---
--- >>> periodToHz @Natural 5000
--- 2.0e8
---
--- Before Clash 1.8, this function always received a 'Natural' and returned a
--- 'Ratio' 'Natural'. To get the old behavior of the function use type
--- applications:
---
--- >>> periodToHz @Natural @(Ratio Natural) 5000
+-- >>> periodToHz @(Ratio Natural) (5000 :: Natural)
 -- 200000000 % 1
 --
 -- __NB__: This function is not synthesizable
-periodToHz :: (HasCallStack, Real a, Fractional b) => a -> b
+periodToHz :: forall hz period. (HasCallStack, Fractional hz, Real period) => period -> hz
 periodToHz period
   | period > 0 = fromRational $ 1.0 / (toRational period * 1e-12)
   | otherwise  = withFrozenCallStack $ error "Zero period"
