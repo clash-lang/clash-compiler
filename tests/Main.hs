@@ -822,6 +822,7 @@ runClashTest = defaultMain
         , outputTest "StructFieldNames" def{hdlTargets=[SystemVerilog]}
         , runTest "ConstructorComments" def{hdlSim=[]}
         , outputTest "ConstructorComments" def
+        , outputTest "SpecializeLetPortNames" def{hdlTargets=[Verilog]}
         ]
       , clashTestGroup "Netlist"
           [ clashLibTest "Identity" def
