@@ -1155,6 +1155,7 @@ runClashTest t3105Env = defaultMain
         ]
       , clashTestGroup "Types"
         [ runTest "TypeFamilyReduction" def{hdlSim=[]}
+        , runTest "PolykindedDataFamily" def
         , runTest "NatExp" def{hdlSim=[]}
         ]
       , clashTestGroup "TopEntity"

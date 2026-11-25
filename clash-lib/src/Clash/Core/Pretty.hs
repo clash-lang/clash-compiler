@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
-                     2021-2022, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -262,7 +262,7 @@ instance ClashPretty Type where
 
 instance PrettyPrec TyCon where
   pprPrec prec t = case t of
-    AlgTyCon _ nm kn _ (DataTyCon dcs) _ -> do
+    AlgTyCon _ nm kn _ (DataTyCon dcs) _ _ -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
@@ -276,7 +276,7 @@ instance PrettyPrec TyCon where
 
         pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> ty))
 
-    AlgTyCon _ nm kn _ (NewTyCon dc _) _ -> do
+    AlgTyCon _ nm kn _ (NewTyCon dc _) _ _ -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
