@@ -28,7 +28,7 @@ Clock domains are now implemented through `KnownClockDomain`, which has types
 `ClockPeriod`, `ClockActiveEdge`, `ClockResetKind`, `ClockInitBehavior`, `ClockResetPolarity`, and `ClockPeriodFraction`.
 
 # ADDED
-Similar to `knownDomain`, the functions `knownActiveEdge`, `knownResetKind`, `knownInitBehavior`, `knownResetPolarity` and `knownFraction`
+Similar to `knownClockDomain`, the functions `knownActiveEdge`, `knownResetKind`, `knownInitBehavior`, `knownResetPolarity` and `knownFraction`
 can now be used to obtain singleton versions of domain parameters.
 
 # ADDED
@@ -43,7 +43,7 @@ and `switchHiddenClockResetEnableDomain`.
 `Domain` is now of kind `Type` instead of `Symbol`.
 
 # CHANGED
-`knownDomain` is no longer a class method of `KnownDomain`.
+`knownClockDomain` is no longer a class method of `KnownDomain`.
 
 # CHANGED
 Domains no longer specify the hardware parameters directly.
@@ -51,10 +51,10 @@ The open type family `ClockDomainOf` selects the physical clock for each logical
 Its result must have a `KnownClockDomain` instance. A physical clock maps to itself.
 
 Clock domains are now Haskell types. Replace `Signal "System" a` with
-`Signal System a`. For a custom domain, `createDomain vSystem{vName="Fast"}`
+`Signal System a`. For a custom domain, `createClockDomain vSystem{vName="Fast"}`
 declares the type and its instances. To migrate a handwritten `KnownDomain`
 instance, declare `data Fast`, set `type instance ClockDomainOf Fast = Fast`,
-move the clock properties from `KnownConf` to the associated types of
+move the clock properties from `KnownClockConf` to the associated types of
 `KnownClockDomain Fast`, and add `instance KnownDomain Fast`.
 
 # CHANGED
@@ -62,7 +62,7 @@ move the clock properties from `KnownConf` to the associated types of
 Use `hzToPeriod @Period freq` for an exact period or
 `floor (hzToPeriod @Period freq)` for the former whole-picosecond result.
 `clockPeriod @dom` gives the whole picoseconds. Use
-`vPeriod (knownVDomain @dom)` for the complete period.
+`vPeriod (knownVClockDomain @dom)` for the complete period.
 
 # CHANGED
 In `clash-manifest.json`, use a clock port's `domain` field to look up its
@@ -79,3 +79,6 @@ declaration and `~SYM[0]` at each reference.
 Signals and bidirectional pins can carry data without a clock configuration. When
 Clash can resolve their physical clock, it records that clock in the manifest.
 Clock ports require a resolvable configuration.
+
+# CHANGED
+The clock-configuration API now uses `ClockDomainConfiguration`, `SClockDomainConfiguration`, and `VClockDomainConfiguration`. The related accessors and helpers use clock-domain names too: `KnownClockConf`, `KnownClockConfiguration`, `knownClockDomain`, `knownVClockDomain`, `vClockDomain`, `sClockDomainPeriod`, and `createClockDomain`.

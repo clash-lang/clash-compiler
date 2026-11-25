@@ -61,10 +61,10 @@ module Clash.Signal.Internal
   , SameClockDomain(..)
   , clockDomainOfSelf
   , KnownClockDomain(..)
-  , KnownConf
-  , KnownConfiguration
-  , knownDomain
-  , sDomainPeriod
+  , KnownClockConf
+  , KnownClockConfiguration
+  , knownClockDomain
+  , sClockDomainPeriod
   , KnownResetPolarity(..)
   , KnownInitBehavior(..)
   , KnownResetKind(..)
@@ -92,17 +92,17 @@ module Clash.Signal.Internal
   , ResetPolarity(..)
   , SResetPolarity(..)
   , SRatioNat(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
+  , ClockDomainConfiguration(..)
+  , SClockDomainConfiguration(..)
   , SupportsSwitchingTo
   , EligibleDomainSwitch
   -- ** Configuration type families
-  , DomainConfigurationPeriod
-  , DomainConfigurationPeriodFraction
-  , DomainConfigurationActiveEdge
-  , DomainConfigurationResetKind
-  , DomainConfigurationInitBehavior
-  , DomainConfigurationResetPolarity
+  , ClockDomainConfigurationPeriod
+  , ClockDomainConfigurationPeriodFraction
+  , ClockDomainConfigurationActiveEdge
+  , ClockDomainConfigurationResetKind
+  , ClockDomainConfigurationInitBehavior
+  , ClockDomainConfigurationResetPolarity
   -- *** Convenience types
   , HasSynchronousReset
   , HasAsynchronousReset
@@ -128,9 +128,9 @@ module Clash.Signal.Internal
   , vIntelSystem
   , vXilinxSystem
     -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , createDomain
+  , VClockDomainConfiguration(..)
+  , vClockDomain
+  , createClockDomain
     -- * Clocks
   , Clock (..)
   , ClockN (..)
@@ -374,8 +374,8 @@ instance Show (SInitBehavior init) where
 --
 -- See module documentation of "Clash.Explicit.Signal" for more information on
 -- how to create custom synthesis domains.
-data DomainConfiguration
-  = DomainConfiguration
+data ClockDomainConfiguration
+  = ClockDomainConfiguration
   { _name :: Domain
   -- ^ Domain name
   , _period :: Nat
@@ -397,34 +397,34 @@ data DomainConfiguration
 #endif
 
 -- | Helper type family for 'DomainPeriod'
-type family DomainConfigurationPeriod (config :: DomainConfiguration) :: Nat where
-  DomainConfigurationPeriod
-    ('DomainConfiguration name period fraction edge reset init polarity) = period
+type family ClockDomainConfigurationPeriod (config :: ClockDomainConfiguration) :: Nat where
+  ClockDomainConfigurationPeriod
+    ('ClockDomainConfiguration name period fraction edge reset init polarity) = period
 
 -- | Helper type family for 'DomainPeriodFraction'
-type family DomainConfigurationPeriodFraction (config :: DomainConfiguration) :: Ratio Nat where
-  DomainConfigurationPeriodFraction
-    ('DomainConfiguration name period fraction edge reset init polarity) = fraction
+type family ClockDomainConfigurationPeriodFraction (config :: ClockDomainConfiguration) :: Ratio Nat where
+  ClockDomainConfigurationPeriodFraction
+    ('ClockDomainConfiguration name period fraction edge reset init polarity) = fraction
 
 -- | Helper type family for 'DomainActiveEdge'
-type family DomainConfigurationActiveEdge (config :: DomainConfiguration) :: ActiveEdge where
-  DomainConfigurationActiveEdge
-    ('DomainConfiguration name period fraction edge reset init polarity) = edge
+type family ClockDomainConfigurationActiveEdge (config :: ClockDomainConfiguration) :: ActiveEdge where
+  ClockDomainConfigurationActiveEdge
+    ('ClockDomainConfiguration name period fraction edge reset init polarity) = edge
 
 -- | Helper type family for 'DomainResetKind'
-type family DomainConfigurationResetKind (config :: DomainConfiguration) :: ResetKind where
-  DomainConfigurationResetKind
-    ('DomainConfiguration name period fraction edge reset init polarity) = reset
+type family ClockDomainConfigurationResetKind (config :: ClockDomainConfiguration) :: ResetKind where
+  ClockDomainConfigurationResetKind
+    ('ClockDomainConfiguration name period fraction edge reset init polarity) = reset
 
 -- | Helper type family for 'DomainInitBehavior'
-type family DomainConfigurationInitBehavior (config :: DomainConfiguration) :: InitBehavior where
-  DomainConfigurationInitBehavior
-    ('DomainConfiguration name period fraction edge reset init polarity) = init
+type family ClockDomainConfigurationInitBehavior (config :: ClockDomainConfiguration) :: InitBehavior where
+  ClockDomainConfigurationInitBehavior
+    ('ClockDomainConfiguration name period fraction edge reset init polarity) = init
 
 -- | Helper type family for 'DomainResetPolarity'
-type family DomainConfigurationResetPolarity (config :: DomainConfiguration) :: ResetPolarity where
-  DomainConfigurationResetPolarity
-    ('DomainConfiguration name period fraction edge reset init polarity) = polarity
+type family ClockDomainConfigurationResetPolarity (config :: ClockDomainConfiguration) :: ResetPolarity where
+  ClockDomainConfigurationResetPolarity
+    ('ClockDomainConfiguration name period fraction edge reset init polarity) = polarity
 
 -- | Convenience type to constrain a domain to have synchronous resets. Example
 -- usage:
@@ -523,9 +523,9 @@ instance Show (SRatioNat r) where
     <> " % "
     <> show (natToNatural @(Denominator r))
 
--- | Singleton version of 'DomainConfiguration'
-data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
-  SDomainConfiguration ::
+-- | Singleton version of 'ClockDomainConfiguration'
+data SClockDomainConfiguration (dom :: Domain) (conf :: ClockDomainConfiguration) where
+  SClockDomainConfiguration ::
     1 <= period =>
     { sPeriod :: SNat period
     -- ^ Period of clock in /ps/
@@ -540,14 +540,14 @@ data SDomainConfiguration (dom :: Domain) (conf :: DomainConfiguration) where
     -- unknown/undefined, or configurable to a specific value
     , sResetPolarity :: SResetPolarity polarity
     -- ^ Whether resets are active high or active low
-    } -> SDomainConfiguration dom
-      ( 'DomainConfiguration dom
+    } -> SClockDomainConfiguration dom
+      ( 'ClockDomainConfiguration dom
            period fraction edge reset init polarity
       )
 
-deriving instance Show (SDomainConfiguration dom conf)
+deriving instance Show (SClockDomainConfiguration dom conf)
 
-type KnownConfiguration dom conf = (KnownDomain dom, KnownConf dom ~ conf)
+type KnownClockConfiguration dom conf = (KnownDomain dom, KnownClockConf dom ~ conf)
 
 -- | Evidence for a known clock period fraction in the interval [0, 1).
 class KnownFraction (fraction :: Ratio Nat) where
@@ -583,8 +583,8 @@ instance KnownResetPolarity ActiveLow  where knownResetPolarity = SActiveLow
 instance KnownResetPolarity ActiveHigh where knownResetPolarity = SActiveHigh
 
 -- | The configuration parameters of a known domain given as a
--- 'DomainConfiguration'.
-type KnownConf dom = 'DomainConfiguration dom
+-- 'ClockDomainConfiguration'.
+type KnownClockConf dom = 'ClockDomainConfiguration dom
   (DomainPeriod dom)
   (DomainPeriodFraction dom)
   (DomainActiveEdge dom)
@@ -716,14 +716,14 @@ type DomainInitBehavior (dom :: Domain) =
 type DomainResetPolarity (dom :: Domain) =
   ClockResetPolarity (ClockDomainOf dom)
 
--- | Returns 'SDomainConfiguration' corresponding to an instance's 'KnownDomain'.
+-- | Returns 'SClockDomainConfiguration' corresponding to an instance's 'KnownDomain'.
 --
 -- Example usage:
 --
--- >>> knownDomain @System
--- SDomainConfiguration {sPeriod = SNat @10000, sPeriodFraction = type 0 % 1, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
-knownDomain :: KnownDomain dom => SDomainConfiguration dom (KnownConf dom)
-knownDomain = SDomainConfiguration
+-- >>> knownClockDomain @System
+-- SClockDomainConfiguration {sPeriod = SNat @10000, sPeriodFraction = type 0 % 1, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
+knownClockDomain :: KnownDomain dom => SClockDomainConfiguration dom (KnownClockConf dom)
+knownClockDomain = SClockDomainConfiguration
   { sPeriod         = SNat
   , sPeriodFraction = knownFraction
   , sActiveEdge     = knownActiveEdge
@@ -766,13 +766,13 @@ type instance ClockDomainOf IntelSystem = IntelSystem
 instance KnownDomain IntelSystem
 
 -- | Convenience value to allow easy "subclassing" of System domain. Should
--- be used in combination with 'createDomain'. For example, if you just want to
+-- be used in combination with 'createClockDomain'. For example, if you just want to
 -- change the period but leave all other settings intact use:
 --
--- > createDomain vSystem{vName="System10", vPeriod=10}
+-- > createClockDomain vSystem{vName="System10", vPeriod=10}
 --
-vSystem :: VDomainConfiguration
-vSystem = vDomain (knownDomain @System)
+vSystem :: VClockDomainConfiguration
+vSystem = vClockDomain (knownClockDomain @System)
 
 -- | A clock (and reset) dom with clocks running at 100 MHz. Memory elements
 -- respond to the rising edge of the clock, and asynchronously to changes in
@@ -783,13 +783,13 @@ vSystem = vDomain (knownDomain @System)
 data System
 
 -- | Convenience value to allow easy "subclassing" of IntelSystem domain. Should
--- be used in combination with 'createDomain'. For example, if you just want to
+-- be used in combination with 'createClockDomain'. For example, if you just want to
 -- change the period but leave all other settings intact use:
 --
--- > createDomain vIntelSystem{vName="Intel10", vPeriod=10}
+-- > createClockDomain vIntelSystem{vName="Intel10", vPeriod=10}
 --
-vIntelSystem :: VDomainConfiguration
-vIntelSystem = vDomain (knownDomain @IntelSystem)
+vIntelSystem :: VClockDomainConfiguration
+vIntelSystem = vClockDomain (knownClockDomain @IntelSystem)
 
 -- | A clock (and reset) dom with clocks running at 100 MHz. Memory elements
 -- respond to the rising edge of the clock, and asynchronously to changes in
@@ -800,13 +800,13 @@ vIntelSystem = vDomain (knownDomain @IntelSystem)
 data IntelSystem
 
 -- | Convenience value to allow easy "subclassing" of XilinxSystem domain. Should
--- be used in combination with 'createDomain'. For example, if you just want to
+-- be used in combination with 'createClockDomain'. For example, if you just want to
 -- change the period but leave all other settings intact use:
 --
--- > createDomain vXilinxSystem{vName="Xilinx10", vPeriod=10}
+-- > createClockDomain vXilinxSystem{vName="Xilinx10", vPeriod=10}
 --
-vXilinxSystem :: VDomainConfiguration
-vXilinxSystem = vDomain (knownDomain @XilinxSystem)
+vXilinxSystem :: VClockDomainConfiguration
+vXilinxSystem = vClockDomain (knownClockDomain @XilinxSystem)
 
 -- | A clock (and reset) dom with clocks running at 100 MHz. Memory elements
 -- respond to the rising edge of the clock, and synchronously to changes in
@@ -932,44 +932,44 @@ instance Integral Period where
   divMod = quotRem
   toInteger (Period (n :% m)) = toInteger $ n `div` m
 
--- | Same as SDomainConfiguration but allows for easy updates through record update syntax.
--- Should be used in combination with 'vDomain' and 'createDomain'. Example:
+-- | Same as SClockDomainConfiguration but allows for easy updates through record update syntax.
+-- Should be used in combination with 'vClockDomain' and 'createClockDomain'. Example:
 --
--- > createDomain (knownVDomain @System){vName="System10", vPeriod=10}
+-- > createClockDomain (knownVClockDomain @System){vName="System10", vPeriod=10}
 --
 -- This duplicates the settings in the 'System' domain, replaces the name and
 -- period, and creates an instance for it. As most users often want to update
 -- the system domain, a shortcut is available in the form:
 --
--- > createDomain vSystem{vName="System10", vPeriod=10}
+-- > createClockDomain vSystem{vName="System10", vPeriod=10}
 --
-data VDomainConfiguration
-  = VDomainConfiguration
+data VClockDomainConfiguration
+  = VClockDomainConfiguration
   { vName :: String
-  -- ^ Corresponds to '_name' of 'DomainConfiguration'
+  -- ^ Corresponds to '_name' of 'ClockDomainConfiguration'
   , vPeriod :: Period
-  -- ^ Corresponds to '_period' and '_periodFraction' of 'DomainConfiguration'
+  -- ^ Corresponds to '_period' and '_periodFraction' of 'ClockDomainConfiguration'
   , vActiveEdge :: ActiveEdge
-  -- ^ Corresponds to '_activeEdge' of 'DomainConfiguration'
+  -- ^ Corresponds to '_activeEdge' of 'ClockDomainConfiguration'
   , vResetKind :: ResetKind
-  -- ^ Corresponds to '_resetKind' of 'DomainConfiguration'
+  -- ^ Corresponds to '_resetKind' of 'ClockDomainConfiguration'
   , vInitBehavior :: InitBehavior
-  -- ^ Corresponds to '_initBehavior' of 'DomainConfiguration'
+  -- ^ Corresponds to '_initBehavior' of 'ClockDomainConfiguration'
   , vResetPolarity :: ResetPolarity
-  -- ^ Corresponds to '_resetPolarity' of 'DomainConfiguration'
+  -- ^ Corresponds to '_resetPolarity' of 'ClockDomainConfiguration'
   }
   deriving (Eq, Ord, Generic, NFData, Show, Read, Binary, Hashable)
 
--- | Convert 'SDomainConfiguration' to 'VDomainConfiguration'.
--- Should be used in combination with 'createDomain' only.
-vDomain ::
+-- | Convert 'SClockDomainConfiguration' to 'VClockDomainConfiguration'.
+-- Should be used in combination with 'createClockDomain' only.
+vClockDomain ::
   forall dom conf.
   Typeable dom =>
-  SDomainConfiguration dom conf ->
-  VDomainConfiguration
-vDomain cfg@SDomainConfiguration{} = VDomainConfiguration
+  SClockDomainConfiguration dom conf ->
+  VClockDomainConfiguration
+vClockDomain cfg@SClockDomainConfiguration{} = VClockDomainConfiguration
   { vName = show $ typeRep @dom
-  , vPeriod = sDomainPeriod cfg
+  , vPeriod = sClockDomainPeriod cfg
   , vActiveEdge = case cfg.sActiveEdge of
       SRising -> Rising
       SFalling -> Falling
@@ -985,8 +985,8 @@ vDomain cfg@SDomainConfiguration{} = VDomainConfiguration
   }
 
 -- | Clock period in picoseconds, including the fractional part.
-sDomainPeriod :: SDomainConfiguration dom conf -> Period
-sDomainPeriod cfg@SDomainConfiguration{} =
+sClockDomainPeriod :: SClockDomainConfiguration dom conf -> Period
+sClockDomainPeriod cfg@SClockDomainConfiguration{} =
   snatToNum cfg.sPeriod + periodFraction cfg.sPeriodFraction
  where
   periodFraction :: forall (srn :: Ratio Nat). SRatioNat srn -> Period
@@ -994,29 +994,29 @@ sDomainPeriod cfg@SDomainConfiguration{} =
     $ natToNatural @(Numerator srn) % natToNatural @(Denominator srn)
 
 -- TODO: Function might reject valid type names. Figure out what's allowed.
-isValidDomainName :: String -> Bool
-isValidDomainName (x:xs) = isAsciiUpper x && all isAscii xs && all isAlphaNum xs
-isValidDomainName _ = False
+isValidClockDomainName :: String -> Bool
+isValidClockDomainName (x:xs) = isAsciiUpper x && all isAscii xs && all isAlphaNum xs
+isValidClockDomainName _ = False
 
 -- | Convenience method to express new domains in terms of others.
 --
--- > createDomain (knownVDomain @System){vName="System10", vPeriod=10}
+-- > createClockDomain (knownVClockDomain @System){vName="System10", vPeriod=10}
 --
 -- This duplicates the settings in the "System" domain, replaces the name and
 -- period, and creates an instance for it. As most users often want to update
 -- the system domain, a shortcut is available in the form:
 --
--- > createDomain vSystem{vName="System10", vPeriod=10}
+-- > createClockDomain vSystem{vName="System10", vPeriod=10}
 --
 -- The function will create two extra identifiers. The first:
 --
 -- > data System10 :: Domain
 --
 -- You can use that as the dom to Clocks\/Resets\/Enables\/Signals. For example:
--- @Signal System10 Int@. Additionally, it will create a 'VDomainConfiguration'
--- that you can use in later calls to 'createDomain':
+-- @Signal System10 Int@. Additionally, it will create a 'VClockDomainConfiguration'
+-- that you can use in later calls to 'createClockDomain':
 --
--- > vSystem10 = knownVDomain @System10
+-- > vSystem10 = knownVClockDomain @System10
 --
 -- It also defines @type instance ClockDomainOf System10 = System10@ and
 -- makes @System10@ an instance of both 'KnownClockDomain' and 'KnownDomain'.
@@ -1028,10 +1028,10 @@ isValidDomainName _ = False
 -- > data CustomDomain :: Domain
 -- >
 -- > -- | Here is some documentation for vCustomDomain
--- > createDomain vSystem{vName="CustomDomain"}
-createDomain :: VDomainConfiguration -> Q [Dec]
-createDomain cfg@VDomainConfiguration{} =
-  if isValidDomainName cfg.vName then do
+-- > createClockDomain vSystem{vName="CustomDomain"}
+createClockDomain :: VClockDomainConfiguration -> Q [Dec]
+createClockDomain cfg@VClockDomainConfiguration{} =
+  if isValidClockDomainName cfg.vName then do
     kcdType <- [t| KnownClockDomain $nameT |]
     kdType <- [t| KnownDomain $nameT |]
     kpType <- [t| $periodT |]
@@ -1041,7 +1041,7 @@ createDomain cfg@VDomainConfiguration{} =
     kiType <- [t| $initT |]
     koType <- [t| $polarityT |]
 
-    let vNameImpl = AppE (VarE 'vDomain) (AppTypeE (VarE 'knownDomain) (ConT name))
+    let vNameImpl = AppE (VarE 'vClockDomain) (AppTypeE (VarE 'knownClockDomain) (ConT name))
         kpImpl = mkTySynInstD ''ClockPeriod         [ConT name] kpType
         kfImpl = mkTySynInstD ''ClockPeriodFraction [ConT name] kfType
         keImpl = mkTySynInstD ''ClockActiveEdge     [ConT name] keType
@@ -1061,8 +1061,8 @@ createDomain cfg@VDomainConfiguration{} =
         ]
 
       , concat
-        [ -- vDomain helper (ex: vSystem = vDomain (knownDomain @System))
-          [ SigD vname (ConT ''VDomainConfiguration)
+        [ -- vClockDomain helper (ex: vSystem = vClockDomain (knownClockDomain @System))
+          [ SigD vname (ConT ''VClockDomainConfiguration)
           , FunD vname [Clause [] (NormalB vNameImpl) []]
           ]
         | not vHelperExists
@@ -1232,7 +1232,7 @@ and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
 The parameter /dom/ is a Haskell type of kind 'Domain'. 'ClockDomainOf' maps a
-'KnownDomain' to its physical clock. 'KnownConf' describes the clock period,
+'KnownDomain' to its physical clock. 'KnownClockConf' describes the clock period,
 active edge, reset behavior and initial values for memory elements in /dom/.
 
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
@@ -1491,7 +1491,7 @@ instance Typeable dom => Show (DiffClock dom) where
 -- clkSystem = clockGen @System
 -- @
 --
--- See 'DomainConfiguration' for more information on how to use synthesis domains.
+-- See 'ClockDomainConfiguration' for more information on how to use synthesis domains.
 clockGen
   :: KnownDomain dom
   => Clock dom
@@ -1514,10 +1514,10 @@ clockGen = tbClockGen (pure True)
 -- import "Clash.Explicit.Testbench"
 --
 -- -- Fast domain: twice as fast as \"Slow\"
--- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Fast\", vPeriod=10}
+-- 'Clash.Explicit.Prelude.createClockDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Fast\", vPeriod=10}
 --
 -- -- Slow domain: twice as slow as \"Fast\"
--- 'Clash.Explicit.Prelude.createDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Slow\", vPeriod=20}
+-- 'Clash.Explicit.Prelude.createClockDomain' 'Clash.Explicit.Prelude.vSystem'{vName=\"Slow\", vPeriod=20}
 --
 -- topEntity
 --   :: 'Clock' Fast
@@ -1555,7 +1555,7 @@ tbClockGen done = noinline const (Clock Nothing) done
 {-# ANN tbClockGen hasBlackBox #-}
 
 -- | Femtoseconds expressed as an 'Int64'. Is a newtype to prevent accidental
--- mixups with picoseconds - the unit used in 'DomainConfiguration'.
+-- mixups with picoseconds - the unit used in 'ClockDomainConfiguration'.
 --
 newtype Femtoseconds = Femtoseconds Int64
   -- No 'Integral' instance to prevent accidental picoseconds / femtoseconds mixup
@@ -1579,7 +1579,7 @@ mapFemtoseconds f (Femtoseconds fs) = Femtoseconds (f fs)
 -- clkSystem = dynamicClockGen @System
 -- @
 --
--- See 'DomainConfiguration' for more information on how to use synthesis domains.
+-- See 'ClockDomainConfiguration' for more information on how to use synthesis domains.
 dynamicClockGen ::
   KnownDomain dom =>
   -- | Clock period in /femto/seconds.
@@ -1609,7 +1609,7 @@ dynamicClockGen periods = tbDynamicClockGen periods (pure True)
 -- clkSystem = dynamicClockGen @System
 -- @
 --
--- See 'DomainConfiguration' for more information on how to use synthesis domains.
+-- See 'ClockDomainConfiguration' for more information on how to use synthesis domains.
 tbDynamicClockGen ::
   KnownDomain dom =>
   -- | Clock period in /femto/seconds.
@@ -1693,8 +1693,8 @@ resetPolarityProxy
    . (KnownDomain dom, DomainResetPolarity dom ~ polarity)
   => proxy dom
   -> SResetPolarity polarity
-resetPolarityProxy _proxy = case knownDomain @dom of
-  cfg@SDomainConfiguration{} -> cfg.sResetPolarity
+resetPolarityProxy _proxy = case knownClockDomain @dom of
+  cfg@SClockDomainConfiguration{} -> cfg.sResetPolarity
 
 -- | Convert a reset to an active high reset. Has no effect if reset is already
 -- an active high reset. Is unsafe because it can introduce:
@@ -1982,8 +1982,8 @@ delay# (Clock _) (fromEnable -> en) powerUpVal0 =
     go powerUpVal1 en
   where
     powerUpVal1 :: a
-    powerUpVal1 = case knownDomain @dom of
-      cfg@SDomainConfiguration{} -> case cfg.sInitBehavior of
+    powerUpVal1 = case knownClockDomain @dom of
+      cfg@SClockDomainConfiguration{} -> case cfg.sInitBehavior of
         SDefined -> powerUpVal0
         SUnknown -> deepErrorX
                   $ "First value of `delay` unknown on domain "
@@ -2021,8 +2021,8 @@ register#
   -> Signal dom a
   -> Signal dom a
 register# clk@(Clock _) rst ena powerUpVal resetVal =
-  case knownDomain @dom of
-    cfg@SDomainConfiguration{} -> case cfg.sResetKind of
+  case knownClockDomain @dom of
+    cfg@SClockDomainConfiguration{} -> case cfg.sResetKind of
       SSynchronous -> syncRegister# clk rst ena powerUpVal resetVal
       SAsynchronous -> asyncRegister# clk rst ena powerUpVal resetVal
 {-# OPAQUE register# #-}
@@ -2039,8 +2039,8 @@ registerPowerup#
   -> a
   -> a
 registerPowerup# (Clock _) a =
-  case knownDomain @dom of
-    cfg@SDomainConfiguration{} -> case cfg.sInitBehavior of
+  case knownClockDomain @dom of
+    cfg@SClockDomainConfiguration{} -> case cfg.sInitBehavior of
       SDefined -> a
       SUnknown -> deepErrorX
                 $ "First value of register undefined on domain "
@@ -2642,7 +2642,7 @@ clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
     | otherwise =
         -- Dynamic clocks count femtoseconds. Quantize only after scaling
         -- the entire period, including its fractional picoseconds.
-        Left (floor (1000 * sDomainPeriod (knownDomain @dom)))
+        Left (floor (1000 * sClockDomainPeriod (knownClockDomain @dom)))
 
   -- Coerce whole signal instead of `fmap coerce` to prevent useless constructor
   -- packing and unpacking.

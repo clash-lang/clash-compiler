@@ -12,9 +12,9 @@ import Clash.Explicit.Testbench
 
 import qualified Prelude as P
 
-createDomain vSystem{vName="DDRA", vPeriod=5000}
-createDomain vXilinxSystem{vName="DDRS", vPeriod=5000}
-createDomain vXilinxSystem{vName="Dom4", vPeriod=2500}
+createClockDomain vSystem{vName="DDRA", vPeriod=5000}
+createClockDomain vXilinxSystem{vName="DDRS", vPeriod=5000}
+createClockDomain vXilinxSystem{vName="Dom4", vPeriod=2500}
 
 type C = Unsigned 11
 type D = Unsigned 9
@@ -23,13 +23,13 @@ type TestLen = 44
 type TestLen2 = 2 * TestLen - 1
 
 type DomCxt slow fast fPeriod reset =
-  ( KnownConfiguration fast
-      ( 'DomainConfiguration fast
+  ( KnownClockConfiguration fast
+      ( 'ClockDomainConfiguration fast
            fPeriod (0 :% 1)
            'Rising reset 'Defined 'ActiveHigh
       )
-  , KnownConfiguration slow
-      ( 'DomainConfiguration slow
+  , KnownClockConfiguration slow
+      ( 'ClockDomainConfiguration slow
            (2*fPeriod) (0 :% 1)
            'Rising reset 'Defined 'ActiveHigh
       )

@@ -100,7 +100,7 @@ import qualified Clash.Netlist.Id                as Id
 import qualified Clash.Netlist.Types             as N
 import           Clash.Netlist.Util              (typeSize, isVoid, stripAttributes, stripVoid)
 import           Clash.Signal.Internal
-  (ResetKind(..), ResetPolarity(..), InitBehavior(..), VDomainConfiguration (..))
+  (ResetKind(..), ResetPolarity(..), InitBehavior(..), VClockDomainConfiguration (..))
 import           Clash.Util
 import qualified Clash.Util.Interpolate          as I
 
@@ -600,7 +600,7 @@ renderElem b (Period n) = do
       let ps = MkFixed (floor (1000 * vPeriod dom)) :: Fixed E3
       in return $ const $ Text.pack $ showFixed True ps
     _ ->
-      error $ $(curLoc) ++ "Period: Expected `KnownDomain` or `KnownConfiguration`, not: " ++ show ty
+      error $ $(curLoc) ++ "Period: Expected `KnownDomain` or `KnownClockConfiguration`, not: " ++ show ty
 
 renderElem _ LongestPeriod = do
   doms <- domainConfigurations
@@ -614,7 +614,7 @@ renderElem b (Tag n) = do
   case hwTypeDomain $ stripVoid ty of
     Just dom -> return $ const $ Text.pack $ vName dom
     Nothing -> error $ $(curLoc)
-            <> "Tag: Expected `KnownDomain` or `KnownConfiguration`, not: "
+            <> "Tag: Expected `KnownDomain` or `KnownClockConfiguration`, not: "
             <> show ty
 
 renderElem b (IF c t f) = do
@@ -763,7 +763,7 @@ renderElem b (IF c t f) = do
                              ++ "\nGot: " ++ show c'
 renderElem b e = fmap const (renderTag b e)
 
-getDomainConf :: HasCallStack => HWType -> VDomainConfiguration
+getDomainConf :: HasCallStack => HWType -> VClockDomainConfiguration
 getDomainConf ty = case snd $ stripAttributes $ stripVoid ty of
   KnownDomain dom -> dom
   Clock dom -> dom

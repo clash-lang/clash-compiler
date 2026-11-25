@@ -20,8 +20,8 @@ manipulating these 'Signal's belong.
 For synthesis, /dom/ is a data type with no constructors. It may have type
 parameters. For a 'KnownDomain', 'ClockDomainOf' identifies the physical
 clock that supplies its clock period,
-active edge, reset behavior and initial values. 'KnownConf' gives the complete
-'DomainConfiguration' for /dom/. Multiple domains may share a physical clock.
+active edge, reset behavior and initial values. 'KnownClockConf' gives the complete
+'ClockDomainConfiguration' for /dom/. Multiple domains may share a physical clock.
 
 The built-in 'System' supplies its own clock configuration.
 
@@ -43,7 +43,7 @@ of the clock, can be reset asynchronously with regards to the clock, and have
 defined power up values if applicable.
 
 In order to create a new domain, you don't have to instantiate it explicitly.
-Instead, you can have 'createDomain' create a domain for you. You can also use
+Instead, you can have 'createClockDomain' create a domain for you. You can also use
 the same function to subclass existing domains.
 
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
@@ -69,8 +69,8 @@ types are encoded in a synthesis domain. For the following examples we assume
 the following exist:
 
 @
-'createDomain' 'vSystem'{vName=\"SyncExample\", vResetKind='Synchronous'}
-'createDomain' 'vSystem'{vName=\"AsyncExample\", vResetKind='Asynchronous'}
+'createClockDomain' 'vSystem'{vName=\"SyncExample\", vResetKind='Synchronous'}
+'createClockDomain' 'vSystem'{vName=\"AsyncExample\", vResetKind='Asynchronous'}
 @
 
 See the previous section on how to use domains.
@@ -152,8 +152,8 @@ module Clash.Explicit.Signal
   , ClockDomainOf
   , clockDomainOfSelf
   , KnownClockDomain(..)
-  , KnownConfiguration
-  , KnownConf
+  , KnownClockConfiguration
+  , KnownClockConf
     -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction
@@ -170,8 +170,8 @@ module Clash.Explicit.Signal
   , SResetKind(..)
   , ResetPolarity(..)
   , SResetPolarity(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
+  , ClockDomainConfiguration(..)
+  , SClockDomainConfiguration(..)
     -- *** Convenience types #conveniencetypes#
     -- $conveniencetypes
 
@@ -199,11 +199,11 @@ module Clash.Explicit.Signal
   , vIntelSystem
   , vXilinxSystem
     -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , knownDomain
-  , createDomain
-  , knownVDomain
+  , VClockDomainConfiguration(..)
+  , vClockDomain
+  , knownClockDomain
+  , createClockDomain
+  , knownVClockDomain
   , clockPeriod
   , activeEdge
   , resetKind
@@ -311,7 +311,7 @@ import           Clash.Signal.Bundle
 import           Clash.Signal.BiSignal
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
-  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
+  (knownVClockDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import qualified Clash.Sized.Vector
 import           Clash.XException
   (NFDataX, deepErrorX, fromJustX, seqX, ShowX(..))
@@ -456,7 +456,7 @@ systemResetGen = resetGen
 -- The 'unsafeSynchronizer' works in such a way that, given 2 clocks:
 --
 -- @
--- createDomain vSystem{vName=\"Dom7\", vPeriod=7}
+-- createClockDomain vSystem{vName=\"Dom7\", vPeriod=7}
 --
 -- clk7 :: 'Clock' Dom7
 -- clk7 = 'clockGen'
@@ -468,7 +468,7 @@ systemResetGen = resetGen
 -- and
 --
 -- @
--- createDomain vSystem{vName=\"Dom2\", vPeriod=2}
+-- createClockDomain vSystem{vName=\"Dom2\", vPeriod=2}
 --
 -- clk2 :: 'Clock' Dom2
 -- clk2 = 'clockGen'

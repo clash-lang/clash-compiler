@@ -100,7 +100,7 @@ import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
 import           Clash.Signal.Internal
-  ( ActiveEdge(..), VDomainConfiguration(..), sameDomain )
+  ( ActiveEdge(..), VClockDomainConfiguration(..), sameDomain )
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
 import qualified Clash.Warning                 as W

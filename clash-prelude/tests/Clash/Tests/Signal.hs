@@ -28,7 +28,7 @@ import           Clash.Prelude                  hiding (sample)
 
 import           Clash.Signal.Internal
   (ClockAB(..), clockTicks, Femtoseconds(..), dynamicClockGen, hzToFs, sample, head#,
-   SRatioNat(..), sDomainPeriod, tbDynamicClockGen)
+   SRatioNat(..), sClockDomainPeriod, tbDynamicClockGen)
 import           GHC.Real (Ratio((:%)))
 
 import           Control.Arrow.Transformer.Automaton
@@ -38,14 +38,14 @@ import           Text.Read (readMaybe)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-createDomain vSystem{vName="H11", vPeriod=hzToPeriod 11}
-createDomain vSystem{vName="H77", vPeriod=hzToPeriod 77}
+createClockDomain vSystem{vName="H11", vPeriod=hzToPeriod 11}
+createClockDomain vSystem{vName="H77", vPeriod=hzToPeriod 77}
 
-createDomain vSystem{vName="F1", vPeriod=20}
-createDomain vSystem{vName="DDR10", vPeriod=10}
-createDomain vSystem{vName="F6", vPeriod=250}
+createClockDomain vSystem{vName="F1", vPeriod=20}
+createClockDomain vSystem{vName="DDR10", vPeriod=10}
+createClockDomain vSystem{vName="F6", vPeriod=250}
 
-createDomain vSystem{vName="FractionalClock", vPeriod=20.5}
+createClockDomain vSystem{vName="FractionalClock", vPeriod=20.5}
 
 -- | A virtual partitioning of a domain: @Secure dom@ designates the same
 -- physical clock domain as @dom@ and can hence be switched to and from at no
@@ -124,7 +124,7 @@ tests =
         mapM_ (\cfg -> readMaybe (show cfg) @?= Just cfg)
           [vSystem, vFractionalClock, vSystem{vPeriod=1/2}]
     , testCase "read legacy clock configurations" $ do
-        let oldSystem = "VDomainConfiguration {vName = \"System\", vPeriod = 10000, " <>
+        let oldSystem = "VClockDomainConfiguration {vName = \"System\", vPeriod = 10000, " <>
               "vActiveEdge = Rising, vResetKind = Asynchronous, " <>
               "vInitBehavior = Defined, vResetPolarity = ActiveHigh}"
             complete p s = [x :: E.Period | (x, "") <- readsPrec p s]
@@ -138,7 +138,7 @@ tests =
           ["1 % 0", "1/0 ps", "2 + 1/0 ps"]
     , testCase "clock fractions need not be in lowest terms" $ do
         let period :: SRatioNat f -> E.Period
-            period f = sDomainPeriod (SDomainConfiguration (SNat @2) f
+            period f = sClockDomainPeriod (SClockDomainConfiguration (SNat @2) f
                                        SRising SAsynchronous SDefined SActiveHigh)
         period (SRatioNat :: SRatioNat (2 :% 4)) @?= 2.5
         period (SRatioNat :: SRatioNat (0 :% 7)) @?= 2

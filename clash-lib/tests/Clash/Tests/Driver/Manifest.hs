@@ -43,11 +43,11 @@ genDigest = Base16.encode . Text.encodeUtf8 . coerce @ArbitraryText <$> Q.arbitr
 genString :: Q.Gen FilePath
 genString = Text.unpack . coerce @ArbitraryText <$> Q.arbitrary
 
-genDomain :: Q.Gen (Text, VDomainConfiguration)
+genDomain :: Q.Gen (Text, VClockDomainConfiguration)
 genDomain = do
   nm <- coerce @(Q.Gen ArbitraryText) Q.arbitrary
   dom <-
-    VDomainConfiguration
+    VClockDomainConfiguration
       <$> pure (Text.unpack nm)
       <*> (fromIntegral @Int . abs <$> Q.arbitraryBoundedIntegral)
       <*> Q.elements [Rising, Falling]

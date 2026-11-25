@@ -10,13 +10,13 @@ import qualified Prelude as P
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
-createDomain vSystem{vName="Fast", vPeriod=5000.5, vActiveEdge=Falling}
+createClockDomain vSystem{vName="Fast", vPeriod=5000.5, vActiveEdge=Falling}
 
 data Tagged a
 type instance ClockDomainOf (Tagged a) = a
 instance KnownClockDomain a => KnownDomain (Tagged a)
 
-createDomain vSystem{vName="SignalOnly", vPeriod=27123}
+createClockDomain vSystem{vName="SignalOnly", vPeriod=27123}
 data Wire
 type instance ClockDomainOf Wire = SignalOnly
 data Unclocked

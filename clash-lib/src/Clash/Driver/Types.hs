@@ -46,7 +46,7 @@ import           GHC.Types.Basic                (InlineSpec)
 import           GHC.Types.SrcLoc               (SrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Signal.Internal          (VDomainConfiguration(..))
+import           Clash.Signal.Internal          (VClockDomainConfiguration(..))
 
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
@@ -130,8 +130,8 @@ type BindingMap = VarEnv (Binding Term)
 
 -- | Maps core types with a 'Clash.Signal.Internal.KnownDomain'
 -- instance that appear in the design to their corresponding
--- 'VDomainConfiguration'.
-type DomainMap = Map Type VDomainConfiguration
+-- 'VClockDomainConfiguration'.
+type DomainMap = Map Type VClockDomainConfiguration
 
 -- | Information to show about transformations during compilation.
 --
@@ -481,7 +481,7 @@ class Monad m => HasClashOpts m where
 -- Currently this limited to the names and periods of clocks for create_clock.
 --
 newtype SdcInfo = SdcInfo
-  { sdcClock :: [(Text, VDomainConfiguration)]
+  { sdcClock :: [(Text, VClockDomainConfiguration)]
   }
 
 -- | Render an SDC file from an SdcInfo.
@@ -491,7 +491,7 @@ pprSDC :: SdcInfo -> Doc ()
 pprSDC = vcat . fmap go . sdcClock
  where
   go (i, dom) =
-        -- VDomainConfiguration stores period in ps, SDC expects it in ns.
+        -- VClockDomainConfiguration stores period in ps, SDC expects it in ns.
     let p        = MkFixed (floor (1000 * vPeriod dom)) :: Fixed E6
         name     = braces (pretty (Text.dropAround (== '\\') i))
         period   = viaShow p

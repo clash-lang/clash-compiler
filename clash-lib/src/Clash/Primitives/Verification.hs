@@ -40,7 +40,7 @@ import           Clash.Netlist.Types
 import           Clash.Netlist.BlackBox.Types
   (BlackBoxFunction, BlackBoxMeta(..), TemplateKind(TDecl), RenderVoid(..),
    emptyBlackBoxMeta)
-import           Clash.Signal.Internal           (VDomainConfiguration(..))
+import           Clash.Signal.Internal           (VClockDomainConfiguration(..))
 
 import           Clash.Verification.Internal
 import           Clash.Verification.Pretty

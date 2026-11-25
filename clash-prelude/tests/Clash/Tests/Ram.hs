@@ -40,8 +40,8 @@ import Test.Tasty.HUnit
 import Clash.Explicit.Prelude
 import Clash.Explicit.RAM
 
-createDomain vSystem{vName="WriteDom", vPeriod=2.5}
-createDomain vSystem{vName="ReadDom", vPeriod=2}
+createClockDomain vSystem{vName="WriteDom", vPeriod=2.5}
+createClockDomain vSystem{vName="ReadDom", vPeriod=2}
 
 type Ram = (   Signal System Int
             -> Signal System Bool

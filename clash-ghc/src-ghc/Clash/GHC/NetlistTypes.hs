@@ -66,7 +66,7 @@ import Clash.Util                       (curLoc)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-import Clash.Signal.Internal (VDomainConfiguration(..), Period(..))
+import Clash.Signal.Internal (VClockDomainConfiguration(..), Period(..))
 import qualified Clash.Signal.Internal as Signal
 
 ghcTypeToHWType
@@ -183,7 +183,7 @@ ghcTypeToHWType mkdtcus iw = go
          | occ == "Clash.Signal.BiSignal.BiSignalOut" ->
              biSignal (Void . Just . BiDirectional Out)
 
-         -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration.
+         -- XXX: this is a hack to get a KnownDomain from a KnownClockConfiguration.
          -- Constraint-tuple type constructors are internal names that move
          -- between modules across GHC versions ('GHC.Classes' <= 9.12 vs
          -- 'GHC.Internal.Classes' >= 9.14); both forms appear here.
@@ -417,7 +417,7 @@ domainConfig ::
   TyConMap ->
   DomainKind ->
   Type ->
-  (VDomainConfiguration -> HWType) ->
+  (VClockDomainConfiguration -> HWType) ->
   ExceptT String (MaybeT (State TTState)) FilteredHWType
 domainConfig normalize ids m kind dom c = do
   let missing = throwE $ "Cannot resolve clock domain for " ++ showPpr dom
@@ -448,7 +448,7 @@ domainConfig normalize ids m kind dom c = do
   vResetPolarity <- domResetPolarity =<< resolve clockResetPolarityTCU
   let vName = domTag m cdom
       vPeriod = period + frac
-      conf = VDomainConfiguration{..}
+      conf = VClockDomainConfiguration{..}
   modify $ second $ insert cdom conf
   return $ FilteredHWType (c conf) []
 

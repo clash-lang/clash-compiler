@@ -3,8 +3,8 @@ module FractionalClockTiming where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-createDomain vSystem{vName="FractionalClock", vPeriod=5.055}
-createDomain vSystem{vName="Reference", vPeriod=1100}
+createClockDomain vSystem{vName="FractionalClock", vPeriod=5.055}
+createClockDomain vSystem{vName="Reference", vPeriod=1100}
 
 edges :: KnownDomain dom => Clock dom -> Enable dom -> Signal dom (Unsigned 8)
 edges clk en = n

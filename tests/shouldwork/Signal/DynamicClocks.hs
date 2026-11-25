@@ -13,8 +13,8 @@ import Clash.Explicit.Prelude
 import Clash.Signal.Internal (Femtoseconds (..), tbDynamicClockGen, mapFemtoseconds)
 import Clash.Explicit.Testbench
 
-createDomain vSystem{vName="Static", vPeriod=1000}
-createDomain vSystem{vName="Dynamic", vPeriod=1000}
+createClockDomain vSystem{vName="Static", vPeriod=1000}
+createClockDomain vSystem{vName="Dynamic", vPeriod=1000}
 
 counter :: KnownDomain dom => Clock dom -> Reset dom -> Enable dom -> Signal dom Int
 counter clk rst ena = let counter0 = register clk rst ena 0 (counter0 + 1) in counter0

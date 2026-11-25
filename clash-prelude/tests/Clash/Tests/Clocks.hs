@@ -13,10 +13,10 @@ import Test.Tasty.HUnit
 import Clash.Explicit.Prelude
 import Clash.Intel.ClockGen (unsafeAltpll)
 
--- Ratio of clock periods in 'createDomain' and 'resetLen' are chosen, rest is
+-- Ratio of clock periods in 'createClockDomain' and 'resetLen' are chosen, rest is
 -- derived from that
 
-createDomain vSystem{vName="ClocksSlow", vPeriod=3 * vPeriod vSystem}
+createClockDomain vSystem{vName="ClocksSlow", vPeriod=3 * vPeriod vSystem}
 
 resetLen :: SNat 10
 resetLen = SNat

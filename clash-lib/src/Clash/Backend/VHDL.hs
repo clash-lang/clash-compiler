@@ -76,7 +76,7 @@ import           Clash.Netlist.BlackBox.Util
 import qualified Clash.Netlist.Id                     as Id
 import           Clash.Netlist.Types                  hiding (intWidth, usages, _usages)
 import           Clash.Netlist.Util
-import           Clash.Signal.Internal                (VDomainConfiguration(..))
+import           Clash.Signal.Internal                (VClockDomainConfiguration(..))
 import           Clash.Util
   (SrcSpan, noSrcSpan, clogBase, curLoc, makeCached, indexNote)
 import qualified Clash.Util.Interpolate               as I

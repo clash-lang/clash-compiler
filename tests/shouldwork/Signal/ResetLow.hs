@@ -6,7 +6,7 @@ module ResetLow where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-createDomain vSystem{vName="SystemLow", vResetPolarity=ActiveLow}
+createClockDomain vSystem{vName="SystemLow", vResetPolarity=ActiveLow}
 
 testInput :: Vec 7 (Signed 8)
 testInput = 1 :> 2 :> 3 :> 4 :> 5 :> 6 :> 7 :> Nil

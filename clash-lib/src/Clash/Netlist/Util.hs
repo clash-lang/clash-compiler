@@ -597,7 +597,7 @@ hasUnconstrainedExistential tcm dc =
                 -> [eTV] == efvs
                 | otherwise
                 -- Normal type constructors are fully generative, e.g. given:
-                -- DomainConfiguration a b ~ DomainConfiguration "System" 10000
+                -- ClockDomainConfiguration a b ~ ClockDomainConfiguration "System" 10000
                 --
                 -- we can infer both `a ~ "System"` and `b ~ 10000`
                 -> eTV `elem` efvs

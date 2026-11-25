@@ -80,7 +80,7 @@ import Clash.Driver.Types
 import Clash.Driver.Warning                 (CanWarn)
 import Clash.Netlist.BlackBox.Types         (BlackBoxTemplate)
 import Clash.Primitives.Types               (CompiledPrimMap)
-import Clash.Signal.Internal                (ActiveEdge, VDomainConfiguration(..))
+import Clash.Signal.Internal                (ActiveEdge, VClockDomainConfiguration(..))
 import Clash.Unique                         (Unique)
 
 import Clash.Annotations.BitRepresentation.Internal
@@ -402,7 +402,7 @@ isBiDirectional = go . snd
 --
 -- This will not consider @ClockN@ to be a clock argument, which means only the
 -- positive phase of a differential pair will be added to @sdcClock@.
-findClocks :: Component -> [(Text, VDomainConfiguration)]
+findClocks :: Component -> [(Text, VClockDomainConfiguration)]
 findClocks (Component _ is _ _) =
   mapMaybe isClock is
  where
@@ -457,13 +457,13 @@ data HWType
   -- populated when using records.
   | SP !Text [(Text, [HWType])]
   -- ^ Sum-of-Product type: Name and Constructor names + field types
-  | Clock !VDomainConfiguration
+  | Clock !VClockDomainConfiguration
   -- ^ Clock type corresponding to the attached domain configuration
-  | ClockN !VDomainConfiguration
+  | ClockN !VClockDomainConfiguration
   -- ^ ClockN type corresponding to the attached domain configuration
-  | Reset !VDomainConfiguration
+  | Reset !VClockDomainConfiguration
   -- ^ Reset type corresponding to the attached domain configuration
-  | Enable !VDomainConfiguration
+  | Enable !VClockDomainConfiguration
   -- ^ Enable type corresponding to the attached domain configuration
   | BiDirectional !PortDirection !HWType
   -- ^ Tagging type indicating a bidirectional (inout) port
@@ -478,7 +478,7 @@ data HWType
   -- info, see: Clash.Annotations.BitRepresentations.
   | Annotated [Attr Text] !HWType
   -- ^ Annotated with HDL attributes
-  | KnownDomain !VDomainConfiguration
+  | KnownDomain !VClockDomainConfiguration
   -- ^ Known Domain Configuration
   | FileType
   -- ^ File type for simulation-level I/O
@@ -491,7 +491,7 @@ annotated :: [Attr Text] -> HWType -> HWType
 annotated [] t = t
 annotated attrs t = Annotated attrs t
 
-hwTypeDomain :: HWType -> Maybe VDomainConfiguration
+hwTypeDomain :: HWType -> Maybe VClockDomainConfiguration
 hwTypeDomain = \case
   Clock dom -> Just dom
   ClockN dom -> Just dom

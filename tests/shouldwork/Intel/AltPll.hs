@@ -8,8 +8,8 @@ import System.Directory (listDirectory)
 import System.Environment (getArgs)
 import System.FilePath ((</>), takeExtension)
 
-createDomain vSystem{vName="PllIn", vPeriod=8000.25}
-createDomain vSystem{vName="PllOut", vPeriod=5333.5}
+createClockDomain vSystem{vName="PllIn", vPeriod=8000.25}
+createClockDomain vSystem{vName="PllOut", vPeriod=5333.5}
 
 topEntity :: Clock PllIn -> Reset PllIn -> (Clock PllOut, Reset PllOut)
 topEntity = altpllSync

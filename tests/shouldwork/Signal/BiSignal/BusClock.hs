@@ -9,7 +9,7 @@ import qualified Prelude as P
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
-createDomain vSystem{vName="Bus", vPeriod=250000}
+createClockDomain vSystem{vName="Bus", vPeriod=250000}
 data Unclocked
 
 -- The buffer exposes the external pins to the receiving register. Its HDL

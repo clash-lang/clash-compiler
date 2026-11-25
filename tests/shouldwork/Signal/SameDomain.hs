@@ -13,7 +13,7 @@ import Data.Kind (Type)
 import Type.Reflection (Typeable)
 import Data.Type.Equality ((:~:)(Refl))
 
-createDomain vSystem{vName="OtherSystem"}
+createClockDomain vSystem{vName="OtherSystem"}
 
 type SystemAlias = System
 

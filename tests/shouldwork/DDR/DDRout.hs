@@ -9,13 +9,13 @@ import Clash.Explicit.Prelude
 import Clash.Explicit.DDR
 import Clash.Explicit.Testbench
 
-createDomain vSystem{vName="AsyncReal", vPeriod=2000, vResetKind=Asynchronous}  -- real clock domain
---createDomain vSystem{vName="AsyncDDR", vPeriod=1000, vResetKind=Asynchronous}  -- fake ddr domain (same as TB)
-createDomain vSystem{vName="SyncReal", vPeriod=2000, vResetKind=Synchronous}  -- real clock domain
-createDomain vSystem{vName="SyncDDR", vPeriod=1000, vResetKind=Synchronous}  -- fake ddr domain
+createClockDomain vSystem{vName="AsyncReal", vPeriod=2000, vResetKind=Asynchronous}  -- real clock domain
+--createClockDomain vSystem{vName="AsyncDDR", vPeriod=1000, vResetKind=Asynchronous}  -- fake ddr domain (same as TB)
+createClockDomain vSystem{vName="SyncReal", vPeriod=2000, vResetKind=Synchronous}  -- real clock domain
+createClockDomain vSystem{vName="SyncDDR", vPeriod=1000, vResetKind=Synchronous}  -- fake ddr domain
 
 -- | Domain used for testbench itself
-createDomain vSystem{vName="TB", vPeriod=1000, vResetKind=Asynchronous}
+createClockDomain vSystem{vName="TB", vPeriod=1000, vResetKind=Asynchronous}
 type AsyncDDR = TB
 
 {-
@@ -25,13 +25,13 @@ The four variants defined here are all the combinations of
 -}
 
 topEntityGeneric
-  :: ( KnownConfiguration fast
-         ( 'DomainConfiguration fast
+  :: ( KnownClockConfiguration fast
+         ( 'ClockDomainConfiguration fast
               fPeriod (fNumer :% fDenom)
               edge reset init polarity
          )
-     , KnownConfiguration slow
-         ( 'DomainConfiguration slow
+     , KnownClockConfiguration slow
+         ( 'ClockDomainConfiguration slow
               (2*fPeriod) ((2*fNumer) :% fDenom)
               edge reset init polarity
          )

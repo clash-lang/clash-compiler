@@ -10,8 +10,8 @@ module RMulti where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-createDomain vSystem{vName="P10", vPeriod=10000}
-createDomain vSystem{vName="P20", vPeriod=20000}
+createClockDomain vSystem{vName="P10", vPeriod=10000}
+createClockDomain vSystem{vName="P20", vPeriod=20000}
 
 type Ram =
      Clock P20

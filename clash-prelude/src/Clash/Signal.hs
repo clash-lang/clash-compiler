@@ -19,8 +19,8 @@ manipulating these 'Signal's belong.
 For synthesis, /dom/ is a data type with no constructors. It may have type
 parameters. For a 'KnownDomain', 'ClockDomainOf' identifies the physical
 clock that supplies its clock period,
-active edge, reset behavior and initial values. 'KnownConf' gives the complete
-'DomainConfiguration' for /dom/. Multiple domains may share a physical clock.
+active edge, reset behavior and initial values. 'KnownClockConf' gives the complete
+'ClockDomainConfiguration' for /dom/. Multiple domains may share a physical clock.
 
 The built-in 'System' supplies its own clock configuration.
 
@@ -42,7 +42,7 @@ asynchronously to changes in their resets, and have defined power up values
 if applicable.
 
 In order to create a new domain, you don't have to instantiate it explicitly.
-Instead, you can have 'createDomain' create a domain for you. You can also use
+Instead, you can have 'createClockDomain' create a domain for you. You can also use
 the same function to subclass existing domains.
 
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
@@ -83,8 +83,8 @@ module Clash.Signal
   , ClockDomainOf
   , clockDomainOfSelf
   , KnownClockDomain(..)
-  , KnownConfiguration
-  , KnownConf
+  , KnownClockConfiguration
+  , KnownClockConf
     -- ** Domain projections
   , DomainPeriod
   , DomainPeriodFraction
@@ -101,8 +101,8 @@ module Clash.Signal
   , SResetKind(..)
   , ResetPolarity(..)
   , SResetPolarity(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
+  , ClockDomainConfiguration(..)
+  , SClockDomainConfiguration(..)
   , SupportsSwitchingTo
   , EligibleDomainSwitch
     -- *** Convenience types
@@ -132,11 +132,11 @@ module Clash.Signal
   , vIntelSystem
   , vXilinxSystem
     -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , knownDomain
-  , createDomain
-  , knownVDomain
+  , VClockDomainConfiguration(..)
+  , vClockDomain
+  , knownClockDomain
+  , createClockDomain
+  , knownVClockDomain
   , clockPeriod
   , activeEdge
   , resetKind
@@ -291,7 +291,7 @@ import           Clash.Signal.Internal hiding
   (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor,
    signalAutomaton)
 import           Clash.Signal.Internal.Ambiguous
-  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
+  (knownVClockDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import           Clash.XException      (NFDataX, ShowX)
 
 {- $setup

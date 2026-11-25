@@ -67,7 +67,7 @@ import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
-import           Clash.Signal (VDomainConfiguration(..), Period(..))
+import           Clash.Signal (VClockDomainConfiguration(..), Period(..))
 import           Clash.Util.Graph (callGraphBindings)
 
 data PortDirection
@@ -180,7 +180,7 @@ data Manifest
     --
     -- This list is reverse topologically sorted. I.e., a component might depend
     -- on any component listed before it, but not after it.
-  , domains :: HashMap Text VDomainConfiguration
+  , domains :: HashMap Text VClockDomainConfiguration
     -- ^ Domains encountered in design
   , transitiveDependencies :: [Text]
     -- ^ Dependencies of this design (fully qualified binder names). Is a
@@ -243,7 +243,7 @@ instance ToJSON Manifest where
             , "reset_polarity" .= show vResetPolarity
             ]
           )
-        | (cdomNm, VDomainConfiguration{..}) <- HashMap.toList domains ]
+        | (cdomNm, VClockDomainConfiguration{..}) <- HashMap.toList domains ]
       , "dependencies" .= Aeson.object
         [ "transitive" .= transitiveDependencies ]
       ]
@@ -301,9 +301,9 @@ instance FromJSON Manifest where
         <*> (v .: "domains" >>= HashMap.traverseWithKey parseDomain)
         <*> (v .: "dependencies" >>= (.: "transitive"))
    where
-    parseDomain :: Text -> Aeson.Object -> Parser VDomainConfiguration
+    parseDomain :: Text -> Aeson.Object -> Parser VClockDomainConfiguration
     parseDomain nm v =
-      VDomainConfiguration
+      VClockDomainConfiguration
         <$> pure (Text.unpack nm)
         <*> (Period <$> (v .: "period"))
         <*> parseWithRead "active_edge" v
