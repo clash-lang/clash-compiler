@@ -48,7 +48,7 @@ runInputStage idirs src = do
   let o = opts idirs
   let backend = initBackend @VHDLState o
   pds <- primDirs backend
-  generateBindings o (return ()) pds (opt_importPaths o) [] (hdlKind backend) src Nothing
+  generateBindings o (return ()) pds (opt_importPaths o) (hdlKind backend) src Nothing
 
 runNormalisationStage
   :: [FilePath]

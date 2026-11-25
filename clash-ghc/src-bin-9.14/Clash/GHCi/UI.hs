@@ -2674,8 +2674,7 @@ makeHDL Proxy startAction optsRef srcs = do
 
               forM_ srcs $ \src -> do
                 -- Generate bindings:
-                let dbs = reverse [p | PackageDB (PkgDbPath p) <- packageDBFlags dflags]
-                (clashEnv, clashDesign) <- generateBindings opts2 startAction primDirs_ idirs dbs hdl src (Just dflags)
+                (clashEnv, clashDesign) <- generateBindings opts2 startAction primDirs_ idirs hdl src (Just dflags)
 
                 let getMain = getMainTopEntity src clashDesign
                 mainTopEntity <- traverse getMain (GHC.mainFunIs dflags)
