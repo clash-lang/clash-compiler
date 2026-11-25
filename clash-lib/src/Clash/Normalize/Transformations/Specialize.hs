@@ -587,6 +587,10 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
         go bs (TyApp e' _) = case go [] e' of
           []  -> bs
           bs' -> init bs' ++ bs
+        -- Lambdas after a let (or tick) are still arguments of the function.
+        -- E.g. @foo x = let .. in \clk rst -> ..@
+        go bs (Let _ e')  = go bs e'
+        go bs (Tick _ e') = go bs e'
         go bs _ = bs
 
 -- Specializing non Var's is used by nonRepANF
