@@ -1329,8 +1329,8 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
           process(~ARG[#{clockA}])
           begin
               if(rising_edge(~ARG[#{clockA}])) then
-                    if(~ARG[#{enaA}]) then
-                      if(~ARG[#{wenaA}]) then
+                    if(~ARG[#{enaA}] = '1') then
+                      if(~ARG[#{wenaA}] = '1') then
                           mem(~IF~SIZE[~TYP[#{addrA}]]~THENto_integer(~ARG[#{addrA}])~ELSE0~FI) := ~ARG[#{datA}];
                       end if;
                       ~SYM[#{symDoutA}] <= mem(~IF~SIZE[~TYP[#{addrA}]]~THENto_integer(~ARG[#{addrA}])~ELSE0~FI);
@@ -1342,8 +1342,8 @@ trueDualPortBlockRamWrapper clkA enA weA addrA datA clkB enB weB addrB datB =
           process(~ARG[#{clockB}])
           begin
               if(rising_edge(~ARG[#{clockB}])) then
-                  if(~ARG[#{enaB}]) then
-                      if(~ARG[#{wenaB}]) then
+                  if(~ARG[#{enaB}] = '1') then
+                      if(~ARG[#{wenaB}] = '1') then
                           mem(~IF~SIZE[~TYP[#{addrB}]]~THENto_integer(~ARG[#{addrB}])~ELSE0~FI) := ~ARG[#{datB}];
                       end if;
                       ~SYM[#{symDoutB}] <= mem(~IF~SIZE[~TYP[#{addrB}]]~THENto_integer(~ARG[#{addrB}])~ELSE0~FI);

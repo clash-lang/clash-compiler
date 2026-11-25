@@ -31,7 +31,7 @@
           if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
               ~SYM[1] <= ~ARG[9];
-            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] = '1' then~ELSEe~FI
               ~SYM[1] <= ~ARG[11];
             end if;
           end if;
@@ -42,7 +42,7 @@
           if ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[5]) then
             if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
               ~SYM[2] <= ~ARG[10];
-            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] = '1' then~ELSEe~FI
               ~SYM[2] <= ~ARG[11];
             end if;
           end if;
@@ -53,7 +53,7 @@
           if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
               ~SYM[3] <= ~ARG[8];
-            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] = '1' then~ELSEe~FI
               ~SYM[3] <= ~SYM[2];
             end if;
           end if;
@@ -65,7 +65,7 @@
         begin
           if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
             ~SYM[1] <= ~ARG[9];
-          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] = '1' and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             ~SYM[1] <= ~ARG[11];
           end if;
         end process;
@@ -74,7 +74,7 @@
         begin
           if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
             ~SYM[2] <= ~ARG[10];
-          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[5]) then
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] = '1' and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENfalling_edge~ELSErising_edge~FI(~ARG[5]) then
             ~SYM[2] <= ~ARG[11];
           end if;
         end process;
@@ -83,7 +83,7 @@
         begin
           if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
             ~SYM[3] <= ~ARG[8];
-          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] = '1' and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             ~SYM[3] <= ~SYM[2];
           end if;
         end process;
@@ -122,7 +122,7 @@
           if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
               ~SYM[1] <= ~ARG[8];
-            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] = '1' then~ELSEe~FI
               ~SYM[1] <= ~ARG[9];
             end if;
           end if;
@@ -133,7 +133,7 @@
           if ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
               ~SYM[2] <= ~ARG[8];
-            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] then~ELSEe~FI
+            els~IF ~ISACTIVEENABLE[7] ~THENif ~ARG[7] = '1' then~ELSEe~FI
               ~SYM[2] <= ~ARG[10];
             end if;
           end if;
@@ -145,7 +145,7 @@
         begin
           if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
             ~SYM[1] <= ~ARG[8];
-          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] = '1' and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             ~SYM[1] <= ~ARG[9];
           end if;
         end process;
@@ -154,7 +154,7 @@
         begin
           if ~ARG[6] = ~IF~ISACTIVEHIGH[2]~THEN'1'~ELSE'0'~FI then
             ~SYM[2] <= ~ARG[8];
-          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
+          elsif ~IF ~ISACTIVEENABLE[7] ~THEN ~ARG[7] = '1' and ~ELSE ~FI ~IF~ACTIVEEDGE[Rising][2]~THENrising_edge~ELSEfalling_edge~FI(~ARG[5]) then
             ~SYM[2] <= ~ARG[10];
           end if;
         end process;
