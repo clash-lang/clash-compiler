@@ -47,7 +47,7 @@ import Language.Haskell.TH.Syntax       (showName)
 import Clash.Driver.Types               (KnownDomainTyConUniques(..))
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Name                  (Name (..))
-import Clash.Core.Pretty                (PrettyOptions(..), showPpr, showPpr')
+import Clash.Core.Pretty                (showPpr)
 import Clash.Core.TyCon                 (TyCon(PromotedDataCon), TyConMap, tyConDataCons, tyConName)
 import Clash.Core.Type
   ( ConstTy(..), LitTy (..), Type (..), TypeView (..)
@@ -68,6 +68,7 @@ import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
 import Clash.Signal.Internal (VClockDomainConfiguration(..), Period(..))
 import qualified Clash.Signal.Internal as Signal
+import Clash.Signal.Internal.Name (DomainName(..), renderDomainName)
 
 ghcTypeToHWType
   :: Maybe KnownDomainTyConUniques
@@ -344,20 +345,20 @@ liftE
 liftE = mapExceptT (MaybeT . pure . Just . coerce)
 
 -- The manifest and ~TAG use the same qualified marker and nominal indices.
-domTag :: TyConMap -> Type -> String
-domTag tcm ty = tag False ty ""
+domTag :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) String
+domTag tcm = fmap renderDomainName . tag
  where
-  tag nested (AppTy f x) =
-    showParen nested (tag False f . showChar ' ' . tag True x)
-  tag _ (ConstTy (TyCon tc)) =
+  tag (AppTy f x) = DomainApp <$> tag f <*> tag x
+  tag (ConstTy (TyCon tc)) =
     let promoted = case UniqMap.lookup tc tcm of
           Just PromotedDataCon{} -> "'"
           _ -> ""
-    in showString (promoted ++ unpack (nameStable tc))
-  tag _ (LitTy (SymTy s)) = shows s
-  tag _ (LitTy (CharTy c)) = shows c
-  tag nested (AnnType _ t) = tag nested t
-  tag _ t = showString (showPpr' minBound{useStableNames = True} t)
+    in pure (DomainName (promoted ++ unpack (nameStable tc)))
+  tag (LitTy (SymTy s)) = pure (DomainName (show s))
+  tag (LitTy (CharTy c)) = pure (DomainName (show c))
+  tag (LitTy (NumTy n)) = pure (DomainName (show n))
+  tag (AnnType _ t) = tag t
+  tag t = throwE $ "Cannot name unresolved clock domain type: " ++ showPpr t
 
 domPeriod :: Monad m => Type -> ExceptT String (MaybeT m) Period
 domPeriod (LitTy (NumTy period)) = pure (fromInteger period)
@@ -446,8 +447,8 @@ domainConfig normalize ids m kind dom c = do
   vResetKind     <- domResetKind =<< resolve clockResetKindTCU
   vInitBehavior  <- domInitBehavior =<< resolve clockInitBehaviorTCU
   vResetPolarity <- domResetPolarity =<< resolve clockResetPolarityTCU
-  let vName = domTag m cdom
-      vPeriod = period + frac
+  vName <- domTag m cdom
+  let vPeriod = period + frac
       conf = VClockDomainConfiguration{..}
   modify $ second $ insert cdom conf
   return $ FilteredHWType (c conf) []

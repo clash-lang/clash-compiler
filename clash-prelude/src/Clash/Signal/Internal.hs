@@ -8,6 +8,7 @@ License    :  BSD2 (see the file LICENSE)
 Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 -}
 
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -219,6 +220,7 @@ where
 
 import Data.IORef                 (IORef, atomicModifyIORef, newIORef, readIORef)
 import Type.Reflection            (Typeable, typeRep)
+import Clash.Signal.Internal.Name (renderDomainName, typeRepDomainName)
 import Control.Arrow.Transformer.Automaton
 import Control.Applicative        (liftA3)
 import Control.DeepSeq            (NFData)
@@ -376,8 +378,8 @@ instance Show (SInitBehavior init) where
 -- how to create custom synthesis domains.
 data ClockDomainConfiguration
   = ClockDomainConfiguration
-  { _name :: Domain
-  -- ^ Domain name
+  { _name :: ClockDomain
+  -- ^ Physical clock domain
   , _period :: Nat
   -- ^ Period of clock in /ps/
   , _periodFraction :: Ratio Nat
@@ -524,7 +526,7 @@ instance Show (SRatioNat r) where
     <> show (natToNatural @(Denominator r))
 
 -- | Singleton version of 'ClockDomainConfiguration'
-data SClockDomainConfiguration (dom :: Domain) (conf :: ClockDomainConfiguration) where
+data SClockDomainConfiguration (cdom :: ClockDomain) (conf :: ClockDomainConfiguration) where
   SClockDomainConfiguration ::
     1 <= period =>
     { sPeriod :: SNat period
@@ -540,8 +542,8 @@ data SClockDomainConfiguration (dom :: Domain) (conf :: ClockDomainConfiguration
     -- unknown/undefined, or configurable to a specific value
     , sResetPolarity :: SResetPolarity polarity
     -- ^ Whether resets are active high or active low
-    } -> SClockDomainConfiguration dom
-      ( 'ClockDomainConfiguration dom
+    } -> SClockDomainConfiguration cdom
+      ( 'ClockDomainConfiguration cdom
            period fraction edge reset init polarity
       )
 
@@ -584,7 +586,7 @@ instance KnownResetPolarity ActiveHigh where knownResetPolarity = SActiveHigh
 
 -- | The configuration parameters of a known domain given as a
 -- 'ClockDomainConfiguration'.
-type KnownClockConf dom = 'ClockDomainConfiguration dom
+type KnownClockConf dom = 'ClockDomainConfiguration (ClockDomainOf dom)
   (DomainPeriod dom)
   (DomainPeriodFraction dom)
   (DomainActiveEdge dom)
@@ -716,13 +718,14 @@ type DomainInitBehavior (dom :: Domain) =
 type DomainResetPolarity (dom :: Domain) =
   ClockResetPolarity (ClockDomainOf dom)
 
--- | Returns 'SClockDomainConfiguration' corresponding to an instance's 'KnownDomain'.
+-- | Return the physical clock configuration of a 'KnownDomain'. Logical
+-- domains sharing a clock have the same singleton configuration.
 --
 -- Example usage:
 --
 -- >>> knownClockDomain @System
 -- SClockDomainConfiguration {sPeriod = SNat @10000, sPeriodFraction = type 0 % 1, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
-knownClockDomain :: KnownDomain dom => SClockDomainConfiguration dom (KnownClockConf dom)
+knownClockDomain :: KnownDomain dom => SClockDomainConfiguration (ClockDomainOf dom) (KnownClockConf dom)
 knownClockDomain = SClockDomainConfiguration
   { sPeriod         = SNat
   , sPeriodFraction = knownFraction
@@ -946,7 +949,10 @@ instance Integral Period where
 data VClockDomainConfiguration
   = VClockDomainConfiguration
   { vName :: String
-  -- ^ Corresponds to '_name' of 'ClockDomainConfiguration'
+  -- ^ Unique, qualified name of the physical clock domain, including type and
+  -- kind arguments. Matches the compiler's manifest keys and blackbox @~TAG@.
+  -- When passed to 'createClockDomain', override this with the desired Haskell
+  -- type name instead.
   , vPeriod :: Period
   -- ^ Corresponds to '_period' and '_periodFraction' of 'ClockDomainConfiguration'
   , vActiveEdge :: ActiveEdge
@@ -963,12 +969,12 @@ data VClockDomainConfiguration
 -- | Convert 'SClockDomainConfiguration' to 'VClockDomainConfiguration'.
 -- Should be used in combination with 'createClockDomain' only.
 vClockDomain ::
-  forall dom conf.
-  Typeable dom =>
-  SClockDomainConfiguration dom conf ->
+  forall cdom conf.
+  Typeable cdom =>
+  SClockDomainConfiguration cdom conf ->
   VClockDomainConfiguration
 vClockDomain cfg@SClockDomainConfiguration{} = VClockDomainConfiguration
-  { vName = show $ typeRep @dom
+  { vName = renderDomainName (typeRepDomainName (typeRep @cdom))
   , vPeriod = sClockDomainPeriod cfg
   , vActiveEdge = case cfg.sActiveEdge of
       SRising -> Rising
@@ -983,6 +989,8 @@ vClockDomain cfg@SClockDomainConfiguration{} = VClockDomainConfiguration
       SActiveHigh -> ActiveHigh
       SActiveLow -> ActiveLow
   }
+{-# OPAQUE vClockDomain #-}
+{-# ANN vClockDomain dontTranslate #-}
 
 -- | Clock period in picoseconds, including the fractional part.
 sClockDomainPeriod :: SClockDomainConfiguration dom conf -> Period

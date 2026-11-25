@@ -128,7 +128,7 @@ tests =
               "vActiveEdge = Rising, vResetKind = Asynchronous, " <>
               "vInitBehavior = Defined, vResetPolarity = ActiveHigh}"
             complete p s = [x :: E.Period | (x, "") <- readsPrec p s]
-        readMaybe oldSystem @?= Just vSystem
+        readMaybe oldSystem @?= Just vSystem{vName="System"}
         readMaybe @E.Period "(10000)" @?= Just 10000
         complete 7 "2 % 4" @?= [1/2]
         complete 8 "(2 % 4)" @?= [1/2]

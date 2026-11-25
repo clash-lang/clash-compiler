@@ -54,7 +54,7 @@ Clock domains are now Haskell types. Replace `Signal "System" a` with
 `Signal System a`. For a custom domain, `createClockDomain vSystem{vName="Fast"}`
 declares the type and its instances. To migrate a handwritten `KnownDomain`
 instance, declare `data Fast`, set `type instance ClockDomainOf Fast = Fast`,
-move the clock properties from `KnownClockConf` to the associated types of
+move the clock properties to the associated types of
 `KnownClockDomain Fast`, and add `instance KnownDomain Fast`.
 
 # CHANGED
@@ -67,6 +67,9 @@ Use `hzToPeriod @Period freq` for an exact period or
 # CHANGED
 In `clash-manifest.json`, use a clock port's `domain` field to look up its
 physical clock in `domains`. Keys include the qualified type identity.
+Runtime `vName` uses the same naming convention as the compiler, including
+nominal type and kind arguments. Logical domains sharing a physical clock
+produce the same clock name.
 Whole periods are JSON numbers. For a fractional period, divide the object's
 `numerator` by its `denominator` to obtain picoseconds.
 

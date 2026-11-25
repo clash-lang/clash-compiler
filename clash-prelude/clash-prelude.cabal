@@ -265,6 +265,7 @@ Library
                       Clash.Signal.Delayed.Bundle
                       Clash.Signal.Internal
                       Clash.Signal.Internal.Ambiguous
+                      Clash.Signal.Internal.Name
                       Clash.Signal.Trace
 
                       Clash.Sized.BitVector
