@@ -30,9 +30,11 @@ import           Test.Tasty.Common
 import           Test.Tasty.Ghdl
 import           Test.Tasty.Iverilog
 import           Test.Tasty.Modelsim hiding (ModelSim)
+import           Test.Tasty.Quartus hiding (Quartus)
 import           Test.Tasty.SymbiYosys
 import           Test.Tasty.Verilator hiding (Verilator)
 import           Test.Tasty.Vivado hiding (Vivado)
+import           Test.Tasty.Yosys hiding (Yosys)
 
 {- Note [copy data files hack]
 
@@ -96,6 +98,22 @@ data VerificationTool = SymbiYosys
 data Sim = Vivado | GHDL | IVerilog | ModelSim | Verilator
   deriving (Show, Eq, Bounded, Enum)
 
+-- | Synthesis tools, each with the resources synthesis should use. See
+-- 'hdlSynth'.
+data Synth
+  = VivadoSynth [(T.Text, Int)]
+  -- ^ Synthesize for a Xilinx 7-series part with Vivado, and check the number
+  -- of primitive cells per cell type. Cell types are glob patterns, such as
+  -- @("FD*", 0)@.
+  | YosysSynth [(T.Text, Int)]
+  -- ^ Like 'VivadoSynth', but synthesize with Yosys' @synth_xilinx@. Only runs
+  -- for Verilog: Yosys cannot read VHDL, nor the SystemVerilog Clash generates
+  -- for most types.
+  | QuartusSynth [(T.Text, Int)]
+  -- ^ Synthesize for an Intel Cyclone 10 GX part with Quartus Prime Pro, and
+  -- check rows of the resource usage summary of the synthesis report, such as
+  -- @("Dedicated logic registers", 0)@.
+
 data TestOptions =
   TestOptions
     { hdlSim :: [Sim]
@@ -104,6 +122,10 @@ data TestOptions =
     -- ^ Load hdl into simulators (GHDL, ModelSim, etc.). All simulators except
     -- Vivado need to be listed in `hdlLoad` for `hdlSim` to be able to run. For
     -- Vivado, listing it here is a no-op.
+    , hdlSynth :: [Synth]
+    -- ^ Synthesize every build target with these tools, and check the resources
+    -- synthesis used. Usually combined with @hdlSim=[]@ and a 'buildTargets'
+    -- listing top entities.
     , expectSimFail :: Maybe (TestExitCode, T.Text)
     -- ^ Expect simulation to fail: Nothing if simulation is expected to run
     -- without errors, or Just (part of) the error message the simulation is
@@ -140,6 +162,7 @@ instance Default TestOptions where
     TestOptions
       { hdlSim=[minBound ..]
       , hdlLoad=[minBound ..]
+      , hdlSynth=[]
       , expectClashFail=Nothing
       , expectSimFail=Nothing
       , expectVerificationFail=Nothing
@@ -426,6 +449,40 @@ sbyTests opts@TestOptions {..} parentTmp =
     singleTest t (SbyVerificationTest expectVerificationFail parentTmp (dir t) t)
   dir = targetTempPath parentTmp "symbiyosys"
 
+-- | Generate test trees for synthesizing build targets, see 'hdlSynth'
+synthTests
+  :: TestOptions
+  -> IO FilePath
+  -> HDL
+  -> [TestTree]
+synthTests opts@TestOptions{..} parentTmp target =
+  concatMap synthTest hdlSynth
+ where
+  synthTest synth = case synth of
+    VivadoSynth cells ->
+      [ synthGroup "Vivado" "vivado-synth" $ \dir t ->
+          VivadoSynthTest parentTmp dir (T.pack t) cells ]
+    YosysSynth cells
+      | target == Verilog ->
+        [ synthGroup "Yosys" "yosys" $ \dir t ->
+            YosysSynthTest parentTmp dir (T.pack t) cells ]
+      | otherwise -> []
+    QuartusSynth resources ->
+      [ synthGroup "Quartus" "quartus" $ \dir t ->
+          QuartusSynthTest parentTmp dir (T.pack t) resources ]
+
+  synthGroup
+    :: IsTest t
+    => TestName
+    -> String
+    -- ^ Name of the directory to synthesize in, see 'targetTempPath'
+    -> (IO FilePath -> String -> t)
+    -> TestTree
+  synthGroup name tool mkTest =
+    testGroup name
+      [ singleTest (stepName "synth" t) (mkTest (targetTempPath parentTmp tool t) t)
+      | t <- getBuildTargets opts ]
+
 rmTmpDir :: FilePath -> IO ()
 rmTmpDir = Directory.removeDirectoryRecursive
 
@@ -439,7 +496,7 @@ runTest1 modName opts@TestOptions{..} path target =
   withResource mkTmpDir rmTmpDir $ \tmpDir ->
     dependentTestGroup (show target) AllSucceed
       [ clashTest tmpDir
-      , testGroup "tools" (verifTests tmpDir : hdlTests tmpDir)
+      , testGroup "tools" (verifTests tmpDir : hdlTests tmpDir <> hdlSynthTests tmpDir)
       ]
  where
   mkTmpDir = flip createTempDirectory ("clash-test_" <> modName) =<< getCanonicalTemporaryDirectory
@@ -485,6 +542,10 @@ runTest1 modName opts@TestOptions{..} path target =
       , buildAndSimTests Verilator (verilatorTests opts tmpDir)
       , buildAndSimTests Vivado (vivadoTests opts tmpDir)
       ]
+
+  hdlSynthTests tmpDir
+    | isJust expectClashFail = []
+    | otherwise = synthTests opts tmpDir target
 
   verifTests tmpDir =
     case verificationTool of

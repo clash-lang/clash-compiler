@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -freverse-errors #-}
 
@@ -21,20 +22,20 @@ testBenchAB :: Signal A Bool
 testBenchAB = strictAnd <$> doneA <*> (unsafeSynchronizer clk10 clk20 doneB)
   where
     --Template haskell simulation
-    simOutA = $(collectSimResults (length opsA) $ pack <$> (fst simEntityAB))
-    simOutB = $(collectSimResults (length opsB) $ pack <$> (snd simEntityAB))
+    simOutA = $(collectSimResults (length opsA) $ splitUndefined . pack <$> (fst simEntityAB))
+    simOutB = $(collectSimResults (length opsB) $ splitUndefined . pack <$> (snd simEntityAB))
 
     --topEntity output
     (portA, portB) = topOut topEntityAB clk20 clk10
 
     --Verification
     outputVerifierA = outputVerifierWith
-     (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port A")
+     (\clk rst -> assertMasked clk rst "outputVerifierBitVector Port A")
     outoutVerifierB = outputVerifierWith
-     (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port B")
+     (\clk rst -> assertMasked clk rst "outputVerifierBitVector Port B")
 
-    doneA  = outputVerifierA clk20 clk20 noReset simOutA $ pack <$> portA
-    doneB  = outoutVerifierB clk10 clk10 noReset simOutB $ pack <$> portB
+    doneA  = outputVerifierA clk20 clk20 noReset simOutA $ (0,) . pack <$> portA
+    doneB  = outoutVerifierB clk10 clk10 noReset simOutB $ (0,) . pack <$> portB
 
     -- Testbench clocks
     clk20 :: Clock A
@@ -53,22 +54,22 @@ testBenchBC :: Signal B Bool
 testBenchBC = strictAnd <$> doneA <*> (unsafeSynchronizer clk7 clk10 doneB)
   where
     -- Template haskell simulation
-    simOutA = $(collectSimResults (length opsA) $ pack <$> (fst simEntityBC))
+    simOutA = $(collectSimResults (length opsA) $ splitUndefined . pack <$> (fst simEntityBC))
     simOutB =
       $(collectSimResults (length opsB * 14 `div` 10) $
-          pack <$> (snd simEntityBC))
+          splitUndefined . pack <$> (snd simEntityBC))
 
     -- topEntity output
     (portA, portB) = topOut topEntityBC clk10 clk7
 
     -- Verification
     outputVerifierA = outputVerifierWith
-     (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port A")
+     (\clk rst -> assertMasked clk rst "outputVerifierBitVector Port A")
     outoutVerifierB = outputVerifierWith
-     (\clk rst -> assertBitVector clk rst "outputVerifierBitVector Port B")
+     (\clk rst -> assertMasked clk rst "outputVerifierBitVector Port B")
 
-    doneA  = outputVerifierA clk10 clk10 noReset simOutA $ pack <$> portA
-    doneB  = outoutVerifierB clk7 clk7 noReset simOutB $ pack <$> portB
+    doneA  = outputVerifierA clk10 clk10 noReset simOutA $ (0,) . pack <$> portA
+    doneB  = outoutVerifierB clk7 clk7 noReset simOutB $ (0,) . pack <$> portB
 
     -- Testbench clocks
     clk10 :: Clock B

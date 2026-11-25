@@ -121,7 +121,8 @@ failing test, not every test's pass.
 #### `--auto-detect-tools`
 
 Many tests rely on external tools (`ghdl`, `iverilog`, `verilator`, `vivado`,
-`vsim`/ModelSim, `sby`/SymbiYosys). Passing `--auto-detect-tools` tells the
+`vsim`/ModelSim, `sby`/SymbiYosys, `yosys`, `quartus_syn`/Quartus Prime Pro).
+Passing `--auto-detect-tools` tells the
 testsuite to look on `$PATH` and silently skip tests for any tool that isn't
 installed. Without it, you'd have to spell out `--no-ghdl --no-iverilog ...`
 for everything you don't have.

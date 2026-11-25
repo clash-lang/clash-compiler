@@ -5,6 +5,8 @@ module DualBlockRamDefinitions where
 
 import qualified Prelude as P
 import Clash.Explicit.Prelude
+import Clash.Explicit.Testbench (assertBitVector)
+import Clash.Sized.Internal.BitVector (BitVector(BV))
 
 import DualBlockRamTypes
 
@@ -118,3 +120,19 @@ clk7TH = clockGen @C
 
 twice = concatMap (replicate d2)
 strictAnd !a !b = (&&) a b
+
+-- The conflict tests expect undefined (X) outputs. 'assertBitVector' ignores X
+-- bits in expected values, but Verilator is a two-state simulator: it turns
+-- them into zeroes, which then fail to match. We therefore split every
+-- expected value into a fully defined mask of its undefined bits and its
+-- defined bits, and mask the actual value ourselves.
+splitUndefined :: KnownNat n => BitVector n -> (BitVector n, BitVector n)
+splitUndefined (BV m v) = (BV 0 m, BV 0 v .&. complement (BV 0 m))
+
+-- | 'assertBitVector' for expected values made by 'splitUndefined'. The actual
+-- value is paired with a dummy mask, as 'outputVerifierWith' needs actual and
+-- expected values of the same type.
+assertMasked clk rst msg actual expected =
+  assertBitVector clk rst msg (applyMask <$> actual <*> expected) (snd <$> expected)
+ where
+  applyMask (_, a) (m, _) = a .&. complement m

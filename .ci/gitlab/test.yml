@@ -118,17 +118,17 @@ build-clash-dev:
 suite:vhdl:
   extends: .test-cache
   script:
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-vivado --no-quartus
 
 suite:verilog:
   extends: .test-cache
   script:
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-vivado --no-quartus
 
 suite:systemverilog:
   extends: .test-cache
   script:
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-vivado --no-quartus
 
 # Tests run on local fast machines with Vivado installed. We only run these at night
 # to save resources - as Vivado is quite slow to execute.
@@ -144,7 +144,7 @@ suite:vivado:verilog:
   extends: .test-cache-nightly
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .Verilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys --no-yosys --no-quartus
   tags:
     - local
     - vivado-2022.1-standard
@@ -153,7 +153,7 @@ suite:vivado:systemverilog:
   extends: .test-cache-nightly
   script:
     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+    - bin/clash-testsuite:clash-testsuite -j$THREADS -p .SystemVerilog --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys --no-yosys --no-quartus
   tags:
     - local
     - vivado-2022.1-standard
@@ -173,7 +173,7 @@ suite:vivado:systemverilog:
 #   extends: .test-cache-nightly
 #   script:
 #     - source /opt/tools/Xilinx/Vivado/2022.1/settings64.sh
-#     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys
+#     - bin/clash-testsuite:clash-testsuite -j$THREADS -p .VHDL --hide-successes --no-modelsim --no-ghdl --no-iverilog --no-verilator --no-symbiyosys --no-yosys --no-quartus
 #   tags:
 #     - local
 #     - vivado-2022.1-standard
