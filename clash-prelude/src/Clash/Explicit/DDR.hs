@@ -90,7 +90,7 @@ ddrIn
   => NFDataX a
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriodMultiple dom 2 domDDR
+  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -112,7 +112,7 @@ ddrIn#
   => NFDataX a
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriodMultiple dom 2 domDDR
+  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -193,7 +193,7 @@ ddrOut
   => NFDataX a
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriodMultiple dom 2 domDDR
+  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -213,7 +213,7 @@ ddrOut#
   => NFDataX a
   => KnownDomain dom
   => KnownDomain domDDR
-  => DomainPeriodMultiple dom 2 domDDR
+  => DomainPeriod dom ~ (2 * DomainPeriod domDDR)
   => Clock dom
   -> Reset dom
   -> Enable dom
@@ -268,8 +268,8 @@ ddrOut# clk rst en i0 xs ys =
 ddrForwardClock
   :: forall domDDR domOut domIn
    . KnownDomain domOut
-  => DomainPeriodMultiple domIn 1 domOut
-  => DomainPeriodMultiple domIn 2 domDDR
+  => DomainPeriod domIn ~ DomainPeriod domOut
+  => DomainPeriod domIn ~ (2 * DomainPeriod domDDR)
   => Clock domIn
   -> Reset domIn
   -> Enable domIn
@@ -306,8 +306,8 @@ ddrForwardClock clk rst en idle phase oddr =
 
 ddrForwardClock#
   :: KnownDomain domOut
-  => DomainPeriodMultiple domIn 1 domOut
-  => DomainPeriodMultiple domIn 2 domDDR
+  => DomainPeriod domIn ~ DomainPeriod domOut
+  => DomainPeriod domIn ~ (2 * DomainPeriod domDDR)
   => Clock domIn
   -> Signal domDDR Bit
   -> Clock domOut

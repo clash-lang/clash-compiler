@@ -28,8 +28,6 @@
 --    matter (equivalent to issue #1458).
 
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
 
 module Clash.Tests.Ram (tests) where
 
@@ -39,9 +37,6 @@ import Test.Tasty.HUnit
 
 import Clash.Explicit.Prelude
 import Clash.Explicit.RAM
-
-createClockDomain vSystem{vName="WriteDom", vPeriod=2.5}
-createClockDomain vSystem{vName="ReadDom", vPeriod=2}
 
 type Ram = (   Signal System Int
             -> Signal System Bool
@@ -122,22 +117,9 @@ ramAssertion ram0 samples = actual @?= expectedOutput
                                              (fromList we)
                                              (fromList wr)
                                              (fromList din)
-
--- Writes occur at 0, 2.5, 5, ... ps. A simultaneous read sees the old value.
-fractionalClocks :: Assertion
-fractionalClocks = do
-  let values = asyncRam# (clockGen @WriteDom) (clockGen @ReadDom) enableGen d2
-                 (pure 0) (pure True) (pure 0) (fromList [1 :: Int ..])
-  sampleN 8 (maybeIsX <$> values) @?=
-    [Nothing, Just 1, Just 2, Just 3, Just 4, Just 4, Just 5, Just 6]
-  [snatToNum (SNat @(DomainToHz WriteDom)), snatToNum (SNat @(DomainToHz ReadDom))]
-    @?= L.map (floor @Rational @Integer . periodToHz . vPeriod) [vWriteDom, vReadDom]
-  snatToNum (SNat @(PeriodToCycles WriteDom 5)) @?= (2 :: Integer)
-
 tests :: TestTree
 tests = testGroup "Ram"
-  [ testCase "Fractional clocks" fractionalClocks
-  , testCase "Undefined enable" $ ramAssertion ram undefEn
+  [ testCase "Undefined enable" $ ramAssertion ram undefEn
   , testCase "Undefined write address" $ ramAssertion ram undefWAddr
   , testCase "OOB write address" $ ramAssertion ram oobWAddr
   , testCase "Undefined write data" $ ramAssertion ram undefWData

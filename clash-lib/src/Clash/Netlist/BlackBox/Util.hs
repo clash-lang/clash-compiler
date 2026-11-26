@@ -51,7 +51,6 @@ import           Data.Bitraversable              (bitraverse)
 import           Data.Bool                       (bool)
 import           Data.Coerce                     (coerce)
 import           Data.Containers.ListUtils       (nubOrd)
-import           Data.Fixed                      (Fixed(MkFixed), E3, showFixed)
 import           Data.Foldable                   (foldrM)
 import           Data.Hashable                   (Hashable (..))
 import qualified Data.HashMap.Strict             as HashMap
@@ -597,8 +596,7 @@ renderElem b (Period n) = do
   let (_, ty, _) = bbInputs b !! n
   case stripVoid ty of
     KnownDomain dom ->
-      let ps = MkFixed (floor (1000 * vPeriod dom)) :: Fixed E3
-      in return $ const $ Text.pack $ showFixed True ps
+      return $ const $ Text.pack $ show (vPeriod dom)
     _ ->
       error $ $(curLoc) ++ "Period: Expected `KnownDomain` or `KnownClockConfiguration`, not: " ++ show ty
 
@@ -606,8 +604,8 @@ renderElem _ LongestPeriod = do
   doms <- domainConfigurations
   -- Longest period with a minimum of 100 ns, see:
   -- https://github.com/clash-lang/clash-compiler/issues/2455
-  let longestPeriod = maximum (100_000 : fmap (ceiling . vPeriod) (Map.elems doms))
-  return (const (Text.pack (show @Integer longestPeriod)))
+  let longestPeriod = maximum (100_000 : fmap vPeriod (Map.elems doms))
+  return (const (Text.pack (show longestPeriod)))
 
 renderElem b (Tag n) = do
   let (_, ty, _) = bbInputs b !! n

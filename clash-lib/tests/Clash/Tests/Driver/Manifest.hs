@@ -4,7 +4,7 @@
 module Clash.Tests.Driver.Manifest where
 
 import qualified Data.Aeson as Aeson
-import Data.Aeson ((.:), (.=))
+import Data.Aeson ((.:))
 import qualified Data.Aeson.Encode.Pretty as Aeson
 import qualified Data.Aeson.Types as Aeson
 import Data.ByteString (ByteString)
@@ -15,7 +15,6 @@ import Data.Text (Text)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import GHC.Real (Ratio((:%)))
 
 import Test.Tasty
 import Test.Tasty.HUnit (testCase, (@?=))
@@ -121,9 +120,5 @@ tests =
               let decoded = Aeson.eitherDecode (Aeson.encode manifest)
               fmap (fmap vPeriod . domains) decoded @?=
                 Right (HashMap.singleton "System" expectedPeriod)
-            exactThird = Aeson.object
-              ["numerator" .= (10000 :: Int), "denominator" .= (3 :: Int)]
         check 10000 (Aeson.Number 10000) 10000
-        check (Period (20000 :% 2)) (Aeson.Number 10000) 10000
-        check (10000 / 3) exactThird (10000 / 3)
     ]

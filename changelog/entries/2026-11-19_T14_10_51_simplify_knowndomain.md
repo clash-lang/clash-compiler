@@ -25,10 +25,10 @@ signals can go from the public into the private domain, but not the other way ar
 
 # ADDED
 Clock domains are now implemented through `KnownClockDomain`, which has types
-`ClockPeriod`, `ClockActiveEdge`, `ClockResetKind`, `ClockInitBehavior`, `ClockResetPolarity`, and `ClockPeriodFraction`.
+`ClockPeriod`, `ClockActiveEdge`, `ClockResetKind`, `ClockInitBehavior`, and `ClockResetPolarity`.
 
 # ADDED
-Similar to `knownClockDomain`, the functions `knownActiveEdge`, `knownResetKind`, `knownInitBehavior`, `knownResetPolarity` and `knownFraction`
+Similar to `knownClockDomain`, the functions `knownActiveEdge`, `knownResetKind`, `knownInitBehavior`, and `knownResetPolarity`
 can now be used to obtain singleton versions of domain parameters.
 
 # ADDED
@@ -58,20 +58,11 @@ move the clock properties to the associated types of
 `KnownClockDomain Fast`, and add `instance KnownDomain Fast`.
 
 # CHANGED
-`vPeriod` now holds a `Period` in picoseconds, including any fractional part.
-Use `hzToPeriod @Period freq` for an exact period or
-`floor (hzToPeriod @Period freq)` for the former whole-picosecond result.
-`clockPeriod @dom` gives the whole picoseconds. Use
-`vPeriod (knownVClockDomain @dom)` for the complete period.
-
-# CHANGED
 In `clash-manifest.json`, use a clock port's `domain` field to look up its
 physical clock in `domains`. Keys include the qualified type identity.
 Runtime `vName` uses the same naming convention as the compiler, including
 nominal type and kind arguments. Logical domains sharing a physical clock
 produce the same clock name.
-Whole periods are JSON numbers. For a fractional period, divide the object's
-`numerator` by its `denominator` to obtain picoseconds.
 
 In blackbox templates, `~TAG[n]` expands to the qualified manifest key for
 the physical clock domain of argument `n`. The key can contain punctuation
@@ -84,4 +75,4 @@ Clash can resolve their physical clock, it records that clock in the manifest.
 Clock ports require a resolvable configuration.
 
 # CHANGED
-The clock-configuration API now uses `ClockDomainConfiguration`, `SClockDomainConfiguration`, and `VClockDomainConfiguration`. The related accessors and helpers use clock-domain names too: `KnownClockConf`, `KnownClockConfiguration`, `knownClockDomain`, `knownVClockDomain`, `vClockDomain`, `sClockDomainPeriod`, and `createClockDomain`.
+The clock-configuration API now uses `ClockDomainConfiguration`, `SClockDomainConfiguration`, and `VClockDomainConfiguration`. The related accessors and helpers use clock-domain names too: `KnownClockConf`, `KnownClockConfiguration`, `knownClockDomain`, `knownVClockDomain`, `vClockDomain`, and `createClockDomain`.

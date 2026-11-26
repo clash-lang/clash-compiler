@@ -3,34 +3,28 @@
 module InvalidClockPort where
 
 import Clash.Explicit.Prelude
-import Clash.Signal.Internal (KnownFraction)
-import GHC.Real (Ratio((:%)))
 
-data Physical (whole :: Nat) (frac :: Nat)
-data Virtual (whole :: Nat) (frac :: Nat)
+data Physical (whole :: Nat)
+data Virtual (whole :: Nat)
 
-type instance ClockDomainOf (Virtual whole frac) = Physical whole frac
-type instance ClockDomainOf (Physical whole frac) = Project whole frac
-type family Project whole frac where
-  Project 2 frac = System
-  Project whole frac = Physical whole frac
+type instance ClockDomainOf (Virtual whole) = Physical whole
+type instance ClockDomainOf (Physical whole) = Project whole
+type family Project whole where
+  Project 2 = System
+  Project whole = Physical whole
 
 instance
-  ( KnownNat whole, KnownNat frac, KnownNat (whole - 1)
-  , KnownFraction (frac :% 2), Project whole frac ~ Physical whole frac
-  ) => KnownClockDomain (Physical whole frac) where
-  type ClockPeriod (Physical whole frac) = whole
-  type ClockPeriodFraction (Physical whole frac) = frac :% 2
-  type ClockActiveEdge (Physical whole frac) = 'Rising
-  type ClockResetKind (Physical whole frac) = 'Asynchronous
-  type ClockInitBehavior (Physical whole frac) = 'Defined
-  type ClockResetPolarity (Physical whole frac) = 'ActiveHigh
+  ( KnownNat whole, KnownNat (whole - 1)
+  , Project whole ~ Physical whole
+  ) => KnownClockDomain (Physical whole) where
+  type ClockPeriod (Physical whole) = whole
+  type ClockActiveEdge (Physical whole) = 'Rising
+  type ClockResetKind (Physical whole) = 'Asynchronous
+  type ClockInitBehavior (Physical whole) = 'Defined
+  type ClockResetPolarity (Physical whole) = 'ActiveHigh
 
 -- A bare port does not ask GHC to solve the physical instance's context.
-improperFraction :: Clock (Physical 1 3) -> Bool -> Bool
-improperFraction _ = not
-
-indirectProjection :: Clock (Virtual 2 0) -> Bool -> Bool
+indirectProjection :: Clock (Virtual 2) -> Bool -> Bool
 indirectProjection _ = not
 
 data Populated = Populated

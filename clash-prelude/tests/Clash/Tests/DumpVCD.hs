@@ -10,13 +10,9 @@ import Data.Map.Strict (Map)
 import Data.Maybe (isJust)
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 import Test.Tasty
-import Test.Tasty.HUnit (testCase, assertBool)
-import qualified Data.Text as Text
 import Test.Tasty.Hedgehog (testPropertyNamed)
 import Type.Reflection (typeRep)
 
-import qualified Clash.Explicit.Prelude as E
-import Clash.Tests.Signal (FractionalClock)
 import Clash.Signal.Trace
 import Clash.Sized.BitVector (BitVector, size#)
 import Hedgehog.Extra (LockstepWalk (..), combinations, lockstepWalk)
@@ -52,8 +48,8 @@ parseMetadata dcs = go Nothing Nothing dcs
           MS -> (* 1000) <$> scale US
           US -> (* 1000) <$> scale NS
           NS -> (* 1000) <$> scale PS
-          PS -> (* 1000) <$> scale FS
-          FS -> Right t
+          PS -> Right t
+          FS -> Left "$timescale fs unsupported; raw time in ps"
     t0 <- scale u
     go (Just t0) m dcs0
   go ts Nothing (Vars vs : dcs0) = do
@@ -193,8 +189,6 @@ multiDomainTrace =
               Range.linear 2 4
       -- @common@ scales all periods by a common power of ten factor
       common <- H.forAll $ fmap (10 ^) $ Gen.integral_ $ Range.constant (0 :: Int) 4
-      -- Include fractional picoseconds.
-      fraction <- H.forAll $ Gen.element [1, 0.5, 0.125, 0.003 :: Period]
       -- Interesting behavior of multiple signals is captured by the relation between them.
       -- The relation is defined by the ratios between the periods, which depends only on
       -- the prime factors they do not share. Hence, primes are excellent candidates. It
@@ -217,7 +211,7 @@ multiDomainTrace =
         sampleDuration = min 1000 $ product periodFactors + 10
         signalNames =
           take k ["a", "b", "c", "d"] ++ if isJust duplSignal then ["e"] else []
-        periods = map ((fraction *) . fromIntegral . (* common)) periodFactors
+        periods = map (* common) periodFactors
         periods0
           | Just i <- duplSignal = periods ++ [periods !! i]
           | otherwise = periods
@@ -238,12 +232,11 @@ multiDomainTrace =
             failWithMsg "VCDFile has no SimulationCommands"
       let
         -- The end of sampling is defined pretty weirdly in 'dumpVCD' currently
-        end = toInteger (sampleDuration - 2) * foldl1 gcd periodsFs `div` timeScale
-        periodsFs = map (floor . (1000 *)) periods
+        end = sampleDuration - 2
         signalCorrects =
           map
             ( \(name, (idCode, period, vs)) ->
-                signalCorrect name idCode (floor (1000 * period) `div` timeScale) end vs
+                signalCorrect name idCode (period `div` timeScale) end vs
             )
             $ Map.assocs
             $ Map.intersectionWith
@@ -263,11 +256,5 @@ tests :: TestTree
 tests =
   testGroup
     "DumpVCD"
-    [ testCase "traceSignal and traceVecSignal use the domain period" $ do
-        let signal = traceSignal @FractionalClock "scalar" (E.fromList (cycle [False, True]))
-            vec = traceVecSignal @FractionalClock "vector" ((\x -> x E.:> E.Nil) <$> signal)
-        vcd <- either fail pure =<< dumpVCD (0, 5) vec ["scalar", "vector_0"]
-        assertBool "expected femtosecond ticks" ("$timescale 1fs $end" `Text.isInfixOf` vcd)
-        assertBool "expected a transition at 20.5 ps" ("#20500" `elem` Text.lines vcd)
-    , testPropertyNamed "multiDomainTrace" "multiDomainTrace" $ multiDomainTrace
+    [ testPropertyNamed "multiDomainTrace" "multiDomainTrace" $ multiDomainTrace
     ]

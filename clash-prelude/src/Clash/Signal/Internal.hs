@@ -15,7 +15,6 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -65,21 +64,12 @@ module Clash.Signal.Internal
   , KnownClockConf
   , KnownClockConfiguration
   , knownClockDomain
-  , sClockDomainPeriod
   , KnownResetPolarity(..)
   , KnownInitBehavior(..)
   , KnownResetKind(..)
   , KnownActiveEdge(..)
-  , KnownFraction(..)
   -- ** Domain projections
   , DomainPeriod
-  , DomainPeriodFraction
-  , PeriodNumerator
-  , PeriodDenominator
-  , ScaledPeriod
-  , Numerator
-  , Denominator
-  , DomainPeriodMultiple
   , DomainActiveEdge
   , DomainResetKind
   , DomainInitBehavior
@@ -92,14 +82,12 @@ module Clash.Signal.Internal
   , SResetKind(..)
   , ResetPolarity(..)
   , SResetPolarity(..)
-  , SRatioNat(..)
   , ClockDomainConfiguration(..)
   , SClockDomainConfiguration(..)
   , SupportsSwitchingTo
   , EligibleDomainSwitch
   -- ** Configuration type families
   , ClockDomainConfigurationPeriod
-  , ClockDomainConfigurationPeriodFraction
   , ClockDomainConfigurationActiveEdge
   , ClockDomainConfigurationResetKind
   , ClockDomainConfigurationInitBehavior
@@ -114,7 +102,6 @@ module Clash.Signal.Internal
   , Microseconds
   , Nanoseconds
   , Picoseconds
-  , Period(..)
   -- **** Time conversions
   , DomainToHz
   , HzToPeriod
@@ -234,16 +221,15 @@ import Data.Hashable              (Hashable)
 import Data.Int                   (Int64)
 import Data.Maybe                 (isJust)
 import Data.Proxy                 (Proxy(..))
-import qualified Text.Read as Read
+import Data.Ratio                 (Ratio)
 import Data.Type.Equality         ((:~:)(Refl), testEquality)
 import GHC.Generics               (Generic)
 import GHC.Magic                  (noinline)
 import GHC.Stack                  (HasCallStack, withFrozenCallStack)
 import GHC.Types                  (Type)
 import GHC.TypeError              (Assert, TypeError, ErrorMessage(..))
-import GHC.TypeLits               (Div, KnownNat, Nat, type (<=), type (+), type (*), type (-))
+import GHC.TypeLits               (Div, KnownNat, Nat, type (<=), type (*), type (-))
 import GHC.TypeLits.Extra         (DivRU)
-import GHC.Real                   (Ratio(..), (%), ratioPrec)
 import GHC.Records                (HasField(getField))
 import Language.Haskell.TH.Syntax hiding (Type) -- (Lift (..), Q, Dec)
 import Language.Haskell.TH.Compat
@@ -264,9 +250,9 @@ import Clash.Class.Num            (SaturatingNum(..))
 import Clash.CPP                  (fStrictMapSignal)
 import Clash.Magic                (clashSimulation)
 import Clash.NamedTypes
-import Clash.Promoted.Nat         (SNat(..), natToNatural, snatToNum)
+import Clash.Promoted.Nat         (SNat(..), snatToNum)
 import Clash.XException
-  (NFDataX(..), ShowX, errorX, isX, deepseqX, defaultSeqX, seqX)
+  (NFDataX(..), errorX, isX, deepseqX, defaultSeqX, seqX)
 
 {- $setup
 >>> :set -XDataKinds
@@ -382,8 +368,6 @@ data ClockDomainConfiguration
   -- ^ Physical clock domain
   , _period :: Nat
   -- ^ Period of clock in /ps/
-  , _periodFraction :: Ratio Nat
-  -- ^ Rational fraction of the period (always smaller than one)
   , _activeEdge :: ActiveEdge
   -- ^ Active edge of the clock
   , _resetKind :: ResetKind
@@ -401,32 +385,27 @@ data ClockDomainConfiguration
 -- | Helper type family for 'DomainPeriod'
 type family ClockDomainConfigurationPeriod (config :: ClockDomainConfiguration) :: Nat where
   ClockDomainConfigurationPeriod
-    ('ClockDomainConfiguration name period fraction edge reset init polarity) = period
-
--- | Helper type family for 'DomainPeriodFraction'
-type family ClockDomainConfigurationPeriodFraction (config :: ClockDomainConfiguration) :: Ratio Nat where
-  ClockDomainConfigurationPeriodFraction
-    ('ClockDomainConfiguration name period fraction edge reset init polarity) = fraction
+    ('ClockDomainConfiguration name period edge reset init polarity) = period
 
 -- | Helper type family for 'DomainActiveEdge'
 type family ClockDomainConfigurationActiveEdge (config :: ClockDomainConfiguration) :: ActiveEdge where
   ClockDomainConfigurationActiveEdge
-    ('ClockDomainConfiguration name period fraction edge reset init polarity) = edge
+    ('ClockDomainConfiguration name period edge reset init polarity) = edge
 
 -- | Helper type family for 'DomainResetKind'
 type family ClockDomainConfigurationResetKind (config :: ClockDomainConfiguration) :: ResetKind where
   ClockDomainConfigurationResetKind
-    ('ClockDomainConfiguration name period fraction edge reset init polarity) = reset
+    ('ClockDomainConfiguration name period edge reset init polarity) = reset
 
 -- | Helper type family for 'DomainInitBehavior'
 type family ClockDomainConfigurationInitBehavior (config :: ClockDomainConfiguration) :: InitBehavior where
   ClockDomainConfigurationInitBehavior
-    ('ClockDomainConfiguration name period fraction edge reset init polarity) = init
+    ('ClockDomainConfiguration name period edge reset init polarity) = init
 
 -- | Helper type family for 'DomainResetPolarity'
 type family ClockDomainConfigurationResetPolarity (config :: ClockDomainConfiguration) :: ResetPolarity where
   ClockDomainConfigurationResetPolarity
-    ('ClockDomainConfiguration name period fraction edge reset init polarity) = polarity
+    ('ClockDomainConfiguration name period edge reset init polarity) = polarity
 
 -- | Convenience type to constrain a domain to have synchronous resets. Example
 -- usage:
@@ -489,12 +468,12 @@ type HzToPeriod (hz :: Nat) = Seconds 1 `Div` hz
 
 -- | The domain's clock frequency in hertz, rounded down to a whole hertz.
 type DomainToHz (dom :: Domain) =
-  (Seconds 1 * PeriodDenominator dom) `Div` PeriodNumerator dom
+  Seconds 1 `Div` DomainPeriod dom
 
 -- | Number of clock cycles required at the clock frequency of @dom@ before a minimum
 -- @period@ in picoseconds has passed, rounded up to a whole cycle.
 type PeriodToCycles (dom :: Domain) (period :: Nat) =
-  (period * PeriodDenominator dom) `DivRU` PeriodNumerator dom
+  period `DivRU` DomainPeriod dom
 
 -- | Converts a period in picoseconds to a frequency in hertz. This might lead to rounding
 -- errors.
@@ -504,35 +483,12 @@ type PeriodToHz (period :: Nat) = (Seconds 1) `Div` period
 -- @period@ has passed. The same as 'PeriodToCycles'.
 type ClockDivider (dom :: Domain) (period :: Nat) = PeriodToCycles dom period
 
--- | Helper type family for accessing the numerator of type-level ratios.
-type family Numerator (r :: Ratio a) :: a where
-  Numerator (x :% _) = x
-
--- | Helper type family for accessing the denominator of type-level ratios.
-type family Denominator (r :: Ratio a) :: a where
-  Denominator (_ :% x) = x
-
--- | A value-level witness for the fractional part of a clock period,
--- between zero (inclusive) and one (exclusive).
-data SRatioNat (r :: Ratio Nat) where
-  SRatioNat ::
-    (KnownNat numerator, KnownNat denominator, 1 <= denominator, numerator + 1 <= denominator) =>
-    SRatioNat (numerator :% denominator)
-
-instance Show (SRatioNat r) where
-  show SRatioNat = "type "
-    <> show (natToNatural @(Numerator r))
-    <> " % "
-    <> show (natToNatural @(Denominator r))
-
 -- | Singleton version of 'ClockDomainConfiguration'
 data SClockDomainConfiguration (cdom :: ClockDomain) (conf :: ClockDomainConfiguration) where
   SClockDomainConfiguration ::
     1 <= period =>
     { sPeriod :: SNat period
     -- ^ Period of clock in /ps/
-    , sPeriodFraction :: SRatioNat fraction
-    -- ^ Rational fraction of the period (always smaller than one)
     , sActiveEdge :: SActiveEdge edge
     -- ^ Active edge of the clock (not yet implemented)
     , sResetKind :: SResetKind reset
@@ -544,21 +500,12 @@ data SClockDomainConfiguration (cdom :: ClockDomain) (conf :: ClockDomainConfigu
     -- ^ Whether resets are active high or active low
     } -> SClockDomainConfiguration cdom
       ( 'ClockDomainConfiguration cdom
-           period fraction edge reset init polarity
+           period edge reset init polarity
       )
 
 deriving instance Show (SClockDomainConfiguration dom conf)
 
 type KnownClockConfiguration dom conf = (KnownDomain dom, KnownClockConf dom ~ conf)
-
--- | Evidence for a known clock period fraction in the interval [0, 1).
-class KnownFraction (fraction :: Ratio Nat) where
-  knownFraction :: SRatioNat fraction
-instance
-  (KnownNat numerator, KnownNat denominator, 1 <= denominator, numerator + 1 <= denominator) =>
-  KnownFraction (numerator :% denominator)
- where
-  knownFraction = SRatioNat
 
 -- | Evidence for the active edge to be known.
 class KnownActiveEdge (edge :: ActiveEdge) where
@@ -588,7 +535,6 @@ instance KnownResetPolarity ActiveHigh where knownResetPolarity = SActiveHigh
 -- 'ClockDomainConfiguration'.
 type KnownClockConf dom = 'ClockDomainConfiguration (ClockDomainOf dom)
   (DomainPeriod dom)
-  (DomainPeriodFraction dom)
   (DomainActiveEdge dom)
   (DomainResetKind dom)
   (DomainInitBehavior dom)
@@ -630,7 +576,6 @@ class
   ( Typeable cdom
   , KnownNat (ClockPeriod cdom)
   , KnownNat (ClockPeriod cdom - 1)
-  , KnownFraction (ClockPeriodFraction cdom)
   , KnownActiveEdge (ClockActiveEdge cdom)
   , KnownResetKind (ClockResetKind cdom)
   , KnownInitBehavior (ClockInitBehavior cdom)
@@ -644,8 +589,6 @@ class
   type ClockResetKind cdom :: ResetKind
   type ClockInitBehavior cdom :: InitBehavior
   type ClockResetPolarity cdom :: ResetPolarity
-  type ClockPeriodFraction cdom :: Ratio Nat
-  type ClockPeriodFraction cdom = 0 :% 1
 
 -- | For synthesis, declare a domain as a data type with no constructors.
 -- It may have type parameters, as in the @Secure@ example below.
@@ -675,32 +618,9 @@ class
   ) =>
   KnownDomain (dom :: Domain)
 
--- | Whole picoseconds in the clock period. See also 'DomainPeriodFraction'.
+-- | The clock period in picoseconds associated with @dom@
 type DomainPeriod (dom :: Domain) =
   ClockPeriod (ClockDomainOf dom)
-
--- | The rational fraction of the clock period associated with @dom@
-type DomainPeriodFraction (dom :: Domain) =
-  ClockPeriodFraction (ClockDomainOf dom)
-
--- | Denominator of the complete clock period in picoseconds. The ratio need
--- not be in lowest terms; use together with 'PeriodNumerator'.
-type PeriodDenominator dom = Denominator (DomainPeriodFraction dom)
-
--- | Numerator of the complete clock period in picoseconds. Includes both the
--- whole and fractional parts; use together with 'PeriodDenominator'.
-type PeriodNumerator dom = ScaledPeriod (DomainPeriod dom) (DomainPeriodFraction dom)
-
--- | Numerator of a whole period plus a fractional period. Wait for the
--- fraction to be known before asking the KnownNat solver to
--- decompose the arithmetic in a polymorphic ClockDivider constraint.
-type family ScaledPeriod (whole :: Nat) (fraction :: Ratio Nat) :: Nat where
-  ScaledPeriod whole (n :% d) = whole * d + n
-
--- | The period of @slow@ is exactly @n@ times the period of @fast@.
-type DomainPeriodMultiple slow n fast =
-  (PeriodNumerator slow * PeriodDenominator fast)
-    ~ (n * PeriodNumerator fast * PeriodDenominator slow)
 
 -- | The active clock edge associated with @dom@
 type DomainActiveEdge (dom :: Domain) =
@@ -724,11 +644,10 @@ type DomainResetPolarity (dom :: Domain) =
 -- Example usage:
 --
 -- >>> knownClockDomain @System
--- SClockDomainConfiguration {sPeriod = SNat @10000, sPeriodFraction = type 0 % 1, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
+-- SClockDomainConfiguration {sPeriod = SNat @10000, sActiveEdge = SRising, sResetKind = SAsynchronous, sInitBehavior = SDefined, sResetPolarity = SActiveHigh}
 knownClockDomain :: KnownDomain dom => SClockDomainConfiguration (ClockDomainOf dom) (KnownClockConf dom)
 knownClockDomain = SClockDomainConfiguration
   { sPeriod         = SNat
-  , sPeriodFraction = knownFraction
   , sActiveEdge     = knownActiveEdge
   , sResetKind      = knownResetKind
   , sInitBehavior   = knownInitBehavior
@@ -819,122 +738,6 @@ vXilinxSystem = vClockDomain (knownClockDomain @XilinxSystem)
 -- how to create custom synthesis domains.
 data XilinxSystem
 
--- | A precise period given in picoseconds.
--- Converting a 'Period' with 'fromIntegral' discards fractional picoseconds,
--- while 'toRational' preserves them.
-newtype Period = Period (Ratio Nat)
-  deriving stock   ( Lift )
-  deriving newtype ( NFDataX, NFData, ShowX, Eq, Ord, Binary
-                   , Enum, Num, Real, RealFrac, Fractional, Hashable
-                   )
-
-instance Show Period where
-  show (Period (n :% m))
-    | n `mod` m == 0 = show (n `div` m) <> " ps"
-    | n `div` m == 0 = show n <> "/" <> show m <> " ps"
-    | otherwise      = show (n `div` m) <> " + "
-                    <> show (n `mod` m) <> "/" <> show m <> " ps"
-
--- Accept earlier clock configurations with a bare Natural or a Ratio.
-instance Read Period where
-  readPrec = Read.parens withSuffix Read.<++ (fromIntegral <$> natural)
-   where
-    natural = Read.readPrec :: Read.ReadPrec Natural
-    withSuffix = do
-      whole <- natural
-      part <- Read.lexP
-      case part of
-        Read.Ident "ps" -> pure (fromIntegral whole)
-        Read.Symbol "%" -> Read.prec ratioPrec (fraction whole)
-        Read.Symbol "/" -> fraction whole <* ps
-        Read.Symbol "+" -> do
-          n <- natural
-          Read.Symbol "/" <- Read.lexP
-          (fromIntegral whole +) <$> fraction n <* ps
-        _ -> Read.pfail
-    ps = do
-      Read.Ident "ps" <- Read.lexP
-      pure ()
-    fraction n = do
-      d <- Read.step natural
-      if d == 0 then Read.pfail else pure (Period (n % d))
-
--- Some notes on the `Integral Period` instance given below:
---
---  1. The instance satisfies:
---
---        (x `quot` y) * y + (x `rem` y) == x
---     && (x `div`  y) * y + (x `mod` y) == x
---
---     It further ensures that the quotient is always an integer and that
---     @rem x y < y && rem x y >= 0 @, which are the desired properties for
---     splitting rationals into their corresponding integer and fractional
---     parts.
---
---     Machine checkable proofs for the aforementioned properties are given in
---     `clash-prelude/src/Clash/Signal/Internal/IntegralPeriodProperties.agda`.
---     The proof are only given for `quot` and `rem`, as for rationals over the
---     naturals `quot` / `rem` and `div` / `mod` always coincide.
---
---  2. One may consider to use of the following alternative definition for the
---     reminder:
---
---     rem x y = let Period (n :% m) = x / y
---                in Period ((n `mod` m) :% (denominator x * denominator y))
---
---     However, this definition will break the aforementioned laws due to
---     @x / y@ returning a normalized fraction. It is crucial here that the
---     intermediate result is not normalized to satisfy the aforementioned
---     laws. Study the result of @quot (3 / 4) (6 / 5)@ to see the particular
---     difference.
---
---  3. While the aforementioned properties do hold, they are no sufficient
---     condition for 'Period' to be an Euclidean domain. Due to the infinite
---     density of the rationals it is considered impossible to define them as
---     such. In this particular case, the proof sketch below can be used to
---     disproof the instance being Euclidean. This is no strong limitation
---     though, as the properties of (1) are still sufficient for our purposes.
---
---     Proof sketch:
---
---     To be an Euclidean domain, there must exist an Euclidean function
---
---        f :: Period -> Positive Natural
---
---     such that if `rem x y /= 0` then `f y > f (rem x y)`. For the sake of
---     contradiction assume such f would exist. Then
---
---     * Pick (i / n) s.t. f (i / n) is minimal with i > 1 and n /= 0,
---       i.e., there are no i' and n' with i' > 1 and n' /= 0 s.t.
---       f (i' / n') < f (i / n). Such i and n must exist, since f is total
---       and maps to the positive integers.
---     * Pick j s.t. abs j is a prime and j > i (hence: gcd i j == 1)
---     * Then: `rem (j / n) (i / n) /= 0`
---         => Proof by contraction, assume the opposite:
---            -> rem (j / n) (i / n) == 0
---            -> ((j * n) `mod` (i * n)) / (n * n) == 0
---            -> (j * n) `mod` (i * n) == 0
---            -> exists k s.t. j * n == k * i * n
---            -> exists k s.t. j == k * i
---            -> gcd i j is a multiple of i
---            -> gcd i j /= 1
---     * Since `rem (j / n) (i / n) /= 0` it must hold
---       f (i / n) > f (rem (j / n) (i / n)) which contradicts minimality
---       of the chosen (i / n). Consequently, such function f cannot exist.
---     * QED
---
-instance Integral Period where
-  quotRem (Period (a :% b)) (Period (c :% d)) =
-    ( Period $ ((a * d) `div` (b * c)) % 1
-    , Period $ ((a * d) `mod` (b * c)) % (b * d)
-    )
-  quot x y = fst $ quotRem x y
-  rem x y = snd $ quotRem x y
-  div = quot
-  mod = rem
-  divMod = quotRem
-  toInteger (Period (n :% m)) = toInteger $ n `div` m
-
 -- | Same as SClockDomainConfiguration but allows for easy updates through record update syntax.
 -- Should be used in combination with 'vClockDomain' and 'createClockDomain'. Example:
 --
@@ -953,8 +756,8 @@ data VClockDomainConfiguration
   -- kind arguments. Matches the compiler's manifest keys and blackbox @~TAG@.
   -- When passed to 'createClockDomain', override this with the desired Haskell
   -- type name instead.
-  , vPeriod :: Period
-  -- ^ Corresponds to '_period' and '_periodFraction' of 'ClockDomainConfiguration'
+  , vPeriod :: Natural
+  -- ^ Corresponds to '_period' of 'ClockDomainConfiguration'
   , vActiveEdge :: ActiveEdge
   -- ^ Corresponds to '_activeEdge' of 'ClockDomainConfiguration'
   , vResetKind :: ResetKind
@@ -975,7 +778,7 @@ vClockDomain ::
   VClockDomainConfiguration
 vClockDomain cfg@SClockDomainConfiguration{} = VClockDomainConfiguration
   { vName = renderDomainName (typeRepDomainName (typeRep @cdom))
-  , vPeriod = sClockDomainPeriod cfg
+  , vPeriod = snatToNum cfg.sPeriod
   , vActiveEdge = case cfg.sActiveEdge of
       SRising -> Rising
       SFalling -> Falling
@@ -991,15 +794,6 @@ vClockDomain cfg@SClockDomainConfiguration{} = VClockDomainConfiguration
   }
 {-# OPAQUE vClockDomain #-}
 {-# ANN vClockDomain dontTranslate #-}
-
--- | Clock period in picoseconds, including the fractional part.
-sClockDomainPeriod :: SClockDomainConfiguration dom conf -> Period
-sClockDomainPeriod cfg@SClockDomainConfiguration{} =
-  snatToNum cfg.sPeriod + periodFraction cfg.sPeriodFraction
- where
-  periodFraction :: forall (srn :: Ratio Nat). SRatioNat srn -> Period
-  periodFraction SRatioNat = Period
-    $ natToNatural @(Numerator srn) % natToNatural @(Denominator srn)
 
 -- TODO: Function might reject valid type names. Figure out what's allowed.
 isValidClockDomainName :: String -> Bool
@@ -1043,7 +837,6 @@ createClockDomain cfg@VClockDomainConfiguration{} =
     kcdType <- [t| KnownClockDomain $nameT |]
     kdType <- [t| KnownDomain $nameT |]
     kpType <- [t| $periodT |]
-    kfType <- [t| $numeratorT :% $denominatorT |]
     keType <- [t| $edgeT |]
     krType <- [t| $resetKindT |]
     kiType <- [t| $initT |]
@@ -1051,7 +844,6 @@ createClockDomain cfg@VClockDomainConfiguration{} =
 
     let vNameImpl = AppE (VarE 'vClockDomain) (AppTypeE (VarE 'knownClockDomain) (ConT name))
         kpImpl = mkTySynInstD ''ClockPeriod         [ConT name] kpType
-        kfImpl = mkTySynInstD ''ClockPeriodFraction [ConT name] kfType
         keImpl = mkTySynInstD ''ClockActiveEdge     [ConT name] keType
         krImpl = mkTySynInstD ''ClockResetKind      [ConT name] krType
         kiImpl = mkTySynInstD ''ClockInitBehavior   [ConT name] kiType
@@ -1078,7 +870,7 @@ createClockDomain cfg@VClockDomainConfiguration{} =
       , [ mkTySynInstD ''ClockDomainOf [ConT name] (ConT name)
           -- KnownClockDomain instance (ex: instance KnownClockDomain System where ...)
         , InstanceD Nothing [] kcdType
-            [kpImpl, kfImpl, keImpl, krImpl, kiImpl, koImpl]
+            [kpImpl, keImpl, krImpl, kiImpl, koImpl]
           -- KnownDomain instance (ex: instance KnownDomain System)
         , InstanceD Nothing [] kdType []
         ]
@@ -1091,12 +883,6 @@ createClockDomain cfg@VClockDomainConfiguration{} =
   name = mkName cfg.vName
   nameT = pure $ ConT name
   periodT = pure $ LitT $ NumTyLit $ toInteger cfg.vPeriod
-  (numeratorT, denominatorT) =
-    let Period (n :% m) = cfg.vPeriod
-    in ( pure $ LitT $ NumTyLit $ toInteger $ n `mod` m
-       , pure $ LitT $ NumTyLit $ toInteger m
-       )
-
   edgeT = pure $ case cfg.vActiveEdge of
     Rising -> PromotedT 'Rising
     Falling -> PromotedT 'Falling
@@ -1567,8 +1353,7 @@ tbClockGen done = noinline const (Clock Nothing) done
 --
 newtype Femtoseconds = Femtoseconds Int64
   -- No 'Integral' instance to prevent accidental picoseconds / femtoseconds mixup
-  deriving stock    (Show, Eq, Ord, Generic, Lift)
-  deriving anyclass (NFDataX, NFData)
+  deriving (Show, Eq, Generic, NFDataX, NFData, Lift, Ord)
 
 -- | Strip newtype wrapper 'Femtoseconds'
 unFemtoseconds :: Femtoseconds -> Int64
@@ -2491,13 +2276,8 @@ simulate_lazy f = sample_lazy . f . fromList_lazy
 --
 -- I.e., to calculate the clock period for a circuit to run at 240 MHz we get
 --
--- >>> hzToPeriod @Period 240e6
--- 4166 + 2/3 ps
---
--- The 'Period' type application is optional, but recommended if no other type
--- is enforced by the context. Otherwise, GHC most likely will default to
--- 'GHC.Types.Double', which is imprecise in comparison to @Period@ being
--- defined as a newtype over @Ratio Natural@ instead.
+-- >>> hzToPeriod 240e6
+-- 4166
 --
 -- If the value @hzToPeriod@ is applied to is not of the type 'Ratio'
 -- 'Natural', you can use @hzToPeriod ('realToFrac' f)@. Note that if @f@ is
@@ -2505,24 +2285,17 @@ simulate_lazy f = sample_lazy . f . fromList_lazy
 -- t'Control.Exception.ArithException'@ without a call stack, making debugging
 -- cumbersome.
 --
--- Before Clash 1.12, this function always returned an 'Integral' type with
--- the result being rounded down. To get back this behavior of the function
--- combine it with 'floor':
+-- Before Clash 1.8, this function always returned a 'Natural'. To get the old
+-- behavior of this function, use a type application:
 --
--- >>> floor (hzToPeriod @Period 240e6)
--- 4166
---
--- Before Clash 1.8, this function always returned a 'Natural'. To get back
--- this behavior of the function combine it with 'floor' and use a type
--- application:
---
--- >>> floor @_ @Natural (hzToPeriod @Period 240e6)
+-- >>> hzToPeriod @Natural 240e6
 -- 4166
 --
 -- * __NB__: This function is not synthesizable
-hzToPeriod :: (HasCallStack, Fractional a) => Ratio Natural -> a
+-- * __NB__: This function is lossy. I.e., @periodToHz . hzToPeriod /= id@.
+hzToPeriod :: (HasCallStack, Integral a) => Ratio Natural -> a
 hzToPeriod freq
-  | freq > 0  = fromRational $ toRational $ (1.0 / freq) / 1e-12
+  | freq > 0  = floor ((1.0 / freq) / 1e-12)
   | otherwise = withFrozenCallStack $ error "Zero frequency"
 
 -- | Calculate the period in __fs__, given a frequency in __Hz__
@@ -2552,16 +2325,21 @@ hzToFs freq
 -- >>> periodToHz 5000
 -- 2.0e8
 --
--- Before Clash 1.8, this function returned a 'Ratio' 'Natural'. Use a type
--- application to select that result for a period in whole picoseconds:
+-- Note that if @p@ in @periodToHz ('fromIntegral' p)@ is negative,
+-- @fromIntegral@ will give an @'Control.Exception.Underflow' ::
+-- t'Control.Exception.ArithException'@ without a call stack, making debugging
+-- cumbersome.
 --
--- >>> periodToHz @(Ratio Natural) (5000 :: Natural)
+-- Before Clash 1.8, this function always returned a 'Ratio'
+-- 'Natural'. To get the old behavior of this function, use a type application:
+--
+-- >>> periodToHz @(Ratio Natural) 5000
 -- 200000000 % 1
 --
 -- __NB__: This function is not synthesizable
-periodToHz :: forall hz period. (HasCallStack, Fractional hz, Real period) => period -> hz
+periodToHz :: (HasCallStack, Fractional a) => Natural -> a
 periodToHz period
-  | period > 0 = fromRational $ 1.0 / (toRational period * 1e-12)
+  | period > 0 = fromRational $ 1.0 / (fromIntegral period * 1e-12)
   | otherwise  = withFrozenCallStack $ error "Zero period"
 
 -- | Calculate the frequency in __Hz__, given the period in __fs__
@@ -2648,9 +2426,8 @@ clockTicks clkA clkB = clockTicksEither (toEither clkA) (toEither clkB)
     | Just periods <- maybePeriods =
         Right (unFemtosecondsSignal periods)
     | otherwise =
-        -- Dynamic clocks count femtoseconds. Quantize only after scaling
-        -- the entire period, including its fractional picoseconds.
-        Left (floor (1000 * sClockDomainPeriod (knownClockDomain @dom)))
+        -- Dynamic clocks count femtoseconds.
+        Left (1000 * snatToNum (sPeriod (knownClockDomain @dom)))
 
   -- Coerce whole signal instead of `fmap coerce` to prevent useless constructor
   -- packing and unpacking.

@@ -677,7 +677,6 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
                  map show [ ''ClockDomainOf      , ''ClockPeriod
                           , ''ClockActiveEdge    , ''ClockResetKind
                           , ''ClockInitBehavior  , ''ClockResetPolarity
-                          , ''ClockPeriodFraction
                           ]
             then UniqDSet.addOneToUniqDSet s
                    $ FamInstEnv.famInstTyCon inst
@@ -688,7 +687,6 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
              , clockDomainOfTC
              , clockInitBehaviorTC
              , clockPeriodTC
-             , clockPeriodFractionTC
              , clockResetKindTC
              , clockResetPolarityTC
              ] <- knownTyCons
@@ -699,7 +697,6 @@ loadModules startAction useColor hdl modName dflagsM idirs = do
              , clockResetKindTCU      = fromTC clockResetKindTC
              , clockInitBehaviorTCU   = fromTC clockInitBehaviorTC
              , clockResetPolarityTCU  = fromTC clockResetPolarityTC
-             , clockPeriodFractionTCU = fromTC clockPeriodFractionTC
              }
           | otherwise = Nothing
          where

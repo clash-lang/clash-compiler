@@ -10,7 +10,7 @@ import qualified Prelude as P
 import System.Environment (getArgs)
 import System.FilePath ((</>))
 
-createClockDomain vSystem{vName="Fast", vPeriod=5000.5, vActiveEdge=Falling}
+createClockDomain vSystem{vName="Fast", vPeriod=5000, vActiveEdge=Falling}
 
 data Tagged a
 type instance ClockDomainOf (Tagged a) = a
@@ -48,7 +48,7 @@ mainVerilog = do
         unless (fragment `isInfixOf` contents) $
           fail ("Missing " <> show fragment <> " in " <> file)
   check (dir </> "topEntity.v") "negedge clk"
-  check (dir </> "topEntity.sdc") "-period 5.000500 -waveform {0.000 2.500250}"
+  check (dir </> "topEntity.sdc") "-period 5.000 -waveform {0.000 2.500}"
   check (root </> show 'clockPort </> "clockPort.v") "assign result = clkN;"
   Just manifest <- Manifest.readManifest (dir </> Manifest.manifestFilename)
   unless (P.any ((== 27123) . vPeriod) (Manifest.domains manifest)) $

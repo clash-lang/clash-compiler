@@ -144,8 +144,8 @@
       -- ~IF~ISACTIVEENABLE[1]~THENtbClockGen~ELSEclockGen~FI begin
       -- pragma translate_off
       ~GENSYM[clkGen][0] : process is
-        constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0] ps / 2;
-        constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0] ps - ~SYM[1];
+        constant ~GENSYM[half_periodH][1] : time := ~PERIOD[0]000 fs / 2;
+        constant ~GENSYM[half_periodL][2] : time := ~PERIOD[0]000 fs - ~SYM[1];
       begin
         ~RESULT <= ~IF~ACTIVEEDGE[Rising][0]~THEN'0'~ELSE'1'~FI;
         wait for ~LONGESTPERIOD ps;
