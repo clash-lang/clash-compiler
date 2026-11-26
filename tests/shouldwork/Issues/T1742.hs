@@ -7,7 +7,7 @@ import           Clash.Annotations.SynthesisAttributes
 import           Clash.Annotations.TopEntity
 import           Clash.Annotations.TH
 
-createDomain vSystem{vName="Bank2C", vPeriod=20000, vResetKind=Asynchronous, vResetPolarity=ActiveLow}
+createClockDomain vSystem{vName="Bank2C", vPeriod=20000, vResetKind=Asynchronous, vResetPolarity=ActiveLow}
 
 type Pin t x y = t `Annotate` 'StringAttr "chip_pin" x
                    `Annotate` 'StringAttr "altera_attribute" ("-name IO_STANDARD \"" `AppendSymbol` y `AppendSymbol` "\"")

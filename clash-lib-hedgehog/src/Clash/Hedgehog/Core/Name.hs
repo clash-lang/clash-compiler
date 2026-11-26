@@ -45,12 +45,14 @@ genOccNameWith f =
     (fmap f (Gen.fake Fake.words))
 
 genName :: forall m a. MonadGen m => m OccName -> m (Name a)
-genName genOccName =
+genName genOccName = do
+  name <- genOccName
   Name
     <$> Gen.element [User, System, Internal]
-    <*> genOccName
+    <*> pure name
     <*> genUnique
     <*> pure noSrcSpan
+    <*> pure name
 
 genKindName :: forall m. MonadGen m => m KiName
 genKindName = genName (genOccNameWith Text.toTitle)

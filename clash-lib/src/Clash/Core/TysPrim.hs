@@ -186,7 +186,7 @@ integerPrimTc =
       }
     rhs = DataTyCon [isDc,ipDc,inDc]
   in
-    AlgTyCon uniq name liftedTypeKind 0 rhs False
+    AlgTyCon uniq name liftedTypeKind 0 rhs False Nothing
 
 naturalNsDc = nsDc
   where
@@ -222,7 +222,7 @@ naturalPrimTc =
       }
     rhs = DataTyCon [nsDc,nbDc]
    in
-    AlgTyCon uniq name liftedTypeKind 0 rhs False
+    AlgTyCon uniq name liftedTypeKind 0 rhs False Nothing
 charPrimTc    = liftedPrimTC charPrimTyConName
 stringPrimTc  = liftedPrimTC stringPrimTyConName
 wordPrimTc    = liftedPrimTC wordPrimTyConName

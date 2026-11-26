@@ -102,7 +102,7 @@ module Clash.Signal.Trace
 import           Clash.Annotations.Primitive (hasBlackBox)
 import           Clash.Signal.Internal (fromList)
 import           Clash.Signal
-  (KnownDomain(..), SDomainConfiguration(..), Signal, bundle, unbundle)
+  (KnownDomain, knownClockDomain, SClockDomainConfiguration(..), Signal, bundle, unbundle)
 import           Clash.Sized.Vector    (Vec, iterateI)
 import qualified Clash.Sized.Vector    as Vector
 import           Clash.Class.BitPack   (BitPack, BitSize, pack, unpack)
@@ -244,8 +244,8 @@ traceSignal
   -- ^ Signal to trace
   -> Signal dom a
 traceSignal traceName signal =
-  case knownDomain @dom of
-    SDomainConfiguration{sPeriod} ->
+  case knownClockDomain @dom of
+    SClockDomainConfiguration{sPeriod} ->
       unsafePerformIO $
         traceSignal# traceMap# (snatToNum sPeriod) traceName signal
 {-# OPAQUE traceSignal #-}
@@ -292,8 +292,8 @@ traceVecSignal
   -- ^ Signal to trace
   -> Signal dom (Vec (n+1) a)
 traceVecSignal traceName signal =
-  case knownDomain @dom of
-    SDomainConfiguration{sPeriod} ->
+  case knownClockDomain @dom of
+    SClockDomainConfiguration{sPeriod} ->
       unsafePerformIO $
         traceVecSignal# traceMap# (snatToNum sPeriod) traceName signal
 {-# OPAQUE traceVecSignal #-}

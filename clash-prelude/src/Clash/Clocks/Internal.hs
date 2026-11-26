@@ -27,7 +27,6 @@ import Clash.CPP (haddockOnly)
 import Clash.Explicit.Reset (resetSynchronizer)
 import Clash.Explicit.Signal (unsafeSynchronizer)
 import Clash.Magic (setName)
-import Clash.Promoted.Symbol (SSymbol(..))
 import Clash.Signal.Internal
   (clockGen, Clock(..), Domain, KnownDomain, Reset, Signal, unsafeFromActiveLow,
    unsafeToActiveLow)
@@ -51,7 +50,7 @@ deriveClocksInstance n =
         type ClocksCxt $instType = $cxtType
         type NumOutClocks $instType = $numOutClocks
 
-        clocks (Clock _ Nothing) $(varP rst) = $funcImpl
+        clocks (Clock Nothing) $(varP rst) = $funcImpl
         clocks _ _ = error "clocks: dynamic clocks unsupported"
         {-# OPAQUE clocks #-}
     |]
@@ -73,7 +72,7 @@ deriveClocksInstance n =
   lockImpl = [|
     unsafeSynchronizer clockGen clockGen (unsafeToActiveLow $(varE rst))
     |]
-  clkImpls = replicate n [| Clock SSymbol Nothing |]
+  clkImpls = replicate n [| Clock Nothing |]
   funcImpl = tupE $ clkImpls <> [lockImpl]
 
 -- Derive instances for up to and including 18 clocks, except when we are

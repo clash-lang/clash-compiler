@@ -16,38 +16,24 @@ Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
-string refers to a single /synthesis domain/. A synthesis domain describes the
-behavior of certain aspects of memory elements in it. More specifically, a
-domain looks like:
+For synthesis, /dom/ is a data type with no constructors. It may have type
+parameters. For a 'KnownDomain', 'ClockDomainOf' identifies the physical
+clock that supplies its clock period,
+active edge, reset behavior and initial values. 'KnownClockConf' gives the complete
+'ClockDomainConfiguration' for /dom/. Multiple domains may share a physical clock.
+
+The built-in 'System' supplies its own clock configuration.
 
 @
-'DomainConfiguration'
-  { _name :: 'Domain'
-  -- ^ Domain name
-  , _period :: 'Clash.Promoted.Nat.Nat'
-  -- ^ Clock period in \/ps\/
-  , _activeEdge :: 'ActiveEdge'
-  -- ^ Active edge of the clock
-  , _resetKind :: 'ResetKind'
-  -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-  , _initBehavior :: 'InitBehavior'
-  -- ^ Whether the initial (or "power up") value of memory elements is
-  -- unknown/undefined, or configurable to a specific value
-  , _resetPolarity :: ResetPolarity
-  -- ^ Whether resets are active high or active low
-  }
-@
+type instance ClockDomainOf System = System
+instance KnownClockDomain System where
+  type ClockPeriod System        = 10000
+  type ClockActiveEdge System    = 'Rising
+  type ClockResetKind System     = 'Asynchronous
+  type ClockInitBehavior System  = 'Defined
+  type ClockResetPolarity System = 'ActiveHigh
 
-Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, an instance of 'KnownDomain' should be
-made. Clash provides an implementation 'System' with some common options
-chosen:
-
-@
-instance KnownDomain 'System' where
-  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+instance KnownDomain System
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -56,7 +42,7 @@ asynchronously to changes in their resets, and have defined power up values
 if applicable.
 
 In order to create a new domain, you don't have to instantiate it explicitly.
-Instead, you can have 'createDomain' create a domain for you. You can also use
+Instead, you can have 'createClockDomain' create a domain for you. You can also use
 the same function to subclass existing domains.
 
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
@@ -87,9 +73,24 @@ module Clash.Signal
   , BiSignalDefault(..)
     -- * Domain
   , Domain
+  , ClockDomain
   , sameDomain
-  , KnownDomain(..)
-  , KnownConfiguration
+  , switchDomain
+  , switchClockDomain
+  , switchResetDomain
+  , switchEnableDomain
+  , KnownDomain
+  , ClockDomainOf
+  , clockDomainOfSelf
+  , KnownClockDomain(..)
+  , KnownClockConfiguration
+  , KnownClockConf
+    -- ** Domain projections
+  , DomainPeriod
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
@@ -98,14 +99,10 @@ module Clash.Signal
   , SResetKind(..)
   , ResetPolarity(..)
   , SResetPolarity(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
+  , ClockDomainConfiguration(..)
+  , SClockDomainConfiguration(..)
+  , SupportsSwitchingTo
+  , EligibleDomainSwitch
     -- *** Convenience types
     -- $conveniencetypes
 
@@ -132,10 +129,11 @@ module Clash.Signal
   , vIntelSystem
   , vXilinxSystem
     -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , createDomain
-  , knownVDomain
+  , VClockDomainConfiguration(..)
+  , vClockDomain
+  , knownClockDomain
+  , createClockDomain
+  , knownVClockDomain
   , clockPeriod
   , activeEdge
   , resetKind
@@ -175,23 +173,27 @@ module Clash.Signal
   , exposeClock
   , withClock
   , hasClock
+  , switchHiddenClockDomain
     -- ** Hidden reset
   , HiddenReset
   , hideReset
   , exposeReset
   , withReset
   , hasReset
+  , switchHiddenResetDomain
     -- ** Hidden enable
   , HiddenEnable
   , hideEnable
   , exposeEnable
   , withEnable
   , hasEnable
+  , switchHiddenEnableDomain
     -- ** Hidden clock, reset, and enable
   , HiddenClockResetEnable
   , hideClockResetEnable
   , exposeClockResetEnable
   , withClockResetEnable
+  , switchHiddenClockResetEnableDomain
   , SystemClockResetEnable
     -- * Basic circuit functions
   , andEnable
@@ -286,7 +288,7 @@ import           Clash.Signal.Internal hiding
   (sample, sample_lazy, sampleN, sampleN_lazy, simulate, simulate_lazy, testFor,
    signalAutomaton)
 import           Clash.Signal.Internal.Ambiguous
-  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
+  (knownVClockDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import           Clash.XException      (NFDataX, ShowX)
 
 {- $setup
@@ -699,6 +701,14 @@ hasClock
 hasClock = fromLabel @(HiddenClockName dom)
 {-# INLINE hasClock #-}
 
+-- | Switches the domain of a hidden clock. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchHiddenClockDomain ::
+  (EligibleDomainSwitch domA domB, HiddenClock domA) =>
+  (HiddenClock domB => r) -> r
+switchHiddenClockDomain = withClock $ switchClockDomain hasClock
+{-# INLINE switchHiddenClockDomain #-}
+
 {- | Expose a hidden 'Reset' argument of a component, so it can be applied
 explicitly.
 
@@ -779,6 +789,14 @@ hasReset
   => Reset dom
 hasReset = fromLabel @(HiddenResetName dom)
 {-# INLINE hasReset #-}
+
+-- | Switches the domain of a hidden reset. See 'switchDomain' for further
+-- details on domain switching in particular.
+switchHiddenResetDomain ::
+  (EligibleDomainSwitch domA domB, HiddenReset domA) =>
+  (HiddenReset domB => r) -> r
+switchHiddenResetDomain = withReset $ switchResetDomain hasReset
+{-# INLINE switchHiddenResetDomain #-}
 
 {- | Expose a hidden 'Enable' argument of a component, so it can be applied
 explicitly.
@@ -863,6 +881,14 @@ hasEnable
   => Enable dom
 hasEnable = fromLabel @(HiddenEnableName dom)
 {-# INLINE hasEnable #-}
+
+-- | Switches the domain of a hidden enable. See 'switchDomain' for
+-- further details on domain switching in particular.
+switchHiddenEnableDomain ::
+  (EligibleDomainSwitch domA domB, HiddenEnable domA) =>
+  (HiddenEnable domB => r) -> r
+switchHiddenEnableDomain = withEnable $ switchEnableDomain hasEnable
+{-# INLINE switchHiddenEnableDomain #-}
 
 {- | Merge enable signal with signal of bools by applying the boolean AND
 operation.
@@ -1016,6 +1042,18 @@ withClockResetEnable
 withClockResetEnable =
   \clk rst en f -> withClock clk (withReset rst (withEnable en f))
 {-# INLINE withClockResetEnable #-}
+
+-- | Switches the domain of a hidden clock, reset, and enable. See
+-- 'switchDomain' for further details on domain switching in
+-- particular.
+switchHiddenClockResetEnableDomain ::
+  (EligibleDomainSwitch domA domB, HiddenClockResetEnable domA) =>
+  (HiddenClockResetEnable domB => r) -> r
+switchHiddenClockResetEnableDomain =
+  withClockResetEnable (switchClockDomain hasClock)
+                       (switchResetDomain hasReset)
+                       (switchEnableDomain hasEnable)
+{-# INLINE switchHiddenClockResetEnableDomain #-}
 
 -- * Basic circuit functions
 

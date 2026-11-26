@@ -230,12 +230,14 @@ library
                       Clash.GHCi.UI.Monad
 
                       Clash.GHC.ClashFlags
+                      Clash.GHC.Domain
                       Clash.GHC.Evaluator.Primitive.Util
                       Clash.GHC.Evaluator.Primitives
                       Clash.GHC.Evaluator.Primitives.Clash.Annotations.BitRepresentation.Deriving
                       Clash.GHC.Evaluator.Primitives.Clash.Class.BitPack.Internal
                       Clash.GHC.Evaluator.Primitives.Clash.Class.Exp
                       Clash.GHC.Evaluator.Primitives.Clash.Promoted.Nat
+                      Clash.GHC.Evaluator.Primitives.Clash.Signal.Internal
                       Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.BitVector
                       Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Index
                       Clash.GHC.Evaluator.Primitives.Clash.Sized.Internal.Signed

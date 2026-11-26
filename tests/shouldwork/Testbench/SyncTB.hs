@@ -8,9 +8,9 @@ import Clash.Signal (mux)
 
 import Unsafe.Coerce
 
-createDomain vSystem{vName="Dom2", vPeriod=2}
-createDomain vSystem{vName="Dom7", vPeriod=7}
-createDomain vSystem{vName="Dom9", vPeriod=9}
+createClockDomain vSystem{vName="Dom2", vPeriod=2}
+createClockDomain vSystem{vName="Dom7", vPeriod=7}
+createClockDomain vSystem{vName="Dom9", vPeriod=9}
 
 zeroAt0
   :: forall dom a

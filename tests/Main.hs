@@ -334,6 +334,10 @@ runClashTest t3105Env = defaultMain
           , clashFlags=["-package-id", testsuiteUnitId]
           , expectClashFail=Just (def, "NOT:local sources")
           }
+        , runTest "TypeRepFingerprint" def{
+            hdlTargets=[Verilog]
+          , expectClashFail=Just (def, "Typeable.Internal")
+          }
         , runTest "NamedSymbolsAndNumberedSymbols" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "~SYM[mySymbol] uses the same name as previously used in ~GENSYM")
@@ -378,7 +382,24 @@ runClashTest t3105Env = defaultMain
           }
         ]
       , clashTestGroup "Signal"
-        [ runTest "MAC" def{
+        [ runTest "CoerceClockN" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "arising from a use of")
+          }
+        , clashTestVariants "BareClock"
+          [ clashTestVariants target
+            [ runTest "InvalidClockPort" def{
+                hdlTargets=[VHDL]
+              , clashFlags=["-main-is", target]
+              , expectClashFail=Just (def, message)
+              }
+            ]
+          | (target, message) <-
+              [ ("indirectProjection", "A physical clock domain must map to itself")
+              , ("populatedMarker", "expected a data type with no constructors")
+              ]
+          ]
+        , runTest "MAC" def{
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "Couldn't instantiate blackbox for Clash.Signal.Internal.register#")
           }
@@ -1091,6 +1112,9 @@ runClashTest t3105Env = defaultMain
             }
         , runTest "Oversample" def
             { hdlTargets = [Verilog, SystemVerilog] }
+        , outputTest "ClockConfiguration" def{hdlTargets=[Verilog]}
+        , outputTest "PhysicalClockKeys" def{hdlTargets=[Verilog]}
+        , runTest "SameDomain" def
         , runTest "RegisterAR" def
         , runTest "RegisterSR" def
         , runTest "RegisterAE" def
@@ -1122,7 +1146,8 @@ runClashTest t3105Env = defaultMain
         , runTest "T3432" def{hdlTargets=[Verilog], hdlSim=[]}
         , runTest "T3434" def
         , clashTestGroup "BiSignal"
-          [ runTest "Counter" def
+          [ outputTest "BusClock" def{hdlTargets=[Verilog]}
+          , runTest "Counter" def
           , runTest "CounterHalfTuple" def
           , runTest "CounterHalfTupleRev" def
           , outputTest "T2472" def{hdlTargets=[VHDL]}
@@ -1155,6 +1180,7 @@ runClashTest t3105Env = defaultMain
         ]
       , clashTestGroup "Types"
         [ runTest "TypeFamilyReduction" def{hdlSim=[]}
+        , runTest "PolykindedDataFamily" def
         , runTest "NatExp" def{hdlSim=[]}
         ]
       , clashTestGroup "TopEntity"

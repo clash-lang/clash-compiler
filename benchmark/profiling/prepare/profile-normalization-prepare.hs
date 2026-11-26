@@ -39,10 +39,10 @@ prepareFile idirs fIn = do
                    , envCustomReprs clashEnv
                    , topNames
                    , topName
-                   , envDomains clashEnv
+                   , envDomainTCUs clashEnv
                    )
 
       putStrLn $ "Serialising to : " ++ fOut
-      B.writeFile fOut $ encode inputs
+      B.writeFile fOut $ encode (inputs :: NormalizationInputs)
       putStrLn "Done"
     _ -> error "no top entities"

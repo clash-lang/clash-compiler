@@ -10,45 +10,31 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 Clash has synchronous 'Signal's in the form of:
 
 @
-'Signal' (dom :: 'GHC.TypeLits.Symbol') a
+'Signal' (dom :: 'Domain') a
 @
 
 Where /a/ is the type of the value of the 'Signal', for example /Int/ or /Bool/,
 and /dom/ is the /clock-/ (and /reset-/) domain to which the memory elements
 manipulating these 'Signal's belong.
 
-The type-parameter, /dom/, is of the kind 'Domain' - a simple string. That
-string refers to a single /synthesis domain/. A synthesis domain describes the
-behavior of certain aspects of memory elements in it. More specifically, a
-domain looks like:
+For synthesis, /dom/ is a data type with no constructors. It may have type
+parameters. For a 'KnownDomain', 'ClockDomainOf' identifies the physical
+clock that supplies its clock period,
+active edge, reset behavior and initial values. 'KnownClockConf' gives the complete
+'ClockDomainConfiguration' for /dom/. Multiple domains may share a physical clock.
+
+The built-in 'System' supplies its own clock configuration.
 
 @
-'DomainConfiguration'
-  { _name:: 'GHC.TypeLits.Symbol'
-  -- ^ Domain name
-  , _period :: 'GHC.TypeLits.Nat'
-  -- ^ Clock period in \/ps\/
-  , _edge :: 'ActiveEdge'
-  -- ^ Active edge of the clock
-  , _reset :: 'ResetKind'
-  -- ^ Whether resets are synchronous (edge-sensitive) or asynchronous (level-sensitive)
-  , _init :: 'InitBehavior'
-  -- ^ Whether the initial (or "power up") value of memory elements is
-  -- unknown/undefined, or configurable to a specific value
-  , _polarity :: 'ResetPolarity'
-  -- ^ Whether resets are active high or active low
-  }
-@
+type instance ClockDomainOf System = System
+instance KnownClockDomain System where
+  type ClockPeriod System        = 10000
+  type ClockActiveEdge System    = 'Rising
+  type ClockResetKind System     = 'Asynchronous
+  type ClockInitBehavior System  = 'Defined
+  type ClockResetPolarity System = 'ActiveHigh
 
-Check the documentation of each of the types to see the various options Clash
-provides. In order to specify a domain, an instance of 'KnownDomain' should be
-made. Clash provides a standard implementation, called 'System', that is
-configured as follows:
-
-@
-instance KnownDomain 'System' where
-  type KnownConf 'System' = 'DomainConfiguration 'System' 10000 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = 'SDomainConfiguration' SSymbol SNat 'SRising' 'SAsynchronous' 'SDefined' 'SActiveHigh'
+instance KnownDomain System
 @
 
 In words, \"System\" is a synthesis domain with a clock running with a period
@@ -57,7 +43,7 @@ of the clock, can be reset asynchronously with regards to the clock, and have
 defined power up values if applicable.
 
 In order to create a new domain, you don't have to instantiate it explicitly.
-Instead, you can have 'createDomain' create a domain for you. You can also use
+Instead, you can have 'createClockDomain' create a domain for you. You can also use
 the same function to subclass existing domains.
 
 * __NB__: \"Bad things\"™  happen when you actually use a clock period of @0@,
@@ -83,8 +69,8 @@ types are encoded in a synthesis domain. For the following examples we assume
 the following exist:
 
 @
-'DomainConfiguration' \"SyncExample\" _period _edge 'Synchronous' _init
-'DomainConfiguration' \"AsyncExample\" _period _edge 'Asynchronous' _init
+'createClockDomain' 'vSystem'{vName=\"SyncExample\", vResetKind='Synchronous'}
+'createClockDomain' 'vSystem'{vName=\"AsyncExample\", vResetKind='Asynchronous'}
 @
 
 See the previous section on how to use domains.
@@ -95,7 +81,7 @@ can potentially introduce situations prone to meta-stability:
     *   /Reset situation 1/:
 
         @
-        f :: 'Reset' \"SyncExample\" -> 'Reset' \"SyncExample\" -> ..
+        f :: 'Reset' SyncExample -> 'Reset' SyncExample -> ..
         f x y = ..
         @
 
@@ -106,7 +92,7 @@ can potentially introduce situations prone to meta-stability:
     *   /Reset situation 2/:
 
         @
-        g :: 'Reset' \"AsyncExample\" -> 'Reset' \"AsyncExample\" -> ..
+        g :: 'Reset' AsyncExample -> 'Reset' AsyncExample -> ..
         g x y = ..
         @
 
@@ -154,8 +140,26 @@ module Clash.Explicit.Signal
   , BiSignalDefault(..)
     -- * Domain
   , Domain
-  , KnownDomain(..)
-  , KnownConfiguration
+  , ClockDomain
+  , sameDomain
+  , switchDomain
+  , switchClockDomain
+  , switchResetDomain
+  , switchEnableDomain
+  , SupportsSwitchingTo
+  , EligibleDomainSwitch
+  , KnownDomain
+  , ClockDomainOf
+  , clockDomainOfSelf
+  , KnownClockDomain(..)
+  , KnownClockConfiguration
+  , KnownClockConf
+    -- ** Domain projections
+  , DomainPeriod
+  , DomainActiveEdge
+  , DomainResetKind
+  , DomainInitBehavior
+  , DomainResetPolarity
   , ActiveEdge(..)
   , SActiveEdge(..)
   , InitBehavior(..)
@@ -164,14 +168,8 @@ module Clash.Explicit.Signal
   , SResetKind(..)
   , ResetPolarity(..)
   , SResetPolarity(..)
-  , DomainConfiguration(..)
-  , SDomainConfiguration(..)
-  -- ** Configuration type families
-  , DomainPeriod
-  , DomainActiveEdge
-  , DomainResetKind
-  , DomainInitBehavior
-  , DomainResetPolarity
+  , ClockDomainConfiguration(..)
+  , SClockDomainConfiguration(..)
     -- *** Convenience types #conveniencetypes#
     -- $conveniencetypes
 
@@ -198,10 +196,11 @@ module Clash.Explicit.Signal
   , vIntelSystem
   , vXilinxSystem
     -- ** Domain utilities
-  , VDomainConfiguration(..)
-  , vDomain
-  , createDomain
-  , knownVDomain
+  , VClockDomainConfiguration(..)
+  , vClockDomain
+  , knownClockDomain
+  , createClockDomain
+  , knownVClockDomain
   , clockPeriod
   , activeEdge
   , resetKind
@@ -309,7 +308,7 @@ import           Clash.Signal.Bundle
 import           Clash.Signal.BiSignal
 import           Clash.Signal.Internal
 import           Clash.Signal.Internal.Ambiguous
-  (knownVDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
+  (knownVClockDomain, clockPeriod, activeEdge, resetKind, initBehavior, resetPolarity)
 import qualified Clash.Sized.Vector
 import           Clash.XException
   (NFDataX, deepErrorX, fromJustX, seqX, ShowX(..))
@@ -322,19 +321,29 @@ import           Clash.XException
 >>> import Clash.Promoted.Nat (SNat(..))
 >>> import qualified Data.List as L
 >>> :{
-instance KnownDomain "Dom2" where
-  type KnownConf "Dom2" = 'DomainConfiguration "Dom2" 2 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+data Dom2 :: Domain
+type instance ClockDomainOf Dom2 = Dom2
+instance KnownClockDomain Dom2 where
+  type ClockPeriod Dom2        = 2
+  type ClockActiveEdge Dom2    = 'Rising
+  type ClockResetKind Dom2     = 'Asynchronous
+  type ClockInitBehavior Dom2  = 'Defined
+  type ClockResetPolarity Dom2 = 'ActiveHigh
+instance KnownDomain Dom2
 :}
 
 >>> :{
-instance KnownDomain "Dom7" where
-  type KnownConf "Dom7" = 'DomainConfiguration "Dom7" 7 'Rising 'Asynchronous 'Defined 'ActiveHigh
-  knownDomain = SDomainConfiguration SSymbol SNat SRising SAsynchronous SDefined SActiveHigh
+data Dom7 :: Domain
+type instance ClockDomainOf Dom7 = Dom7
+instance KnownClockDomain Dom7 where
+  type ClockPeriod Dom7        = 7
+  type ClockActiveEdge Dom7    = 'Rising
+  type ClockResetKind Dom7     = 'Asynchronous
+  type ClockInitBehavior Dom7  = 'Defined
+  type ClockResetPolarity Dom7 = 'ActiveHigh
+instance KnownDomain Dom7
 :}
 
->>> type Dom2 = "Dom2"
->>> type Dom7 = "Dom7"
 >>> let clk2 = clockGen @Dom2
 >>> let clk7 = clockGen @Dom7
 >>> let en2 = enableGen @Dom2
@@ -444,7 +453,7 @@ systemResetGen = resetGen
 -- The 'unsafeSynchronizer' works in such a way that, given 2 clocks:
 --
 -- @
--- createDomain vSystem{vName=\"Dom7\", vPeriod=7}
+-- createClockDomain vSystem{vName=\"Dom7\", vPeriod=7}
 --
 -- clk7 :: 'Clock' Dom7
 -- clk7 = 'clockGen'
@@ -456,7 +465,7 @@ systemResetGen = resetGen
 -- and
 --
 -- @
--- createDomain vSystem{vName=\"Dom2\", vPeriod=2}
+-- createClockDomain vSystem{vName=\"Dom2\", vPeriod=2}
 --
 -- clk2 :: 'Clock' Dom2
 -- clk2 = 'clockGen'

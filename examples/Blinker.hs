@@ -13,10 +13,10 @@ data LedMode
 
 -- Define a synthesis domain with a clock with a period of 20000 /ps/. Signal
 -- coming from the reset button is low when pressed, and high when not pressed.
-createDomain vSystem{vName="Input", vPeriod=20000, vResetPolarity=ActiveLow}
+createClockDomain vSystem{vName="Input", vPeriod=20000, vResetPolarity=ActiveLow}
 
 -- Define a synthesis domain with a clock with a period of 50000 /ps/.
-createDomain vSystem{vName="Dom50", vPeriod=50000}
+createClockDomain vSystem{vName="Dom50", vPeriod=50000}
 
 {-# ANN topEntity
   (Synthesize

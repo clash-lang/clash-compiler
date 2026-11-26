@@ -19,7 +19,7 @@ import qualified Data.HashMap.Strict                          as HM
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
 import           Clash.Core.Var (Id)
 import           Clash.Core.TyCon (TyConMap,TyConName)
-import           Clash.Driver.Types (BindingMap, DomainMap)
+import           Clash.Driver.Types (BindingMap, DomainMap, KnownDomainTyConUniques)
 import           Data.IntMap.Strict (IntMap)
 
 
@@ -53,7 +53,7 @@ type NormalizationInputs =
   , CustomReprs
   , [Id]
   , Id
-  , DomainMap
+  , Maybe KnownDomainTyConUniques
   )
 
 -- data that's serialised to file between profile-netlist-prepare  and profile-netlist-run
@@ -64,5 +64,6 @@ type NetlistInputs =
   , TyConMap
   , CustomReprs
   , Id
+  , Maybe KnownDomainTyConUniques
   , DomainMap
   )

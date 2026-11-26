@@ -2,7 +2,7 @@
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
                      2017     , Google Inc.
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -32,6 +32,7 @@ module Clash.Core.Type
   , tyView
   , coreView
   , coreView1
+  , dataFamilyView
   , mkTyConTy
   , mkFunTy
   , mkPolyFunTy
@@ -47,6 +48,7 @@ module Clash.Core.Type
   , isTypeFamilyApplication
   , isFunTy
   , isClassTy
+  , isClockEvidence
   , applyFunTy
   , findFunSubst
   , reduceTypeFamily
@@ -68,7 +70,7 @@ import           Data.List              (foldl')
 #endif
 import           Data.List.Extra        (splitAtList)
 import           Data.Maybe             (isJust, mapMaybe)
-import           Data.Text              (Text)
+import           Data.Text              (Text, pack)
 import           GHC.Base               (isTrue#,(==#))
 import           GHC.Generics           (Generic(..))
 import           GHC.Integer            (smallInteger)
@@ -83,11 +85,13 @@ import           GHC.Builtin.Names
   (typeCharCmpTyFamNameKey, typeConsSymbolTyFamNameKey, typeUnconsSymbolTyFamNameKey,
    typeCharToNatTyFamNameKey, typeNatToCharTyFamNameKey)
 import           GHC.Builtin.Names
-  (integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
+  (fUNTyConKey, integerTyConKey, typeNatAddTyFamNameKey, typeNatExpTyFamNameKey,
    typeNatMulTyFamNameKey, typeNatSubTyFamNameKey,
    typeNatCmpTyFamNameKey, ordLTDataConKey, ordEQDataConKey, ordGTDataConKey,
+   ordLTDataConName, ordEQDataConName, ordGTDataConName,
    typeSymbolAppendFamNameKey, typeSymbolCmpTyFamNameKey,
    typeNatDivTyFamNameKey, typeNatModTyFamNameKey)
+import           GHC.Types.Name         (nameStableString)
 import           GHC.Types.SrcLoc       (wiredInSrcSpan)
 
 -- Local imports
@@ -98,6 +102,7 @@ import {-# SOURCE #-} Clash.Core.Subst
 import           Clash.Core.TyCon
 import           Clash.Core.Var
 import qualified Clash.Data.UniqMap as UniqMap
+import qualified Clash.Signal.Internal as Signal
 import           Clash.Unique (fromGhcUnique)
 import           Clash.Util
 
@@ -173,6 +178,10 @@ type KiName     = Name Kind
 -- unsaturated. This can happen in instance heads, or in the eta-reduced
 -- representation of newtypes. So what are those additional 2 arguments compared to
 -- the "normal" function type? They're the kinds of argument and result type.
+--
+-- GHC function types retain the full FUN mult argRep resRep arg res
+-- application for nominal family matching. Expose the same FunTy view for
+-- term rewrites without allocating an argument list on this common path.
 tyView :: Type -> TypeView
 -- XXX: this is a manually unrolled version of:
 --
@@ -205,6 +214,8 @@ tyView tOrig = case tOrig of
         AppTy l3 argK -> case l3 of
           ConstTy (TyCon tc) -> TyConApp tc [argK,resK,arg,res]
           ConstTy Arrow -> FunTy arg res -- See Note [Arrow arguments]
+          AppTy (ConstTy (TyCon tc)) _
+            | nameUniq tc == fromGhcUnique fUNTyConKey -> FunTy arg res
           _ -> case go [argK,resK,arg,res] l3 of
             (ConstTy (TyCon tc),args)
               -> TyConApp tc args
@@ -263,6 +274,15 @@ newTyConInstRhs (tvs,ty) tys
     = Nothing
   where
     (tys1, tys2) = splitAtList tvs tys
+
+-- | Recover the source family application of a representation constructor.
+-- For example, @R:TaggedBool label@ becomes @Tagged Bool label@. The mapping
+-- can also restore structured indices, e.g. @R:FMaybe a@ becomes @F (Maybe a)@.
+dataFamilyView :: TyConMap -> Type -> Maybe Type
+dataFamilyView tcm (tyView -> TyConApp tc args) = do
+  inst <- dataFamilyInst =<< UniqMap.lookup tc tcm
+  newTyConInstRhs inst args
+dataFamilyView _ _ = Nothing
 
 -- | Make a function type of an argument and result type
 mkFunTy :: Type -> Type -> Type
@@ -442,12 +462,21 @@ funSubst tcm (Just s) = uncurry go
       -- So this is why, whenever we match against a type variable, we first
       -- check if there is already a substitution defined for this type variable,
       -- and if so, the applied type, and the type in the substitution should match.
-      Just ty' | ty' `aeqType` ty -> Just s
+      Just ty' | ty' `aeqType` ty
+               || familyType ty' `aeqType` familyType ty -> Just s
       _ -> Nothing
 
     -- Only look through annotations in RHS after the VarTy case, so we can
     -- preserve annotations in the substitution created by the VarTy case above
     go t1 (AnnType _ t2) = go t1 t2
+
+    -- A generic family equation may still mention the source data family,
+    -- while a concrete argument (or another equation) uses its representation.
+    -- Compare their family applications without changing the representation
+    -- used elsewhere in Core.
+    go t1 t2
+      | Just t1' <- dataFamilyView tcm t1 = go t1' t2
+      | Just t2' <- dataFamilyView tcm t2 = go t1 t2'
 
     -- [Note] funSubst FunTy
     --
@@ -481,6 +510,16 @@ funSubst tcm (Just s) = uncurry go
       | l1 == l2 = Just s
 
     go _ _ = Nothing
+
+    -- Repeated variables need equality rather than another pattern match:
+    -- neither occurrence may introduce new substitutions. Look through family
+    -- representations recursively, including nested family arguments.
+    familyType ty
+      | Just ty' <- dataFamilyView tcm ty = familyType ty'
+    familyType (AppTy f a) = AppTy (familyType f) (familyType a)
+    familyType (ForAllTy v ty) = ForAllTy v (familyType ty)
+    familyType (AnnType attrs ty) = AnnType attrs (familyType ty)
+    familyType ty = ty
 
 {- [Note: Eager type families]
 
@@ -520,10 +559,13 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
           case compare i1 i2 of
             LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordLTDataConName)
             EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordEQDataConName)
             GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordGTDataConName)
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeSymbolCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
@@ -533,10 +575,13 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
           case compare s1 s2 of
             LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordLTDataConName)
             EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordEQDataConName)
             GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordGTDataConName)
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeCharCmpTyFamNameKey -- "GHC.TypeNats.CmpSymbol"
@@ -546,10 +591,13 @@ reduceTypeFamily tcm (tyView -> TyConApp tc tys)
           case compare s1 s2 of
             LT -> Name User (showt 'LT)
                     (fromGhcUnique ordLTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordLTDataConName)
             EQ -> Name User (showt 'EQ)
                     (fromGhcUnique ordEQDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordEQDataConName)
             GT -> Name User (showt 'GT)
                     (fromGhcUnique ordGTDataConKey) wiredInSrcSpan
+                    (pack $ nameStableString ordGTDataConName)
       _ -> Nothing
 
   | nameUniq tc == fromGhcUnique typeConsSymbolTyFamNameKey -- ConsSymbol
@@ -705,15 +753,23 @@ normalizeType tcMap = go
   go ty = case tyView ty of
     TyConApp tcNm args
       -- These Clash types are implemented with newtypes.
-      -- We need to keep these newtypes because they define the width of the numbers.
+      -- Keep their HDL widths. ClockN is a wire although it wraps Proxy.
       | nameOcc tcNm == "Clash.Sized.Internal.BitVector.Bit" ||
         nameOcc tcNm == "Clash.Sized.Internal.BitVector.BitVector" ||
         nameOcc tcNm == "Clash.Sized.Internal.Index.Index"         ||
         nameOcc tcNm == "Clash.Sized.Internal.Signed.Signed"       ||
+        nameOcc tcNm == "Clash.Signal.Internal.ClockN" ||
         nameOcc tcNm == "Clash.Sized.Internal.Unsigned.Unsigned"
       -> mkTyConApp tcNm (map go args)
       | otherwise
       -> case UniqMap.find tcNm tcMap of
+          -- Keep a newtype-family representation until a representation view
+          -- is requested. Erasing it to its payload would lose the family
+          -- identity needed for later matching; ordinary data-family
+          -- representations can follow the normal normalization path.
+          tc@AlgTyCon{algTcRhs = NewTyCon{}}
+             | isJust (dataFamilyInst tc)
+             -> mkTyConApp tcNm (map go args)
           AlgTyCon {algTcRhs = (NewTyCon _ nt)}
              -> case newTyConInstRhs nt args of
                   Just ty' -> go ty'
@@ -745,3 +801,13 @@ isClassTy tcm (tyView -> TyConApp tcNm _) =
     Just (AlgTyCon {isClassTc}) -> isClassTc
     _ -> False
 isClassTy _ _ = False
+
+-- | A superclass selector may return clock evidence directly or as part of a
+-- hidden clock/reset/enable tuple. Other products can contain runtime fields.
+isClockEvidence :: TyConMap -> Type -> Bool
+isClockEvidence tcm ty = case tyView ty of
+  TyConApp tc args
+    | nameOcc tc == showt ''Signal.KnownDomain -> True
+    | nameOcc tc == showt ''Signal.KnownClockDomain -> True
+    | isClassTy tcm ty -> any (isClockEvidence tcm) args
+  _ -> False

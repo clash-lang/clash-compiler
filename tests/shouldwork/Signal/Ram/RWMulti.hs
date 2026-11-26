@@ -24,8 +24,8 @@ module RWMulti where
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 
-createDomain vSystem{vName="P30", vPeriod=30000}
-createDomain vSystem{vName="P50", vPeriod=50000}
+createClockDomain vSystem{vName="P30", vPeriod=30000}
+createClockDomain vSystem{vName="P50", vPeriod=50000}
 
 ram
   :: forall wdom rdom

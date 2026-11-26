@@ -9,6 +9,7 @@ module Clash.Tests.AsyncFIFOSynchronizer (tests) where
 
 import Data.Maybe (isJust, catMaybes)
 import qualified Prelude as P
+import Type.Reflection (typeRep)
 
 import Hedgehog as H
 import qualified Hedgehog.Range as Range
@@ -19,7 +20,7 @@ import Test.Tasty.HUnit
 
 import Clash.Explicit.Prelude
 
-createDomain vSystem{vName = "Slow", vPeriod = 2 * vPeriod vSystem}
+createClockDomain vSystem{vName = "Slow", vPeriod = 2 * vPeriod vSystem}
 
 sync12RW
   :: ( KnownDomain dom1
@@ -972,9 +973,9 @@ test6W7 = testW sync6W7
   , (Nothing,False)
   ]
 
-createDomain vSystem{vName="A", vPeriod=hzToPeriod 20e6} -- fast
-createDomain vSystem{vName="B", vPeriod=hzToPeriod 10e6} -- slow
-createDomain vSystem{vName="C", vPeriod=hzToPeriod 7e6} -- slower
+createClockDomain vSystem{vName="A", vPeriod=hzToPeriod 20e6} -- fast
+createClockDomain vSystem{vName="B", vPeriod=hzToPeriod 10e6} -- slow
+createClockDomain vSystem{vName="C", vPeriod=hzToPeriod 7e6} -- slower
 
 data DomProxy (dom :: Domain) where
   DomProxy
@@ -983,8 +984,8 @@ data DomProxy (dom :: Domain) where
 
 -- A more useful Show instance than the one for 'Proxy'
 instance Show (DomProxy dom) where
-  showsPrec d dom@DomProxy =
-    showParen (d > app_prec) $ ("DomProxy @" <>) . (symbolVal dom <>)
+  showsPrec d DomProxy =
+    showParen (d > app_prec) $ ("DomProxy @" <>) . (show (typeRep @dom) <>)
    where app_prec = 10
 
 data NamedTest a = NamedTest

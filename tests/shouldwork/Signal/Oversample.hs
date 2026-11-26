@@ -3,7 +3,7 @@ module Oversample where
 import           Clash.Explicit.Prelude
 import           Clash.Explicit.Testbench (biTbClockGen, outputVerifier)
 
-createDomain vSystem{vName="Dom7", vPeriod=700}
+createClockDomain vSystem{vName="Dom7", vPeriod=700}
 
 clk7 :: Clock Dom7
 clk7 = clockGen
@@ -11,7 +11,7 @@ clk7 = clockGen
 en7 :: Enable Dom7
 en7 = enableGen
 
-createDomain vSystem{vName="Dom2", vPeriod=200}
+createClockDomain vSystem{vName="Dom2", vPeriod=200}
 
 clk2 :: Clock Dom2
 clk2 = clockGen

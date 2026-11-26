@@ -80,7 +80,7 @@ connected to the clock generator is /active-low/, the following will instantiate
 the required input domain:
 
 @
-'Clash.Signal.createDomain' 'Clash.Signal.vSystem'{vName=\"DomInput\", vPeriod=20000, vResetPolarity='Clash.Signal.ActiveLow'}
+'Clash.Signal.createClockDomain' 'Clash.Signal.vSystem'{vName=\"DomInput\", vPeriod=20000, vResetPolarity='Clash.Signal.ActiveLow'}
 @
 
 If you haven't determined the frequency you want the design to run at, the
@@ -92,7 +92,7 @@ Supposing you need a clock running at 150 MHz for your design, the following
 will instantiate a suitable domain:
 
 @
-'Clash.Signal.createDomain' 'Clash.Signal.vSystem'{vName=\"Dom150\", vPeriod='Clash.Signal.hzToPeriod' 150e6}
+'Clash.Signal.createClockDomain' 'Clash.Signal.vSystem'{vName=\"Dom150\", vPeriod='Clash.Signal.hzToPeriod' 150e6}
 @
 
 As the clock generator always reacts asynchronously to its reset input, it will
@@ -136,7 +136,7 @@ reset outputs. The compiler needs to be able to fully determine the types of the
 individual tuple elements from the context; the clock generator function itself
 will not constrain them. If the types of the tuple elements cannot be inferred,
 you can use pattern type signatures to specify the types. Supposing the
-referenced domains have been created with 'Clash.Signal.createDomain', an
+referenced domains have been created with 'Clash.Signal.createClockDomain', an
 instance with a single output clock can be instantiated using:
 
 @
@@ -169,8 +169,8 @@ signal is /active-low/, this will generate a 150 MHz clock for use by the
 circuit:
 
 @
-'Clash.Signal.createDomain' 'Clash.Signal.vSystem'{vName=\"DomInput\", vPeriod=20000, vResetPolarity='Clash.Signal.ActiveLow'}
-'Clash.Signal.createDomain' 'Clash.Signal.vSystem'{vName=\"Dom150\", vPeriod='Clash.Signal.hzToPeriod' 150e6}
+'Clash.Signal.createClockDomain' 'Clash.Signal.vSystem'{vName=\"DomInput\", vPeriod=20000, vResetPolarity='Clash.Signal.ActiveLow'}
+'Clash.Signal.createClockDomain' 'Clash.Signal.vSystem'{vName=\"Dom150\", vPeriod='Clash.Signal.hzToPeriod' 150e6}
 
 topEntity
   :: 'Clock' DomInput
@@ -235,7 +235,7 @@ determine the types of the individual tuple elements from the context; the clock
 generator function itself will not constrain them. If the types of the tuple
 elements cannot be inferred, you can use pattern type signatures to specify the
 types. Supposing the referenced domains have been created with
-'Clash.Signal.createDomain', an instance with a single output clock can be
+'Clash.Signal.createClockDomain', an instance with a single output clock can be
 instantiated using:
 
 @
@@ -272,8 +272,8 @@ input is deasserted and vice versa.
 
 {- $unsafe_example
 @
-'Clash.Signal.createDomain' 'Clash.Signal.vSystem'{vName=\"DomInput\", vPeriod=20000, vResetPolarity='Clash.Signal.ActiveLow'}
-'Clash.Signal.createDomain' 'Clash.Signal.vSystem'{vName=\"Dom150\", vPeriod='Clash.Signal.hzToPeriod' 150e6}
+'Clash.Signal.createClockDomain' 'Clash.Signal.vSystem'{vName=\"DomInput\", vPeriod=20000, vResetPolarity='Clash.Signal.ActiveLow'}
+'Clash.Signal.createClockDomain' 'Clash.Signal.vSystem'{vName=\"Dom150\", vPeriod='Clash.Signal.hzToPeriod' 150e6}
 
 topEntity
   :: 'Clock' DomInput

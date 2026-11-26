@@ -1,7 +1,7 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente,
                      2016     , Myrtle Software Ltd,
-                     2021-2022, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -90,7 +90,9 @@ data PrettyOptions = PrettyOptions
   -- ^ whether to display module qualifiers
   , displayTicks      :: Bool
   -- ^ whether to display ticks
-  }
+  , useStableNames    :: Bool
+  -- ^ whether to stable names
+  } deriving (Bounded)
 
 instance Default PrettyOptions where
   def = PrettyOptions
@@ -98,6 +100,7 @@ instance Default PrettyOptions where
     , displayTypes      = unsafeLookupEnvBool "CLASH_PPR_TYPES" True
     , displayQualifiers = unsafeLookupEnvBool "CLASH_PPR_QUALIFIERS" True
     , displayTicks      = unsafeLookupEnvBool "CLASH_PPR_TICKS" True
+    , useStableNames    = unsafeLookupEnvBool "CLASH_PPR_STABLE" False
     }
 
 -- | Annotations carried on pretty-printed code.
@@ -106,6 +109,9 @@ data ClashAnnotation
   -- ^ marking navigation to a different context
   | AnnSyntax  SyntaxElement
   -- ^ marking a specific sort of syntax
+  | AnnStableAlternative Text
+  -- ^ a plain text alternative (not allowed to contain any
+  -- newlines)
   deriving Eq
 
 -- | Specific places in the program syntax.
@@ -134,6 +140,8 @@ class PrettyPrec p where
         Column f             -> Column (hide . f)
         WithPageWidth f      -> WithPageWidth (hide . f)
         Nesting f            -> Nesting (hide . f)
+        Annotated (AnnStableAlternative t) _ | useStableNames opts
+                             -> unsafeTextWithoutNewlines t
         Annotated ann d'     ->
           if not (displayTypes opts)      && ann == AnnSyntax Type
           || not (displayUniques opts)    && ann == AnnSyntax Unique
@@ -207,11 +215,12 @@ viewName n = (qual, occ, T.pack $ show $ nameUniq n)
   where (qual, occ) = T.breakOnEnd "." $ nameOcc n
 
 instance PrettyPrec (Name a) where
-  pprPrec p (viewName -> (qual, occ, uniq)) = do
+  pprPrec p name@(viewName -> (qual, occ, uniq)) = do
     qual' <- annotate (AnnSyntax Qualifier) <$> pprPrec p qual
     occ'  <- pprPrec p occ
     uniq' <- annotate (AnnSyntax Unique) . brackets <$> (pprPrec p uniq)
-    return $ qual' <> occ' <> uniq'
+    return $ annotate (AnnStableAlternative $ nameStable name)
+           $ qual' <> occ' <> uniq'
 
 instance ClashPretty (Name a) where
   clashPretty = fromPpr
@@ -262,7 +271,7 @@ instance ClashPretty Type where
 
 instance PrettyPrec TyCon where
   pprPrec prec t = case t of
-    AlgTyCon _ nm kn _ (DataTyCon dcs) _ -> do
+    AlgTyCon _ nm kn _ (DataTyCon dcs) _ _ -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
@@ -276,7 +285,7 @@ instance PrettyPrec TyCon where
 
         pure (name <> annotate (AnnSyntax Type) (space <> dcolon <+> ty))
 
-    AlgTyCon _ nm kn _ (NewTyCon dc _) _ -> do
+    AlgTyCon _ nm kn _ (NewTyCon dc _) _ _ -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)
@@ -289,7 +298,7 @@ instance PrettyPrec TyCon where
     PromotedDataCon _ _ _ _ dc ->
       fmap ("promoted" <+>) (pprPrec prec dc)
 
-    FunTyCon _ nm kn _ ss -> do
+    FunTyCon{tyConName=nm, tyConKind=kn, tyConSubst=ss} -> do
       name <- pprPrec prec nm
       kind <- pprKind kn
       let decl = name <> annotate (AnnSyntax Type) (space <> dcolon <+> kind)

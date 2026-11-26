@@ -22,10 +22,13 @@ import qualified Prelude as P
 import           Prelude hiding (undefined)
 
 import qualified Clash.Explicit.Prelude         as E
+import           Clash.Explicit.DDR             (ddrForwardClock)
+import           Clash.Explicit.Testbench       (biTbClockGen)
 import           Clash.Prelude                  hiding (sample)
 
 import           Clash.Signal.Internal
-  (Femtoseconds(..), dynamicClockGen, sample, head#)
+  (ClockAB(..), clockTicks, Femtoseconds(..), dynamicClockGen, sample, head#,
+   tbDynamicClockGen)
 
 import           Control.Arrow.Transformer.Automaton
   (Automaton(..))
@@ -33,11 +36,23 @@ import           Control.Exception              (evaluate)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-createDomain vSystem{vName="H11", vPeriod=hzToPeriod 11}
-createDomain vSystem{vName="H77", vPeriod=hzToPeriod 77}
+createClockDomain vSystem{vName="H11", vPeriod=hzToPeriod 11}
+createClockDomain vSystem{vName="H77", vPeriod=hzToPeriod 77}
 
-createDomain vSystem{vName="F1", vPeriod=20}
-createDomain vSystem{vName="F6", vPeriod=250}
+createClockDomain vSystem{vName="F1", vPeriod=20}
+createClockDomain vSystem{vName="DDR10", vPeriod=10}
+createClockDomain vSystem{vName="F6", vPeriod=250}
+
+-- | A virtual partitioning of a domain: @Secure dom@ designates the same
+-- physical clock domain as @dom@ and can hence be switched to and from at no
+-- hardware cost. Exercises the 'ClockDomainOf' projection of 'KnownDomain'.
+data Secure (dom :: Domain)
+
+type instance ClockDomainOf (Secure dom) = ClockDomainOf dom
+instance KnownDomain dom => KnownDomain (Secure dom)
+
+type instance (Secure System) `SupportsSwitchingTo` System = 'True
+type instance System `SupportsSwitchingTo` (Secure System) = 'True
 
 main :: IO ()
 main = defaultMain tests
@@ -73,13 +88,48 @@ tests =
       , testCase "satPred SatBound" case_satPredSatBound
       ]
     , testGroup "unsafeSynchronizer"
-      [ testCase "case_dynamicStaticEq" case_dynamicStaticEq
+      [ testCase "static testbench clock with synchronized enable" $
+          let (testClk, circuitClk) = biTbClockGen @F1 @F6 (pure True)
+          in P.take 5 (clockTicks testClk circuitClk)
+               @?= [ClockAB, ClockA, ClockA, ClockA, ClockA]
+      , testCase "dynamic testbench clock with synchronized enable" $
+          let testClk = clockGen @F1
+              periods = fromList (P.cycle [Femtoseconds 10000, Femtoseconds 30000])
+              enabled = E.unsafeSynchronizer testClk circuitClk (pure True)
+              circuitClk = tbDynamicClockGen @F6 periods enabled
+          in P.take 6 (clockTicks testClk circuitClk)
+               @?= [ClockAB, ClockB, ClockA, ClockAB, ClockB, ClockA]
+      , testCase "DDR forwarded clock with synchronized waveform" $
+          let clk = clockGen @F1
+              waveform = E.unsafeSynchronizer forwarded (clockGen @DDR10) (pure high)
+              forwarded = ddrForwardClock @DDR10 @F1 clk E.resetGen enableGen
+                            Nothing Nothing (\_ _ _ _ -> waveform)
+          in P.take 3 (clockTicks clk forwarded) @?= [ClockAB, ClockAB, ClockAB]
+      , testCase "case_dynamicStaticEq" case_dynamicStaticEq
       , testCase "case_dynamicHasEffect" case_dynamicHasEffect
       , testCase "case_changingDynamicClocks" case_changingDynamicClocks
       , testCase "case_F1_F6" case_F1_F6
       , testCase "case_F6_F1" case_F6_F1
       ]
+    , testGroup "switchDomain"
+      [ testCase "into virtual domain" case_switchDomainInto
+      , testCase "out of virtual domain" case_switchDomainOutOf
+      ]
     ]
+
+-- | 'switchDomain' into a virtual partitioning of System is an identity on
+-- the signal's values.
+case_switchDomainInto :: Assertion
+case_switchDomainInto = do
+  let s = fromList [1, 2, 3] :: Signal System Int
+  sampleN @(Secure System) 3 (switchDomain s) @?= [1, 2, 3]
+
+-- | 'switchDomain' out of a virtual partitioning of System is an identity on
+-- the signal's values.
+case_switchDomainOutOf :: Assertion
+case_switchDomainOutOf = do
+  let s = fromList [4, 5, 6] :: Signal (Secure System) Int
+  sampleN @System 3 (switchDomain s) @?= [4, 5, 6]
 
 -- | Asserts that static clocks behave the same as dynamic clocks with a static
 -- period signal passed into it.

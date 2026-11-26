@@ -64,10 +64,10 @@ import Clash.Intel.ClockGen
 
 -- Define a synthesis domain with a clock with a period of 20000 \/ps\/. Signal
 -- coming from the reset button is low when pressed, and high when not pressed.
-'Clash.Explicit.Signal.createDomain'
+'Clash.Explicit.Signal.createClockDomain'
   vSystem{vName=\"DomInput\", vPeriod=20000, vResetPolarity=ActiveLow}
 -- Define a synthesis domain with a clock with a period of 50000 \/ps\/.
-'Clash.Explicit.Signal.createDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
+'Clash.Explicit.Signal.createClockDomain' vSystem{vName=\"Dom50\", vPeriod=50000}
 
 topEntity
   :: Clock DomInput

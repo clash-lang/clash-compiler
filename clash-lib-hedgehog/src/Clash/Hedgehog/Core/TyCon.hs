@@ -1,5 +1,5 @@
 {-|
-Copyright   : (C) 2021, QBayLogic B.V.
+Copyright   : (C) 2021-2026, QBayLogic B.V.
 License     : BSD2 (see the file LICENSE)
 Maintainer  : QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -138,7 +138,7 @@ genAlgTyConFrom range tcm = do
              -- TODO Generate NewTyCon
            ]
 
-  let tc = AlgTyCon (nameUniq name) name kn arity rhs False
+  let tc = AlgTyCon (nameUniq name) name kn arity rhs False Nothing
 
   canGenDataKinds >>= \case
     True ->
@@ -177,7 +177,7 @@ genFunTyConFrom tcm = do
   let (argKns, resKn) = splitFunForallTy kn
   substs <- genSubsts name (rights argKns) resKn
 
-  let tc = FunTyCon (nameUniq name) name kn arity substs
+  let tc = FunTyCon (nameUniq name) name kn arity False substs
   pure (UniqMap.singleton name tc)
  where
   genSubsts :: TyConName -> [Kind] -> Kind -> CoreGenT m [([Type], Type)]

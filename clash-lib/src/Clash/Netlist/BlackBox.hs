@@ -39,7 +39,7 @@ import qualified Control.Lens                  as Lens
 import           Control.Monad                 (unless, replicateM, zipWithM)
 import           Control.Monad.Extra           (concatMapM)
 import           Data.Bifunctor                (first, second)
-import           Data.Either                   (lefts, partitionEithers)
+import           Data.Either                   (lefts, rights, partitionEithers)
 import           Data.Foldable                 (for_)
 import qualified Data.HashMap.Lazy             as HashMap
 import qualified Data.IntMap                   as IntMap
@@ -99,7 +99,8 @@ import           Clash.Netlist.Util            as N
 import           Clash.Normalize.Primitives    (removedArg)
 import           Clash.Primitives.Types        as P
 import qualified Clash.Primitives.Util         as P
-import           Clash.Signal.Internal         (ActiveEdge (..))
+import           Clash.Signal.Internal
+  ( ActiveEdge(..), VClockDomainConfiguration(..), sameDomain )
 import           Clash.Util
 import qualified Clash.Util.Interpolate        as I
 import qualified Clash.Warning                 as W
@@ -574,6 +575,12 @@ mkPrimitive bbEParen bbEasD declType dst pInfo args tickDecls =
               _ -> error $ $(curLoc) ++ "dataToTag: " ++ show (map (either showPpr showPpr) args)
 #endif
 
+          | pNm == showt 'sameDomain -> do
+              (_, sp) <- Lens.use curCompNm
+              let msg = "Cannot determine sameDomain at compile time for "
+                     ++ unwords (map showPpr (rights args))
+              throw (ClashException sp msg Nothing)
+
           | pNm == "Clash.Explicit.SimIO.mealyIO" -> do
               resM <- resBndr1 True dst
               case resM of
@@ -968,8 +975,9 @@ collectMealy dstNm dst tcm (kd:clk:mealyFun:mealyInit:mealyIn:_) = do
       -- ensures that the "opposite" edge always comes first.
       kdTy <- unsafeCoreTypeToHWTypeM $(curLoc) (inferCoreTypeOf tcm kd)
       let edge = case stripVoid (stripFiltered kdTy) of
-                   KnownDomain _ _ Rising _ _ _  -> Falling
-                   KnownDomain _ _ Falling _ _ _ -> Rising
+                   KnownDomain dom -> case vActiveEdge dom of
+                     Rising -> Falling
+                     Falling -> Rising
                    _ -> error "internal error"
       (clkExpr,clkDecls) <-
         mkExpr False Concurrent (NetlistId (Id.unsafeMake "__MEALY_CLK__") (inferCoreTypeOf tcm clk)) clk

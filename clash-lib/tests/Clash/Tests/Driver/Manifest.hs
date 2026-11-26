@@ -1,9 +1,12 @@
 {-# LANGUAGE NamedFieldPuns  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Clash.Tests.Driver.Manifest where
 
 import qualified Data.Aeson as Aeson
+import Data.Aeson ((.:))
 import qualified Data.Aeson.Encode.Pretty as Aeson
+import qualified Data.Aeson.Types as Aeson
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Base16 as Base16
 import Data.Coerce (coerce)
@@ -14,6 +17,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 
 import Test.Tasty
+import Test.Tasty.HUnit (testCase, (@?=))
 
 import qualified Test.Tasty.QuickCheck as Q
 import qualified Test.QuickCheck.Utf8 as Q
@@ -38,11 +42,11 @@ genDigest = Base16.encode . Text.encodeUtf8 . coerce @ArbitraryText <$> Q.arbitr
 genString :: Q.Gen FilePath
 genString = Text.unpack . coerce @ArbitraryText <$> Q.arbitrary
 
-genDomain :: Q.Gen (Text, VDomainConfiguration)
+genDomain :: Q.Gen (Text, VClockDomainConfiguration)
 genDomain = do
   nm <- coerce @(Q.Gen ArbitraryText) Q.arbitrary
   dom <-
-    VDomainConfiguration
+    VClockDomainConfiguration
       <$> pure (Text.unpack nm)
       <*> (fromIntegral @Int . abs <$> Q.arbitraryBoundedIntegral)
       <*> Q.elements [Rising, Falling]
@@ -104,4 +108,17 @@ tests =
             fromRight (error "Failed to decode manifest") (Aeson.eitherDecode encoded)
 
         pure (fileNamesDecoded Q.=== fileNames)
+    , testCase "domain periods retain their exact JSON representation" $ do
+        let check period expectedJSON expectedPeriod = do
+              let manifest = Manifest "" Nothing (0, 0) [] [] "" [] doms []
+                  doms = HashMap.singleton "System" vSystem{vPeriod=period}
+                  periodField = Aeson.withObject "Manifest" $ \obj -> do
+                    domainMap <- obj .: "domains"
+                    system <- domainMap .: "System"
+                    system .: "period"
+              Aeson.parseEither periodField (Aeson.toJSON manifest) @?= Right expectedJSON
+              let decoded = Aeson.eitherDecode (Aeson.encode manifest)
+              fmap (fmap vPeriod . domains) decoded @?=
+                Right (HashMap.singleton "System" expectedPeriod)
+        check 10000 (Aeson.Number 10000) 10000
     ]

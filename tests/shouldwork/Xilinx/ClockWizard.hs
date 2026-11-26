@@ -14,8 +14,8 @@ import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
 import Clash.Xilinx.ClockGen
 
-createDomain vSystem{vName="DomIn", vPeriod=hzToPeriod 24_000_000}
-createDomain vXilinxSystem{vName="DomOut", vPeriod=hzToPeriod 300_000_000}
+createClockDomain vSystem{vName="DomIn", vPeriod=hzToPeriod 24_000_000}
+createClockDomain vXilinxSystem{vName="DomOut", vPeriod=hzToPeriod 300_000_000}
 
 topEntity ::
   Clock DomIn ->

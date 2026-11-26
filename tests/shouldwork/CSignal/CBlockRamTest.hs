@@ -2,7 +2,7 @@ module CBlockRamTest where
 
 import Clash.Explicit.Prelude
 
-createDomain vSystem{vName="DomA10", vPeriod=10}
+createClockDomain vSystem{vName="DomA10", vPeriod=10}
 
 topEntity
   :: Clock  DomA10

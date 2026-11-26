@@ -26,7 +26,7 @@ prepareFile :: [FilePath] -> FilePath -> IO ()
 prepareFile idirs fIn = do
   putStrLn $ "Preparing: " ++ fIn
   let fOut = fIn ++ ".net.bin"
-  (clashEnv, clashDesign, top) <- runNormalisationStage idirs fIn
+  (clashEnv, clashDesign, top, domains) <- runNormalisationStage idirs fIn
 
   let inputs = ( designBindings clashDesign
                , designEntities clashDesign
@@ -34,7 +34,8 @@ prepareFile idirs fIn = do
                , envTyConMap clashEnv
                , envCustomReprs clashEnv
                , top
-               , envDomains clashEnv
+               , envDomainTCUs clashEnv
+               , domains
                )
 
   putStrLn $ "Serialising to : " ++ fOut

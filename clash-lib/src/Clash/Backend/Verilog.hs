@@ -75,7 +75,7 @@ import           Clash.Annotations.SynthesisAttributes (Attr(..))
 import           Clash.Backend
 import           Clash.Backend.Verilog.Time           (periodToString)
 import           Clash.Debug                          (traceIf)
-import           Clash.Driver.Types                   (ClashOpts(..))
+import           Clash.Driver.Types                   (ClashOpts(..), DomainMap)
 import           Clash.Explicit.BlockRam.Internal     (unpackNats)
 import           Clash.Netlist.BlackBox.Types         (HdlSyn)
 import           Clash.Netlist.BlackBox.Util
@@ -141,7 +141,7 @@ instance Backend VerilogState where
     , _hdlsyn=opt_hdlSyn opts
     , _undefValue=opt_forceUndefined opts
     , _aggressiveXOptBB_=coerce (opt_aggressiveXOptBB opts)
-    , _domainConfigurations_=emptyDomainMap
+    , _domainConfigurations_=mempty
     , _usages=mempty
     }
   hdlKind         = const Verilog

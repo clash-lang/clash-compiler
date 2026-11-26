@@ -10,6 +10,7 @@
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UnboxedTuples #-}
 
@@ -19,9 +20,13 @@ where
 
 import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
-import Data.Text                        (pack)
+import Data.Map                         (insert)
+import Data.Text                        (pack, unpack)
 import Data.Text.Extra                  (showt)
-import Control.Monad.State.Strict       (State)
+import Control.Arrow                    (second)
+import Control.Monad                    (unless, void)
+import Control.Monad.State.Strict       (State, modify)
+import Control.Monad.Trans.Class        (lift)
 import Control.Monad.Trans.Except
   (Except, ExceptT (..), mapExceptT, runExceptT, throwE)
 import Control.Monad.Trans.Maybe        (MaybeT (..))
@@ -38,17 +43,21 @@ import qualified GHC.Stack.Types
 import GHC.Word                         (Word8, Word16, Word32, Word64)
 import Language.Haskell.TH.Syntax       (showName)
 
+import Clash.Driver.Types               (KnownDomainTyConUniques(..))
 import Clash.Core.DataCon               (DataCon (..))
 import Clash.Core.Name                  (Name (..))
 import Clash.Core.Pretty                (showPpr)
-import Clash.Core.TyCon                 (TyConMap, tyConDataCons)
+import Clash.Core.TyCon                 (TyCon(PromotedDataCon), TyConMap, tyConDataCons, tyConName)
 import Clash.Core.Type
-  (LitTy (..), Type (..), TypeView (..), coreView, coreView1, tyView)
-import Clash.Core.Util                  (tyNatSize, substArgTys)
+  ( ConstTy(..), LitTy (..), Type (..), TypeView (..)
+  , tyView, mkTyConApp
+  )
+import Clash.GHC.Domain (isEmptyDomain, normalizeDomain, normalizeDomainBounded)
+import Clash.Core.Util                  (tyNatSize)
 import qualified Clash.Data.UniqMap as UniqMap
 import Clash.Netlist.Util               (coreTypeToHWType, stripFiltered)
 import Clash.Netlist.Types
-  (HWType(..), HWMap, FilteredHWType(..), PortDirection (..))
+  (HWType(..), TTState, FilteredHWType(..), PortDirection (..))
 import Clash.Signal.Internal
   (ResetPolarity(..), ActiveEdge(..), ResetKind(..)
   ,InitBehavior(..))
@@ -56,10 +65,14 @@ import Clash.Util                       (curLoc)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-import Clash.Signal.Internal (KnownDomain)
+import Clash.Signal.Internal (VClockDomainConfiguration(..))
+import qualified Clash.Signal.Internal as Signal
+import Clash.Signal.Internal.Name (DomainName(..), renderDomainName)
 
 ghcTypeToHWType
-  :: Int
+  :: Maybe KnownDomainTyConUniques
+  -- ^ TyCon uniques of the families used to resolve a domain's clock configuration
+  -> Int
   -- ^ Integer width. The width Clash assumes an Integer to be (instead of it
   -- begin an arbitrarily large, runtime sized construct).
   -> CustomReprs
@@ -68,19 +81,38 @@ ghcTypeToHWType
   -- ^ Type constructor map
   -> Type
   -- ^ Type to convert to HWType
-  -> State HWMap (Maybe (Either String FilteredHWType))
-ghcTypeToHWType iw = go
+  -> State TTState (Maybe (Either String FilteredHWType))
+ghcTypeToHWType mkdtcus iw = go
   where
     -- returnN :: HWType ->
     returnN t = return (FilteredHWType t [])
 
-    go :: CustomReprs -> TyConMap -> Type -> State HWMap (Maybe (Either String FilteredHWType))
+    domCfg m = domainConfig (pure . normalizeDomain m) mkdtcus m
+
+    -- Signals and bidirectional pins need no dictionary to carry data.
+    -- Record their physical clock only when all its properties resolve.
+    recordSignalDomain m dom = lift $ lift $ void $ runMaybeT $ runExceptT $ do
+      let normalize = liftMaybe . normalizeDomainBounded 10000 m
+      domainConfig normalize mkdtcus m Logical dom Clock
+
+    go ::
+      CustomReprs ->
+      TyConMap ->
+      Type ->
+      State TTState (Maybe (Either String FilteredHWType))
     go reprs m (AnnType attrs typ) = fmap Just . runExceptT $ do
       FilteredHWType typ' areVoids <- ExceptT $ coreTypeToHWType go reprs m typ
       return (FilteredHWType (Annotated attrs typ') areVoids)
 
     go reprs m ty@(tyView -> TyConApp tc args) = runMaybeT . runExceptT $
-      let occ = nameOcc tc in
+      let occ = nameOcc tc
+          biSignal wrap = case args of
+            [_, dom, szTy] -> do
+              recordSignalDomain m dom
+              sz <- liftE (tyNatSize m szTy)
+              returnN (wrap (BitVector (fromInteger sz)))
+            _ -> throwE $ $(curLoc) ++ show occ ++ " TC has unexpected amount of arguments"
+      in
       if | occ == showt ''Int8                  -> returnN (Signed 8)
          | occ == showt ''Int16                 -> returnN (Signed 16)
          | occ == showt ''Int32                 -> returnN (Signed 32)
@@ -141,26 +173,17 @@ ghcTypeToHWType iw = go
          | occ `elem` ["GHC.Prim.~#", "GHC.Internal.Prim.~#"]
                                                -> returnN (Void Nothing)
 
-         | occ == "Clash.Signal.Internal.Signal" ->
-             ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m (args !! 1)
+         | occ == "Clash.Signal.Internal.Signal", [dom, el] <- args -> do
+             recordSignalDomain m dom
+             ExceptT $ MaybeT $ Just <$> coreTypeToHWType go reprs m el
 
-         | occ == "Clash.Signal.BiSignal.BiSignalIn" -> do
-             szTy <- case args of
-               [_, _, szTy] -> pure szTy
-               _ -> throwE $ $(curLoc) ++ "BiSignalIn TC has unexpected amount of arguments"
-             let fType ty1 = FilteredHWType ty1 []
-             (fType . BiDirectional In . BitVector . fromInteger) <$>
-               liftE (tyNatSize m szTy)
+         | occ == "Clash.Signal.BiSignal.BiSignalIn" ->
+             biSignal (BiDirectional In)
 
-         | occ == "Clash.Signal.BiSignal.BiSignalOut" -> do
-             szTy <- case args of
-               [_, _, szTy] -> pure szTy
-               _ -> throwE $ $(curLoc) ++ "BiSignalOut TC has unexpected amount of arguments"
-             let fType ty1 = FilteredHWType ty1 []
-             (fType . Void . Just . BiDirectional Out . BitVector . fromInteger) <$>
-               liftE (tyNatSize m szTy)
+         | occ == "Clash.Signal.BiSignal.BiSignalOut" ->
+             biSignal (Void . Just . BiDirectional Out)
 
-         -- XXX: this is a hack to get a KnownDomain from a KnownConfiguration.
+         -- XXX: this is a hack to get a KnownDomain from a KnownClockConfiguration.
          -- Constraint-tuple type constructors are internal names that move
          -- between modules across GHC versions ('GHC.Classes' <= 9.12 vs
          -- 'GHC.Internal.Classes' >= 9.14); both forms appear here.
@@ -168,10 +191,10 @@ ghcTypeToHWType iw = go
                       , "GHC.Classes.CTuple2", "GHC.Internal.Classes.CTuple2"
                       ]
          , [arg0@(tyView -> TyConApp kdNm _), arg1] <- args
-         , nameOcc kdNm == showt ''KnownDomain
+         , nameOcc kdNm == showt ''Signal.KnownDomain
          -> case tyView arg1 of
                 TyConApp kdNm1 _
-                  | nameOcc kdNm1 == showt ''KnownDomain
+                  | nameOcc kdNm1 == showt ''Signal.KnownDomain
                   -> do let stripVoid (Void (Just t)) = t
                             stripVoid t = t
                         k1 <- (stripVoid . stripFiltered) <$> ExceptT (MaybeT (go reprs m arg0))
@@ -180,46 +203,28 @@ ghcTypeToHWType iw = go
                 _ -> ExceptT (MaybeT (go reprs m arg0))
 
          | occ == "Clash.Signal.Internal.KnownDomain"
-         -> case tyConDataCons (UniqMap.find tc m) of
-               [dc] -> case substArgTys dc args of
-                 [_knownSymbol, _knownNat, tyView -> TyConApp _ [_,dom]] ->
-                  case tyView (coreView m dom) of
-                   TyConApp _ [tag0, period0, edge0, rstKind0, init0, polarity0] -> do
-                     tag1      <- domTag m tag0
-                     period1   <- domPeriod m period0
-                     edge1     <- domEdge m edge0
-                     rstKind1  <- domResetKind m rstKind0
-                     init1     <- domInitBehavior m init0
-                     polarity1 <- domResetPolarity m polarity0
-                     let kd = KnownDomain (pack tag1) period1 edge1 rstKind1 init1 polarity1
-                     returnN (Void (Just kd))
-                   _ -> ExceptT (MaybeT (pure Nothing))
-                 _ -> ExceptT (MaybeT (pure Nothing))
-               _ -> ExceptT (MaybeT (pure Nothing))
+         , [dom] <- args
+         -> domCfg m Logical dom $ Void . Just . KnownDomain
+
+         | occ == showt ''Signal.KnownClockDomain
+         , [cdom] <- args
+         -> domCfg m Physical cdom $ Void . Just . KnownDomain
 
          | occ == "Clash.Signal.Internal.Clock"
-         , [tag0] <- args
-         -> do
-             tag1 <- domTag m tag0
-             returnN (Clock (pack tag1))
+         , [dom] <- args
+         -> domCfg m Logical dom Clock
 
          | occ == "Clash.Signal.Internal.ClockN"
-         , [tag0] <- args
-         -> do
-             tag1 <- domTag m tag0
-             returnN (ClockN (pack tag1))
+         , [dom] <- args
+         -> domCfg m Logical dom ClockN
 
          | occ == "Clash.Signal.Internal.Reset"
-         , [tag0] <- args
-         -> do
-             tag1 <- domTag m tag0
-             returnN (Reset (pack tag1))
+         , [dom] <- args
+         -> domCfg m Logical dom Reset
 
          | occ == "Clash.Signal.Internal.Enable"
-         , [tag0] <- args
-         -> do
-             tag1 <- domTag m tag0
-             returnN (Enable (pack tag1))
+         , [dom] <- args
+         -> domCfg m Logical dom Enable
 
          | occ == "Clash.Sized.Internal.BitVector.Bit" -> returnN Bit
 
@@ -338,15 +343,27 @@ liftE
   -> ExceptT e (MaybeT m) a
 liftE = mapExceptT (MaybeT . pure . Just . coerce)
 
+-- The manifest and ~TAG use the same qualified marker and nominal indices.
 domTag :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) String
-domTag m (coreView1 m -> Just ty) = domTag m ty
-domTag _ (LitTy (SymTy tag)) = pure tag
-domTag _ ty = throwE $ "Internal error. Cannot translate domain tag:\n" ++ showPpr ty
+domTag tcm = fmap renderDomainName . tag
+ where
+  tag (AppTy f x) = DomainApp <$> tag f <*> tag x
+  tag (ConstTy (TyCon tc)) =
+    let promoted = case UniqMap.lookup tc tcm of
+          Just PromotedDataCon{} -> "'"
+          _ -> ""
+    in pure (DomainName (promoted ++ unpack (nameStable tc)))
+  tag (LitTy (SymTy s)) = pure (DomainName (show s))
+  tag (LitTy (CharTy c)) = pure (DomainName (show c))
+  tag (LitTy (NumTy n)) = pure (DomainName (show n))
+  tag (AnnType _ t) = tag t
+  tag t = throwE $ "Cannot name unresolved clock domain type: " ++ showPpr t
 
-domPeriod :: Monad m => TyConMap -> Type -> ExceptT String (MaybeT m) Integer
-domPeriod m (coreView1 m -> Just ty) = domPeriod m ty
-domPeriod _ (LitTy (NumTy period)) = pure period
-domPeriod _ ty = throwE $ "Internal error. Cannot translate domain period:\n" ++ showPpr ty
+domPeriod :: Monad m => Type -> ExceptT String (MaybeT m) Natural
+domPeriod (LitTy (NumTy period)) = pure (fromInteger period)
+domPeriod ty = throwE
+  $ "Internal error. Cannot translate domain period:\n"
+ ++ showPpr ty
 
 fromType
   :: Monad m
@@ -354,13 +371,11 @@ fromType
   -- ^ Name of type (for error reporting)
   -> [(String, a)]
   -- ^ [(Fully qualified constructor name, constructor value)
-  -> TyConMap
-  -- ^ Constructor map (used to look through newtypes)
   -> Type
   -- ^ Type representing some constructor
   -> ExceptT String (MaybeT m) a
-fromType tyNm constrs m ty =
-  case tyView (coreView m ty) of
+fromType tyNm constrs ty =
+  case tyView ty of
     TyConApp tcNm [] ->
       go constrs (nameOcc tcNm)
     _ ->
@@ -374,10 +389,56 @@ fromType tyNm constrs m ty =
   go [] _ =
     throwE $ "Can't translate " ++ tyNm ++ showPpr ty
 
+data DomainKind = Logical | Physical
+
+liftMaybe :: Monad m => Maybe a -> ExceptT e (MaybeT m) a
+liftMaybe = ExceptT . MaybeT . pure . fmap Right
+
+-- Bare clock ports need the same checks as a KnownClockDomain dictionary.
+-- Signal-only metadata uses bounded normalization and may omit the clock.
+domainConfig ::
+  (Type -> ExceptT String (MaybeT (State TTState)) Type) ->
+  Maybe KnownDomainTyConUniques ->
+  TyConMap ->
+  DomainKind ->
+  Type ->
+  (VClockDomainConfiguration -> HWType) ->
+  ExceptT String (MaybeT (State TTState)) FilteredHWType
+domainConfig normalize ids m kind dom c = do
+  let missing = throwE $ "Cannot resolve clock domain for " ++ showPpr dom
+      resolveAt marker u = do
+        tc <- maybe missing pure (UniqMap.lookup u m)
+        normalize (mkTyConApp (tyConName tc) [marker])
+      checkMarker marker = unless (isEmptyDomain m marker) $
+        throwE $ "Cannot resolve clock domain " ++ showPpr marker
+              ++ ": expected a data type with no constructors"
+  KnownDomainTyConUniques{..} <- maybe missing pure ids
+  marker <- normalize dom
+  checkMarker marker
+  cdom <- case kind of
+    Physical -> pure marker
+    Logical -> do
+      physical <- resolveAt marker clockDomainOfTCU
+      checkMarker physical
+      pure physical
+  let resolve = resolveAt cdom
+  self <- resolve clockDomainOfTCU
+  unless (self == cdom) $
+    throwE $ "A physical clock domain must map to itself: " ++ showPpr cdom
+  period         <- domPeriod =<< resolve clockPeriodTCU
+  vActiveEdge    <- domEdge =<< resolve clockActiveEdgeTCU
+  vResetKind     <- domResetKind =<< resolve clockResetKindTCU
+  vInitBehavior  <- domInitBehavior =<< resolve clockInitBehaviorTCU
+  vResetPolarity <- domResetPolarity =<< resolve clockResetPolarityTCU
+  vName <- domTag m cdom
+  let vPeriod = period
+      conf = VClockDomainConfiguration{..}
+  modify $ second $ insert cdom conf
+  return $ FilteredHWType (c conf) []
+
 domEdge
   :: Monad m
-  => TyConMap
-  -> Type
+  => Type
   -> ExceptT String (MaybeT m) ActiveEdge
 domEdge =
   fromType
@@ -387,8 +448,7 @@ domEdge =
 
 domResetKind
   :: Monad m
-  => TyConMap
-  -> Type
+  => Type
   -> ExceptT String (MaybeT m) ResetKind
 domResetKind =
   fromType
@@ -398,8 +458,7 @@ domResetKind =
 
 domInitBehavior
   :: Monad m
-  => TyConMap
-  -> Type
+  => Type
   -> ExceptT String (MaybeT m) InitBehavior
 domInitBehavior =
   fromType
@@ -409,8 +468,7 @@ domInitBehavior =
 
 domResetPolarity
   :: Monad m
-  => TyConMap
-  -> Type
+  => Type
   -> ExceptT String (MaybeT m) ResetPolarity
 domResetPolarity =
   fromType

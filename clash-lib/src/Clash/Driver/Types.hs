@@ -26,8 +26,8 @@ import           Control.DeepSeq                (NFData(rnf), deepseq)
 import           Data.Binary                    (Binary)
 import           Data.Fixed
 import           Data.Hashable
-import           Data.HashMap.Strict            (HashMap)
 import           Data.IntMap.Strict             (IntMap)
+import           Data.Map.Strict                (Map)
 import           Data.Maybe                     (isJust)
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
@@ -46,11 +46,12 @@ import           GHC.Types.Basic                (InlineSpec)
 import           GHC.Types.SrcLoc               (SrcSpan)
 
 import           Clash.Annotations.BitRepresentation.Internal (CustomReprs)
-import           Clash.Signal.Internal
+import           Clash.Signal.Internal          (VClockDomainConfiguration(..))
 
 import           Clash.Backend.Verilog.Time     (Period(..), Unit(Fs))
 import           Clash.Core.Pretty              (unsafeLookupEnvBool)
 import           Clash.Core.Term                (Term)
+import           Clash.Core.Type                (Type)
 import           Clash.Core.TyCon               (TyConMap, TyConName)
 import           Clash.Core.Var                 (Id)
 import           Clash.Core.VarEnv              (VarEnv)
@@ -58,6 +59,7 @@ import           Clash.Driver.Bool              (OverridingBool(..))
 import           Clash.Netlist.BlackBox.Types   (HdlSyn (..))
 import {-# SOURCE #-} Clash.Netlist.Types       (PreserveCase(..), TopEntityT)
 import           Clash.Primitives.Types         (CompiledPrimMap)
+import           Clash.Unique                   (Unique)
 import           Clash.Warning                  (WarningOpts, defWarningOpts)
 
 data ClashEnv = ClashEnv
@@ -66,8 +68,17 @@ data ClashEnv = ClashEnv
   , envTupleTyCons :: IntMap TyConName
   , envPrimitives  :: CompiledPrimMap
   , envCustomReprs :: CustomReprs
-  , envDomains     :: DomainMap
+  , envDomainTCUs  :: Maybe KnownDomainTyConUniques
   } deriving (Generic, NFData)
+
+data KnownDomainTyConUniques = KnownDomainTyConUniques
+  { clockDomainOfTCU       :: Unique
+  , clockPeriodTCU         :: Unique
+  , clockActiveEdgeTCU     :: Unique
+  , clockResetKindTCU      :: Unique
+  , clockInitBehaviorTCU   :: Unique
+  , clockResetPolarityTCU  :: Unique
+  } deriving (Generic, NFData, Binary)
 
 data ClashDesign = ClashDesign
   { designEntities :: [TopEntityT]
@@ -115,7 +126,11 @@ data Binding a = Binding
 --
 -- Global functions cannot be mutually recursive, only self-recursive.
 type BindingMap = VarEnv (Binding Term)
-type DomainMap = HashMap Text VDomainConfiguration
+
+-- | Maps core types with a 'Clash.Signal.Internal.KnownDomain'
+-- instance that appear in the design to their corresponding
+-- 'VClockDomainConfiguration'.
+type DomainMap = Map Type VClockDomainConfiguration
 
 -- | Information to show about transformations during compilation.
 --
@@ -465,7 +480,7 @@ class Monad m => HasClashOpts m where
 -- Currently this limited to the names and periods of clocks for create_clock.
 --
 newtype SdcInfo = SdcInfo
-  { sdcClock :: [(Text, VDomainConfiguration)]
+  { sdcClock :: [(Text, VClockDomainConfiguration)]
   }
 
 -- | Render an SDC file from an SdcInfo.
@@ -475,7 +490,7 @@ pprSDC :: SdcInfo -> Doc ()
 pprSDC = vcat . fmap go . sdcClock
  where
   go (i, dom) =
-        -- VDomainConfiguration stores period in ps, SDC expects it in ns.
+        -- VClockDomainConfiguration stores period in ps, SDC expects it in ns.
     let p        = MkFixed (toInteger $ vPeriod dom) :: Fixed E3
         name     = braces (pretty (Text.dropAround (== '\\') i))
         period   = viaShow p

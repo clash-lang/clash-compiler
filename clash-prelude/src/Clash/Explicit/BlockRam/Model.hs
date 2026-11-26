@@ -22,7 +22,7 @@ import GHC.TypeNats (KnownNat)
 import Clash.Promoted.Nat (SNat(..), natToNum)
 import Clash.Signal.Bundle (Bundle(bundle))
 import Clash.Signal.Internal
-  (KnownDomain(..), Clock (..), Signal (..), ClockAB (..), clockTicks)
+  (KnownDomain, Clock (..), Signal (..), ClockAB (..), clockTicks)
 import Clash.Sized.Index (Index)
 import Clash.XException (XException(..), NFDataX(..), seqX)
 import Clash.XException.MaybeX (MaybeX(..), toMaybeX, andX)

@@ -5,7 +5,7 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Clash.Signal.Internal.Ambiguous
-  ( knownVDomain
+  ( knownVClockDomain
   , clockPeriod
   , activeEdge
   , resetKind
@@ -22,8 +22,8 @@ clockPeriod
    . (KnownDomain dom, DomainPeriod dom ~ period)
   => SNat period
 clockPeriod =
-  case knownDomain @dom of
-    SDomainConfiguration{sPeriod} ->
+  case knownClockDomain @dom of
+    SClockDomainConfiguration{sPeriod} ->
       sPeriod
 {-# OPAQUE clockPeriod #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
@@ -42,8 +42,8 @@ activeEdge
    . (KnownDomain dom, DomainActiveEdge dom ~ edge)
   => SActiveEdge edge
 activeEdge =
-  case knownDomain @dom of
-    SDomainConfiguration{sActiveEdge} ->
+  case knownClockDomain @dom of
+    SClockDomainConfiguration{sActiveEdge} ->
       sActiveEdge
 {-# OPAQUE activeEdge #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
@@ -62,8 +62,8 @@ resetKind
    . (KnownDomain dom, DomainResetKind dom ~ sync)
   => SResetKind sync
 resetKind =
-  case knownDomain @dom of
-    SDomainConfiguration{sResetKind} ->
+  case knownClockDomain @dom of
+    SClockDomainConfiguration{sResetKind} ->
       sResetKind
 {-# OPAQUE resetKind #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
@@ -82,8 +82,8 @@ initBehavior
    . (KnownDomain dom, DomainInitBehavior dom ~ init)
   => SInitBehavior init
 initBehavior =
-  case knownDomain @dom of
-    SDomainConfiguration{sInitBehavior} ->
+  case knownClockDomain @dom of
+    SClockDomainConfiguration{sInitBehavior} ->
       sInitBehavior
 {-# OPAQUE initBehavior #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
@@ -102,17 +102,17 @@ resetPolarity
    . (KnownDomain dom, DomainResetPolarity dom ~ polarity)
   => SResetPolarity polarity
 resetPolarity =
-  case knownDomain @dom of
-    SDomainConfiguration{sResetPolarity} ->
+  case knownClockDomain @dom of
+    SClockDomainConfiguration{sResetPolarity} ->
       sResetPolarity
 {-# OPAQUE resetPolarity #-}
 -- @NOINLINE: https://github.com/clash-lang/clash-compiler/issues/662
 
--- | Like 'knownDomain but yields a 'VDomainConfiguration'. Should only be used
--- in combination with 'createDomain'.
-knownVDomain
+-- | Like 'knownClockDomain but yields a 'VClockDomainConfiguration'. Should only be used
+-- in combination with 'createClockDomain'.
+knownVClockDomain
   :: forall dom
    . KnownDomain dom
-  => VDomainConfiguration
-knownVDomain =
-  vDomain (knownDomain @dom)
+  => VClockDomainConfiguration
+knownVClockDomain =
+  vClockDomain (knownClockDomain @dom)

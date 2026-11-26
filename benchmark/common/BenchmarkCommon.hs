@@ -53,18 +53,18 @@ runInputStage idirs src = do
 runNormalisationStage
   :: [FilePath]
   -> String
-  -> IO (ClashEnv, ClashDesign, Id)
+  -> IO (ClashEnv, ClashDesign, Id, DomainMap)
 runNormalisationStage idirs src = do
   supplyN <- Supply.newSupply
   (env, design) <- runInputStage idirs src
   let topEntityNames = fmap topId (designEntities design)
   case topEntityNames of
     topEntity:_ -> do
-      transformedBindings <-
+      (transformedBindings, domains) <-
             normalizeEntity env (designBindings design)
-              (ghcTypeToHWType (opt_intWidth (opts idirs)))
+              (ghcTypeToHWType (envDomainTCUs env) (opt_intWidth (opts idirs)))
               ghcEvaluator
               evaluator
               topEntityNames supplyN topEntity
-      return (env, design{designBindings=transformedBindings},topEntity)
+      return (env, design{designBindings=transformedBindings},topEntity,domains)
     _ -> error "no top entities"

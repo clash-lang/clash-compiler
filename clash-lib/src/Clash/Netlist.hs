@@ -75,7 +75,8 @@ import           Clash.Core.Var                   (Id, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, lookupVarEnv,
    lookupVarEnv')
-import           Clash.Driver.Types               (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
+import           Clash.Driver.Types
+  (BindingMap, Binding(..), ClashEnv(..), ClashOpts (..))
 import           Clash.Netlist.BlackBox
 import qualified Clash.Netlist.Id                 as Id
 import           Clash.Netlist.Types              as HW
@@ -99,7 +100,7 @@ genNetlist
   -> VarEnv Identifier
   -- ^ Top entity names
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcoded Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
@@ -113,12 +114,12 @@ genNetlist
   -- ^ Component name prefix
   -> Id
   -- ^ Name of the @topEntity@
-  -> IO (Component, ComponentMap, IdentifierSet)
+  -> IO (Component, ComponentMap, IdentifierSet, SomeBackend)
 genNetlist env eval isTb globals tops topNames typeTrans ite be seen0 dir prefixM topEntity = do
   ((_meta, topComponent), s) <-
     runNetlistMonad env eval isTb globals tops typeTrans ite be seen1 dir componentNames_
       $ genComponent topEntity
-  return (topComponent, _components s, seen1)
+  return (topComponent, _components s, seen1, _backend s)
  where
   (componentNames_, seen1) =
     genNames (opt_newInlineStrat (envOpts env)) prefixM seen0 topNames globals
@@ -134,7 +135,7 @@ runNetlistMonad
   -> VarEnv TopEntityT
   -- ^ TopEntity annotations
   -> (CustomReprs -> TyConMap -> Type ->
-      State HWMap (Maybe (Either String FilteredHWType)))
+      State TTState (Maybe (Either String FilteredHWType)))
   -- ^ Hardcode Type -> HWType translator
   -> Bool
   -- ^ Whether the backend supports ifThenElse expressions
@@ -1023,6 +1024,9 @@ mkDcApplication
     -- ^ DataCon Arguments
     -> NetlistMonad (Expr,[Declaration])
     -- ^ Returned expression and a list of generate BlackBox declarations
+-- The dictionary's type supplies all clock metadata. Its Typeable superclass
+-- has no hardware representation.
+mkDcApplication _ [Void (Just (KnownDomain _))] _ _ _ = pure (Noop, [])
 mkDcApplication declType [dstHType] bndr dc args = do
   let dcNm = nameOcc (dcName dc)
   tcm <- Lens.view tcCache

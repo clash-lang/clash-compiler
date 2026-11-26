@@ -1,6 +1,6 @@
 {-|
   Copyright   :  (C) 2012-2016, University of Twente
-                     2021-2024, QBayLogic B.V.
+                     2021-2026, QBayLogic B.V.
   License     :  BSD2 (see the file LICENSE)
   Maintainer  :  QBayLogic B.V. <devops@qbaylogic.com>
 
@@ -23,6 +23,7 @@ module Clash.Core.TyCon
   , isNewTypeTc
   , isPromotedDc
   , tyConDataCons
+  , dataFamilyInst
   )
 where
 
@@ -51,6 +52,8 @@ data TyCon
   , tyConArity  :: !Int         -- ^ Number of type arguments
   , algTcRhs    :: !AlgTyConRhs -- ^ DataCon definitions
   , isClassTc   :: !Bool        -- ^ Is this a class dictionary?
+  , tyConFamilyInst :: !(Maybe ([TyVar],Type))
+  -- ^ For a data-family representation: parameters and source family application.
   }
   | PromotedDataCon
   { tyConUniq   :: {-# UNPACK #-} !Unique -- invariant (same as dcUniq)
@@ -65,6 +68,7 @@ data TyCon
   , tyConName   :: !TyConName      -- ^ Name of the TyCon
   , tyConKind   :: !Kind           -- ^ Kind of the TyCon
   , tyConArity  :: !Int            -- ^ Number of type arguments
+  , isDataFamily :: !Bool          -- ^ Data families have nominally distinct applications
   , tyConSubst  :: [([Type],Type)] -- ^ List of: ([LHS match types], RHS type)
   }
   -- | Primitive TyCons
@@ -116,6 +120,14 @@ mkKindTyCon :: TyConName
             -> TyCon
 mkKindTyCon name kind
   = PrimTyCon (nameUniq name) name kind 0
+
+-- | The source family application of a data-family representation constructor.
+-- The type variables are the representation parameters needed by the mapping.
+-- Trailing parameters can be eta-reduced, e.g. @R:TaggedBool@ maps directly to
+-- @Tagged Bool@, with a label supplied later to either constructor.
+dataFamilyInst :: TyCon -> Maybe ([TyVar],Type)
+dataFamilyInst AlgTyCon{tyConFamilyInst = inst} = inst
+dataFamilyInst _ = Nothing
 
 -- | Does the TyCon look like a tuple TyCon
 isTupleTyConLike :: TyConName -> Bool

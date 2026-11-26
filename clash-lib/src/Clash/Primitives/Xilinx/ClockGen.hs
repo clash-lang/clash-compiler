@@ -26,7 +26,7 @@ import qualified Data.Text as T
 import Prettyprinter.Interpolate (__di)
 import Text.Show.Pretty (ppShow)
 
-import Clash.Signal (periodToHz)
+import Clash.Signal (periodToHz, vPeriod)
 
 import Clash.Backend (Backend)
 import qualified Clash.Netlist.Id as Id
@@ -142,8 +142,7 @@ clockWizardTclTemplate isDifferential bbCtx
     : _ <- bbInputs bbCtx
   , [compName] <- bbQsysIncName bbCtx
   = let
-    clkFreq (KnownDomain _ p _ _ _ _) =
-      periodToHz (fromInteger p) / 1e6 :: Double
+    clkFreq (KnownDomain (vPeriod -> p)) = periodToHz p / 1e6 :: Double
     clkFreq _ =
       error $ "Internal error: not a KnownDomain\n" <> ppShow bbCtx
 
