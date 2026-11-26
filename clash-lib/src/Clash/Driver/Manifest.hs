@@ -37,6 +37,7 @@ import           Data.HashMap.Strict (HashMap)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe (catMaybes)
 import           Data.Monoid (Ap(getAp))
+import           Data.Ratio (numerator, denominator)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import qualified Data.Text.Lazy as LText
@@ -66,7 +67,7 @@ import qualified Clash.Netlist.Types as Netlist
 import qualified Clash.Netlist.Id as Id
 import           Clash.Netlist.Util (typeSize)
 import           Clash.Primitives.Util (hashCompiledPrimMap)
-import           Clash.Signal (VClockDomainConfiguration(..))
+import           Clash.Signal (VClockDomainConfiguration(..), Period(..))
 import           Clash.Util.Graph (callGraphBindings)
 
 data PortDirection
@@ -235,7 +236,7 @@ instance ToJSON Manifest where
       , "domains" .= HashMap.fromList
         [ ( cdomNm
           , Aeson.object
-            [ "period" .= vPeriod
+            [ "period" .= periodJSON vPeriod
             , "active_edge" .= show vActiveEdge
             , "reset_kind" .= show vResetKind
             , "init_behavior" .= show vInitBehavior
@@ -246,6 +247,11 @@ instance ToJSON Manifest where
       , "dependencies" .= Aeson.object
         [ "transitive" .= transitiveDependencies ]
       ]
+   where
+    -- Existing manifest readers expect whole picoseconds to be a JSON number.
+    periodJSON (Period p) = case numerator p `quotRem` denominator p of
+      (whole, 0) -> toJSON whole
+      _ -> toJSON p
 
 -- Note [Failed hex digest decodes]
 --
@@ -299,7 +305,7 @@ instance FromJSON Manifest where
     parseDomain nm v =
       VClockDomainConfiguration
         <$> pure (Text.unpack nm)
-        <*> (v .: "period")
+        <*> (Period <$> (v .: "period"))
         <*> parseWithRead "active_edge" v
         <*> parseWithRead "reset_kind" v
         <*> parseWithRead "init_behavior" v

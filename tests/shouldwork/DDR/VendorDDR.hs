@@ -5,6 +5,7 @@
 
 module VendorDDR where
 
+import GHC.Real
 import Clash.Explicit.DDR
 import Clash.Explicit.Prelude
 import Clash.Explicit.Testbench
@@ -22,8 +23,16 @@ type TestLen = 44
 type TestLen2 = 2 * TestLen - 1
 
 type DomCxt slow fast fPeriod reset =
-  ( KnownClockConfiguration fast ('ClockDomainConfiguration fast fPeriod 'Rising reset 'Defined 'ActiveHigh)
-  , KnownClockConfiguration slow ('ClockDomainConfiguration slow (2*fPeriod) 'Rising reset 'Defined 'ActiveHigh)
+  ( KnownClockConfiguration fast
+      ( 'ClockDomainConfiguration fast
+           fPeriod (0 :% 1)
+           'Rising reset 'Defined 'ActiveHigh
+      )
+  , KnownClockConfiguration slow
+      ( 'ClockDomainConfiguration slow
+           (2*fPeriod) (0 :% 1)
+           'Rising reset 'Defined 'ActiveHigh
+      )
   )
 
 type VendorIn slow fast =

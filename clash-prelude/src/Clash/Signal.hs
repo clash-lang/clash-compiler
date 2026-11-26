@@ -87,6 +87,8 @@ module Clash.Signal
   , KnownClockConf
     -- ** Domain projections
   , DomainPeriod
+  , DomainPeriodFraction
+  , DomainPeriodMultiple
   , DomainActiveEdge
   , DomainResetKind
   , DomainInitBehavior
@@ -115,6 +117,7 @@ module Clash.Signal
   , Microseconds
   , Nanoseconds
   , Picoseconds
+  , Period(..)
   -- **** Time conversions
   , DomainToHz
   , HzToPeriod

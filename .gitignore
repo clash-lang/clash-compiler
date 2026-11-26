@@ -33,6 +33,7 @@ cabal.config
 *.bin
 *.log
 *.tar.gz
+*.agdai
 
 *~
 *.DS_Store

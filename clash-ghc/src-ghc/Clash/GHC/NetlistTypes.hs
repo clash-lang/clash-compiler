@@ -21,6 +21,7 @@ where
 import Data.Coerce                      (coerce)
 import Data.Functor.Identity            (Identity (..))
 import Data.Map                         (insert)
+import Data.Ratio                       ((%))
 import Data.Text                        (pack, unpack)
 import Data.Text.Extra                  (showt)
 import Control.Arrow                    (second)
@@ -65,7 +66,7 @@ import Clash.Util                       (curLoc)
 
 import Clash.Annotations.BitRepresentation.Internal
   (CustomReprs)
-import Clash.Signal.Internal (VClockDomainConfiguration(..))
+import Clash.Signal.Internal (VClockDomainConfiguration(..), Period(..))
 import qualified Clash.Signal.Internal as Signal
 import Clash.Signal.Internal.Name (DomainName(..), renderDomainName)
 
@@ -359,11 +360,26 @@ domTag tcm = fmap renderDomainName . tag
   tag (AnnType _ t) = tag t
   tag t = throwE $ "Cannot name unresolved clock domain type: " ++ showPpr t
 
-domPeriod :: Monad m => Type -> ExceptT String (MaybeT m) Natural
+domPeriod :: Monad m => Type -> ExceptT String (MaybeT m) Period
 domPeriod (LitTy (NumTy period)) = pure (fromInteger period)
 domPeriod ty = throwE
   $ "Internal error. Cannot translate domain period:\n"
  ++ showPpr ty
+
+domPeriodFraction ::
+  Monad m =>
+  Type ->
+  ExceptT String (MaybeT m) Period
+domPeriodFraction (tyView -> TyConApp tc [_, nTy, dTy])
+  | (nameOcc tc `elem` ["GHC.Internal.Real.:%","GHC.Real.:%"])
+  , LitTy (NumTy n) <- nTy
+  , LitTy (NumTy d) <- dTy
+  = if 0 <= n && n < d
+    then pure (Period (fromInteger n % fromInteger d))
+    else throwE $ "ClockPeriodFraction must be in [0, 1), got " ++ show n ++ "/" ++ show d
+domPeriodFraction ty = throwE
+  $ "Internal error. Cannot translate domain period fraction:\n"
+ ++ show (tyView ty)
 
 fromType
   :: Monad m
@@ -426,12 +442,13 @@ domainConfig normalize ids m kind dom c = do
   unless (self == cdom) $
     throwE $ "A physical clock domain must map to itself: " ++ showPpr cdom
   period         <- domPeriod =<< resolve clockPeriodTCU
+  frac           <- domPeriodFraction =<< resolve clockPeriodFractionTCU
   vActiveEdge    <- domEdge =<< resolve clockActiveEdgeTCU
   vResetKind     <- domResetKind =<< resolve clockResetKindTCU
   vInitBehavior  <- domInitBehavior =<< resolve clockInitBehaviorTCU
   vResetPolarity <- domResetPolarity =<< resolve clockResetPolarityTCU
   vName <- domTag m cdom
-  let vPeriod = period
+  let vPeriod = period + frac
       conf = VClockDomainConfiguration{..}
   modify $ second $ insert cdom conf
   return $ FilteredHWType (c conf) []

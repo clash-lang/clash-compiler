@@ -96,8 +96,8 @@
       // ~IF~ISACTIVEENABLE[1]~THENtbClockGen~ELSEclockGen~FI begin
       // pragma translate_off
       reg ~TYPO ~GENSYM[clk][0];
-      // 1 = 0.1ps
-      localparam ~GENSYM[half_period][1] = (~PERIOD[0]0 / 2);
+      // Parse the period as whole femtoseconds before converting to 100 fs units.
+      localparam realtime ~GENSYM[clock_period][1] = ~PERIOD[0]e3 * 0.01;
       always begin
         // Delay of 1 mitigates race conditions (https://github.com/steveicarus/iverilog/issues/160)
         #1 ~SYM[0] = ~IF~ACTIVEEDGE[Rising][0]~THEN 0 ~ELSE 1 ~FI;
@@ -111,9 +111,12 @@
           end
           ~ELSE~FI
           ~SYM[0] = ~ ~SYM[0];
-          #~SYM[1];
-          ~SYM[0] = ~ ~SYM[0];
-          #~SYM[1];
+          // Schedule both delays from the active edge so that rounding the
+          // half period to simulator precision cannot change the full period.
+          fork
+            #(~SYM[1] / 2.0) ~SYM[0] = ~ ~SYM[0];
+            #~SYM[1];
+          join
         end
       end
 
@@ -172,10 +175,12 @@
       // resetGen begin
       // pragma translate_off
       reg ~TYPO ~GENSYM[rst][0];
-      localparam ~GENSYM[reset_period][1] = ~LONGESTPERIOD0 - 10 + (~LIT[2] * ~PERIOD[0]0);
+      localparam realtime ~GENSYM[clock_period][1] = ~PERIOD[0]e3 * 0.01;
       initial begin
         #1 ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 1 ~ELSE 0 ~FI;
-        #~SYM[1] ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
+        #(~LONGESTPERIOD0 - 10);
+        repeat (~LIT[2]) #~SYM[1];
+        ~SYM[0] = ~IF ~ISACTIVEHIGH[0] ~THEN 0 ~ELSE 1 ~FI;
       end
       assign ~RESULT = ~SYM[0];
       // pragma translate_on

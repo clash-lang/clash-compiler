@@ -386,6 +386,14 @@ runClashTest t3105Env = defaultMain
             hdlTargets=[VHDL]
           , expectClashFail=Just (def, "arising from a use of")
           }
+        , runTest "FractionalDDR" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "Couldn't match type")
+          }
+        , runTest "ImproperClockFraction" def{
+            hdlTargets=[VHDL]
+          , expectClashFail=Just (def, "In the instance declaration for")
+          }
         , clashTestVariants "BareClock"
           [ clashTestVariants target
             [ runTest "InvalidClockPort" def{
@@ -395,7 +403,8 @@ runClashTest t3105Env = defaultMain
               }
             ]
           | (target, message) <-
-              [ ("indirectProjection", "A physical clock domain must map to itself")
+              [ ("improperFraction", "ClockPeriodFraction must be in [0, 1)")
+              , ("indirectProjection", "A physical clock domain must map to itself")
               , ("populatedMarker", "expected a data type with no constructors")
               ]
           ]
@@ -1069,6 +1078,16 @@ runClashTest t3105Env = defaultMain
         , runTest "HoldResetAsync" def
         , runTest "HoldResetSync" def
         , runTest "ResetGen" def
+        , runTest "FractionalClockTiming" def
+        , clashTestVariants "ClockPrecision"
+          [ clashTestVariants precision
+            [ runTest "FractionalClockTiming" def
+                { hdlTargets = [Verilog, SystemVerilog]
+                , clashFlags = ["-fclash-timescale-precision", precision]
+                }
+            ]
+          | precision <- ["10fs", "1fs"]
+          ]
         ,
           -- TODO: we do not support memory files in Vivado
           --
@@ -1368,6 +1387,8 @@ runClashTest t3105Env = defaultMain
             }
           ]
         ]
+      , clashTestGroup "Intel"
+        [ outputTest "AltPll" def{hdlTargets=[Verilog]} ]
       , clashTestGroup "Xilinx"
         [ let _opts = def{ hdlLoad=[Vivado]
                          , hdlSim=[Vivado]

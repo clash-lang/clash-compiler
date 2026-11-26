@@ -78,6 +78,7 @@ data KnownDomainTyConUniques = KnownDomainTyConUniques
   , clockResetKindTCU      :: Unique
   , clockInitBehaviorTCU   :: Unique
   , clockResetPolarityTCU  :: Unique
+  , clockPeriodFractionTCU :: Unique
   } deriving (Generic, NFData, Binary)
 
 data ClashDesign = ClashDesign
@@ -491,7 +492,7 @@ pprSDC = vcat . fmap go . sdcClock
  where
   go (i, dom) =
         -- VClockDomainConfiguration stores period in ps, SDC expects it in ns.
-    let p        = MkFixed (toInteger $ vPeriod dom) :: Fixed E3
+    let p        = MkFixed (floor (1000 * vPeriod dom)) :: Fixed E6
         name     = braces (pretty (Text.dropAround (== '\\') i))
         period   = viaShow p
         waveform = braces ("0.000" <+> viaShow (p / 2))

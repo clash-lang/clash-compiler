@@ -39,8 +39,7 @@ import Clash.Annotations.Primitive (hasBlackBox)
 import Clash.Explicit.Signal (unbundle, KnownDomain, andEnable)
 import Clash.Promoted.Nat    (SNat (..), snatToNum, pow2SNat)
 import Clash.Signal.Internal
-  (Clock (..), ClockAB (..), Signal (..), Enable, fromEnable, clockTicks)
-import Clash.Signal.Internal.Ambiguous (clockPeriod)
+  (Clock (..), ClockAB (..), Signal (..), Enable, fromEnable, clockTicks, knownClockDomain, sClockDomainPeriod)
 import Clash.Sized.Unsigned  (Unsigned)
 import Clash.XException
   (defaultSeqX, deepErrorX, fromJustX, maybeIsX, NFDataX)
@@ -152,8 +151,8 @@ asyncRam# wClk rClk en sz rd we wr din = dout
     dout = if rPeriod == wPeriod
            then goSingle ramI rd en0 wr din
            else go (clockTicks wClk rClk) ramI rd en0 wr din
-    rPeriod = snatToNum (clockPeriod @rdom) :: Int
-    wPeriod = snatToNum (clockPeriod @wdom) :: Int
+    rPeriod = sClockDomainPeriod (knownClockDomain @rdom)
+    wPeriod = sClockDomainPeriod (knownClockDomain @wdom)
     szI = snatToNum sz :: Int
 
     goSingle :: Seq.Seq a -> Signal rdom Int -> Signal wdom Bool
